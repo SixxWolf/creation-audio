@@ -1,0 +1,17 @@
+# Outillage local Claude Code
+.claude/
+
+# Notes de travail internes — à ne PAS publier (sinon lisibles sur creationaudio.ca/…)
+RECAP.md
+PLAN-refonte-filament.md
+brief-refonte-creation-audio.md
+
+# Brouillons / sources non utilisés par le site en ligne
+maquette-creation-audio.html
+Inspiration NFS.jpg
+Image Filament Bambu Lab/
+
+# Divers OS
+Thumbs.db
+Desktop.ini
+.DS_Store

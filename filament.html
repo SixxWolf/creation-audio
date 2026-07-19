@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Filament 3D — PLA, PETG, ABS · stock en direct | Création Audio</title>
+<meta name="description" content="Filament d'impression 3D à Québec : PLA Basic, PLA Matte, PETG et ABS, codes hex officiels Bambu Lab. Choisissez votre couleur, recharge ou avec bobine, ramassage local.">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Création Audio">
+<meta property="og:locale" content="fr_CA">
+<meta property="og:title" content="Filament 3D — PLA, PETG, ABS · stock en direct | Création Audio">
+<meta property="og:description" content="Filament d'impression 3D à Québec : PLA Basic, PLA Matte, PETG et ABS, codes hex officiels Bambu Lab. Recharge ou avec bobine, ramassage local.">
+<meta property="og:url" content="https://creationaudio.ca/filament.html">
+<meta property="og:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<script>document.documentElement.className+=' js';</script>
+</head>
+<body class="theme-3d">
+
+<header class="site-header">
+  <a class="brand" href="index.html" aria-label="Création Audio — retour à l'accueil">
+    <span class="d"></span>Création&nbsp;Audio
+  </a>
+  <nav class="site-nav" aria-label="Navigation principale">
+    <a href="audio.html">Audio</a>
+    <a href="pieces.html">Pièces</a>
+    <a href="filament.html" aria-current="page">Filament</a>
+    <a href="#contact">Contact</a>
+  </nav>
+  <div id="cartSlot" class="cart-slot"><!-- bouton panier injecté par cart.js --></div>
+</header>
+
+<main>
+
+  <section class="shop">
+    <div class="wrap">
+
+      <div class="shop-head">
+        <p class="eyebrow">Atelier · filament</p>
+        <h1 class="shop-title">Choisissez votre filament</h1>
+        <p class="shop-lead">Une couleur, un type (recharge ou avec bobine), et hop au panier — ramassage à Québec.</p>
+      </div>
+
+      <!-- Onglets matériau (construits par JS depuis le catalogue) -->
+      <div id="matTabs" class="mat-tabs" role="tablist" aria-label="Matériau"></div>
+
+      <!-- Configurateur produit -->
+      <div class="config">
+        <div class="config-media">
+          <span class="rfid-badge" aria-hidden="true">
+            <svg viewBox="0 0 24 18" width="30" height="22"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+              <path d="M4 14a10 10 0 0 1 16 0"/><path d="M7 14a6.5 6.5 0 0 1 10 0"/><path d="M10 14a3 3 0 0 1 4 0"/></g></svg>
+            <span class="rfid-txt">RFID</span>
+          </span>
+          <img id="cfgImg" class="config-img" alt="" width="500" height="500" decoding="async">
+        </div>
+
+        <div class="config-panel">
+          <p class="cfg-eyebrow" id="cfgMat"></p>
+          <h2 class="cfg-title" id="cfgName">&nbsp;</h2>
+
+          <div class="cfg-block">
+            <span class="cfg-label">Type</span>
+            <div class="cfg-type" role="group" aria-label="Type de filament">
+              <button type="button" class="cfg-type-btn is-active" data-type="refill">
+                <span class="ctb-name">Recharge</span><span class="ctb-price">20&nbsp;$</span>
+              </button>
+              <button type="button" class="cfg-type-btn" data-type="spool">
+                <span class="ctb-name">Avec&nbsp;Bobine</span><span class="ctb-price">25&nbsp;$</span>
+              </button>
+            </div>
+            <p class="cfg-typehint">La recharge nécessite une bobine réutilisable.</p>
+          </div>
+
+          <div class="cfg-price-row">
+            <span class="cfg-price" id="cfgPrice">20&nbsp;$</span>
+            <span class="cfg-avail" id="cfgAvail"></span>
+          </div>
+
+          <div class="cfg-block">
+            <span class="cfg-label">Couleur <span class="cfg-colorname" id="cfgColorName"></span></span>
+            <div class="cfg-swatches" id="cfgSwatches"><!-- pastilles injectées par JS --></div>
+          </div>
+
+          <div class="cfg-buy">
+            <div class="cfg-qty" aria-label="Quantité">
+              <button type="button" class="cfg-qminus" aria-label="Diminuer">&minus;</button>
+              <input type="number" id="cfgQty" class="cfg-qval" min="1" step="1" value="1" inputmode="numeric" aria-label="Quantité">
+              <button type="button" class="cfg-qplus" aria-label="Augmenter">+</button>
+            </div>
+            <button type="button" class="cfg-add" id="cfgAdd">Ajouter au panier</button>
+          </div>
+
+          <button type="button" class="addon" id="addSpool" aria-label="Ajouter une bobine vide réutilisable (5 $)">
+            <span class="addon-thumb">
+              <img src="assets/img/spool-reusable.png" alt="" onerror="this.onerror=null;this.src='assets/img/spool-reusable.svg'">
+            </span>
+            <span class="addon-info">
+              <span class="addon-name">Bobine vide réutilisable</span>
+              <span class="addon-desc">En supplément — pour vos recharges</span>
+            </span>
+            <span class="addon-cta"><span class="addon-price">5&nbsp;$</span><span class="addon-plus">+ Ajouter</span></span>
+          </button>
+
+          <p class="cfg-note" id="cfgNote">Ø&nbsp;1,75&nbsp;mm · Recharge 1&nbsp;kg, <strong>sans bobine</strong> · Codes hex officiels Bambu&nbsp;Lab.<br>
+            À insérer sur une bobine vide réutilisable. Aucun paiement en ligne — on confirme la dispo et un ramassage à Québec.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="section" id="reservation">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow reveal">Comment ça marche</p>
+        <h2 class="reveal" data-delay="1">Commander en 3 étapes</h2>
+      </div>
+      <div class="cards">
+        <article class="card reveal">
+          <span class="kicker">Étape 1</span>
+          <h3>Composez votre commande</h3>
+          <p>Choisissez le matériau (PLA, PETG, ABS), la couleur, puis le type&nbsp;: recharge (20&nbsp;$) ou avec bobine (25&nbsp;$). Besoin d'une bobine vide réutilisable&nbsp;? Ajoutez-la (5&nbsp;$). Puis «&nbsp;Ajouter au panier&nbsp;».</p>
+        </article>
+        <article class="card reveal" data-delay="1">
+          <span class="kicker">Étape 2</span>
+          <h3>Envoyez votre liste sur Messenger</h3>
+          <p>Ouvrez le panier (en haut à droite) et cliquez «&nbsp;Copier ma liste &amp; écrire sur Messenger&nbsp;»&nbsp;: votre sélection et le total sont copiés, prêts à coller dans la conversation.</p>
+        </article>
+        <article class="card reveal" data-delay="2">
+          <span class="kicker">Étape 3</span>
+          <h3>On confirme · ramassage à Québec</h3>
+          <p>On valide la dispo et le total, puis on convient d'un point de ramassage à Québec. Paiement sur place à la remise&nbsp;— aucun paiement en ligne.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="contact" id="contact">
+    <div class="wrap">
+      <p class="eyebrow reveal" style="color:var(--ember)">Contact</p>
+      <h2 class="reveal" data-delay="1">Une question&nbsp;? Écrivez-nous.</h2>
+      <p class="contact-lead reveal" data-delay="2">
+        Le plus simple&nbsp;: envoyez votre panier de filament, ou décrivez votre pièce à imprimer.
+        On répond vite, par courriel ou sur Messenger.
+      </p>
+
+      <div class="contact-methods reveal" data-delay="3">
+        <a class="contact-method email" href="mailto:contact@creationaudio.ca?subject=Filament">
+          <span class="cm-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+              <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>
+            </svg>
+          </span>
+          <span class="cm-label">Courriel</span>
+          <span class="cm-value">contact@creationaudio.ca</span>
+          <span class="cm-cta">Nous écrire&nbsp;→</span>
+        </a>
+
+        <a class="contact-method messenger" href="https://m.me/61591945465745" target="_blank" rel="noopener">
+          <span class="cm-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.5 2 2 6.14 2 11.25c0 2.88 1.42 5.45 3.65 7.14V22l3.34-1.83c.89.25 1.83.38 2.81.38 5.5 0 10-4.14 10-9.25S17.5 2 12 2Zm1.03 12.13-2.56-2.73-5 2.73 5.5-5.83 2.62 2.73 4.94-2.73-5.5 5.83Z"/>
+            </svg>
+          </span>
+          <span class="cm-label">Facebook · Messenger</span>
+          <span class="cm-value">Réponse rapide</span>
+          <span class="cm-cta">Envoyez-nous un message&nbsp;→</span>
+        </a>
+
+        <a class="contact-method info" href="https://maps.app.goo.gl/qU1dzv9jMYChh7eg8" target="_blank" rel="noopener">
+          <span class="cm-ico" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+              <path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/>
+            </svg>
+          </span>
+          <span class="cm-label">Ramassage · sur rendez-vous</span>
+          <span class="cm-value">Québec, QC&nbsp;G1P&nbsp;4H2</span>
+          <span class="cm-cta">Voir sur la carte&nbsp;→</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap" style="display:flex;flex-wrap:wrap;gap:14px 30px;align-items:center;justify-content:space-between;width:100%">
+    <span>© 2026 Création Audio — Québec</span>
+    <nav class="footer-links" aria-label="Pied de page">
+      <a href="index.html">Accueil</a>
+      <a href="audio.html">Audio</a>
+      <a href="pieces.html">Pièces</a>
+      <a href="filament.html">Filament</a>
+      <a href="mailto:contact@creationaudio.ca">Courriel</a>
+      <a href="https://www.facebook.com/profile.php?id=61591945465745" target="_blank" rel="noopener">Facebook</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/reveal.js"></script>
+<script src="assets/catalog.js"></script>
+<script src="assets/filament-images.js"></script>
+<script src="assets/inventory.js"></script>
+<script src="assets/filament-configurator.js"></script>
+<script src="assets/cart.js"></script>
+</body>
+</html>
