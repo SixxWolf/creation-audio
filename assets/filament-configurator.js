@@ -125,12 +125,24 @@
     render();
   }
 
+  /* Si la couleur courante est en rupture pour le type choisi, bascule sur la
+     1re couleur disponible du matériau. Si aucune ne l'est, on garde la
+     sélection (l'écran affichera « Rupture de stock »). */
+  function ensureAvailableColor() {
+    if (state.code && available(state.code, state.type)) return;
+    var list = colorsOf(state.mat);
+    for (var i = 0; i < list.length; i++) {
+      if (available(list[i].code, state.type)) { state.code = list[i].code; return; }
+    }
+  }
+
   function setType(type) {
     if (type !== 'refill' && type !== 'spool') return;
     state.type = type;
     Array.prototype.forEach.call(document.querySelectorAll('.cfg-type-btn'), function (b) {
       b.classList.toggle('is-active', b.getAttribute('data-type') === type);
     });
+    ensureAvailableColor();
     refreshSwatchStates();
     render();
   }
@@ -192,20 +204,53 @@
   qtyInput.addEventListener('change', function () { setQty(getQty()); });
   addBtn.addEventListener('click', add);
 
-  // accessoire : bobine vide réutilisable (5 $)
-  var spoolBtn = document.getElementById('addSpool');
-  if (spoolBtn) spoolBtn.addEventListener('click', function () {
-    if (window.CA && window.CA.cart && window.CA.cart.add) {
-      window.CA.cart.add('SPOOL', 'accessory', 1);
-      if (window.CA.cart.flyTo) {
-        var thumb = spoolBtn.querySelector('.addon-thumb') || spoolBtn;
-        window.CA.cart.flyTo('assets/img/spool-reusable.png', thumb.getBoundingClientRect());
+  /* ---------- accessoires : bobines vides réutilisables ----------
+     Stock géré dans Supabase comme les filaments (colonne qty). */
+  var ACCESSORIES = [
+    { btn: 'addSpool',   code: 'SPOOL',   pill: 'spoolAvail',   img: 'assets/img/spool-reusable.png' },
+    { btn: 'addSpoolHt', code: 'SPOOLHT', pill: 'spoolHtAvail', img: 'assets/img/spool-reusable-ht.png' }
+  ];
+  function accStock(code) {
+    var t = window.CA && window.CA.stock;
+    if (!t || t[code] == null) return null;      // non géré / pas encore chargé
+    var n = parseInt(t[code], 10);
+    return isNaN(n) ? null : n;
+  }
+  function renderAccessories() {
+    ACCESSORIES.forEach(function (a) {
+      var btn = document.getElementById(a.btn), pill = document.getElementById(a.pill);
+      if (!btn || !pill) return;
+      var n = accStock(a.code);
+      if (n === null) {                          // stock inconnu : on n'affiche rien
+        pill.className = 'addon-stock'; pill.innerHTML = '';
+        btn.classList.remove('is-oos'); btn.disabled = false;
+        return;
       }
-    }
+      var ok = n > 0;
+      pill.className = 'addon-stock show ' + (ok ? 'in' : 'out');
+      pill.innerHTML = '<span class="dot" aria-hidden="true"></span>' +
+        (ok ? n + ' en stock' : 'Rupture de stock');
+      btn.classList.toggle('is-oos', !ok);
+      btn.disabled = !ok;
+    });
+  }
+  ACCESSORIES.forEach(function (a) {
+    var btn = document.getElementById(a.btn);
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      if (window.CA && window.CA.cart && window.CA.cart.add) {
+        window.CA.cart.add(a.code, 'accessory', 1);
+        if (window.CA.cart.flyTo) {
+          var thumb = btn.querySelector('.addon-thumb') || btn;
+          window.CA.cart.flyTo(a.img, thumb.getBoundingClientRect());
+        }
+      }
+    });
   });
 
   // le stock arrive (ou change) → on rafraîchit dispo + pastilles
-  document.addEventListener('inventory-ready', function () { refreshSwatchStates(); render(); });
+  document.addEventListener('inventory-ready', function () { ensureAvailableColor(); refreshSwatchStates(); render(); renderAccessories(); });
 
   /* ---------- utilitaires ---------- */
   function escHtml(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
@@ -214,4 +259,5 @@
   /* ---------- init ---------- */
   buildTabs();
   if (state.mat) selectMaterial(state.mat);
+  renderAccessories();
 })();

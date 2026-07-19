@@ -38,7 +38,11 @@
   // prix par type + accessoire « bobine vide réutilisable »
   var PRICES_T = { refill: 20, spool: 25 };
   var TYPE_LABEL_T = { refill: 'Recharge', spool: 'Avec Bobine', accessory: 'Accessoire' };
-  var SPOOL = { code: 'SPOOL', name: 'Bobine vide réutilisable', material: 'Accessoire', hex: '#D7D9DB', price: 5 };
+  var SPOOLS = {
+    SPOOL:   { code: 'SPOOL',   name: 'Bobine vide réutilisable', material: 'Accessoire', hex: '#D7D9DB', price: 5 },
+    SPOOLHT: { code: 'SPOOLHT', name: 'Bobine vide réutilisable — haute température', material: 'Accessoire', hex: '#3A3D42', price: 10 }
+  };
+  var SPOOL = SPOOLS.SPOOL;
   var fxType = 'refill';   // type courant du sélecteur
 
   /* ---------- utilitaires ---------- */
@@ -158,9 +162,10 @@
       if (!found[k]) { found[k] = { code: item.code, name: item.name, material: item.material, hex: item.hex, price: PRICES_T[type], qty: 0, type: type }; order.push(k); }
       found[k].qty += qty;
     }
-    function addSpoolLine(qty) {
-      var k = key('SPOOL', 'accessory');
-      if (!found[k]) { found[k] = { code: 'SPOOL', name: SPOOL.name, material: 'Accessoire', hex: SPOOL.hex, price: SPOOL.price, qty: 0, type: 'accessory' }; order.push(k); }
+    function addSpoolLine(qty, code) {
+      var sp = SPOOLS[code] || SPOOLS.SPOOL;
+      var k = key(sp.code, 'accessory');
+      if (!found[k]) { found[k] = { code: sp.code, name: sp.name, material: 'Accessoire', hex: sp.hex, price: sp.price, qty: 0, type: 'accessory' }; order.push(k); }
       found[k].qty += qty;
     }
     text.split(/\r?\n/).forEach(function (raw) {
@@ -169,7 +174,11 @@
       var low = line.toLowerCase();
       var qty = extractQty(line);
       // bobine vide réutilisable (accessoire)
-      if (/bobine\s*vide|r[ée]utilis|reusable\s*spool|empty\s*spool/.test(low)) { addSpoolLine(qty); return; }
+      if (/bobine\s*vide|r[ée]utilis|reusable\s*spool|empty\s*spool/.test(low)) {
+        var ht = /haute\s*temp|high\s*temp|\bht\b/.test(low);
+        addSpoolLine(qty, ht ? 'SPOOLHT' : 'SPOOL');
+        return;
+      }
       // type détecté sur la ligne
       var type = /avec\s*bobine|with\s*spool/.test(low) ? 'spool' : 'refill';
       // 1) code entre parenthèses
@@ -204,11 +213,12 @@
     else items.push({ code: it.code, name: it.name, material: it.material, hex: it.hex, price: PRICES_T[type], qty: 1, type: type });
     render();
   }
-  function addSpool() {
+  function addSpool(code) {
+    var sp = SPOOLS[code] || SPOOLS.SPOOL;
     var ex = null;
-    for (var i = 0; i < items.length; i++) { if (items[i].code === 'SPOOL') { ex = items[i]; break; } }
+    for (var i = 0; i < items.length; i++) { if (items[i].code === sp.code) { ex = items[i]; break; } }
     if (ex) ex.qty += 1;
-    else items.push({ code: 'SPOOL', name: SPOOL.name, material: 'Accessoire', hex: SPOOL.hex, price: SPOOL.price, qty: 1, type: 'accessory' });
+    else items.push({ code: sp.code, name: sp.name, material: 'Accessoire', hex: sp.hex, price: sp.price, qty: 1, type: 'accessory' });
     render();
   }
   function setFxType(type) {
@@ -429,7 +439,8 @@
   Array.prototype.forEach.call(document.querySelectorAll('.pk-type-btn'), function (b) {
     b.addEventListener('click', function () { setFxType(b.getAttribute('data-type')); });
   });
-  if ($('#pk-spool')) $('#pk-spool').addEventListener('click', addSpool);
+  if ($('#pk-spool')) $('#pk-spool').addEventListener('click', function () { addSpool('SPOOL'); });
+  if ($('#pk-spool-ht')) $('#pk-spool-ht').addEventListener('click', function () { addSpool('SPOOLHT'); });
 
   $('#btn-generate').addEventListener('click', generate);
   $('#co-save').addEventListener('click', saveCompany);

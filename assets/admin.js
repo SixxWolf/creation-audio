@@ -46,6 +46,21 @@
     MATERIAL[i.code] = i.material;                  // ex. « PLA Basic »
     RANK[i.code] = idx;                            // ordre spectral du catalogue
   });
+  // accessoires (hors catalogue de couleurs) : un seul stock, colonne « qty ».
+  // On les enregistre dans les mêmes tables pour réutiliser l'affichage existant.
+  var ACCESSORY = {
+    SPOOL:   { name: 'Bobine vide réutilisable', hex: '#E7E9EA' },
+    SPOOLHT: { name: 'Bobine vide réutilisable — haute température', hex: '#3A3D42' }
+  };
+  Object.keys(ACCESSORY).forEach(function (code, i) {
+    HEX[code] = ACCESSORY[code].hex;
+    NAME[code] = ACCESSORY[code].name;
+    LABEL[code] = 'Accessoire · ' + ACCESSORY[code].name;
+    MATERIAL[code] = 'Accessoires';
+    RANK[code] = 100000 + i;                      // groupe toujours affiché en dernier
+  });
+  function isAccessory(code) { return ACCESSORY.hasOwnProperty(code); }
+
   function colorName(code, dbName) { return NAME[code] || dbName || code; }
   function materialOf(code) { return MATERIAL[code] || 'Autres'; }
   // trie l'inventaire comme la boutique (ordre spectral), inconnus à la fin
@@ -155,7 +170,10 @@
   function markInvToggle() {
     $$('.inv-toggle-btn').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-kind') === invKind); });
   }
-  function qtyOf(r) { return (invKind === 'spool' ? (r.qty_spool != null ? r.qty_spool : 0) : r.qty) | 0; }
+  function qtyOf(r) {
+    if (isAccessory(r.code)) return r.qty | 0;    // accessoire : un seul stock, insensible au toggle
+    return (invKind === 'spool' ? (r.qty_spool != null ? r.qty_spool : 0) : r.qty) | 0;
+  }
 
   function renderInv() {
     var box = $('#inv-list');
@@ -201,7 +219,8 @@
 
   function saveQty(code, val, row) {
     var qty = Math.max(0, parseInt(val, 10) || 0);
-    var col = invKind === 'spool' ? 'qty_spool' : 'qty';
+    // accessoire : toujours la colonne « qty » (pas de distinction recharge/bobine)
+    var col = (!isAccessory(code) && invKind === 'spool') ? 'qty_spool' : 'qty';
     var patch = { updated_at: new Date().toISOString() };
     patch[col] = qty;
     row.classList.add('saving');

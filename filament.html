@@ -101,16 +101,31 @@
             <button type="button" class="cfg-add" id="cfgAdd">Ajouter au panier</button>
           </div>
 
-          <button type="button" class="addon" id="addSpool" aria-label="Ajouter une bobine vide réutilisable (5 $)">
-            <span class="addon-thumb">
-              <img src="assets/img/spool-reusable.png" alt="" onerror="this.onerror=null;this.src='assets/img/spool-reusable.svg'">
-            </span>
-            <span class="addon-info">
-              <span class="addon-name">Bobine vide réutilisable</span>
-              <span class="addon-desc">En supplément — pour vos recharges</span>
-            </span>
-            <span class="addon-cta"><span class="addon-price">5&nbsp;$</span><span class="addon-plus">+ Ajouter</span></span>
-          </button>
+          <div class="addons">
+            <button type="button" class="addon" id="addSpool" aria-label="Ajouter une bobine vide réutilisable (5 $)">
+              <span class="addon-thumb">
+                <img src="assets/img/spool-reusable.png" alt="" onerror="this.onerror=null;this.src='assets/img/spool-reusable.svg'">
+              </span>
+              <span class="addon-info">
+                <span class="addon-name">Bobine vide réutilisable</span>
+                <span class="addon-desc">En supplément — pour vos recharges · Température max 70&nbsp;°C</span>
+                <span class="addon-stock" id="spoolAvail"></span>
+              </span>
+              <span class="addon-cta"><span class="addon-price">5&nbsp;$</span><span class="addon-plus">+ Ajouter</span></span>
+            </button>
+
+            <button type="button" class="addon" id="addSpoolHt" aria-label="Ajouter une bobine vide réutilisable haute température (10 $)">
+              <span class="addon-thumb">
+                <img src="assets/img/spool-reusable-ht.png" alt="">
+              </span>
+              <span class="addon-info">
+                <span class="addon-name">Bobine vide réutilisable — haute température</span>
+                <span class="addon-desc">Pour matériaux techniques (ABS…) · Température max 90&nbsp;°C</span>
+                <span class="addon-stock" id="spoolHtAvail"></span>
+              </span>
+              <span class="addon-cta"><span class="addon-price">10&nbsp;$</span><span class="addon-plus">+ Ajouter</span></span>
+            </button>
+          </div>
 
           <p class="cfg-note" id="cfgNote">Ø&nbsp;1,75&nbsp;mm · Recharge 1&nbsp;kg, <strong>sans bobine</strong> · Codes hex officiels Bambu&nbsp;Lab.<br>
             À insérer sur une bobine vide réutilisable. Aucun paiement en ligne — on confirme la dispo et un ramassage à Québec.</p>

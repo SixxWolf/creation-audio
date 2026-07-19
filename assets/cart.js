@@ -15,7 +15,10 @@
   var TYPE_LABEL = { refill: 'Recharge', spool: 'Avec Bobine', accessory: 'Accessoire' };
   // produits « extra » (accessoires) hors catalogue de couleurs
   var EXTRAS = {
-    SPOOL: { name: 'Bobine vide réutilisable', material: 'Accessoire', price: 5, img: 'assets/img/spool-reusable.png' }
+    SPOOL:   { name: 'Bobine vide réutilisable', material: 'Accessoire', price: 5,
+               img: 'assets/img/spool-reusable.png' },
+    SPOOLHT: { name: 'Bobine vide réutilisable haute température', material: 'Accessoire', price: 10,
+               img: 'assets/img/spool-reusable-ht.png' }
   };
 
   var CAT = window.CA_CATALOG || [];
@@ -45,7 +48,12 @@
 
   /* ---------- plafond selon l'inventaire (par type) ---------- */
   function stockFor(code, type) {
-    if (EXTRAS[code]) return Infinity; // accessoire : pas de plafond
+    if (EXTRAS[code]) {                 // accessoire : un seul stock (colonne qty)
+      var t = window.CA && window.CA.stock;
+      if (!t || t[code] == null) return Infinity;   // non géré / pas encore chargé
+      var q = parseInt(t[code], 10);
+      return isNaN(q) ? Infinity : q;
+    }
     var s = window.CA && window.CA.stockDetail;
     if (!s || !s[code]) return Infinity;
     var v = type === 'spool' ? s[code].spool : s[code].refill;
@@ -126,7 +134,11 @@
     badge.textContent = n;
     btn.classList.toggle('has-items', n > 0);
 
-    var list = entries();
+    // les accessoires (bobine vide) passent toujours en dernier, quel que soit
+    // le moment de l'ajout ; le tri est stable donc le reste garde son ordre
+    var list = entries().slice().sort(function (a, b) {
+      return (isExtra(a.code) ? 1 : 0) - (isExtra(b.code) ? 1 : 0);
+    });
     if (!list.length) {
       itemsBox.innerHTML = '<p class="cart-empty">Ton panier est vide.<br>Choisis une couleur et un type, puis « Ajouter au panier ».</p>';
     } else {
@@ -143,7 +155,7 @@
           '<div class="citem-main">' +
             '<div class="citem-name">' + esc(m.name) + '</div>' +
             '<div class="citem-sub">' + esc(m.material) + (ex ? '' : ' · ' + it.code) + '</div>' +
-            '<div class="citem-type"><span class="citem-badge ' + (ex ? 'extra' : (it.type === 'spool' ? 'spool' : 'refill')) + '">' + TYPE_LABEL[it.type] + '</span>' +
+            '<div class="citem-type"><span class="citem-badge ' + (ex ? 'extra' : (it.type === 'spool' ? 'is-spool' : 'refill')) + '">' + TYPE_LABEL[it.type] + '</span>' +
               '<span class="citem-unit">' + priceOf(it.code, it.type) + '&nbsp;$/u</span></div>' +
             '<div class="citem-qty">' +
               '<button type="button" class="cq-minus" aria-label="Retirer un">&minus;</button>' +
@@ -266,13 +278,33 @@
 
   /* ---------- sortie texte / Messenger ---------- */
   function orderText() {
-    var lines = entries().map(function (it) {
+    // Regroupé par matériau (ordre du catalogue) pour éviter les erreurs de bobine.
+    // Les en-têtes « *** … *** » sont sans chiffre : l'analyseur de facture les ignore.
+    var matOrder = [];
+    CAT.forEach(function (i) { if (matOrder.indexOf(i.material) === -1) matOrder.push(i.material); });
+
+    var groups = {}, extras = [];
+    entries().forEach(function (it) {
       var m = meta(it.code);
       var label = isExtra(it.code) ? m.name : m.name + ' (' + it.code + ') — ' + TYPE_LABEL[it.type];
-      return '- ' + label + ' ×' + it.qty + ' — ' + (it.qty * priceOf(it.code, it.type)) + ' $';
+      var line = '- ' + label + ' ×' + it.qty + ' — ' + (it.qty * priceOf(it.code, it.type)) + ' $';
+      if (isExtra(it.code)) { extras.push(line); return; }
+      (groups[m.material] = groups[m.material] || []).push(line);
     });
+
+    var blocks = [];
+    function pushGroup(mat) {
+      if (groups[mat] && groups[mat].length) {
+        blocks.push('*** ' + String(mat).toUpperCase() + ' ***\n' + groups[mat].join('\n'));
+        delete groups[mat];
+      }
+    }
+    matOrder.forEach(pushGroup);
+    Object.keys(groups).forEach(pushGroup);          // filet de sécurité
+    if (extras.length) blocks.push('*** ACCESSOIRES ***\n' + extras.join('\n'));
+
     return 'Bonjour,\n\nJe souhaite commander le filament suivant :\n\n' +
-      lines.join('\n') +
+      blocks.join('\n\n') +
       '\n\nTotal : ' + subtotal() + ' $' +
       '\nRamassage : région de Québec.\n\nMerci !';
   }
