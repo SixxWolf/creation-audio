@@ -303,6 +303,12 @@ a.splash-wordmark:hover{transform:translateX(-50%) translateY(-1px)}
   .config-media{padding:16px}
   .config-img{max-width:340px}
   .cfg-price{font-size:1.6rem}
+  /* Mobile : la couleur remonte juste sous le nom (collée à l'image)
+     → on voit l'aperçu changer quand on choisit une pastille. */
+  .config-panel > *{order:4}
+  .config-panel > .cfg-eyebrow{order:1}
+  .config-panel > .cfg-title{order:2}
+  .config-panel > .cfg-color{order:3}
 }
 @media(max-width:420px){
   .cfg-type{grid-template-columns:1fr}
