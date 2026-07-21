@@ -48,9 +48,11 @@
   });
   // accessoires (hors catalogue de couleurs) : un seul stock, colonne « qty ».
   // On les enregistre dans les mêmes tables pour réutiliser l'affichage existant.
+  // libellés courts : l'admin affiche une ligne compacte sur mobile
+  // (la boutique et les factures gardent les noms complets)
   var ACCESSORY = {
-    SPOOL:   { name: 'Bobine vide réutilisable', hex: '#E7E9EA' },
-    SPOOLHT: { name: 'Bobine vide réutilisable — haute température', hex: '#3A3D42' }
+    SPOOL:   { name: 'Bobine standard', hex: '#E7E9EA' },
+    SPOOLHT: { name: 'Bobine haute T°', hex: '#3A3D42' }
   };
   Object.keys(ACCESSORY).forEach(function (code, i) {
     HEX[code] = ACCESSORY[code].hex;
@@ -170,6 +172,32 @@
   function markInvToggle() {
     $$('.inv-toggle-btn').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-kind') === invKind); });
   }
+
+  /* --- onglets matériau (utiles sur mobile : évite de scroller jusqu'à l'ABS) ---
+     Les groupes sont tous rendus ; sur mobile le CSS n'affiche que l'actif. */
+  var invMat = null;
+  function buildMatTabs(mats) {
+    var box = $('#inv-mat-tabs');
+    if (!box) return;
+    if (mats.indexOf(invMat) === -1) invMat = mats[0] || null;   // garde l'onglet courant si possible
+    box.innerHTML = mats.map(function (m) {
+      return '<button type="button" class="mat-tab" role="tab" data-mat="' + esc(m) + '">' + esc(m) + '</button>';
+    }).join('');
+    $$('.mat-tab', box).forEach(function (b) {
+      b.addEventListener('click', function () { invMat = b.getAttribute('data-mat'); markMatTabs(); });
+    });
+    markMatTabs();
+  }
+  function markMatTabs() {
+    $$('.mat-tab').forEach(function (b) {
+      var on = b.getAttribute('data-mat') === invMat;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    $$('.inv-group').forEach(function (g) {
+      g.classList.toggle('is-off', g.getAttribute('data-mat') !== invMat);
+    });
+  }
   function qtyOf(r) {
     if (isAccessory(r.code)) return r.qty | 0;    // accessoire : un seul stock, insensible au toggle
     return (invKind === 'spool' ? (r.qty_spool != null ? r.qty_spool : 0) : r.qty) | 0;
@@ -202,11 +230,13 @@
     });
 
     box.innerHTML = '<div class="inv-board">' + groups.map(function (g) {
-      return '<section class="inv-group">' +
+      return '<section class="inv-group" data-mat="' + esc(g.mat) + '">' +
         '<h3 class="inv-group-title">' + esc(g.mat) + '<span class="muted">' + g.items.length + ' couleur' + (g.items.length > 1 ? 's' : '') + '</span></h3>' +
         '<div class="inv-grid">' + g.items.map(cell).join('') + '</div>' +
       '</section>';
     }).join('') + '</div>';
+
+    buildMatTabs(groups.map(function (g) { return g.mat; }));
 
     $$('.inv-row', box).forEach(function (row) {
       var code = row.getAttribute('data-code');
