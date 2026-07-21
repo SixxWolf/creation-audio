@@ -39,7 +39,7 @@
   var PRICES_T = { refill: 20, spool: 25 };
   var TYPE_LABEL_T = { refill: 'Recharge', spool: 'Avec Bobine', accessory: 'Accessoire' };
   var SPOOLS = {
-    SPOOL:   { code: 'SPOOL',   name: 'Bobine vide réutilisable', material: 'Accessoire', hex: '#D7D9DB', price: 5 },
+    SPOOL:   { code: 'SPOOL',   name: 'Bobine vide réutilisable', material: 'Accessoire', hex: '#D7D9DB', price: 10 },
     SPOOLHT: { code: 'SPOOLHT', name: 'Bobine vide réutilisable — haute température', material: 'Accessoire', hex: '#3A3D42', price: 10 }
   };
   var SPOOL = SPOOLS.SPOOL;

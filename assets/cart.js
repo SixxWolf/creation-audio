@@ -15,7 +15,7 @@
   var TYPE_LABEL = { refill: 'Recharge', spool: 'Avec Bobine', accessory: 'Accessoire' };
   // produits « extra » (accessoires) hors catalogue de couleurs
   var EXTRAS = {
-    SPOOL:   { name: 'Bobine vide réutilisable', material: 'Accessoire', price: 5,
+    SPOOL:   { name: 'Bobine vide réutilisable', material: 'Accessoire', price: 10,
                img: 'assets/img/spool-reusable.png' },
     SPOOLHT: { name: 'Bobine vide réutilisable haute température', material: 'Accessoire', price: 10,
                img: 'assets/img/spool-reusable-ht.png' }
