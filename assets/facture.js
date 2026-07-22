@@ -141,6 +141,7 @@
     var n = nextSeq() + 1;
     try { localStorage.setItem(LS_SEQ, String(n)); } catch (e) {}
     $('#inv-number').value = fmtNumber(n);
+    if (typeof updateDeductBtn === 'function') updateDeductBtn();
   }
 
   /* ---------- parseur de commande ---------- */
@@ -393,6 +394,7 @@
     });
 
     refreshPicker();
+    updateDeductBtn();
   }
 
   /* ---------- texte (copier) ---------- */
@@ -426,6 +428,109 @@
     else done();
   }
 
+  /* ---------- déduction de l'inventaire (Supabase, admin connecté) ----------
+     Déclenchée par un bouton explicite. Verrou anti-double-déduction par
+     numéro de facture (localStorage). Plafonne à 0 (jamais de négatif). */
+  var LS_DEDUCTED = 'ca_fx_deducted_v1';
+  function deductedList() { try { return JSON.parse(localStorage.getItem(LS_DEDUCTED) || '[]'); } catch (e) { return []; } }
+  function isDeducted(num) { return deductedList().indexOf(String(num)) !== -1; }
+  function markDeducted(num) {
+    var s = deductedList(); if (s.indexOf(String(num)) === -1) s.push(String(num));
+    try { localStorage.setItem(LS_DEDUCTED, JSON.stringify(s)); } catch (e) {}
+  }
+  function currentInvNum() { return ($('#inv-number').value || '').trim(); }
+  function deductMsg(kind, html) {
+    var m = $('#deduct-msg'); if (!m) return;
+    m.innerHTML = html; m.className = 'fx-msg no-print show ' + (kind || ''); m.style.margin = '-6px 0 12px';
+  }
+  function updateDeductBtn() {
+    var b = $('#btn-deduct'); if (!b) return;
+    if (!items.length) { b.disabled = true; b.textContent = 'Déduire de l\'inventaire'; return; }
+    if (isDeducted(currentInvNum())) { b.disabled = true; b.textContent = '✓ Stock déduit'; }
+    else { b.disabled = false; b.textContent = 'Déduire de l\'inventaire'; }
+  }
+  function labelOf(code) {
+    var m = byCode[code] || SPOOLS[code];
+    return (m ? (m.material ? m.material + ' · ' + m.name : m.name) : code) + ' (' + code + ')';
+  }
+  // besoins par code : recharge + accessoire -> colonne qty ; avec bobine -> qty_spool
+  function deductionNeeds() {
+    var need = {};
+    items.forEach(function (it) {
+      var col = (it.type === 'spool') ? 'qty_spool' : 'qty';
+      var n = need[it.code] || (need[it.code] = { qty: 0, qty_spool: 0 });
+      n[col] += Math.max(0, parseInt(it.qty, 10) || 0);
+    });
+    return need;
+  }
+  function deductInventory() {
+    if (!items.length) return;
+    var sb = window.CA && window.CA.sb;
+    if (!sb) { deductMsg('warn', 'Connexion à la base indisponible (hors ligne&nbsp;?).'); return; }
+    var num = currentInvNum();
+    if (isDeducted(num)) { deductMsg('warn', 'Le stock de la facture ' + esc(num) + ' a déjà été déduit.'); return; }
+    var b = $('#btn-deduct'); b.disabled = true; b.textContent = 'Vérification…';
+    sb.auth.getSession().then(function (r) {
+      var session = r && r.data && r.data.session;
+      if (!session) {
+        deductMsg('warn', 'Tu dois être connecté en admin pour déduire le stock. <a href="admin.html" target="_blank">Ouvrir l\'admin</a>, connecte-toi, puis reviens et réessaie.');
+        updateDeductBtn(); return;
+      }
+      var need = deductionNeeds(), codes = Object.keys(need);
+      sb.from('inventory').select('code,qty,qty_spool').in('code', codes).then(function (res) {
+        if (res.error || !res.data) {
+          sb.from('inventory').select('code,qty').in('code', codes).then(function (r2) {
+            if (r2.error || !r2.data) { deductMsg('warn', 'Lecture du stock impossible.'); updateDeductBtn(); return; }
+            finalizeDeduction(sb, need, codes, r2.data, true);
+          });
+          return;
+        }
+        finalizeDeduction(sb, need, codes, res.data, false);
+      });
+    }, function () { deductMsg('warn', 'Impossible de vérifier la session.'); updateDeductBtn(); });
+  }
+  function finalizeDeduction(sb, need, codes, rows, noSpool) {
+    var cur = {}; rows.forEach(function (r) { cur[r.code] = r; });
+    var plans = [], lines = [], oversell = [], missing = [];
+    codes.forEach(function (code) {
+      var n = need[code], c = cur[code];
+      if (!c) { missing.push(code); return; }
+      var patch = { updated_at: new Date().toISOString() }, changed = false;
+      if (n.qty > 0) {
+        var q0 = parseInt(c.qty, 10) || 0, q1 = q0 - n.qty;
+        if (q1 < 0) { oversell.push(labelOf(code) + ' — recharge/accessoire'); q1 = 0; }
+        patch.qty = q1; changed = true;
+        lines.push(labelOf(code) + ' · recharge/access. : ' + q0 + ' → ' + q1);
+      }
+      if (n.qty_spool > 0) {
+        if (noSpool) { oversell.push(labelOf(code) + ' — avec bobine (colonne absente)'); }
+        else {
+          var s0 = (c.qty_spool != null) ? (parseInt(c.qty_spool, 10) || 0) : 0, s1 = s0 - n.qty_spool;
+          if (s1 < 0) { oversell.push(labelOf(code) + ' — avec bobine'); s1 = 0; }
+          patch.qty_spool = s1; changed = true;
+          lines.push(labelOf(code) + ' · avec bobine : ' + s0 + ' → ' + s1);
+        }
+      }
+      if (changed) plans.push({ code: code, patch: patch });
+    });
+    var txt = 'Déduire de l\'inventaire — facture ' + currentInvNum() + '\n\n' + lines.join('\n');
+    if (oversell.length) txt += '\n\n⚠ Stock insuffisant (sera mis à 0) :\n- ' + oversell.join('\n- ');
+    if (missing.length) txt += '\n\n⚠ Absents de l\'inventaire (ignorés) : ' + missing.join(', ');
+    txt += '\n\nConfirmer la déduction ?';
+    if (!window.confirm(txt)) { deductMsg('', 'Déduction annulée.'); updateDeductBtn(); return; }
+    if (!plans.length) { deductMsg('warn', 'Rien à déduire (articles absents de l\'inventaire).'); updateDeductBtn(); return; }
+    $('#btn-deduct').textContent = 'Déduction…';
+    Promise.all(plans.map(function (p) { return sb.from('inventory').update(p.patch).eq('code', p.code); }))
+      .then(function (results) {
+        var errs = results.filter(function (x) { return x && x.error; });
+        if (errs.length) { deductMsg('warn', 'Erreur sur ' + errs.length + ' article(s). Vérifie l\'inventaire dans l\'admin.'); updateDeductBtn(); return; }
+        markDeducted(currentInvNum());
+        deductMsg('ok', '✓ Stock déduit pour la facture ' + esc(currentInvNum()) +
+          (oversell.length ? ' — ' + oversell.length + ' article(s) mis à 0 faute de stock' : '') + '.');
+        updateDeductBtn();
+      }, function () { deductMsg('warn', 'Échec réseau pendant la déduction.'); updateDeductBtn(); });
+  }
+
   /* ---------- init ---------- */
   fillCompanyForm(loadCompany());
   $('#inv-number').value = fmtNumber(nextSeq());
@@ -447,6 +552,8 @@
   $('#btn-print').addEventListener('click', function () { if (items.length) window.print(); });
   $('#btn-copy').addEventListener('click', copyInvoice);
   $('#btn-next').addEventListener('click', bumpSeq);
+  $('#btn-deduct').addEventListener('click', deductInventory);
+  updateDeductBtn();
   $('#tax-enabled').addEventListener('change', function () { taxEnabled = this.checked; render(); });
   $('#co-logo-file').addEventListener('change', function () { handleLogoFile(this.files && this.files[0]); });
   $('#co-logo-remove').addEventListener('click', function () { logoData = ''; $('#co-logo-file').value = ''; showLogoPreview(); writeCompany(); render(); });
