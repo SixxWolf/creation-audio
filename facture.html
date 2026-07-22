@@ -138,6 +138,15 @@
     .invoice{border:0;border-radius:0;box-shadow:none;padding:14mm}
     .inv-qty,.inv-price{border:0;padding:0;width:auto;text-align:right}
     .inv-del{display:none}
+    /* --- coupure propre sur 2+ pages --- */
+    /* l'en-tête du tableau se répète en haut de chaque page */
+    table.inv-table thead{display:table-header-group}
+    /* une ligne d'article ne se coupe jamais en deux */
+    table.inv-table tr,table.inv-table td{break-inside:avoid;page-break-inside:avoid}
+    /* le bloc Sous-total / Total, le paiement et le pied restent d'un seul tenant */
+    .inv-tot,.inv-pay,.inv-foot{break-inside:avoid;page-break-inside:avoid}
+    /* on évite qu'un titre/total soit orphelin en bas de page */
+    .invoice{orphans:3;widows:3}
   }
 </style>
 </head>
