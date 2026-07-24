@@ -99,6 +99,36 @@
     .inv-stepper button{width:30px;height:30px}   /* compact mais confortable au doigt */
     .inv-qty{width:40px;height:30px;font-size:.8rem}
   }
+  /* --- VENTES --- */
+  .sales-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .sales-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .sales-range-btn{border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:100px;
+    padding:8px 16px;font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;text-transform:uppercase}
+  .sales-range-btn.is-active{background:var(--ink);color:#fff}
+  .sales-refresh-btn{cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--muted);
+    padding:8px 14px;border-radius:100px;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase}
+  .sales-refresh-btn:hover{border-color:var(--ember);color:var(--ember)}
+  .sales-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:4px 0 22px}
+  .sales-stat{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .sales-stat .num{font-family:var(--mono);font-weight:700;font-size:1.7rem;letter-spacing:-.02em;color:var(--ink)}
+  .sales-stat .lbl{font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+  .sales-stat.hot{border-color:var(--ember);background:rgba(255,106,43,.06)}
+  .sales-stat.hot .num{font-size:1.15rem;color:var(--ember);line-height:1.15}
+  .sales-sect-title{font-size:.95rem;font-weight:700;letter-spacing:-.01em;margin:0 0 10px;padding-bottom:7px;border-bottom:1px solid var(--line)}
+  .sales-list{display:flex;flex-direction:column;gap:6px}
+  .sales-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--paper);
+    border:1px solid var(--line);border-radius:10px}
+  .sales-rank{font-family:var(--mono);font-size:.72rem;color:var(--muted);width:24px;flex:none;text-align:right}
+  .sales-row.top{border-color:var(--ember)}
+  .sales-row.top .sales-rank{color:var(--ember);font-weight:700}
+  .sales-sw{width:15px;height:15px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.22)}
+  .sales-nm{flex:1;min-width:0;font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sales-nm .sub{font-weight:400;font-family:var(--mono);font-size:.62rem;color:var(--muted)}
+  .sales-qty{font-family:var(--mono);font-weight:700;font-size:.95rem;flex:none}
+  .sales-qty .u{font-weight:400;font-size:.62rem;color:var(--muted)}
+  .sales-rev{font-family:var(--mono);font-size:.8rem;color:var(--muted);width:74px;text-align:right;flex:none}
+  .sales-empty{color:var(--muted);padding:26px 0;text-align:center}
+  @media(max-width:560px){.sales-rev{display:none}}
 </style>
 </head>
 <body class="admin theme-3d">
@@ -121,6 +151,7 @@
     <span class="admin-brand"><span class="d"></span>Création Audio</span>
     <nav class="admin-tabs">
       <button class="admin-tab active" data-tab="inv">Inventaire</button>
+      <button class="admin-tab" data-tab="sales">Ventes</button>
     </nav>
     <a id="to-facture" href="facture.html" target="_blank">Facturation&nbsp;↗</a>
     <button id="logout">Déconnexion</button>
@@ -137,6 +168,22 @@
       <!-- onglets matériau (affichés sur mobile seulement) -->
       <div id="inv-mat-tabs" class="mat-tabs inv-mat-tabs" role="tablist" aria-label="Matériau"></div>
       <div id="inv-list"></div>
+    </section>
+
+    <section id="tab-sales" class="tab-panel" hidden>
+      <div class="sales-head">
+        <h2>Ventes</h2>
+        <div class="sales-controls">
+          <div class="inv-toggle" role="group" aria-label="Période">
+            <button type="button" class="sales-range-btn is-active" data-days="30">30 jours</button>
+            <button type="button" class="sales-range-btn" data-days="7">7 jours</button>
+            <button type="button" class="sales-range-btn" data-days="365">12 mois</button>
+          </div>
+          <button id="sales-refresh" class="sales-refresh-btn" type="button">Rafraîchir</button>
+        </div>
+      </div>
+      <p class="muted" style="margin-bottom:16px">Ventes enregistrées à la confirmation dans la facturation (bouton «&nbsp;Déduire de l'inventaire&nbsp;»).</p>
+      <div id="sales-body"></div>
     </section>
   </main>
 </div>

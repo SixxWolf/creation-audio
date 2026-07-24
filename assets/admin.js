@@ -140,6 +140,7 @@
       t.classList.add('active');
       $$('.tab-panel').forEach(function (p) { p.hidden = true; });
       $('#tab-' + t.getAttribute('data-tab')).hidden = false;
+      if (t.getAttribute('data-tab') === 'sales') loadSales();  // chargement paresseux
     });
   });
 
@@ -267,4 +268,80 @@
     });
   }
   function flash(row, kind) { row.classList.add('flash-' + kind); setTimeout(function () { row.classList.remove('flash-' + kind); }, 900); }
+
+  /* ---------------- VENTES ---------------- */
+  var salesDays = 30;
+  (function initSalesControls() {
+    $$('.sales-range-btn').forEach(function (b) {
+      b.addEventListener('click', function () {
+        salesDays = parseInt(b.getAttribute('data-days'), 10) || 30;
+        $$('.sales-range-btn').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+        loadSales();
+      });
+    });
+    var r = $('#sales-refresh'); if (r) r.addEventListener('click', loadSales);
+  })();
+
+  function loadSales() {
+    var box = $('#sales-body'); if (!box) return;
+    box.innerHTML = '<p class="muted">Chargement…</p>';
+    var since = new Date(Date.now() - salesDays * 864e5).toISOString();
+    sb.from('sales').select('code,name,material,type,qty,unit_price,invoice_no,sold_at')
+      .gte('sold_at', since).order('sold_at', { ascending: false })
+      .then(function (res) {
+        if (res.error) {
+          box.innerHTML = '<p class="muted">Impossible de charger les ventes. ' +
+            'Si c\'est la première fois, exécute <strong>supabase/add-sales.sql</strong> dans Supabase.</p>';
+          return;
+        }
+        renderSales(res.data || []);
+      }, function () { box.innerHTML = '<p class="muted">Erreur réseau.</p>'; });
+  }
+
+  function salesMoney(n) { return (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' $'; }
+  var SALES_TYPE = { refill: 'Recharge', spool: 'Avec Bobine', accessory: 'Accessoire' };
+
+  function renderSales(rows) {
+    var box = $('#sales-body');
+    if (!rows.length) {
+      box.innerHTML = '<p class="sales-empty">Aucune vente sur cette période.<br>' +
+        'Les ventes s\'enregistrent quand tu cliques «&nbsp;Déduire de l\'inventaire&nbsp;» dans la facturation.</p>';
+      return;
+    }
+    var totalRev = 0, totalUnits = 0, invoices = {}, agg = {}, order = [];
+    rows.forEach(function (r) {
+      var q = r.qty | 0, rev = q * (parseFloat(r.unit_price) || 0);
+      totalRev += rev; totalUnits += q;
+      if (r.invoice_no) invoices[r.invoice_no] = 1;
+      var k = r.code + '|' + r.type;
+      if (!agg[k]) { agg[k] = { code: r.code, name: r.name, material: r.material, type: r.type, qty: 0, rev: 0 }; order.push(k); }
+      agg[k].qty += q; agg[k].rev += rev;
+    });
+    var list = order.map(function (k) { return agg[k]; })
+      .sort(function (a, b) { return b.qty - a.qty || b.rev - a.rev; });
+    var top = list[0], nInv = Object.keys(invoices).length;
+
+    var stats = '<div class="sales-stats">' +
+      '<div class="sales-stat"><div class="num">' + salesMoney(totalRev) + '</div><div class="lbl">Chiffre d\'affaires</div></div>' +
+      '<div class="sales-stat"><div class="num">' + totalUnits + '</div><div class="lbl">Articles vendus</div></div>' +
+      '<div class="sales-stat"><div class="num">' + nInv + '</div><div class="lbl">Facture' + (nInv > 1 ? 's' : '') + '</div></div>' +
+      (top ? '<div class="sales-stat hot"><div class="num">' + esc(colorName(top.code, top.name)) +
+        '</div><div class="lbl">Plus populaire · ' + top.qty + ' vendu' + (top.qty > 1 ? 's' : '') + '</div></div>' : '') +
+      '</div>';
+
+    var listHtml = '<h3 class="sales-sect-title">Détail par produit (du plus vendu au moins vendu)</h3>' +
+      '<div class="sales-list">' + list.map(function (a, i) {
+        var mat = a.material || materialOf(a.code);
+        return '<div class="sales-row' + (i === 0 ? ' top' : '') + '">' +
+          '<span class="sales-rank">' + (i + 1) + '</span>' +
+          '<span class="sales-sw" style="background:' + hexFor(a.code) + '"></span>' +
+          '<span class="sales-nm">' + esc(colorName(a.code, a.name)) +
+            '<span class="sub"> · ' + esc(mat) + ' · ' + esc(a.code) + ' · ' + (SALES_TYPE[a.type] || esc(a.type)) + '</span></span>' +
+          '<span class="sales-qty">' + a.qty + '<span class="u">&nbsp;u</span></span>' +
+          '<span class="sales-rev">' + salesMoney(a.rev) + '</span>' +
+        '</div>';
+      }).join('') + '</div>';
+
+    box.innerHTML = stats + listHtml;
+  }
 })();

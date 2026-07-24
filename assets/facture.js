@@ -525,10 +525,27 @@
         var errs = results.filter(function (x) { return x && x.error; });
         if (errs.length) { deductMsg('warn', 'Erreur sur ' + errs.length + ' article(s). Vérifie l\'inventaire dans l\'admin.'); updateDeductBtn(); return; }
         markDeducted(currentInvNum());
+        logSale(sb);   // journalise la vente (suivi dans l'admin) — best effort
         deductMsg('ok', '✓ Stock déduit pour la facture ' + esc(currentInvNum()) +
           (oversell.length ? ' — ' + oversell.length + ' article(s) mis à 0 faute de stock' : '') + '.');
         updateDeductBtn();
       }, function () { deductMsg('warn', 'Échec réseau pendant la déduction.'); updateDeductBtn(); });
+  }
+  // enregistre chaque ligne de la facture dans le journal des ventes.
+  // Best effort : si ça échoue, le stock est déjà déduit — on prévient sans bloquer.
+  function logSale(sb) {
+    var num = currentInvNum();
+    var rows = items.map(function (it) {
+      return { invoice_no: num, code: it.code, name: it.name, material: it.material || '',
+        type: it.type || 'refill', qty: Math.max(0, parseInt(it.qty, 10) || 0),
+        unit_price: (parseFloat(it.price) || 0) };
+    }).filter(function (r) { return r.qty > 0; });
+    if (!rows.length) return;
+    sb.from('sales').insert(rows).then(function (res) {
+      if (res && res.error) {
+        deductMsg('warn', 'Stock déduit ✓, mais l\'enregistrement de la vente a échoué (table « sales » créée&nbsp;?). Le stock est bon.');
+      }
+    }, function () {});
   }
 
   /* ---------- init ---------- */
