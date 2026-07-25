@@ -86,11 +86,16 @@
     return !!(session && session.user && String(session.user.email || '').toLowerCase() === ADMIN_EMAIL);
   }
   // Aiguillage central : session admin -> panneau ; autre compte -> refus ; rien -> login.
+  // IMPORTANT : on ne fait PAS signOut() ici. signOut() est GLOBAL et
+  // déconnecterait aussi un espace dealer ouvert dans un autre onglet du même
+  // navigateur (le compte d'Olivier flasherait puis reviendrait au login).
+  // La session non-admin est simplement laissée intacte : on refuse l'affichage
+  // du panneau, et la RLS Supabase empêche de toute façon toute action admin.
   function gate(session) {
     if (!session) { showLogin(); return; }
     if (isAdmin(session)) { showApp(); return; }
+    showLogin();
     say('Ce compte n\'a pas accès à l\'administration. Utilise plutôt l\'espace dealer (dealer.html).');
-    sb.auth.signOut().then(showLogin);
   }
   function say(msg, kind) {
     loginErr.textContent = msg;
