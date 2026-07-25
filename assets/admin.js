@@ -76,6 +76,22 @@
   function labelFor(code, dbName) { return LABEL[code] || dbName || code; }
 
   /* ---------------- AUTH ---------------- */
+  // Seul ce compte a accès à l'administration. Les autres comptes connectés
+  // (ex. un dealer comme Olivier) sont refusés et déconnectés d'ici.
+  // Le vrai verrou reste la RLS Supabase (supabase/restrict-admin-access.sql) :
+  // même en contournant ce JavaScript, un non-admin ne peut ni écrire l'inventaire,
+  // ni lire les ventes.
+  var ADMIN_EMAIL = 'creationaudio.ca@gmail.com';
+  function isAdmin(session) {
+    return !!(session && session.user && String(session.user.email || '').toLowerCase() === ADMIN_EMAIL);
+  }
+  // Aiguillage central : session admin -> panneau ; autre compte -> refus ; rien -> login.
+  function gate(session) {
+    if (!session) { showLogin(); return; }
+    if (isAdmin(session)) { showApp(); return; }
+    say('Ce compte n\'a pas accès à l\'administration. Utilise plutôt l\'espace dealer (dealer.html).');
+    sb.auth.signOut().then(showLogin);
+  }
   function say(msg, kind) {
     loginErr.textContent = msg;
     loginErr.className = 'login-err ' + (msg ? 'show' : '') + (kind === 'ok' ? ' ok' : '');
@@ -90,11 +106,11 @@
   // Source de vérité : l'état d'auth. Dès qu'une session existe → on ouvre le panneau.
   sb.auth.onAuthStateChange(function (event, session) {
     console.log('[admin] auth event:', event, 'session?', !!session);
-    if (session) showApp(); else showLogin();
+    gate(session);
   });
 
   sb.auth.getSession().then(function (r) {
-    if (r.data && r.data.session) showApp(); else showLogin();
+    gate(r.data && r.data.session);
   });
 
   $('#login-form').addEventListener('submit', function (e) {
@@ -120,8 +136,8 @@
           say('Connexion acceptée mais aucune session reçue. Vérifie que le compte est confirmé dans Supabase.');
           return;
         }
-        // onAuthStateChange s'occupe d'ouvrir le panneau ; filet de sécurité :
-        showApp();
+        // onAuthStateChange s'occupe d'aiguiller ; filet de sécurité :
+        gate(res.data.session);
       }, function (err) {
         btn.disabled = false; btn.textContent = 'Se connecter';
         console.error('[admin] signIn rejet', err);

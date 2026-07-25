@@ -197,6 +197,13 @@ a.splash-wordmark:hover{transform:translateX(-50%) translateY(-1px)}
 .theme-audio .site-nav a{color:#9096a0}
 .theme-audio .site-nav a:hover{color:#F3F1EA}
 .site-nav{margin-left:auto}
+
+/* bouton « Dealer » — encadré orange, haut à droite */
+.dealer-link{display:inline-flex;align-items:center;gap:7px;text-decoration:none;font-family:var(--mono);
+  font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ember);
+  border:1.5px solid var(--ember);border-radius:100px;padding:7px 15px;transition:background .18s,color .18s}
+.dealer-link:hover{background:var(--ember);color:#fff}
+.dealer-link .d{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
 .cart-slot{display:flex;align-items:center;margin-left:16px}
 
 /* =========================================================
