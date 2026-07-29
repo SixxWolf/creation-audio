@@ -45,6 +45,13 @@
     var p = P.priceOf(material, code, type);
     return p != null ? p : P.spoolPrice(material);
   }
+  // type effectif : « recharge » demandée mais indispo pour ce matériau/couleur
+  // (bobine-seule ou couleur non éligible) -> bascule sur « bobine ».
+  function fxTypeFor(material, code, type) {
+    if (type !== 'refill') return type;
+    var P = window.CA_PRICE;
+    return (P && !P.refillAvailable(material, code)) ? 'spool' : 'refill';
+  }
   var SPOOLS = {
     SPOOL:   { code: 'SPOOL',   name: 'Bobine vide réutilisable', material: 'Accessoire', hex: '#D7D9DB', price: 10 },
     SPOOLHT: { code: 'SPOOLHT', name: 'Bobine vide réutilisable — haute température', material: 'Accessoire', hex: '#3A3D42', price: 10 }
@@ -165,7 +172,7 @@
     var order = [], found = {}, unmatched = [];
     function key(code, type) { return code + '|' + type; }
     function addF(item, qty, type) {
-      type = type || 'refill';
+      type = fxTypeFor(item.material, item.code, type || 'refill');
       var k = key(item.code, type);
       if (!found[k]) { found[k] = { code: item.code, name: item.name, material: item.material, hex: item.hex, price: fxPrice(item.material, item.code, type), qty: 0, type: type }; order.push(k); }
       found[k].qty += qty;
@@ -215,7 +222,7 @@
   function addOne(code) {
     var it = byCode[code];
     if (!it) return;
-    var type = fxType, ex = null;
+    var type = fxTypeFor(it.material, it.code, fxType), ex = null;
     for (var i = 0; i < items.length; i++) { if (items[i].code === code && items[i].type === type) { ex = items[i]; break; } }
     if (ex) ex.qty += 1;
     else items.push({ code: it.code, name: it.name, material: it.material, hex: it.hex, price: fxPrice(it.material, it.code, type), qty: 1, type: type });
