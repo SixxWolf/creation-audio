@@ -36,8 +36,15 @@
   var taxEnabled = false;
 
   // prix par type + accessoire « bobine vide réutilisable »
-  var PRICES_T = { refill: 20, spool: 25 };
+  var PRICES_T = { refill: 20, spool: 25 };   // repli seulement
   var TYPE_LABEL_T = { refill: 'Recharge', spool: 'Avec Bobine', accessory: 'Accessoire' };
+  // prix par défaut selon le matériau (assets/pricing.js) ; repli 20/25
+  function fxPrice(material, code, type) {
+    var P = window.CA_PRICE;
+    if (!P) return PRICES_T[type] || PRICES_T.refill;
+    var p = P.priceOf(material, code, type);
+    return p != null ? p : P.spoolPrice(material);
+  }
   var SPOOLS = {
     SPOOL:   { code: 'SPOOL',   name: 'Bobine vide réutilisable', material: 'Accessoire', hex: '#D7D9DB', price: 10 },
     SPOOLHT: { code: 'SPOOLHT', name: 'Bobine vide réutilisable — haute température', material: 'Accessoire', hex: '#3A3D42', price: 10 }
@@ -160,7 +167,7 @@
     function addF(item, qty, type) {
       type = type || 'refill';
       var k = key(item.code, type);
-      if (!found[k]) { found[k] = { code: item.code, name: item.name, material: item.material, hex: item.hex, price: PRICES_T[type], qty: 0, type: type }; order.push(k); }
+      if (!found[k]) { found[k] = { code: item.code, name: item.name, material: item.material, hex: item.hex, price: fxPrice(item.material, item.code, type), qty: 0, type: type }; order.push(k); }
       found[k].qty += qty;
     }
     function addSpoolLine(qty, code) {
@@ -211,7 +218,7 @@
     var type = fxType, ex = null;
     for (var i = 0; i < items.length; i++) { if (items[i].code === code && items[i].type === type) { ex = items[i]; break; } }
     if (ex) ex.qty += 1;
-    else items.push({ code: it.code, name: it.name, material: it.material, hex: it.hex, price: PRICES_T[type], qty: 1, type: type });
+    else items.push({ code: it.code, name: it.name, material: it.material, hex: it.hex, price: fxPrice(it.material, it.code, type), qty: 1, type: type });
     render();
   }
   function addSpool(code) {

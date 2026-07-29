@@ -28,7 +28,13 @@
 
   function isExtra(code) { return !!EXTRAS[code]; }
   function meta(code) { return byCode[code] || EXTRAS[code] || { name: code, material: '' }; }
-  function priceOf(code, type) { if (EXTRAS[code]) return EXTRAS[code].price; return PRICES[type] || PRICES.refill; }
+  // prix par matériau + type (source : assets/pricing.js) ; repli 20/25 si absent
+  function priceOf(code, type) {
+    if (EXTRAS[code]) return EXTRAS[code].price;
+    var it = byCode[code], mat = it ? it.material : null, P = window.CA_PRICE;
+    if (P) { var p = P.priceOf(mat, code, type); return p != null ? p : P.spoolPrice(mat); }
+    return PRICES[type] || PRICES.refill;
+  }
   function keyOf(code, type) { return code + '|' + type; }
   function imgSrc(code) { if (EXTRAS[code]) return EXTRAS[code].img; var f = IMG[code]; return f ? 'assets/img/filament/' + f : ''; }
 

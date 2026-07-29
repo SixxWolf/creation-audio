@@ -28,6 +28,10 @@
 <body class="theme-3d">
 
 <header class="site-header">
+  <button type="button" id="filterToggle" class="filter-toggle" aria-label="Ouvrir les filtres">
+    <span></span><span></span><span></span>
+    <span id="filterCount" class="filter-count" hidden>0</span>
+  </button>
   <a class="brand" href="index.html" aria-label="Création Audio — retour à l'accueil">
     <span class="d"></span>Création&nbsp;Audio
   </a>
@@ -48,11 +52,34 @@
       <div class="shop-head">
         <p class="eyebrow">Atelier · filament</p>
         <h1 class="shop-title">Choisissez votre filament</h1>
-        <p class="shop-lead">Une couleur, un type (recharge ou avec bobine), et hop au panier — ramassage à Québec.</p>
+        <p class="shop-lead" id="shopLead">Sélectionnez un matériau pour voir les couleurs disponibles — ramassage à Québec.</p>
       </div>
 
-      <!-- Onglets matériau (construits par JS depuis le catalogue) -->
-      <div id="matTabs" class="mat-tabs" role="tablist" aria-label="Matériau"></div>
+      <!-- Écran de sélection du matériau (entrée) -->
+      <div id="matPicker" class="mat-picker"></div>
+
+      <div class="shop-layout" hidden>
+
+        <!-- Barre de filtres (tiroir sur mobile) -->
+        <div id="filterScrim" class="filter-scrim" aria-hidden="true"></div>
+        <aside id="filterRail" class="filter-rail" aria-label="Filtres">
+          <div class="filter-rail-inner">
+            <div class="filter-rail-head">
+              <span class="filter-rail-title">Filtres</span>
+              <button type="button" id="filterClose" class="filter-close" aria-label="Fermer les filtres">×</button>
+            </div>
+            <section class="filter-group">
+              <h3 class="filter-group-title">Couleur</h3>
+              <div id="filterColors" class="filter-opts"></div>
+            </section>
+            <button type="button" class="filter-done" onclick="window.CA&&window.CA.filterDrawer&&window.CA.filterDrawer.close()">Voir les résultats</button>
+          </div>
+        </aside>
+
+        <div class="shop-main">
+          <button type="button" id="matBack" class="mat-back">← Tous les matériaux</button>
+          <!-- Filtres appliqués -->
+          <div id="appliedFilters" class="applied-filters"></div>
 
       <!-- Configurateur produit -->
       <div class="config">
@@ -131,6 +158,9 @@
             À insérer sur une bobine vide réutilisable. Aucun paiement en ligne — on confirme la dispo et un ramassage à Québec.</p>
         </div>
       </div>
+
+        </div><!-- /.shop-main -->
+      </div><!-- /.shop-layout -->
 
     </div>
   </section>
@@ -228,6 +258,7 @@
 <script src="assets/supabase-client.js"></script>
 <script src="assets/reveal.js"></script>
 <script src="assets/catalog.js"></script>
+<script src="assets/pricing.js"></script>
 <script src="assets/filament-images.js"></script>
 <script src="assets/inventory.js"></script>
 <script src="assets/filament-configurator.js"></script>

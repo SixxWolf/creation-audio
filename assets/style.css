@@ -253,6 +253,8 @@ a.splash-wordmark:hover{transform:translateX(-50%) translateY(-1px)}
 .ctb-name{font-weight:600;font-size:1rem}
 .ctb-price{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
 .cfg-type-btn.is-active .ctb-price{color:var(--ember)}
+.cfg-type-btn:disabled,.cfg-type-btn.is-disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);background:var(--paper)}
+.cfg-type-btn:disabled:hover,.cfg-type-btn.is-disabled:hover{border-color:var(--line)}
 .cfg-typehint{font-size:.78rem;color:var(--muted);margin-top:-2px}
 
 .cfg-price-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:420px;align-items:center}
@@ -785,4 +787,108 @@ html{overflow-x:clip}
   .js .reveal{opacity:1;transform:none}
   /* garder un état focus/hover statique lisible */
   .panel:hover h2,.panel:focus-visible h2{text-decoration:underline;text-underline-offset:6px}
+}
+
+/* =========================================================
+   Filtres filament (barre desktop + tiroir mobile)
+   ========================================================= */
+/* hamburger (mobile uniquement) */
+.filter-toggle{display:none;flex-direction:column;gap:4px;width:40px;height:38px;padding:0 9px;
+  align-items:stretch;justify-content:center;border:1px solid var(--line);border-radius:10px;
+  background:transparent;cursor:pointer;position:relative}
+.filter-toggle span:not(.filter-count){display:block;height:2px;border-radius:2px;background:var(--ink)}
+.filter-count{position:absolute;top:-7px;right:-7px;min-width:17px;height:17px;padding:0 4px;border-radius:100px;
+  background:var(--ember);color:#fff;font-family:var(--mono);font-size:.6rem;display:grid;place-items:center}
+
+/* layout 2 colonnes : rail à gauche, configurateur à droite */
+.shop:has(.shop-layout) .wrap{max-width:1240px}
+.shop-layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:clamp(20px,3vw,42px);align-items:start}
+.shop-main{min-width:0}
+
+/* barre de filtres */
+.filter-rail{position:sticky;top:84px}
+.filter-rail-inner{display:flex;flex-direction:column;gap:22px}
+.filter-rail-head{display:flex;align-items:center;justify-content:space-between}
+.filter-rail-title{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.filter-close{display:none;border:0;background:transparent;font-size:1.5rem;line-height:1;color:var(--muted);cursor:pointer}
+.filter-close:hover{color:var(--ember)}
+.filter-group-title{font-size:.98rem;font-weight:700;letter-spacing:-.01em;margin-bottom:8px;
+  padding-bottom:8px;border-bottom:1px solid var(--line)}
+.filter-opts{display:flex;flex-direction:column;gap:1px}
+.filter-opt{display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:8px;cursor:pointer;font-size:.92rem;color:var(--ink)}
+.filter-opt:hover{background:var(--wash)}
+.filter-opt input{width:16px;height:16px;accent-color:var(--ember);cursor:pointer;flex:none;margin:0}
+.filter-dot{width:15px;height:15px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.22);flex:none}
+.filter-opt-txt{min-width:0}
+.filter-done{display:none;width:100%;margin-top:8px;border:0;background:var(--ember);color:#fff;padding:13px;
+  border-radius:100px;font-family:var(--mono);font-size:.74rem;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
+
+/* filtres appliqués (puces) */
+.applied-filters{display:none;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:18px}
+.applied-filters.show{display:flex}
+.applied-label{font-family:var(--mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:2px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--paper);cursor:pointer;
+  padding:6px 11px;border-radius:100px;font-size:.82rem;color:var(--ink);font-family:var(--display)}
+.chip:hover{border-color:var(--ember);color:var(--ember)}
+.chip-x{font-size:1.05rem;line-height:1;color:var(--muted)}
+.chip:hover .chip-x{color:var(--ember)}
+.chip-dot{width:12px;height:12px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.22)}
+.chip-clear{border-style:dashed;color:var(--muted)}
+
+/* pastilles groupées par matériau */
+.cfg-swatches{display:flex;flex-direction:column;gap:6px}
+.swatch-group{display:flex;flex-wrap:wrap;gap:10px}
+.swatch-group-title{font-family:var(--mono);font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);margin:12px 0 4px}
+.swatch-group-title:first-child{margin-top:0}
+.cfg-empty{color:var(--muted);font-size:.92rem;margin:4px 0}
+
+/* scrim du tiroir */
+.filter-scrim{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:95;opacity:0;pointer-events:none;transition:opacity .28s}
+.filter-scrim.open{opacity:1;pointer-events:auto}
+body.no-scroll{overflow:hidden}
+
+/* ---- mobile : rail devient un tiroir qui glisse de la gauche ---- */
+@media(max-width:900px){
+  .filter-toggle{display:flex}
+  .shop-layout{grid-template-columns:1fr}
+  .filter-rail{position:fixed;top:0;left:0;height:100vh;height:100dvh;width:min(320px,86vw);z-index:100;
+    background:var(--paper);border-right:1px solid var(--line);box-shadow:16px 0 50px rgba(0,0,0,.16);
+    transform:translateX(-100%);transition:transform .28s ease;overflow:auto;padding:20px}
+  .filter-rail.open{transform:none}
+  .filter-close{display:inline-flex}
+  .filter-done{display:block}
+}
+@media(prefers-reduced-motion:reduce){.filter-rail{transition:none}.filter-scrim{transition:none}}
+
+/* =========================================================
+   Écran de sélection du matériau (cartes façon Bambu Store)
+   ========================================================= */
+.mat-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(14px,1.6vw,22px)}
+.mat-card{display:flex;flex-direction:column;text-align:left;padding:0;overflow:hidden;cursor:pointer;
+  background:var(--paper);border:1px solid var(--line);border-radius:18px;transition:transform .18s,box-shadow .18s,border-color .18s}
+.mat-card:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.10);border-color:var(--ember)}
+.mat-card-media{position:relative;aspect-ratio:1/1;background:var(--wash);display:grid;place-items:center;overflow:hidden}
+.mat-card-media img{width:100%;height:100%;object-fit:contain;padding:10%}
+.mat-card-rfid{position:absolute;top:12px;left:12px;color:#b9bcc2}
+.mat-card-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:9px}
+.mat-card-name{font-size:1.12rem;font-weight:700;letter-spacing:-.01em}
+.mat-card-count{font-family:var(--mono);font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-top:-4px}
+.mat-card-dots{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.mat-card-dot{width:15px;height:15px;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.18);flex:none}
+.mat-card-more{font-family:var(--mono);font-size:.66rem;color:var(--muted);margin-left:2px}
+.mat-card-cta{margin-top:2px;font-family:var(--mono);font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;color:var(--ember-dim)}
+.mat-card:hover .mat-card-cta{color:var(--ember)}
+
+/* bouton retour vers les matériaux */
+.mat-back{align-self:flex-start;margin-bottom:14px;border:1px solid var(--line);background:transparent;cursor:pointer;
+  padding:8px 15px;border-radius:100px;font-family:var(--mono);font-size:.7rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.mat-back:hover{border-color:var(--ember);color:var(--ember)}
+
+@media(max-width:1100px){.mat-picker{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){
+  .mat-picker{grid-template-columns:1fr;gap:14px}
+  .mat-card{flex-direction:row;align-items:stretch}
+  .mat-card-media{width:132px;flex:none;aspect-ratio:auto}
+  .mat-card-body{flex:1;justify-content:center}
 }
