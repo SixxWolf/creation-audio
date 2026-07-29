@@ -14,6 +14,18 @@
   var reduce = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // Retour arrière : le navigateur restaure le splash depuis son cache
+  // (bfcache) tel qu'il était au départ — c.-à-d. en état « leaving/chosen »
+  // (pointer-events:none, un panneau masqué) → on reste coincé. Le script ne
+  // se relance pas dans ce cas, donc on réinitialise sur l'événement pageshow.
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;               // uniquement les restaurations depuis le cache
+    splash.classList.remove('leaving');
+    var chosen = splash.querySelector('.panel.chosen');
+    if (chosen) chosen.classList.remove('chosen');
+    splash.classList.add('is-ready');       // écran de choix visible et cliquable
+  });
+
   // Animation d'entrée : on marque l'écran « prêt » à la première frame.
   // Filet setTimeout : garantit l'affichage même si les rAF sont gelés
   // (onglet ouvert en arrière-plan), pour ne jamais laisser un écran vide.
