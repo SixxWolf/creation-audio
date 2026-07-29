@@ -128,12 +128,27 @@
   }
 
   /* ---------- écran de sélection du matériau (cartes) ---------- */
+  // image « vitrine » par matériau : couleur vive, familles distinctes entre
+  // cartes (pas deux fois la même couleur), overrides possibles.
+  var HERO_OVERRIDE = { 'PLA Glow': '15500' };   // PLA Glow -> Glow Green
   function buildPicker() {
     if (!pickerEl) return;
+    var usedFam = {};
+    function chooseHero(mat, cols) {
+      if (HERO_OVERRIDE[mat] && byCode[HERO_OVERRIDE[mat]]) return HERO_OVERRIDE[mat];
+      var cand = cols.map(function (i) {
+        return { code: i.code, fam: familyCache[i.code], sat: rgbToHsl(hexRGB(i.hex)).s };
+      }).sort(function (a, b) { return b.sat - a.sat; });   // couleurs vives d'abord
+      var i;
+      for (i = 0; i < cand.length; i++) { if (cand[i].sat > 0.18 && !usedFam[cand[i].fam]) return cand[i].code; }
+      for (i = 0; i < cand.length; i++) { if (!usedFam[cand[i].fam]) return cand[i].code; }
+      return cand.length ? cand[0].code : cols[0].code;
+    }
     pickerEl.innerHTML = materials.map(function (m) {
       var cols = CAT.filter(function (i) { return i.material === m; });
-      var hero = '';
-      for (var i = 0; i < cols.length; i++) { var s = imgSrc(cols[i].code); if (s) { hero = s; break; } }
+      var heroCode = chooseHero(m, cols);
+      if (heroCode) usedFam[familyCache[heroCode]] = true;
+      var hero = imgSrc(heroCode);
       var DOTS = 22;
       var dots = cols.slice(0, DOTS).map(function (i) { return '<span class="mat-card-dot" style="--c:' + i.hex + '"></span>'; }).join('');
       var more = cols.length > DOTS ? '<span class="mat-card-more">+' + (cols.length - DOTS) + '</span>' : '';
