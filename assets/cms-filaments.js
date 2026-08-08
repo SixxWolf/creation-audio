@@ -248,8 +248,12 @@
         sb.storage.from(BUCKET).remove([oldPath]).then(null, function () {});
       }
       var savedId = (res.data && res.data[0] && res.data[0].id) || editingId;
+      var wasEdit = !!editingId;   // modification d'un filament existant ? (sinon = nouvel ajout)
       closeEditor();
-      load(true).then(function () { focusCard(savedId, true); });   // recharge en place, reste sur le filament
+      // recharge en place ; on ne recentre QUE sur une modification.
+      // Pour un ajout, on ne bouge pas : la nouvelle carte se crée en bas de son groupe
+      // et sauter dessus renverrait l'utilisateur tout en bas.
+      load(true).then(function () { if (wasEdit) focusCard(savedId, true); });
     }, function (err) {
       saveBtn.disabled = false;
       statusEl.textContent = 'Erreur : ' + (err && err.message ? err.message : err);
