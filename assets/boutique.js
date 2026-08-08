@@ -157,9 +157,12 @@
     var map = {}, order = [];
     products.filter(function (p) { return (p.brand || 'Autres') === curBrand; }).forEach(function (p) {
       var key = p.material || 'Autres';
-      if (!map[key]) { map[key] = { name: key, items: [] }; order.push(key); }
+      if (!map[key]) { map[key] = { name: key, items: [], sort: (p.material_sort == null ? 9999 : p.material_sort) }; order.push(key); }
       map[key].items.push(p);
     });
+    // ordre des matériaux = sort_order défini dans l'admin (glisser-déposer) ;
+    // tri stable => les égalités conservent l'ordre d'apparition (repli avant migration).
+    order.sort(function (a, b) { return map[a].sort - map[b].sort; });
     materials = order.map(function (k) {
       var m = map[k], first = m.items[0];
       return { name: m.name, items: m.items,

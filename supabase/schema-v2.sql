@@ -179,6 +179,7 @@ with (security_invoker = off) as
     case when m.name is not null then m.tiers_refill else p.tiers_2 end as tiers_2,
     m.description as material_desc,
     m.image_path  as material_image,   -- image vitrine choisie à la main pour le matériau (E4)
+    m.sort_order  as material_sort,    -- ordre des matériaux (drag-and-drop admin) -> pilote l'ordre boutique
     p.qty, p.qty_2, p.size, p.sort_order
   from public.products p
   left join public.materials m on m.name = p.material and m.brand = p.brand
