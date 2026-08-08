@@ -276,7 +276,8 @@ window.CA = window.CA || {};
       var hasS = m.sell_spool != null, hasR = m.sell_refill != null;
       var tag = hasS && hasR ? '' : (hasS ? ' <span class="hint">(bobine seulement)</span>' : ' <span class="hint">(recharge seulement)</span>');
       var ts = tiersSummary(m.tiers_spool), tr = tiersSummary(m.tiers_refill);
-      return '<article class="mat-row" id="mat-' + slug(m.name) + '" data-name="' + esc(m.name) + '">' +
+      return '<article class="mat-row" id="mat-' + slug(m.name) + '" data-name="' + esc(m.name) + '" draggable="true">' +
+        '<span class="mat-drag" title="Glisser pour réordonner">⠿</span>' +
         '<div class="mat-main">' +
           '<div class="mat-name">' + esc(m.name) + tag + '</div>' +
           '<div class="mat-prices money">' +
@@ -302,8 +303,60 @@ window.CA = window.CA || {};
       var row = CA.materialOf(CA.currentBrand, name);
       $('.mat-edit', el).addEventListener('click', function () { openEditor(row); });
       $('.mat-del', el).addEventListener('click', function () { del(row); });
+      wireDrag(el);
     });
     buildNav();
+  }
+
+  /* ---- glisser-déposer : réordonner les matériaux ----
+     L'ordre des matériaux pilote aussi l'ordre des groupes de filaments
+     (cms-filaments les affiche dans l'ordre de brandMaterials). */
+  var dragName = null;
+  function wireDrag(el) {
+    el.addEventListener('dragstart', function (e) {
+      dragName = el.getAttribute('data-name');
+      el.classList.add('dragging');
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', dragName); } catch (_) {} }
+    });
+    el.addEventListener('dragend', function () {
+      dragName = null; el.classList.remove('dragging');
+      $$('.mat-row', listEl).forEach(function (c) { c.classList.remove('drop-target'); });
+    });
+    el.addEventListener('dragover', function (e) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; });
+    el.addEventListener('dragenter', function () { if (el.getAttribute('data-name') !== dragName) el.classList.add('drop-target'); });
+    el.addEventListener('dragleave', function () { el.classList.remove('drop-target'); });
+    el.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var targetName = el.getAttribute('data-name');
+      if (dragName == null || dragName === targetName) return;
+      reorder(dragName, targetName);
+    });
+  }
+  function reorder(fromName, toName) {
+    var seq = brandMaterials();
+    var names = seq.map(function (m) { return m.name; });
+    var from = names.indexOf(fromName), to = names.indexOf(toName);
+    if (from < 0 || to < 0) return;
+    var moved = seq.splice(from, 1)[0];
+    seq.splice(to, 0, moved);
+    // réécrit l'ordre dans le cache global (autres marques inchangées)
+    var others = CA.materials.list.filter(function (m) { return m.brand !== CA.currentBrand; });
+    CA.materials.list = others.concat(seq);
+    persistOrder(seq);   // fixe sort_order en mémoire puis en base
+    notify();            // re-rend matériaux ET filaments (groupes suivent le nouvel ordre)
+  }
+  function persistOrder(seq) {
+    var updates = seq.map(function (m, i) {
+      if (m.sort_order === i) return null;
+      m.sort_order = i;
+      return sb.from('materials').update({ sort_order: i, updated_at: new Date().toISOString() })
+        .eq('brand', m.brand).eq('name', m.name);
+    }).filter(Boolean);
+    if (!updates.length) return;
+    Promise.all(updates).then(function (results) {
+      var bad = results.filter(function (x) { return x && x.error; });
+      if (bad.length && statusEl) statusEl.textContent = 'Ordre partiellement sauvegardé.';
+    }, function () {});
   }
 
   /* ---- liste latérale « Aller au matériau » ---- */

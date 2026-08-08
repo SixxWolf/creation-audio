@@ -182,6 +182,12 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 .mat-rows { display:flex; flex-direction:column; gap:10px; }
 .mat-row { display:flex; align-items:center; gap:14px; background:var(--paper); border:1px solid var(--line);
   border-radius:var(--radius); padding:12px 14px; box-shadow:var(--shadow-sm); }
+.mat-drag { flex:none; width:26px; height:26px; border-radius:8px; align-self:center;
+  background:color-mix(in srgb, var(--paper) 85%, transparent); border:1px solid var(--line);
+  display:flex; align-items:center; justify-content:center; cursor:grab; color:var(--muted); user-select:none; }
+.mat-drag:active { cursor:grabbing; }
+.mat-row.dragging { opacity:.5; }
+.mat-row.drop-target { border-color:var(--ember); box-shadow:0 0 0 2px rgba(255,106,43,.25); }
 .mat-main { flex:1; display:flex; flex-direction:column; gap:5px; min-width:0; }
 .mat-name { font-weight:700; }
 .mat-name .hint { font-weight:500; }
