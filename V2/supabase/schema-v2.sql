@@ -78,18 +78,17 @@ create index if not exists products_active_idx     on public.products (active);
 -- ------------------------------------------------------------
 alter table public.products enable row level security;
 
-drop policy if exists products_admin_read on public.products;
-create policy products_admin_read
-  on public.products for select
-  to authenticated
-  using ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
-
+-- Une seule policy admin (SELECT/INSERT/UPDATE/DELETE) : évite le doublon
+-- permissif (read + write) sur le rôle authenticated. La lecture publique
+-- passe par la vue products_public (security definer), pas par cette table.
+drop policy if exists products_admin_read  on public.products;
 drop policy if exists products_admin_write on public.products;
-create policy products_admin_write
+drop policy if exists products_admin_all   on public.products;
+create policy products_admin_all
   on public.products for all
   to authenticated
-  using  ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 -- ------------------------------------------------------------
 -- TABLE brands — marques (Bambu Lab, Elegoo, Anycubic…)
@@ -109,8 +108,8 @@ drop policy if exists brands_public_read on public.brands;
 create policy brands_public_read on public.brands for select to anon, authenticated using (true);
 drop policy if exists brands_admin_write on public.brands;
 create policy brands_admin_write on public.brands for all to authenticated
-  using ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 -- ------------------------------------------------------------
 -- TABLE materials — PRIX & COÛTS PAR (MARQUE, MATÉRIAU)
@@ -147,18 +146,16 @@ alter table public.materials add  constraint materials_pkey primary key (brand, 
 
 alter table public.materials enable row level security;
 
-drop policy if exists materials_admin_read on public.materials;
-create policy materials_admin_read
-  on public.materials for select
-  to authenticated
-  using ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
-
+-- Une seule policy admin (voir products). La boutique lit les prix via la vue
+-- products_public (security definer), jamais directement la table materials.
+drop policy if exists materials_admin_read  on public.materials;
 drop policy if exists materials_admin_write on public.materials;
-create policy materials_admin_write
+drop policy if exists materials_admin_all   on public.materials;
+create policy materials_admin_all
   on public.materials for all
   to authenticated
-  using  ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 -- ------------------------------------------------------------
 -- VUE publique : produits actifs, SANS les coûts.
@@ -223,15 +220,15 @@ drop policy if exists receipts_admin_all on public.receipts;
 create policy receipts_admin_all
   on public.receipts for all
   to authenticated
-  using  ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 drop policy if exists receipt_lines_admin_all on public.receipt_lines;
 create policy receipt_lines_admin_all
   on public.receipt_lines for all
   to authenticated
-  using  ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 -- Incrément de stock atomique (évite un read-modify-write côté client).
 -- kind = 'refill' -> qty_2 ; sinon -> qty.
@@ -267,20 +264,20 @@ drop policy if exists products_files_admin_insert on storage.objects;
 create policy products_files_admin_insert
   on storage.objects for insert
   to authenticated
-  with check (bucket_id = 'products' and (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com');
+  with check (bucket_id = 'products' and ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com');
 
 drop policy if exists products_files_admin_update on storage.objects;
 create policy products_files_admin_update
   on storage.objects for update
   to authenticated
-  using  (bucket_id = 'products' and (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com')
-  with check (bucket_id = 'products' and (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com');
+  using  (bucket_id = 'products' and ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com')
+  with check (bucket_id = 'products' and ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com');
 
 drop policy if exists products_files_admin_delete on storage.objects;
 create policy products_files_admin_delete
   on storage.objects for delete
   to authenticated
-  using (bucket_id = 'products' and (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com');
+  using (bucket_id = 'products' and ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com');
 
 -- ============================================================
 -- PHASE 4 — FACTURATION
@@ -298,7 +295,7 @@ create table if not exists public.invoice_counters (
 alter table public.invoice_counters enable row level security;
 drop policy if exists invoice_counters_admin_read on public.invoice_counters;
 create policy invoice_counters_admin_read on public.invoice_counters for select to authenticated
-  using ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 -- Réserve et renvoie le prochain numéro (incrément atomique).
 create or replace function public.next_invoice_number()
@@ -371,15 +368,15 @@ drop policy if exists invoices_admin_all on public.invoices;
 create policy invoices_admin_all
   on public.invoices for all
   to authenticated
-  using  ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 drop policy if exists invoice_lines_admin_all on public.invoice_lines;
 create policy invoice_lines_admin_all
   on public.invoice_lines for all
   to authenticated
-  using  ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 -- Déduction de stock : on réutilise receive_stock() avec une quantité NÉGATIVE
 -- (bornée à 0). kind='refill' -> qty_2 ; sinon -> qty (bobine, unité spacer).
@@ -412,13 +409,13 @@ create table if not exists public.dealers (
 alter table public.dealers enable row level security;
 drop policy if exists dealers_admin_all on public.dealers;
 create policy dealers_admin_all on public.dealers for all to authenticated
-  using  ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( (auth.jwt() ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 -- Le compte connecté est-il un dealer ? (le portail s'en sert pour ouvrir l'accès)
 create or replace function public.is_dealer()
 returns boolean language sql security definer set search_path = public stable as $$
-  select exists (select 1 from public.dealers d where d.email = (auth.jwt() ->> 'email'));
+  select exists (select 1 from public.dealers d where d.email = (select auth.jwt() ->> 'email'));
 $$;
 revoke all on function public.is_dealer() from public, anon;
 grant execute on function public.is_dealer() to authenticated;
@@ -434,7 +431,7 @@ create view public.products_dealer with (security_invoker = off) as
          p.tiers, p.qty, p.sort_order
   from public.products p
   where p.active = true and p.type = 'spacer'
-    and (auth.jwt() ->> 'email') in (select email from public.dealers);
+    and (select auth.jwt() ->> 'email') in (select email from public.dealers);
 grant select on public.products_dealer to authenticated;
 
 -- ------------------------------------------------------------
