@@ -235,13 +235,20 @@ create policy receipt_lines_admin_all
 -- p_qty peut être négatif (annulation lors d'une suppression/modification) ;
 -- le stock est borné à 0 (jamais négatif).
 create or replace function public.receive_stock(p_product uuid, p_kind text, p_qty integer)
-returns void language sql security definer set search_path = public as $$
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  -- Garde : fonction SECURITY DEFINER réservée à l'admin (sinon n'importe quel
+  -- compte connecté, ex. un dealer, pourrait modifier le stock). Advisor
+  -- « Signed-In Users Can Execute SECURITY DEFINER Function ».
+  if coalesce((select auth.jwt() ->> 'email'), '') <> 'creationaudio.ca@gmail.com' then
+    raise exception 'Réservé à l''administrateur.';
+  end if;
   update public.products
      set qty   = case when p_kind <> 'refill' then greatest(0, coalesce(qty,0)   + p_qty) else qty   end,
          qty_2 = case when p_kind =  'refill' then greatest(0, coalesce(qty_2,0) + p_qty) else qty_2 end,
          updated_at = now()
    where id = p_product;
-$$;
+end $$;
 revoke all on function public.receive_stock(uuid, text, integer) from public, anon;
 grant execute on function public.receive_stock(uuid, text, integer) to authenticated;
 
@@ -252,12 +259,13 @@ insert into storage.buckets (id, name, public)
 values ('products', 'products', true)
 on conflict (id) do nothing;
 
--- lecture publique des fichiers (les images s'affichent en boutique) :
+-- Lecture publique des images : le bucket est PUBLIC, donc les fichiers se
+-- servent via l'URL publique (getPublicUrl) SANS RLS. On ne crée donc PAS de
+-- policy SELECT anonyme : cela empêche le LISTAGE anonyme du bucket
+-- (advisor « Public Bucket Allows Listing ») sans casser l'affichage des
+-- images. Le code n'utilise jamais .list()/.download() (uniquement getPublicUrl,
+-- upload et remove — couverts par les policies admin ci-dessous).
 drop policy if exists products_files_public_read on storage.objects;
-create policy products_files_public_read
-  on storage.objects for select
-  to anon, authenticated
-  using (bucket_id = 'products');
 
 -- dépôt / màj / suppression : admin uniquement
 drop policy if exists products_files_admin_insert on storage.objects;
@@ -302,6 +310,11 @@ create or replace function public.next_invoice_number()
 returns text language plpgsql security definer set search_path = public as $$
 declare y int := extract(year from current_date)::int; n int;
 begin
+  -- Garde admin (voir receive_stock) : évite qu'un compte connecté non-admin
+  -- incrémente le compteur de factures.
+  if coalesce((select auth.jwt() ->> 'email'), '') <> 'creationaudio.ca@gmail.com' then
+    raise exception 'Réservé à l''administrateur.';
+  end if;
   insert into public.invoice_counters (year, seq) values (y, 1)
     on conflict (year) do update set seq = public.invoice_counters.seq + 1
     returning seq into n;
