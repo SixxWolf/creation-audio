@@ -1,310 +1,802 @@
 <!doctype html>
-<html lang="fr-CA">
+<html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Création Audio</title>
-<meta name="robots" content="noindex,nofollow">
-<link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png?v=3">
-<link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png?v=3">
-<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=3">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Création Audio — Admin V2</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/img/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css">
-<style>
-  body.admin{background:var(--wash);color:var(--ink);min-height:100vh}
-  .muted{color:var(--muted)}
-  /* le masquage doit toujours l'emporter, même sur display:grid/flex ci-dessous */
-  [hidden]{display:none!important}
-  /* --- login --- */
-  .admin-login{min-height:100vh;display:grid;place-items:center;padding:24px}
-  .admin-login form{width:min(380px,92vw);background:var(--paper);border:1px solid var(--line);
-    border-radius:18px;padding:30px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 50px rgba(0,0,0,.08)}
-  .admin-login h1{font-size:1.5rem;letter-spacing:-.02em;margin-bottom:4px}
-  .admin-login .sub{color:var(--muted);font-size:.9rem;margin-bottom:8px}
-  .admin-login input{padding:13px 14px;border:1px solid var(--line);border-radius:10px;font-size:1rem;font-family:var(--display)}
-  .admin-login input:focus{outline:none;border-color:var(--ember);box-shadow:0 0 0 2px rgba(255,106,43,.16)}
-  .admin-login button{margin-top:4px;padding:14px;border:0;border-radius:100px;background:var(--ember);color:#fff;
-    font-family:var(--mono);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
-  .admin-login button:hover{filter:brightness(1.06)}
-  .login-err{display:none;color:#d0402f;font-size:.85rem;text-align:center}
-  .login-err.show{display:block}
-  /* --- barre + onglets --- */
-  .admin-bar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
-    padding:12px clamp(14px,3vw,28px);background:var(--paper);border-bottom:1px solid var(--line)}
-  .admin-brand{font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px}
-  .admin-brand .d{width:10px;height:10px;border-radius:50%;background:var(--ember)}
-  .admin-tabs{display:flex;gap:6px;margin-left:6px}
-  .admin-tab{position:relative;border:0;background:transparent;cursor:pointer;padding:8px 14px;border-radius:100px;
-    font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-  .admin-tab.active{background:var(--ink);color:#fff}
-  .admin-tab .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;
-    border-radius:100px;background:var(--ember);color:#fff;font-size:.66rem}
-  .admin-tab .badge[hidden]{display:none}
-  #to-facture{margin-left:auto;text-decoration:none;border:1px solid var(--ember);background:transparent;cursor:pointer;
-    padding:8px 14px;border-radius:100px;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ember-dim)}
-  #to-facture:hover{background:var(--ember);color:#fff}
-  #logout{border:1px solid var(--line);background:transparent;cursor:pointer;
-    padding:8px 14px;border-radius:100px;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-  #logout:hover{border-color:var(--ember);color:var(--ember)}
-  main.admin-main{max-width:min(1760px,97vw);margin:0 auto;padding:clamp(18px,3vw,32px)}
-  .tab-panel h2{font-size:1.3rem;letter-spacing:-.01em;margin-bottom:16px}
-  /* --- inventaire : 4 colonnes de matériaux côte à côte, lignes compactes --- */
-  /* colonnes larges qui s'adaptent au nombre : nom complet toujours visible */
-  .inv-board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start}
-  .inv-group{min-width:0}
-  .inv-group-title{font-size:.95rem;font-weight:700;letter-spacing:-.01em;margin-bottom:10px;
-    padding-bottom:7px;border-bottom:1px solid var(--line)}
-  .inv-group-title .muted{font-weight:400;font-size:.72rem;display:block;margin-top:2px}
-  .inv-grid{display:flex;flex-direction:column;gap:6px}
-  .inv-row{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 9px;background:var(--paper);
-    border:1px solid var(--line);border-left:3px solid var(--line);border-radius:9px;transition:box-shadow .2s}
-  .inv-row.in{border-left-color:#22a75e}
-  .inv-row.out{border-left-color:#e0483a}
-  .inv-row.flash-ok{box-shadow:0 0 0 2px rgba(34,167,94,.5)}
-  .inv-row.flash-err{box-shadow:0 0 0 2px rgba(224,72,58,.5)}
-  .inv-name{display:flex;align-items:center;gap:8px;min-width:0;flex:0 1 auto;font-weight:600;font-size:.9rem}
-  .inv-sw{width:14px;height:14px;border-radius:50%;flex:none;background:var(--c);
-    box-shadow:inset 0 0 0 1px rgba(0,0,0,.22)}
-  .inv-cname{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-  .inv-code{font-family:var(--mono);font-size:.6rem;color:var(--muted);flex:none}
-  /* un seul stepper par ligne (dimension selon le toggle) */
-  .inv-stepper{display:flex;align-items:center;gap:4px;flex:none;margin-left:auto}
-  .inv-stepper button{width:26px;height:28px;border:1px solid var(--line);background:var(--wash);border-radius:7px;
-    cursor:pointer;font-size:1rem;line-height:1;padding:0}
-  .inv-stepper button:hover{border-color:var(--ember);color:var(--ember)}
-  .inv-qty{width:44px;height:28px;text-align:center;border:1px solid var(--line);border-radius:7px;
-    font-family:var(--mono);font-size:.84rem}
-  /* toggle Refill / Avec Bobine */
-  .inv-toggle{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:100px;
-    background:var(--paper);margin-bottom:18px}
-  .inv-toggle-btn{border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:100px;
-    padding:9px 20px;font-family:var(--mono);font-size:.72rem;letter-spacing:.04em;text-transform:uppercase}
-  .inv-toggle-btn.is-active{background:var(--ink);color:#fff}
-  /* onglets matériau : mobile uniquement (sur ordinateur les 4 colonnes suffisent) */
-  .inv-mat-tabs{display:none;margin-bottom:14px}
-  /* --- MOBILE : lignes compactes sur UNE seule ligne, comme sur ordinateur --- */
-  @media(max-width:700px){
-    .inv-mat-tabs{display:flex}
-    .inv-group.is-off{display:none}     /* un seul matériau à la fois */
-    .inv-group-title{display:none}      /* l'onglet actif sert déjà de titre */
-    main.admin-main{padding:14px 10px}
-    .inv-board{gap:10px}
-    .inv-row{padding:5px 7px 5px 8px;gap:6px}
-    .inv-name{font-size:.86rem;gap:6px}
-    .inv-code{font-size:.56rem}
-    .inv-stepper{gap:3px}
-    .inv-stepper button{width:30px;height:30px}   /* compact mais confortable au doigt */
-    .inv-qty{width:40px;height:30px;font-size:.8rem}
-  }
-  /* --- VENTES --- */
-  .sales-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
-  .sales-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .sales-range-btn{border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:100px;
-    padding:8px 16px;font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;text-transform:uppercase}
-  .sales-range-btn.is-active{background:var(--ink);color:#fff}
-  .sales-refresh-btn{cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--muted);
-    padding:8px 14px;border-radius:100px;font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase}
-  .sales-refresh-btn:hover{border-color:var(--ember);color:var(--ember)}
-  .sales-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:4px 0 22px}
-  .sales-stat{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
-  .sales-stat .num{font-family:var(--mono);font-weight:700;font-size:1.7rem;letter-spacing:-.02em;color:var(--ink)}
-  .sales-stat .lbl{font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px}
-  .sales-stat.hot{border-color:var(--ember);background:rgba(255,106,43,.06)}
-  .sales-stat.hot .num{font-size:1.15rem;color:var(--ember);line-height:1.15}
-  .sales-sect-title{font-size:.95rem;font-weight:700;letter-spacing:-.01em;margin:0 0 10px;padding-bottom:7px;border-bottom:1px solid var(--line)}
-  .sales-list{display:flex;flex-direction:column;gap:6px}
-  .sales-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--paper);
-    border:1px solid var(--line);border-radius:10px}
-  .sales-rank{font-family:var(--mono);font-size:.72rem;color:var(--muted);width:24px;flex:none;text-align:right}
-  .sales-row.top{border-color:var(--ember)}
-  .sales-row.top .sales-rank{color:var(--ember);font-weight:700}
-  .sales-sw{width:15px;height:15px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.22)}
-  .sales-nm{flex:1;min-width:0;font-weight:600;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .sales-nm .sub{font-weight:400;font-family:var(--mono);font-size:.62rem;color:var(--muted)}
-  .sales-qty{font-family:var(--mono);font-weight:700;font-size:.95rem;flex:none}
-  .sales-qty .u{font-weight:400;font-size:.62rem;color:var(--muted)}
-  .sales-rev{font-family:var(--mono);font-size:.8rem;color:var(--muted);width:74px;text-align:right;flex:none}
-  .sales-empty{color:var(--muted);padding:26px 0;text-align:center}
-  @media(max-width:560px){.sales-rev{display:none}}
-  /* --- SPACERS (annonces) --- */
-  .sp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
-  .sp-controls{display:flex;gap:10px;flex-wrap:wrap}
-  .sp-btn-primary{cursor:pointer;border:0;background:var(--ember);color:#fff;padding:10px 18px;border-radius:100px;
-    font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase}
-  .sp-btn-primary:hover{filter:brightness(1.06)}
-  .sp-btn-primary:disabled{opacity:.6;cursor:default}
-  .sp-btn-ghost{cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--muted);
-    padding:8px 14px;border-radius:100px;font-family:var(--mono);font-size:.68rem;letter-spacing:.05em;text-transform:uppercase}
-  .sp-btn-ghost:hover{border-color:var(--ember);color:var(--ember)}
-  /* éditeur */
-  .sp-editor{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:22px}
-  .sp-editor-grid{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:start}
-  .sp-field{display:flex;flex-direction:column;gap:6px}
-  .sp-lbl{font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-  .sp-field input[type=text],.sp-field input[type=number]{padding:11px 12px;border:1px solid var(--line);border-radius:10px;
-    font-size:1rem;font-family:var(--display);background:var(--wash);color:var(--ink)}
-  .sp-field input:focus{outline:none;border-color:var(--ember);box-shadow:0 0 0 2px rgba(255,106,43,.16)}
-  .sp-fields{display:flex;flex-direction:column;gap:12px}
-  .sp-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .sp-drop{width:200px;height:200px;border:2px dashed var(--line);border-radius:12px;display:grid;place-items:center;
-    cursor:pointer;overflow:hidden;background:var(--wash);text-align:center;padding:8px}
-  .sp-drop:hover{border-color:var(--ember)}
-  .sp-drop img{width:100%;height:100%;object-fit:cover}
-  .sp-check{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--ink);cursor:pointer}
-  .sp-editor-actions{display:flex;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap}
-  /* paliers de rabais quantité */
-  .sp-tiers{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
-  .sp-tiers-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-  .sp-tiers-hint{font-size:.78rem;margin:6px 0 12px}
-  .sp-tiers-rows{display:flex;flex-direction:column;gap:8px}
-  .sp-tier-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .sp-tier-txt{font-family:var(--mono);font-size:.7rem;color:var(--muted)}
-  .sp-tier-min,.sp-tier-price{width:90px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;
-    font-size:.95rem;font-family:var(--display);background:var(--wash);color:var(--ink)}
-  .sp-tier-min:focus,.sp-tier-price:focus{outline:none;border-color:var(--ember);box-shadow:0 0 0 2px rgba(255,106,43,.16)}
-  .sp-tier-del{padding:8px 12px}
-  /* résumé des paliers sur les cartes */
-  .sp-tierline{font-family:var(--mono);font-size:.62rem;color:var(--ember-dim);line-height:1.4}
-  /* liste de cartes */
-  .sp-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:16px}
-  .sp-card{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
-  .sp-card.is-hidden{opacity:.62}
-  .sp-thumb{position:relative;aspect-ratio:1/1;background:var(--wash);display:grid;place-items:center;overflow:hidden}
-  .sp-thumb img{width:100%;height:100%;object-fit:cover}
-  .sp-noimg{font-family:var(--mono);font-size:.66rem;color:var(--muted)}
-  .sp-badge-out,.sp-badge-hidden{position:absolute;top:8px;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;
-    text-transform:uppercase;padding:4px 9px;border-radius:100px;color:#fff}
-  .sp-badge-out{right:8px;background:#e0483a}
-  .sp-badge-hidden{left:8px;background:var(--ink)}
-  .sp-body{padding:12px 13px 13px;display:flex;flex-direction:column;gap:9px;flex:1}
-  .sp-name{font-size:.95rem;letter-spacing:-.01em;line-height:1.25}
-  .sp-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}
-  .sp-price{font-family:var(--mono);font-weight:700;font-size:1.05rem;color:var(--ink)}
-  .sp-qty{font-family:var(--mono);font-size:.68rem;color:#22a75e}
-  .sp-qty.out{color:#e0483a}
-  .sp-actions{display:flex;gap:8px}
-  @media(max-width:560px){.sp-editor-grid{grid-template-columns:1fr}.sp-drop{width:100%}}
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css?v=2">
+<link rel="stylesheet" href="assets/admin.css?v=6">
+<link rel="stylesheet" href="assets/facture.css?v=5">
 </head>
-<body class="admin theme-3d">
+<body>
 
-<!-- CONNEXION -->
-<div id="login" class="admin-login">
-  <form id="login-form">
-    <h1><span style="color:var(--ember)">●</span> Admin — Création Audio</h1>
-    <p class="sub">Connecte-toi pour gérer l'inventaire.</p>
-    <input id="login-email" type="email" placeholder="Courriel" autocomplete="username" required>
-    <input id="login-pass" type="password" placeholder="Mot de passe" autocomplete="current-password" required>
-    <button id="login-btn" type="submit">Se connecter</button>
-    <p id="login-err" class="login-err"></p>
+<!-- ======================= ÉCRAN DE CONNEXION ======================= -->
+<section id="login" class="login-wrap" hidden>
+  <form class="login-card" id="login-form">
+    <h1>Admin — Création Audio</h1>
+    <p>Espace privé. Connecte-toi avec le compte administrateur.</p>
+    <div class="field">
+      <label class="lbl" for="login-email">Courriel</label>
+      <input type="text" id="login-email" autocomplete="username" inputmode="email" placeholder="creationaudio.ca@gmail.com">
+    </div>
+    <div class="field">
+      <label class="lbl" for="login-pass">Mot de passe</label>
+      <input type="text" id="login-pass" style="-webkit-text-security:disc;text-security:disc" autocomplete="current-password">
+    </div>
+    <button class="btn btn-accent" type="submit" id="login-btn">Se connecter</button>
+    <p class="status" id="login-status" style="margin-top:12px"></p>
   </form>
-</div>
+</section>
 
-<!-- APPLICATION -->
+<!-- ======================= APPLICATION ADMIN ======================= -->
 <div id="app" hidden>
-  <header class="admin-bar">
-    <span class="admin-brand"><span class="d"></span>Création Audio</span>
-    <nav class="admin-tabs">
-      <button class="admin-tab active" data-tab="inv">Inventaire</button>
-      <button class="admin-tab" data-tab="sales">Ventes</button>
-      <button class="admin-tab" data-tab="spacers">Spacers</button>
-    </nav>
-    <a id="to-facture" href="facture.html" target="_blank">Facturation&nbsp;↗</a>
-    <button id="logout">Déconnexion</button>
+  <header class="topbar">
+    <button class="hamburger" id="nav-toggle" type="button" aria-label="Ouvrir le menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <span class="brand"><span class="d"></span> Création Audio <small>Admin V2</small></span>
+    <span class="topbar-spacer"></span>
+    <span class="who">Connecté&nbsp;: <b id="who-email">…</b></span>
+    <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">Déconnexion</button>
   </header>
 
-  <main class="admin-main">
-    <section id="tab-inv" class="tab-panel">
-      <h2>Inventaire</h2>
-      <p class="muted" style="margin-bottom:16px">Modifie une quantité : c'est enregistré aussitôt et visible en direct sur le site. Choisis le stock à gérer&nbsp;:</p>
-      <div class="inv-toggle" role="group" aria-label="Type de stock">
-        <button type="button" class="inv-toggle-btn is-active" data-kind="refill">Recharge</button>
-        <button type="button" class="inv-toggle-btn" data-kind="spool">Avec Bobine</button>
-      </div>
-      <!-- onglets matériau (affichés sur mobile seulement) -->
-      <div id="inv-mat-tabs" class="mat-tabs inv-mat-tabs" role="tablist" aria-label="Matériau"></div>
-      <div id="inv-list"></div>
-    </section>
+  <nav class="tabs" role="tablist" aria-label="Sections admin">
+    <button class="tab" role="tab" data-tab="filaments" aria-selected="true">Filaments</button>
+    <button class="tab" role="tab" data-tab="inventaire">Inventaire</button>
+    <button class="tab" role="tab" data-tab="spacers">Spacers</button>
+    <button class="tab" role="tab" data-tab="accessoires">Accessoires</button>
+    <button class="tab" role="tab" data-tab="dealers">Dealers</button>
+    <button class="tab" role="tab" data-tab="facturation">Facturation</button>
+    <button class="tab" role="tab" data-tab="historique">Historique</button>
+    <button class="tab" role="tab" data-tab="statistiques">Statistiques</button>
+  </nav>
 
-    <section id="tab-sales" class="tab-panel" hidden>
-      <div class="sales-head">
-        <h2>Ventes</h2>
-        <div class="sales-controls">
-          <div class="inv-toggle" role="group" aria-label="Période">
-            <button type="button" class="sales-range-btn is-active" data-days="30">30 jours</button>
-            <button type="button" class="sales-range-btn" data-days="7">7 jours</button>
-            <button type="button" class="sales-range-btn" data-days="365">12 mois</button>
-          </div>
-          <button id="sales-refresh" class="sales-refresh-btn" type="button">Rafraîchir</button>
+  <!-- Menu latéral mobile (ouvert par le hamburger) -->
+  <div class="nav-backdrop" id="nav-backdrop" hidden></div>
+  <aside class="nav-drawer" id="nav-drawer" aria-label="Menu">
+    <div class="nav-drawer-head"><span class="brand"><span class="d"></span> Menu</span></div>
+    <nav class="drawer-tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="filaments">Filaments</button>
+      <button class="tab" role="tab" data-tab="inventaire">Inventaire</button>
+      <button class="tab" role="tab" data-tab="spacers">Spacers</button>
+      <button class="tab" role="tab" data-tab="accessoires">Accessoires</button>
+      <button class="tab" role="tab" data-tab="dealers">Dealers</button>
+      <button class="tab" role="tab" data-tab="facturation">Facturation</button>
+      <button class="tab" role="tab" data-tab="historique">Historique</button>
+      <button class="tab" role="tab" data-tab="statistiques">Statistiques</button>
+    </nav>
+  </aside>
+
+  <!-- Liste latérale « Aller au matériau » (grand écran, onglet Filaments) -->
+  <nav class="mat-nav" id="mat-nav" aria-label="Aller au matériau"></nav>
+
+  <main>
+    <!-- ---------------- FILAMENTS ---------------- -->
+    <section class="tabpanel" data-panel="filaments" role="tabpanel">
+
+      <!-- ===== MARQUES (Bambu Lab, Elegoo, Anycubic…) ===== -->
+      <div class="brand-bar" id="brand-bar"></div>
+
+      <!-- ===== MATÉRIAUX & PRIX (prix/coûts partagés par toutes les couleurs) ===== -->
+      <div class="panel-head">
+        <div>
+          <h1>Matériaux &amp; prix</h1>
+          <p class="muted">Le prix, le coût et les rabais valent pour <b>toutes les couleurs</b> du matériau.</p>
         </div>
+        <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm" id="m-toggle" type="button" aria-expanded="true">Masquer</button>
+        <button class="btn btn-accent" id="m-new" type="button">+ Nouveau matériau</button>
       </div>
-      <p class="muted" style="margin-bottom:16px">Ventes enregistrées à la confirmation dans la facturation (bouton «&nbsp;Déduire de l'inventaire&nbsp;»).</p>
-      <div id="sales-body"></div>
-    </section>
 
-    <section id="tab-spacers" class="tab-panel" hidden>
-      <div class="sp-head">
-        <h2>Spacers imprimés 3D</h2>
-        <div class="sp-controls">
-          <button id="sp-new" class="sp-btn-primary" type="button">+ Nouvelle annonce</button>
-          <button id="sp-refresh" class="sales-refresh-btn" type="button">Rafraîchir</button>
-        </div>
-      </div>
-      <p class="muted" style="margin-bottom:16px">Ajoute tes spacers comme des annonces&nbsp;: photo, prix, quantité. Ce que tu publies ici alimentera le portail Dealer (à venir). Rien n'est visible pour le public.</p>
-
-      <!-- éditeur d'annonce -->
-      <form id="sp-editor" class="sp-editor" hidden>
-        <div class="sp-editor-grid">
-          <label class="sp-field sp-photo-field">
-            <span class="sp-lbl">Photo</span>
-            <div class="sp-drop" id="sp-drop">
-              <img id="sp-preview" alt="" hidden>
-              <span id="sp-drop-hint" class="muted">Cliquer pour choisir une photo</span>
+      <div id="m-section">
+        <!-- Éditeur matériau -->
+        <form class="editor" id="m-editor" hidden>
+          <h2 id="m-editor-title">Nouveau matériau</h2>
+          <div class="grid">
+            <div class="field">
+              <label class="lbl" for="m-name">Nom du matériau</label>
+              <input type="text" id="m-name" placeholder="PLA Basic" autocomplete="off">
+              <span class="hint">Ex. « PLA Basic ». Doit correspondre exactement au matériau choisi sur les filaments.</span>
             </div>
-            <input id="sp-file" type="file" accept="image/*" hidden>
-          </label>
-          <div class="sp-fields">
-            <label class="sp-field"><span class="sp-lbl">Nom</span>
-              <input id="sp-name" type="text" placeholder="ex. Spacer 6,5&quot; — Honda Civic 2016-2021" required></label>
-            <div class="sp-row2">
-              <label class="sp-field"><span class="sp-lbl">Prix ($)</span>
-                <input id="sp-price" type="number" min="0" step="0.01" placeholder="0.00" required></label>
-              <label class="sp-field"><span class="sp-lbl">Quantité dispo</span>
-                <input id="sp-qty" type="number" min="0" step="1" value="0" required></label>
+            <div class="field">
+              <label class="lbl">Formats vendus</label>
+              <div class="inline" style="gap:18px; flex-wrap:wrap; padding-top:4px">
+                <label class="inline" style="gap:7px"><input type="checkbox" id="m-has-spool" style="width:auto"> Avec bobine</label>
+                <label class="inline" style="gap:7px"><input type="checkbox" id="m-has-refill" style="width:auto"> Recharge</label>
+              </div>
+              <span class="hint">Coche au moins un format.</span>
             </div>
-            <label class="sp-check"><input id="sp-active" type="checkbox" checked> Visible pour les dealers</label>
+
+            <div class="field">
+              <label class="lbl">Prix de vente</label>
+              <div class="row-2">
+                <div class="spool-only">
+                  <span class="hint">Avec bobine</span>
+                  <input type="number" id="m-sell-spool" min="0" step="0.01" placeholder="25.00" class="money">
+                </div>
+                <div class="refill-only">
+                  <span class="hint">Recharge</span>
+                  <input type="number" id="m-sell-refill" min="0" step="0.01" placeholder="20.00" class="money">
+                </div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="lbl">Coût payé <span class="hint">(privé)</span></label>
+              <div class="row-2">
+                <div class="spool-only">
+                  <span class="hint">Avec bobine</span>
+                  <input type="number" id="m-cost-spool" min="0" step="0.01" placeholder="0.00" class="money">
+                </div>
+                <div class="refill-only">
+                  <span class="hint">Recharge</span>
+                  <input type="number" id="m-cost-refill" min="0" step="0.01" placeholder="0.00" class="money">
+                </div>
+              </div>
+            </div>
+
+            <div class="field col-2">
+              <div class="margin-box">
+                <div class="mrow spool-only"><span class="k">Marge bobine</span><span class="v" id="m-margin-spool">—</span></div>
+                <div class="mrow refill-only"><span class="k">Marge recharge</span><span class="v" id="m-margin-refill">—</span></div>
+              </div>
+            </div>
+
+            <div class="field col-2">
+              <label class="lbl" for="m-desc">Caractéristiques <span class="hint">(affichées en boutique)</span></label>
+              <textarea id="m-desc" rows="6" placeholder="Une caractéristique par ligne, ex :&#10;Facile à imprimer — idéal pour débuter&#10;Faibles émissions en intérieur&#10;Compatible avec tous les AMS&#10;Ø 1,75 mm ± 0,03 mm"></textarea>
+              <span class="hint">Chaque ligne devient un point dans la liste « Caractéristiques » de la boutique.</span>
+            </div>
+
+            <!-- Image vitrine du matériau (E4) -->
+            <div class="field col-2">
+              <label class="lbl">Image vitrine <span class="hint">(optionnel — la tuile du matériau en boutique)</span></label>
+              <div class="drop" id="m-drop">
+                <img id="m-preview" alt="" hidden>
+                <span class="drop-hint" id="m-drop-hint">Clique pour choisir une image (JPG/PNG).</span>
+              </div>
+              <input type="file" id="m-file" accept="image/*" hidden>
+              <span class="hint">Sans image, la boutique choisit automatiquement une couleur représentative.</span>
+            </div>
+
+            <!-- Paliers — Bobine -->
+            <div class="field col-2 spool-only">
+              <label class="lbl">Rabais quantité — Bobine</label>
+              <div class="tiers" id="m-tiers-spool"></div>
+              <div><button type="button" class="btn btn-ghost btn-sm" id="m-tier-add-spool">+ Ajouter un palier</button></div>
+            </div>
+            <!-- Paliers — Recharge -->
+            <div class="field col-2 refill-only">
+              <label class="lbl">Rabais quantité — Recharge</label>
+              <div class="tiers" id="m-tiers-refill"></div>
+              <div><button type="button" class="btn btn-ghost btn-sm" id="m-tier-add-refill">+ Ajouter un palier</button></div>
+            </div>
+          </div>
+
+          <div class="editor-actions">
+            <button class="btn btn-accent" type="submit" id="m-save">Enregistrer</button>
+            <button class="btn btn-ghost" type="button" id="m-cancel">Annuler</button>
+            <span class="status" id="m-status"></span>
+          </div>
+        </form>
+
+        <!-- Liste des matériaux -->
+        <div id="m-list" class="mat-rows"></div>
+      </div>
+
+      <!-- ===== FILAMENTS (couleurs — identité + stock) ===== -->
+      <div class="panel-head" style="margin-top:30px">
+        <div>
+          <h1>Filaments</h1>
+          <p class="muted">Chaque couleur hérite du prix de son matériau. Glisse une carte pour changer l'ordre.</p>
+        </div>
+        <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm" id="f-refresh" type="button">Actualiser</button>
+        <button class="btn btn-accent" id="f-new" type="button">+ Nouveau filament</button>
+      </div>
+
+      <!-- Éditeur filament (identité + stock ; le prix vient du matériau) -->
+      <form class="editor" id="f-editor" hidden>
+        <h2 id="f-editor-title">Nouveau filament</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="f-name">Nom (couleur)</label>
+            <input type="text" id="f-name" placeholder="Ex. Titan Gray" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="f-material">Matériau</label>
+            <select id="f-material"></select>
+            <span class="hint" id="f-material-hint">Le prix et les rabais viennent du matériau.</span>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="f-code">Code Bambu <span class="hint">(optionnel)</span></label>
+            <input type="text" id="f-code" placeholder="Ex. 10100" autocomplete="off" inputmode="numeric">
+            <span class="hint">Sert au rattachement automatique en réception de commande.</span>
+          </div>
+          <div class="field">
+            <label class="lbl" for="f-hex">Couleur (pastille)</label>
+            <div class="inline">
+              <input type="color" id="f-hex-picker" value="#888888">
+              <input type="text" id="f-hex" placeholder="#888888" autocomplete="off" style="max-width:120px">
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl" for="f-size">Taille de la case</label>
+            <select id="f-size">
+              <option value="1x1">1 × 1 (standard)</option>
+              <option value="2x1">2 × 1 (large)</option>
+              <option value="1x2">1 × 2 (haut)</option>
+              <option value="2x2">2 × 2 (vedette)</option>
+            </select>
+          </div>
+
+          <!-- Image -->
+          <div class="field col-2">
+            <label class="lbl">Image</label>
+            <div class="drop" id="f-drop">
+              <img id="f-preview" alt="" hidden>
+              <span class="drop-hint" id="f-drop-hint">Clique pour choisir une image (JPG/PNG).</span>
+            </div>
+            <input type="file" id="f-file" accept="image/*" hidden>
+          </div>
+
+          <!-- Formats vendus pour CETTE couleur (limités aux formats du matériau) -->
+          <div class="field col-2">
+            <label class="lbl">Formats vendus (cette couleur)</label>
+            <div class="inline" style="gap:18px; flex-wrap:wrap; padding-top:4px">
+              <label class="inline" style="gap:7px"><input type="checkbox" id="f-offer-spool" style="width:auto"> Avec bobine</label>
+              <label class="inline" style="gap:7px"><input type="checkbox" id="f-offer-refill" style="width:auto"> Recharge</label>
+            </div>
+            <span class="hint" id="f-offer-hint">Décoche un format si cette couleur n'existe pas dans ce format (ex. certaines couleurs uniquement en recharge). Limité aux formats proposés par le matériau.</span>
+          </div>
+
+          <!-- Prix hérité (lecture seule, informatif) -->
+          <div class="field col-2">
+            <div class="margin-box" id="f-price-info"><span class="k">Prix hérité du matériau —</span> <span class="v" id="f-price-preview">choisis un matériau</span></div>
+          </div>
+
+          <!-- Stock (par couleur) -->
+          <div class="field">
+            <label class="lbl">Stock (cette couleur)</label>
+            <div class="row-2">
+              <div id="f-qty-wrap">
+                <span class="hint">Bobines</span>
+                <input type="number" id="f-qty" min="0" step="1" placeholder="0" value="0" class="num">
+              </div>
+              <div id="f-qty2-wrap">
+                <span class="hint">Recharges</span>
+                <input type="number" id="f-qty2" min="0" step="1" placeholder="0" class="num">
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl inline" style="gap:8px">
+              <input type="checkbox" id="f-active" checked style="width:auto"> Visible en boutique
+            </label>
+            <span class="hint">Décoche pour masquer sans supprimer.</span>
           </div>
         </div>
 
-        <div class="sp-tiers">
-          <div class="sp-tiers-head">
-            <span class="sp-lbl">Rabais quantité (optionnel)</span>
-            <button type="button" class="sp-btn-ghost" id="sp-tier-add">+ Ajouter un palier</button>
-          </div>
-          <p class="muted sp-tiers-hint">Ex.&nbsp;: à partir de 5&nbsp;→&nbsp;10&nbsp;$ ch., à partir de 20&nbsp;→&nbsp;9&nbsp;$ ch. Le prix ci-dessus s'applique en dessous du premier palier.</p>
-          <div id="sp-tiers-rows" class="sp-tiers-rows"></div>
-        </div>
-
-        <div class="sp-editor-actions">
-          <button type="submit" class="sp-btn-primary" id="sp-save">Enregistrer</button>
-          <button type="button" class="sp-btn-ghost" id="sp-cancel">Annuler</button>
-          <span id="sp-status" class="muted"></span>
+        <div class="editor-actions">
+          <button class="btn btn-accent" type="submit" id="f-save">Enregistrer</button>
+          <button class="btn btn-ghost" type="button" id="f-cancel">Annuler</button>
+          <span class="status" id="f-status"></span>
         </div>
       </form>
 
-      <div id="sp-list" class="sp-list"></div>
+      <!-- Liste des filaments (groupée par matériau) -->
+      <div class="fil-groups" id="f-list"></div>
+    </section>
+
+    <!-- ---------------- INVENTAIRE (réception de commande) ---------------- -->
+    <section class="tabpanel" data-panel="inventaire" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Inventaire</h1>
+          <p class="muted">Réceptionne une commande Bambu : le stock s'ajoute et la commande est archivée.</p>
+        </div>
+      </div>
+
+      <!-- Réception -->
+      <form class="editor" id="r-editor">
+        <h2 id="r-editor-title">Nouvelle réception</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="r-order">N° de commande Bambu</label>
+            <input type="text" id="r-order" placeholder="Ex. US2409..." autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="r-date">Date de réception</label>
+            <input type="text" id="r-date" placeholder="AAAA-MM-JJ" autocomplete="off">
+          </div>
+          <div class="field col-2">
+            <label class="lbl" for="r-paste">Coller le texte de la commande (optionnel)</label>
+            <textarea id="r-paste" rows="5" placeholder="Copie-colle le récapitulatif de ta commande Bambu ici, puis clique « Analyser »."></textarea>
+            <div class="inline" style="margin-top:8px; gap:8px">
+              <button type="button" class="btn btn-ghost btn-sm" id="r-parse">Analyser le texte</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="r-add-line">+ Ajouter une ligne</button>
+              <span class="hint" id="r-parse-hint"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tableau de confirmation -->
+        <div class="rcp-table-wrap">
+          <table class="rcp-table" id="r-table">
+            <thead>
+              <tr><th>Filament</th><th>Type</th><th class="num">Quantité</th><th></th></tr>
+            </thead>
+            <tbody id="r-rows"></tbody>
+          </table>
+          <p class="hint" id="r-empty-hint">Aucune ligne. Colle un texte puis « Analyser », ou « + Ajouter une ligne ».</p>
+        </div>
+
+        <div class="editor-actions">
+          <button class="btn btn-accent" type="submit" id="r-confirm">Confirmer la réception</button>
+          <button class="btn btn-ghost" type="button" id="r-reset">Vider</button>
+          <span class="status" id="r-status"></span>
+        </div>
+      </form>
+
+      <!-- Historique des réceptions -->
+      <div class="panel-head" style="margin-top:26px">
+        <div><h1 style="font-size:1.1rem">Historique des réceptions</h1></div>
+        <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm" id="r-refresh" type="button">Actualiser</button>
+      </div>
+      <div id="r-history" class="mat-rows"></div>
+    </section>
+
+    <!-- ---------------- Autres onglets (à venir) ---------------- -->
+    <section class="tabpanel" data-panel="spacers" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Spacers</h1>
+          <p class="muted">Tes pièces imprimées 3D (adaptateurs, entretoises…). Glisse une carte pour changer l'ordre.</p>
+        </div>
+        <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm" id="sp-refresh" type="button">Actualiser</button>
+        <button class="btn btn-accent" id="sp-new" type="button">+ Nouveau spacer</button>
+      </div>
+
+      <!-- Éditeur spacer -->
+      <form class="editor" id="sp-editor" hidden>
+        <h2 id="sp-editor-title">Nouveau spacer</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="sp-name">Nom</label>
+            <input type="text" id="sp-name" placeholder="Ex. Adaptateur 6x9 → 6.5" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl inline" style="gap:8px">
+              <input type="checkbox" id="sp-active" checked style="width:auto"> Visible en boutique
+            </label>
+            <span class="hint">Décoche pour masquer sans supprimer.</span>
+          </div>
+
+          <div class="field col-2">
+            <label class="lbl" for="sp-desc">Description <span class="hint">(optionnel, affichée en boutique)</span></label>
+            <textarea id="sp-desc" rows="3" placeholder="Compatibilité, dimensions, véhicule, matériau d'impression…"></textarea>
+          </div>
+
+          <!-- Image -->
+          <div class="field col-2">
+            <label class="lbl">Photo</label>
+            <div class="drop" id="sp-drop">
+              <img id="sp-preview" alt="" hidden>
+              <span class="drop-hint" id="sp-drop-hint">Clique pour choisir une photo (JPG/PNG).</span>
+            </div>
+            <input type="file" id="sp-file" accept="image/*" hidden>
+          </div>
+
+          <!-- Prix CLIENT (public) -->
+          <div class="field">
+            <label class="lbl" for="sp-price">Prix client <span class="hint">(public · par paire)</span></label>
+            <input type="number" id="sp-price" min="0" step="0.01" placeholder="19.99" class="money">
+            <span class="hint">Affiché sur le site, à plat (sans rabais quantité).</span>
+          </div>
+          <!-- Prix DEALER (portail privé) -->
+          <div class="field">
+            <label class="lbl" for="sp-dealer-price">Prix dealer <span class="hint">(Olivier · par paire)</span></label>
+            <input type="number" id="sp-dealer-price" min="0" step="0.01" placeholder="16.99" class="money">
+            <span class="hint">Visible uniquement dans le portail dealer.</span>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="sp-cost">Coût payé <span class="hint">(privé)</span></label>
+            <input type="number" id="sp-cost" min="0" step="0.01" placeholder="0.00" class="money">
+          </div>
+          <div class="field">
+            <label class="lbl" for="sp-qty">Stock (paires)</label>
+            <input type="number" id="sp-qty" min="0" step="1" placeholder="0" value="0" class="num">
+          </div>
+
+          <div class="field col-2">
+            <div class="margin-box">
+              <div class="mrow"><span class="k">Marge client</span><span class="v" id="sp-margin">—</span></div>
+              <div class="mrow"><span class="k">Marge dealer</span><span class="v" id="sp-margin-dealer">—</span></div>
+            </div>
+          </div>
+
+          <!-- Paliers de rabais DEALER uniquement -->
+          <div class="field col-2">
+            <label class="lbl">Rabais quantité — dealer <span class="hint">(par paires)</span></label>
+            <div class="tiers" id="sp-tiers"></div>
+            <div><button type="button" class="btn btn-ghost btn-sm" id="sp-tier-add">+ Ajouter un palier</button></div>
+            <span class="hint">S'applique uniquement au prix dealer (portail + facture Olivier).</span>
+          </div>
+        </div>
+
+        <div class="editor-actions">
+          <button class="btn btn-accent" type="submit" id="sp-save">Enregistrer</button>
+          <button class="btn btn-ghost" type="button" id="sp-cancel">Annuler</button>
+          <span class="status" id="sp-status"></span>
+        </div>
+      </form>
+
+      <!-- Liste des spacers -->
+      <div class="cards" id="sp-list"></div>
+    </section>
+
+    <!-- ---------------- ACCESSOIRES (bobines vides…) ---------------- -->
+    <section class="tabpanel" data-panel="accessoires" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Accessoires</h1>
+          <p class="muted">Bobines vides réutilisables et autres extras proposés en boutique (prix + stock réels). Glisse une carte pour changer l'ordre.</p>
+        </div>
+        <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm" id="ac-refresh" type="button">Actualiser</button>
+        <button class="btn btn-accent" id="ac-new" type="button">+ Nouvel accessoire</button>
+      </div>
+
+      <!-- Éditeur accessoire -->
+      <form class="editor" id="ac-editor" hidden>
+        <h2 id="ac-editor-title">Nouvel accessoire</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="ac-name">Nom</label>
+            <input type="text" id="ac-name" placeholder="Ex. Bobine vide réutilisable" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl inline" style="gap:8px">
+              <input type="checkbox" id="ac-active" checked style="width:auto"> Visible en boutique
+            </label>
+            <span class="hint">Décoche pour masquer sans supprimer.</span>
+          </div>
+
+          <div class="field col-2">
+            <label class="lbl" for="ac-desc">Description <span class="hint">(optionnel, affichée en boutique)</span></label>
+            <textarea id="ac-desc" rows="2" placeholder="Ex. En supplément — pour vos recharges · température max 70 °C"></textarea>
+          </div>
+
+          <!-- Image -->
+          <div class="field col-2">
+            <label class="lbl">Photo</label>
+            <div class="drop" id="ac-drop">
+              <img id="ac-preview" alt="" hidden>
+              <span class="drop-hint" id="ac-drop-hint">Clique pour choisir une photo (JPG/PNG).</span>
+            </div>
+            <input type="file" id="ac-file" accept="image/*" hidden>
+          </div>
+
+          <div class="field">
+            <label class="lbl" for="ac-price">Prix <span class="hint">(public)</span></label>
+            <input type="number" id="ac-price" min="0" step="0.01" placeholder="10.00" class="money">
+          </div>
+          <div class="field">
+            <label class="lbl" for="ac-cost">Coût payé <span class="hint">(privé)</span></label>
+            <input type="number" id="ac-cost" min="0" step="0.01" placeholder="0.00" class="money">
+          </div>
+          <div class="field">
+            <label class="lbl" for="ac-qty">Stock</label>
+            <input type="number" id="ac-qty" min="0" step="1" placeholder="0" value="0" class="num">
+          </div>
+          <div class="field">
+            <div class="margin-box">
+              <div class="mrow"><span class="k">Marge</span><span class="v" id="ac-margin">—</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-actions">
+          <button class="btn btn-accent" type="submit" id="ac-save">Enregistrer</button>
+          <button class="btn btn-ghost" type="button" id="ac-cancel">Annuler</button>
+          <span class="status" id="ac-status"></span>
+        </div>
+      </form>
+
+      <!-- Liste des accessoires -->
+      <div class="cards" id="ac-list"></div>
+    </section>
+
+    <!-- ---------------- DEALERS ---------------- -->
+    <section class="tabpanel" data-panel="dealers" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Dealers</h1>
+          <p class="muted">Comptes autorisés au <b>portail dealer</b> (prix de gros + rabais quantité sur les spacers).</p>
+        </div>
+        <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm" id="dl-refresh" type="button">Actualiser</button>
+        <button class="btn btn-accent" id="dl-new" type="button">+ Ajouter un dealer</button>
+      </div>
+
+      <form class="editor" id="dl-editor" hidden>
+        <h2 id="dl-editor-title">Nouveau dealer</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="dl-email">Courriel du compte</label>
+            <input type="text" id="dl-email" placeholder="olivier@example.com" autocomplete="off" inputmode="email">
+            <span class="hint">Doit correspondre exactement au compte Supabase que tu as créé pour ce dealer.</span>
+          </div>
+          <div class="field">
+            <label class="lbl" for="dl-name">Nom / entreprise <span class="hint">(optionnel)</span></label>
+            <input type="text" id="dl-name" placeholder="OB Audio — Olivier" autocomplete="off">
+          </div>
+        </div>
+        <div class="editor-actions">
+          <button class="btn btn-accent" type="submit" id="dl-save">Enregistrer</button>
+          <button class="btn btn-ghost" type="button" id="dl-cancel">Annuler</button>
+          <span class="status" id="dl-status"></span>
+        </div>
+      </form>
+
+      <div class="placeholder" style="margin-bottom:16px">
+        <b>Rappel.</b> Le dealer se connecte sur <b>dealer.html</b> avec son compte. Il y voit les spacers
+        au <b>prix dealer</b> (avec rabais quantité) et son stock. Les autres visiteurs ne voient jamais ces prix.
+      </div>
+
+      <div id="dl-list" class="mat-rows"><p class="muted">Chargement…</p></div>
+    </section>
+
+    <!-- ---------------- FACTURATION ---------------- -->
+    <section class="tabpanel" data-panel="facturation" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Facturation</h1>
+          <p class="muted">Choisis un gabarit, ajoute des articles, enregistre&nbsp;: le stock est déduit et la facture archivée.</p>
+        </div>
+        <span class="grow"></span>
+        <span class="hint" id="fx-nexthint"></span>
+        <button class="btn btn-ghost btn-sm" id="fx-reset" type="button">Nouvelle facture</button>
+      </div>
+
+      <!-- Barre de gabarit + client -->
+      <div class="fx-bar">
+        <div class="fx-seg" role="tablist" aria-label="Type de facture">
+          <button type="button" class="fx-seg-btn is-active" data-cat="filament">Filament</button>
+          <button type="button" class="fx-seg-btn" data-cat="spacer">Spacer</button>
+          <button type="button" class="fx-seg-btn" data-cat="caisson">Caisson</button>
+        </div>
+        <span class="grow"></span>
+        <label class="fx-check"><input type="checkbox" id="fx-tax"> Taxes (TPS/TVQ)</label>
+      </div>
+
+      <!-- Infos client + facture -->
+      <div class="editor fx-meta">
+        <div class="grid">
+          <div class="field">
+            <label class="lbl">Type de client</label>
+            <div class="fx-seg fx-seg-sm" role="group" aria-label="Type de client">
+              <button type="button" class="fx-cli-btn is-active" data-cli="client">Client</button>
+              <button type="button" class="fx-cli-btn" data-cli="olivier">Olivier (dealer)</button>
+            </div>
+            <span class="hint" id="fx-cli-hint"></span>
+          </div>
+          <div class="field">
+            <label class="lbl" for="fx-cli-name">Client / entreprise</label>
+            <input type="text" id="fx-cli-name" placeholder="Nom ou raison sociale" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="fx-cli-contact">Contact <span class="hint">(optionnel)</span></label>
+            <input type="text" id="fx-cli-contact" placeholder="Courriel / téléphone / Messenger" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="fx-cli-address">Adresse <span class="hint">(optionnel)</span></label>
+            <input type="text" id="fx-cli-address" placeholder="123 rue Exemple" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="fx-cli-city">Ville, code postal <span class="hint">(optionnel)</span></label>
+            <input type="text" id="fx-cli-city" placeholder="Québec, QC  G1A 1A1" autocomplete="off">
+          </div>
+          <div class="field">
+            <div class="row-2">
+              <div>
+                <label class="lbl" for="fx-number">N° de facture <span class="hint">(auto — modifiable)</span></label>
+                <input type="text" id="fx-number" placeholder="F-2026-001" autocomplete="off">
+              </div>
+              <div>
+                <label class="lbl" for="fx-date">Date</label>
+                <input type="text" id="fx-date" placeholder="AAAA-MM-JJ" autocomplete="off">
+              </div>
+            </div>
+          </div>
+          <div class="field col-2">
+            <label class="lbl" for="fx-note">Note / paiement <span class="hint">(optionnel, affichée sur la facture)</span></label>
+            <input type="text" id="fx-note" placeholder="Ex. Paiement à la livraison · Interac · ramassage Québec" autocomplete="off">
+          </div>
+        </div>
+
+        <!-- Entreprise (repliable) -->
+        <details class="fx-company" id="fx-company">
+          <summary>Coordonnées de l'entreprise &amp; taxes <span class="hint">(mémorisées sur cet appareil)</span></summary>
+          <div class="grid" style="margin-top:14px">
+            <div class="field"><label class="lbl" for="co-name">Nom</label><input type="text" id="co-name" autocomplete="off"></div>
+            <div class="field"><label class="lbl" for="co-tagline">Slogan</label><input type="text" id="co-tagline" autocomplete="off"></div>
+            <div class="field"><label class="lbl" for="co-email">Courriel</label><input type="text" id="co-email" autocomplete="off"></div>
+            <div class="field"><label class="lbl" for="co-phone">Téléphone</label><input type="text" id="co-phone" autocomplete="off"></div>
+            <div class="field"><label class="lbl" for="co-address">Adresse</label><input type="text" id="co-address" autocomplete="off"></div>
+            <div class="field"><label class="lbl" for="co-city">Ville</label><input type="text" id="co-city" autocomplete="off"></div>
+            <div class="field">
+              <label class="lbl">N° de taxes <span class="hint">(TPS · TVQ)</span></label>
+              <div class="row-2">
+                <input type="text" id="co-gst" placeholder="TPS" autocomplete="off">
+                <input type="text" id="co-qst" placeholder="TVQ" autocomplete="off">
+              </div>
+            </div>
+            <div class="field">
+              <label class="lbl">Taux (%) <span class="hint">TPS · TVQ</span></label>
+              <div class="row-2">
+                <input type="number" id="gst-rate" step="0.001" placeholder="5">
+                <input type="number" id="qst-rate" step="0.001" placeholder="9.975">
+              </div>
+            </div>
+            <div class="field col-2">
+              <label class="lbl">Logo</label>
+              <div class="inline" style="gap:12px; flex-wrap:wrap">
+                <input type="file" id="co-logo-file" accept="image/*">
+                <span class="fx-logo-prev" id="co-logo-preview" hidden><img id="co-logo-img" alt="logo"></span>
+                <button type="button" class="btn btn-ghost btn-sm" id="co-logo-remove">Retirer</button>
+              </div>
+            </div>
+          </div>
+          <div class="editor-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="co-save">Enregistrer l'entreprise</button>
+            <span class="status" id="co-msg"></span>
+          </div>
+        </details>
+      </div>
+
+      <!-- Corps : catalogue (gauche) + facture (droite) -->
+      <div class="fx-layout">
+        <!-- Colonne gauche : catalogue OU lignes libres (caisson) -->
+        <aside class="fx-side">
+          <!-- Catalogue produits (filament / spacer) -->
+          <div class="fx-picker" id="fx-picker">
+            <div class="fx-picker-head">
+              <input type="search" id="fx-search" placeholder="Rechercher un article…" autocomplete="off">
+              <div class="fx-filters" id="fx-filters" hidden>
+                <select id="fx-brand" aria-label="Filtrer par marque"><option value="all">Toutes les marques</option></select>
+                <select id="fx-material" aria-label="Filtrer par matériau"><option value="all">Tous les matériaux</option></select>
+              </div>
+              <div class="fx-type" id="fx-type" hidden>
+                <button type="button" class="fx-type-btn is-active" data-kind="spool">Avec bobine</button>
+                <button type="button" class="fx-type-btn" data-kind="refill">Recharge</button>
+              </div>
+            </div>
+            <div class="fx-catalog" id="fx-catalog"><p class="muted">Chargement…</p></div>
+          </div>
+
+          <!-- Panneau caisson : specs + ligne libre -->
+          <div class="fx-caisson" id="fx-caisson" hidden>
+            <h3>Spécifications du caisson</h3>
+            <div class="fx-spec-grid">
+              <div class="field"><label class="lbl" for="cx-vehicle">Véhicule</label><input type="text" id="cx-vehicle" placeholder="Ex. Civic 2018" autocomplete="off"></div>
+              <div class="field"><label class="lbl" for="cx-litrage">Litrage / config</label><input type="text" id="cx-litrage" placeholder="Ex. 1 pi³ scellé" autocomplete="off"></div>
+              <div class="field"><label class="lbl" for="cx-event">Évent / accord</label><input type="text" id="cx-event" placeholder="Ex. port 32 Hz" autocomplete="off"></div>
+              <div class="field"><label class="lbl" for="cx-finition">Finition</label><input type="text" id="cx-finition" placeholder="Ex. tapis / suède" autocomplete="off"></div>
+            </div>
+            <h3 style="margin-top:16px">Ajouter une ligne</h3>
+            <p class="hint">Matériaux, main-d'œuvre, transport… Chaque ligne est libre.</p>
+            <button type="button" class="btn btn-ghost btn-sm" id="cx-add-line">+ Ligne libre</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="cx-add-labor">+ Main-d'œuvre</button>
+          </div>
+
+          <!-- Bouton ligne libre pour filament/spacer aussi -->
+          <button type="button" class="btn btn-ghost btn-sm fx-freeline" id="fx-add-free">+ Ligne libre</button>
+        </aside>
+
+        <!-- Colonne droite : la facture -->
+        <div class="fx-main">
+          <div class="fx-invoice" id="fx-invoice"></div>
+
+          <!-- Résumé marge (privé, non imprimé) -->
+          <div class="fx-margin no-print" id="fx-margin" hidden></div>
+
+          <div class="fx-actions no-print">
+            <button class="btn btn-accent" id="fx-save" type="button">Enregistrer la facture</button>
+            <label class="fx-check" id="fx-deduct-wrap"><input type="checkbox" id="fx-deduct" checked> Déduire le stock</label>
+            <button class="btn btn-ghost" id="fx-print" type="button">Imprimer / PDF</button>
+            <button class="btn btn-ghost" id="fx-email" type="button">Envoyer par courriel</button>
+            <button class="btn btn-ghost" id="fx-copy" type="button">Copier</button>
+            <span class="status" id="fx-status"></span>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- ---------------- HISTORIQUE ---------------- -->
+    <section class="tabpanel" data-panel="historique" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Historique</h1>
+          <p class="muted">Toutes les factures. Tu peux <b>annuler</b> une facture à tout moment (le stock est remis).</p>
+        </div>
+        <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm" id="hist-refresh" type="button">Actualiser</button>
+      </div>
+
+      <div class="hist-bar">
+        <input type="search" id="hist-search" placeholder="Rechercher (n°, client…)" autocomplete="off">
+        <div class="fx-seg fx-seg-sm" id="hist-filter" role="group" aria-label="Statut">
+          <button type="button" class="hist-fbtn is-active" data-f="active">Actives</button>
+          <button type="button" class="hist-fbtn" data-f="cancelled">Annulées</button>
+          <button type="button" class="hist-fbtn" data-f="all">Toutes</button>
+        </div>
+      </div>
+
+      <!-- Séparation par type de facture -->
+      <div class="hist-cats" id="hist-cats" role="group" aria-label="Type de facture">
+        <button type="button" class="hist-cbtn is-active" data-c="all">Toutes <span class="hist-cnt" data-cnt="all">0</span></button>
+        <button type="button" class="hist-cbtn" data-c="filament">Filaments <span class="hist-cnt" data-cnt="filament">0</span></button>
+        <button type="button" class="hist-cbtn" data-c="spacer">Spacers <span class="hist-cnt" data-cnt="spacer">0</span></button>
+        <button type="button" class="hist-cbtn" data-c="caisson">Caissons <span class="hist-cnt" data-cnt="caisson">0</span></button>
+        <button type="button" class="hist-cbtn" data-c="mixte">Mixtes <span class="hist-cnt" data-cnt="mixte">0</span></button>
+      </div>
+
+      <div id="hist-list" class="hist-list"><p class="muted">Chargement…</p></div>
+    </section>
+
+    <!-- ---------------- STATISTIQUES ---------------- -->
+    <section class="tabpanel" data-panel="statistiques" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Statistiques</h1>
+          <p class="muted">Factures annulées exclues. Marge = ventes − coûts (hors taxes).</p>
+        </div>
+        <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm" id="stat-refresh" type="button">Actualiser</button>
+      </div>
+
+      <div class="stat-periods" id="stat-periods" role="group" aria-label="Période">
+        <button type="button" class="stat-pbtn" data-days="7">1 semaine</button>
+        <button type="button" class="stat-pbtn is-active" data-days="30">1 mois</button>
+        <button type="button" class="stat-pbtn" data-days="90">3 mois</button>
+        <button type="button" class="stat-pbtn" data-days="180">6 mois</button>
+        <button type="button" class="stat-pbtn" data-days="365">1 an</button>
+        <button type="button" class="stat-pbtn" data-days="0">Tout</button>
+      </div>
+
+      <div id="stat-body"><p class="muted">Chargement…</p></div>
     </section>
   </main>
+
+  <!-- Conteneur d'impression pour la réimpression depuis l'historique (hors flux) -->
+  <div id="hist-print" class="fx-invoice" aria-hidden="true"></div>
 </div>
 
-<script src="assets/supabase-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/supabase-client.js"></script>
-<script src="assets/catalog.js?v=3"></script>
-<script src="assets/admin.js"></script>
-<script src="assets/admin-spacers.js"></script>
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/supabase-config.js?v=1"></script>
+<script src="assets/supabase-client.js?v=1"></script>
+<script src="assets/admin-core.js?v=2"></script>
+<script src="assets/cms-brands.js?v=2"></script>
+<script src="assets/cms-materials.js?v=8"></script>
+<script src="assets/cms-filaments.js?v=9"></script>
+<script src="assets/cms-spacers.js?v=5"></script>
+<script src="assets/cms-accessories.js?v=1"></script>
+<script src="assets/cms-inventory.js?v=4"></script>
+<script src="assets/cms-dealers.js?v=1"></script>
+<script src="assets/cms-facturation.js?v=7"></script>
+<script src="assets/cms-historique.js?v=2"></script>
+<script src="assets/cms-statistiques.js?v=1"></script>
 </body>
 </html>

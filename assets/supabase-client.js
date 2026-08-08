@@ -1,5 +1,5 @@
 /* =========================================================
-   Création Audio — client Supabase partagé
+   Création Audio V2 — client Supabase partagé
    Initialise le client à partir de assets/supabase-config.js
    et l'expose sur window.CA.sb (null si non configuré / hors ligne).
    À charger APRÈS supabase-config.js et le CDN @supabase/supabase-js.
@@ -13,4 +13,5 @@ window.CA = window.CA || {};
     auth: { persistSession: true, autoRefreshToken: true }
   }) : null;
   window.CA.ready = !!window.CA.sb;
+  window.CA.adminEmail = window.CA_ADMIN_EMAIL || 'creationaudio.ca@gmail.com';
 })();

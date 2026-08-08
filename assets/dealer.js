@@ -1,252 +1,274 @@
 /* =========================================================
-   Création Audio — Espace Dealer
-   Connexion Supabase + catalogue des spacers disponibles +
-   panier avec prix dégressif (paliers) → commande Messenger.
-   Nécessite : supabase-config.js, le CDN supabase-js, supabase-client.js.
+   Création Audio V2 — Portail dealer (privé)
+   - Login Supabase. Le compte doit être listé dans « dealers »
+     (vérifié via l'RPC is_dealer()).
+   - Catalogue des spacers au PRIX DEALER + rabais quantité,
+     lu depuis la vue products_dealer (invisible aux non-dealers).
+   - Panier -> commande par Messenger / courriel (aucun paiement).
    ========================================================= */
 (function () {
   'use strict';
 
   var sb = window.CA && window.CA.sb;
+  var FB = 'https://m.me/61591945465745';
+  var EMAIL = 'contact@creationaudio.ca';
+  var BUCKET = 'products';
+  var CART_KEY = 'ca_v2_cart_dealer';
+
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
-  var FB = 'https://m.me/61591945465745';
-  var BUCKET = 'spacers';
-
-  var loginView = $('#dl-login'), appView = $('#dl-app'), loginErr = $('#dl-err');
-
-  if (!sb) {
-    loginErr.textContent = 'Configuration Supabase manquante.';
-    loginErr.className = 'dl-err show';
-    return;
-  }
-  if (location.protocol === 'file:') {
-    loginErr.textContent = 'Ouvre cette page via une adresse http(s) (le site en ligne), pas en double-cliquant le fichier : la connexion ne peut pas se maintenir en « file:// ».';
-    loginErr.className = 'dl-err show';
-  }
-
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
   function money(n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; }
-  function publicUrl(path) {
-    if (!path) return '';
-    try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; }
-    catch (e) { return ''; }
-  }
-  function tiersOf(sp) {
-    return (Array.isArray(sp.tiers) ? sp.tiers : [])
-      .map(function (t) { return { min: parseInt(t.min, 10), price: parseFloat(t.price) }; })
+  function publicUrl(path) { if (!path || !sb) return ''; try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; } catch (e) { return ''; } }
+  function normalizeTiers(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map(function (t) { return { min: parseInt(t.min, 10), price: parseFloat(t.price) }; })
       .filter(function (t) { return isFinite(t.min) && t.min >= 1 && isFinite(t.price) && t.price >= 0; })
       .sort(function (a, b) { return a.min - b.min; });
   }
-  // prix unitaire pour une quantité q : dernier palier atteint, sinon prix de base
-  function unitPrice(sp, q) {
-    var p = +sp.price || 0;
-    tiersOf(sp).forEach(function (t) { if (q >= t.min) p = t.price; });
-    return p;
+  function tierPrice(base, tiers, qty) { var p = +base || 0; normalizeTiers(tiers).forEach(function (t) { if (qty >= t.min) p = t.price; }); return p; }
+  function priceRows(sell, tiers) {
+    var rows = [{ min: 1, price: +sell || 0 }].concat(normalizeTiers(tiers).filter(function (t) { return t.min > 1; }));
+    return rows.map(function (t, i) {
+      var label = t.min === 1 ? '1 paire' : (t.min + '+ paires');
+      return '<div class="sp-pr' + (i === 0 ? ' base' : '') + '">' + label + ' : ' + money(t.price) + '</div>';
+    }).join('');
   }
 
-  /* ---------------- AUTH ---------------- */
-  function say(msg) {
-    loginErr.textContent = msg || '';
-    loginErr.className = 'dl-err' + (msg ? ' show' : '');
+  var loginSec = $('#dl-login'), gateSec = $('#dl-gate'), app = $('#dl-app'),
+      loginForm = $('#dl-login-form'), emailI = $('#dl-login-email'), passI = $('#dl-login-pass'),
+      loginBtn = $('#dl-login-btn'), loginStatus = $('#dl-login-status'),
+      cartBtn = $('#cart-btn'), logoutBtn = $('#logout-btn'),
+      grid = $('#spacers-grid'), hello = $('#dl-hello');
+
+  /* ---------- écrans ---------- */
+  function show(which, email) {
+    loginSec.hidden = which !== 'login';
+    gateSec.hidden = which !== 'gate';
+    app.hidden = which !== 'app';
+    cartBtn.hidden = which !== 'app';
+    logoutBtn.hidden = (which === 'login');
+    if (which === 'app' && email) {
+      hello.innerHTML = 'Connecté : <b>' + esc(email) + '</b> <span class="dl-badge">Dealer</span>' +
+        '<span class="muted" style="margin-left:auto">Prix de gros — rabais quantité inclus</span>';
+    }
   }
-  function showApp() { loginView.hidden = true; appView.hidden = false; boot(); }
-  function showLogin() { appView.hidden = true; loginView.hidden = false; }
-
-  sb.auth.onAuthStateChange(function (event, session) { if (session) showApp(); else showLogin(); });
-  sb.auth.getSession().then(function (r) { if (r.data && r.data.session) showApp(); else showLogin(); });
-
-  $('#dl-login-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    say('');
-    var btn = $('#dl-login-btn'); btn.disabled = true; btn.textContent = 'Connexion…';
-    sb.auth.signInWithPassword({ email: $('#dl-email').value.trim(), password: $('#dl-pass').value })
-      .then(function (res) {
-        btn.disabled = false; btn.textContent = 'Se connecter';
-        if (res.error) {
-          var raw = (res.error.message || '').toLowerCase(), msg;
-          if (raw.indexOf('not confirmed') > -1) msg = 'Compte non confirmé. Contacte Création Audio.';
-          else if (raw.indexOf('invalid login') > -1 || raw.indexOf('invalid credentials') > -1) msg = 'Courriel ou mot de passe incorrect.';
-          else msg = 'Connexion refusée : ' + (res.error.message || 'erreur inconnue');
-          say(msg); return;
-        }
-        if (!(res.data && res.data.session)) { say('Connexion acceptée mais aucune session reçue.'); return; }
-        showApp();
-      }, function (err) {
-        btn.disabled = false; btn.textContent = 'Se connecter';
-        say('Erreur réseau : ' + (err && err.message ? err.message : err));
-      });
-  });
-
-  $('#dl-logout').addEventListener('click', function () { sb.auth.signOut().then(showLogin); });
-
-  /* ---------------- CATALOGUE ---------------- */
-  var booted = false, items = [], byId = {}, cart = {};   // cart : { id: qty }
 
   function boot() {
-    if (booted) return; booted = true;
-    initCart();
-    loadCatalog();
+    if (!sb) { show('login'); loginStatus.textContent = 'Service indisponible.'; return; }
+    sb.auth.getSession().then(function (res) {
+      var session = res && res.data && res.data.session;
+      if (!session) { show('login'); return; }
+      checkDealer(session.user && session.user.email);
+    }, function () { show('login'); });
   }
 
-  function loadCatalog() {
-    var grid = $('#dl-grid');
-    grid.innerHTML = '<p class="dl-empty">Chargement…</p>';
-    sb.from('spacers').select('*').eq('active', true).gt('qty', 0).order('created_at', { ascending: false })
+  function checkDealer(email) {
+    sb.rpc('is_dealer').then(function (res) {
+      if (res.error) { show('gate'); return; }
+      if (res.data === true) { show('app', email); load(); }
+      else show('gate');
+    }, function () { show('gate'); });
+  }
+
+  /* ---------- connexion / déconnexion ---------- */
+  loginForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var email = (emailI.value || '').trim(), pass = passI.value || '';
+    if (!email || !pass) return;
+    loginBtn.disabled = true; loginStatus.textContent = 'Connexion…';
+    sb.auth.signInWithPassword({ email: email, password: pass }).then(function (res) {
+      loginBtn.disabled = false;
+      if (res.error) { loginStatus.textContent = 'Échec : ' + res.error.message; return; }
+      loginStatus.textContent = '';
+      checkDealer(res.data.session && res.data.session.user && res.data.session.user.email);
+    }, function (err) { loginBtn.disabled = false; loginStatus.textContent = 'Erreur : ' + (err && err.message ? err.message : err); });
+  });
+  function doLogout() { sb.auth.signOut().then(function () { passI.value = ''; show('login'); }); }
+  logoutBtn.addEventListener('click', doLogout);
+  $('#gate-logout').addEventListener('click', doLogout);
+
+  /* ---------- catalogue (prix dealer) ---------- */
+  var spacers = [], byId = {};
+  function load() {
+    grid.innerHTML = '<p class="muted">Chargement…</p>';
+    sb.from('products_dealer').select('*').order('sort_order', { ascending: true }).order('name', { ascending: true })
       .then(function (res) {
-        if (res.error) { grid.innerHTML = '<p class="dl-empty">Impossible de charger le catalogue.</p>'; return; }
-        items = res.data || [];
-        byId = {};
-        items.forEach(function (i) { byId[i.id] = i; });
-        renderCatalog();
-      }, function () { grid.innerHTML = '<p class="dl-empty">Erreur réseau.</p>'; });
+        if (res.error) { grid.innerHTML = '<p class="empty">Impossible de charger le catalogue dealer.</p>'; return; }
+        spacers = res.data || [];
+        byId = {}; spacers.forEach(function (p) { byId[p.id] = p; });
+        render(); renderCart();
+      }, function () { grid.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
 
-  function renderCatalog() {
-    var grid = $('#dl-grid');
-    if (!items.length) { grid.innerHTML = '<p class="dl-empty">Aucun spacer disponible pour l\'instant.</p>'; return; }
-    grid.innerHTML = items.map(function (sp) {
-      var url = publicUrl(sp.image_path);
-      var tiers = tiersOf(sp);
-      var tierHtml = tiers.length ? '<div class="dl-tiers">' + tiers.map(function (t) {
-        return '<span class="dl-tier"><span>' + t.min + '+ paires</span><span>' + money(t.price) + ' ch.</span></span>';
-      }).join('') + '</div>' : '';
-      return '<article class="dl-card" data-id="' + sp.id + '">' +
-        '<div class="dl-thumb">' + (url ? '<img src="' + esc(url) + '" alt="' + esc(sp.name) + '">' : '<span class="dl-noimg">Pas de photo</span>') + '</div>' +
-        '<div class="dl-body">' +
-          '<h3 class="dl-name">' + esc(sp.name) + '</h3>' +
-          '<div class="dl-price">' + money(sp.price) + ' <span class="u">/ paire</span></div>' +
-          tierHtml +
-          '<div class="dl-stock">' + (sp.qty | 0) + ' en stock</div>' +
-          '<div class="dl-add">' +
-            '<div class="dl-qty">' +
-              '<button type="button" class="dl-dec" aria-label="moins">&minus;</button>' +
-              '<input type="number" class="dl-q" min="1" step="1" value="1">' +
-              '<button type="button" class="dl-inc" aria-label="plus">+</button>' +
-            '</div>' +
-            '<button type="button" class="dl-add-btn">Ajouter</button>' +
-          '</div>' +
+  function render() {
+    if (!spacers.length) { grid.innerHTML = '<p class="empty">Aucun spacer disponible pour le moment.</p>'; return; }
+    grid.innerHTML = spacers.map(function (p) {
+      var url = publicUrl(p.image_path), out = (p.qty | 0) <= 0, q = p.qty | 0;
+      var desc = p.attrs && p.attrs.description ? p.attrs.description : '';
+      return '<article class="sp-card">' +
+        '<div class="mat-media">' +
+          (url ? '<img src="' + esc(url) + '" alt="' + esc(p.name) + '" loading="lazy">' : '<span class="mat-swatch" style="background:var(--wash)"></span>') +
+          (out ? '<span class="col-badge">Rupture</span>' : '') +
+        '</div>' +
+        '<div class="sp-body">' +
+          '<h3>' + esc(p.name) + '</h3>' +
+          '<div class="sp-stock' + (out ? ' out' : '') + '">' + (out ? 'Rupture de stock' : (q + ' paire' + (q > 1 ? 's' : '') + ' en stock')) + '</div>' +
+          (desc ? '<p class="sp-desc">' + esc(desc) + '</p>' : '') +
+          '<div class="sp-prices">' + priceRows(p.sell_price, p.tiers) + '</div>' +
+          '<button class="dl-add" type="button" data-id="' + esc(p.id) + '"' + (out ? ' disabled' : '') + '>' +
+            (out ? 'Rupture de stock' : 'Ajouter à ma commande') + '</button>' +
         '</div>' +
       '</article>';
     }).join('');
-
-    $$('.dl-card', grid).forEach(function (card) {
-      var id = +card.getAttribute('data-id'), sp = byId[id];
-      var input = $('.dl-q', card);
-      function clamp() { input.value = Math.min(sp.qty | 0, Math.max(1, parseInt(input.value, 10) || 1)); }
-      $('.dl-dec', card).addEventListener('click', function () { input.value = Math.max(1, (parseInt(input.value, 10) || 1) - 1); });
-      $('.dl-inc', card).addEventListener('click', function () { input.value = Math.min(sp.qty | 0, (parseInt(input.value, 10) || 1) + 1); });
-      input.addEventListener('change', clamp);
-      $('.dl-add-btn', card).addEventListener('click', function () {
-        clamp();
-        addToCart(id, parseInt(input.value, 10) || 1);
-        openCart();
+    $$('.dl-add', grid).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var card = b.closest ? b.closest('.sp-card') : null;
+        var src = card ? (card.querySelector('.mat-media img') || card.querySelector('.mat-swatch')) : null;
+        addToCart(b.getAttribute('data-id'), src || b);
       });
     });
   }
 
-  /* ---------------- PANIER ---------------- */
-  function initCart() {
-    $('#dl-cart-open').addEventListener('click', openCart);
-    $('#dl-cart-close').addEventListener('click', closeCart);
-    $('#dl-scrim').addEventListener('click', closeCart);
-    $('#dl-messenger').addEventListener('click', messengerFlow);
-    $('#dl-copy').addEventListener('click', copyOnly);
-  }
-  function openCart() { $('#dl-cart').classList.add('open'); $('#dl-scrim').classList.add('open'); }
-  function closeCart() { $('#dl-cart').classList.remove('open'); $('#dl-scrim').classList.remove('open'); }
+  /* ---------- panier ---------- */
+  var cart = loadCart();
+  function loadCart() { try { return JSON.parse(localStorage.getItem(CART_KEY)) || {}; } catch (e) { return {}; } }
+  function saveCart() { try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) {} }
 
-  function addToCart(id, qty) {
-    var sp = byId[id]; if (!sp) return;
-    var cap = sp.qty | 0;
-    cart[id] = Math.min(cap, (cart[id] || 0) + Math.max(1, qty));
-    renderCart();
+  /* ---- animation « vol vers le panier » ---- */
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function pulseCart() { cartBtn.classList.remove('pulse'); void cartBtn.offsetWidth; cartBtn.classList.add('pulse'); }
+  function flyToCart(el) {
+    if (!el || reduceMotion) { pulseCart(); return; }
+    var from = el.getBoundingClientRect(), to = cartBtn.getBoundingClientRect();
+    var size = Math.max(46, Math.min(110, from.width * 0.5));
+    var sx = from.left + from.width / 2 - size / 2, sy = from.top + from.height / 2 - size / 2;
+    var fly = document.createElement('div');
+    fly.style.cssText = 'position:fixed;left:' + sx + 'px;top:' + sy + 'px;width:' + size + 'px;height:' + size +
+      'px;z-index:70;pointer-events:none;box-shadow:0 8px 24px rgba(20,22,26,.28);background-size:cover;background-position:center;' +
+      'transition:transform .8s cubic-bezier(.2,.7,.25,1),opacity .8s ease-in;will-change:transform,opacity;';
+    if (el.tagName === 'IMG') { fly.style.backgroundImage = 'url("' + el.src + '")'; fly.style.borderRadius = '14px'; }
+    else { fly.style.background = el.style.background || getComputedStyle(el).backgroundColor; fly.style.borderRadius = '50%'; }
+    document.body.appendChild(fly);
+    var dx = (to.left + to.width / 2) - (sx + size / 2), dy = (to.top + to.height / 2) - (sy + size / 2);
+    fly.getBoundingClientRect();
+    fly.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(.12)';
+    fly.style.opacity = '0.2';
+    var done = false;
+    function fin() { if (done) return; done = true; if (fly.parentNode) fly.parentNode.removeChild(fly); pulseCart(); }
+    fly.addEventListener('transitionend', fin); setTimeout(fin, 900);
   }
-  function setQty(id, qty) {
-    var sp = byId[id]; if (!sp) return;
-    qty = Math.max(0, Math.min(sp.qty | 0, qty));
-    if (qty <= 0) delete cart[id]; else cart[id] = qty;
-    renderCart();
+
+  function addToCart(id, srcEl) {
+    var p = byId[id]; if (!p) return;
+    var max = p.qty | 0, cur = cart[id] ? cart[id].qty : 0;
+    if (cur >= max) { toast('Maximum ' + max + ' en stock.'); return; }
+    if (srcEl) flyToCart(srcEl);
+    cart[id] = { id: id, qty: cur + 1 };
+    saveCart(); renderCart(); toast(p.name + ' ajouté.');
   }
-  function cartCount() { return Object.keys(cart).reduce(function (n, id) { return n + cart[id]; }, 0); }
-  function cartTotal() {
-    return Object.keys(cart).reduce(function (s, id) {
-      var sp = byId[id]; return s + cart[id] * unitPrice(sp, cart[id]);
-    }, 0);
+  function changeQty(id, d) {
+    if (!cart[id]) return; var p = byId[id], max = p ? (p.qty | 0) : cart[id].qty; var n = cart[id].qty + d;
+    if (n > max) { toast('Maximum ' + max + ' en stock.'); n = max; }
+    if (n <= 0) delete cart[id]; else cart[id].qty = n; saveCart(); renderCart();
   }
+  function setQty(id, v) {
+    if (!cart[id]) return; var n = parseInt(v, 10); if (isNaN(n)) { renderCart(); return; }
+    var p = byId[id], max = p ? (p.qty | 0) : n; if (n > max) { toast('Maximum ' + max + ' en stock.'); n = max; }
+    if (n <= 0) delete cart[id]; else cart[id].qty = n; saveCart(); renderCart();
+  }
+  function removeItem(id) { delete cart[id]; saveCart(); renderCart(); }
+  function clearCart() { cart = {}; saveCart(); renderCart(); }
+
+  function entries() { return Object.keys(cart).map(function (k) { return cart[k]; }); }
+  function count() { return entries().reduce(function (s, it) { return s + it.qty; }, 0); }
+  function unitOf(it) { var p = byId[it.id]; return p ? tierPrice(p.sell_price, p.tiers, it.qty) : 0; }
+  function lineTotal(it) { return it.qty * unitOf(it); }
+  function total() { return entries().reduce(function (s, it) { return s + lineTotal(it); }, 0); }
+
+  var cartPanel = $('#cart-panel'), cartBackdrop = $('#cart-backdrop'), cartItems = $('#cart-items'),
+      cartCount = $('#cart-count'), cartTotal = $('#cart-total'), cartMsg = $('#cart-msg'),
+      orderBtn = $('#cart-order'), emailBtn = $('#cart-email');
 
   function renderCart() {
-    var box = $('#dl-cart-items'), ids = Object.keys(cart);
-    var badge = $('#dl-cart-count'), n = cartCount();
-    badge.textContent = n; badge.hidden = n === 0;
-
-    if (!ids.length) {
-      box.innerHTML = '<p class="dl-cart-empty">Ton panier est vide.<br>Ajoute des spacers depuis le catalogue.</p>';
-    } else {
-      box.innerHTML = ids.map(function (id) {
-        var sp = byId[id], q = cart[id], u = unitPrice(sp, q), url = publicUrl(sp.image_path);
-        return '<div class="dl-citem" data-id="' + id + '">' +
-          (url ? '<img class="dl-cthumb" src="' + esc(url) + '" alt="">' : '<span class="dl-cthumb"></span>') +
-          '<div class="dl-cinfo">' +
-            '<div class="dl-cname">' + esc(sp.name) + '</div>' +
-            '<div class="dl-cunit">' + money(u) + ' / paire</div>' +
-            '<div class="dl-cqty">' +
-              '<button type="button" class="dl-cdec" aria-label="moins">&minus;</button>' +
-              '<input type="number" class="dl-cq" min="0" step="1" value="' + q + '">' +
-              '<button type="button" class="dl-cinc" aria-label="plus">+</button>' +
+    var n = count(); cartCount.textContent = n; cartBtn.classList.toggle('has-items', n > 0);
+    if (!n) { cartItems.innerHTML = '<p class="cart-empty">Ta commande est vide.<br>Ajoute un spacer pour commencer.</p>'; }
+    else {
+      cartItems.innerHTML = '';
+      entries().forEach(function (it) {
+        var p = byId[it.id]; if (!p) return;
+        var url = publicUrl(p.image_path), max = p.qty | 0;
+        var row = document.createElement('div'); row.className = 'citem';
+        row.innerHTML =
+          '<div class="citem-thumb">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:var(--wash)"></span>') + '</div>' +
+          '<div class="citem-main">' +
+            '<div class="citem-name">' + esc(p.name) + '</div>' +
+            '<div class="citem-type"><span class="citem-unit">' + money(unitOf(it)) + ' / paire</span></div>' +
+            '<div class="citem-qty">' +
+              '<button type="button" class="cq-minus" aria-label="Retirer un">&minus;</button>' +
+              '<input type="number" class="cq-val" min="0" max="' + max + '" value="' + it.qty + '" inputmode="numeric">' +
+              '<button type="button" class="cq-plus" aria-label="Ajouter un"' + (it.qty >= max ? ' disabled' : '') + '>+</button>' +
             '</div>' +
-            '<button type="button" class="dl-crm">Retirer</button>' +
           '</div>' +
-          '<div class="dl-cline">' + money(q * u) + '</div>' +
-        '</div>';
-      }).join('');
-
-      $$('.dl-citem', box).forEach(function (row) {
-        var id = +row.getAttribute('data-id'), input = $('.dl-cq', row);
-        $('.dl-cdec', row).addEventListener('click', function () { setQty(id, (cart[id] || 0) - 1); });
-        $('.dl-cinc', row).addEventListener('click', function () { setQty(id, (cart[id] || 0) + 1); });
-        input.addEventListener('change', function () { setQty(id, parseInt(input.value, 10) || 0); });
-        $('.dl-crm', row).addEventListener('click', function () { setQty(id, 0); });
+          '<div class="citem-right">' +
+            '<button type="button" class="citem-del" aria-label="Supprimer">&times;</button>' +
+            '<div class="citem-line">' + money(lineTotal(it)) + '</div>' +
+          '</div>';
+        $('.cq-minus', row).addEventListener('click', function () { changeQty(it.id, -1); });
+        $('.cq-plus', row).addEventListener('click', function () { changeQty(it.id, 1); });
+        var inp = $('.cq-val', row);
+        inp.addEventListener('change', function () { setQty(it.id, this.value); });
+        inp.addEventListener('focus', function () { this.select(); });
+        $('.citem-del', row).addEventListener('click', function () { removeItem(it.id); });
+        cartItems.appendChild(row);
       });
     }
-
-    $('#dl-total-val').textContent = money(cartTotal());
-    $('#dl-messenger').classList.toggle('is-disabled', n === 0);
+    cartTotal.textContent = money(total());
+    orderBtn.classList.toggle('is-disabled', n === 0);
+    if (emailBtn) emailBtn.classList.toggle('is-disabled', n === 0);
   }
 
-  /* ---------------- MESSENGER ---------------- */
+  function openCart() { cartPanel.classList.add('is-open'); cartBackdrop.hidden = false; document.body.classList.add('cart-lock'); }
+  function closeCart() { cartPanel.classList.remove('is-open'); cartBackdrop.hidden = true; document.body.classList.remove('cart-lock'); }
+  cartBtn.addEventListener('click', openCart);
+  cartBackdrop.addEventListener('click', closeCart);
+  $('#cart-close').addEventListener('click', closeCart);
+  $('#cart-clear').addEventListener('click', clearCart);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && cartPanel.classList.contains('is-open')) closeCart(); });
+
   function orderText() {
-    var lines = Object.keys(cart).map(function (id) {
-      var sp = byId[id], q = cart[id], u = unitPrice(sp, q);
-      return '- ' + sp.name + ' ×' + q + ' — ' + money(u) + ' ch. = ' + money(q * u);
-    });
-    return 'Bonjour,\n\nCommande dealer — spacers :\n\n' + lines.join('\n') +
-      '\n\nTotal : ' + money(cartTotal()) +
-      '\nRamassage : région de Québec.\n\nMerci !';
+    var who = (emailI && emailI.value) ? '' : '';
+    var lines = entries().map(function (it) { var p = byId[it.id]; return '- ' + (p ? p.name : it.id) + ' ×' + it.qty + ' paire' + (it.qty > 1 ? 's' : '') + ' — ' + money(lineTotal(it)); });
+    return 'Bonjour,\n\nCommande DEALER :\n\n' + lines.join('\n') +
+      '\n\nTotal dealer estimé : ' + money(total()) + '\nRamassage : région de Québec.\n\nMerci !';
   }
-  function copyText(txt, done) {
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done || function () {}, function () { fallbackCopy(txt, done); });
-    else fallbackCopy(txt, done);
+  function copyText(txt) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).catch(function () { fallbackCopy(txt); });
+    fallbackCopy(txt);
   }
-  function fallbackCopy(txt, done) {
+  function fallbackCopy(txt) {
     var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); if (done) done(); } catch (e) {}
-    document.body.removeChild(ta);
+    document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(ta);
   }
-  function messengerFlow() {
-    if (cartCount() === 0) return;
+  orderBtn.addEventListener('click', function () {
+    if (count() === 0) return;
     copyText(orderText());
-    var b = $('#dl-messenger'); if (!b._busy) { b._busy = true; var o = b.textContent; b.textContent = 'Liste copiée ✓'; setTimeout(function () { b.textContent = o; b._busy = false; }, 2400); }
+    cartMsg.textContent = 'Commande copiée ✓ — colle-la dans Messenger et envoie.';
     window.open(FB, '_blank', 'noopener');
-  }
-  function copyOnly() {
-    if (cartCount() === 0) return;
-    var b = $('#dl-copy');
-    copyText(orderText(), function () { var o = b.textContent; b.textContent = 'Copié ✓'; setTimeout(function () { b.textContent = o; }, 1800); });
-  }
+  });
+  if (emailBtn) emailBtn.addEventListener('click', function () {
+    if (count() === 0) return;
+    var subject = 'Commande dealer — Création Audio';
+    window.location.href = 'mailto:' + EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(orderText());
+    cartMsg.textContent = 'Ton logiciel de courriel s\'ouvre avec ta commande.';
+  });
+
+  var toastEl = $('#toast'), toastT;
+  function toast(msg) { toastEl.textContent = msg; toastEl.hidden = false; requestAnimationFrame(function () { toastEl.classList.add('show'); }); clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove('show'); }, 2400); }
+
+  boot();
 })();

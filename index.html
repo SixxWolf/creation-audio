@@ -1,63 +1,226 @@
 <!doctype html>
-<html lang="fr-CA">
+<html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Création Audio — Audio automobile & impression 3D à Québec</title>
-<meta name="description" content="Création Audio — audio automobile sur mesure et impression 3D à Québec. Choisissez votre univers : Audio ou Impression 3D.">
-<link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
-<link rel="icon" type="image/png" sizes="32x32" href="assets/img/favicon-32.png?v=3">
-<link rel="icon" type="image/png" sizes="16x16" href="assets/img/favicon-16.png?v=3">
-<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png?v=3">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Création Audio — Impression 3D & audio automobile · Québec</title>
+<meta name="description" content="Création Audio : filaments d'impression 3D, spacers/adaptateurs et caissons de sub sur-mesure. Région de Québec — ramassage local.">
+<link rel="canonical" href="https://creationaudio.ca/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Création Audio">
 <meta property="og:locale" content="fr_CA">
-<meta property="og:title" content="Création Audio — Audio automobile & impression 3D à Québec">
-<meta property="og:description" content="Audio automobile sur mesure et impression 3D à Québec. Choisissez votre univers : Audio ou Impression 3D.">
 <meta property="og:url" content="https://creationaudio.ca/">
+<meta property="og:title" content="Création Audio — Impression 3D & audio automobile">
+<meta property="og:description" content="Filaments, spacers et caissons de sub sur-mesure. Région de Québec.">
 <meta property="og:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Création Audio — Impression 3D & audio automobile">
+<meta name="twitter:description" content="Filaments, spacers et caissons de sub sur-mesure. Région de Québec.">
+<meta name="twitter:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/img/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css">
-<script>document.documentElement.className+=' js';</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css?v=2">
+<link rel="stylesheet" href="assets/header.css?v=3">
+<link rel="stylesheet" href="assets/accueil.css?v=2">
 </head>
-<body class="splash-page">
+<body>
 
-<main class="splash">
-  <div class="splash-wordmark"><span class="d"></span>Création&nbsp;Audio</div>
-
-  <!-- Panneau gauche : Audio (sombre) -->
-  <a class="panel audio" href="audio.html" aria-label="Entrer dans l'univers Audio automobile">
-    <span class="fill"></span>
-    <span class="dim"></span>
-    <div class="inner">
-      <span class="eyebrow">Son · basse · lumière</span>
-      <h2>Audio<br>auto</h2>
-      <p>Adaptateurs pour haut-parleur, rings néon et caissons. Fabriqués à Québec.</p>
-      <span class="enter">Entrer&nbsp;<span class="arw" aria-hidden="true">→</span></span>
-    </div>
+<!-- ======================= EN-TÊTE ======================= -->
+<header class="home-top">
+  <a class="brand" href="index.html"><span class="d"></span> Création Audio</a>
+  <nav class="home-nav" aria-label="Navigation principale">
+    <a href="index.html" class="is-active">Accueil</a>
+    <a href="boutique.html">Filaments</a>
+    <a href="spacers.html">Spacers</a>
+    <a href="#caissons">Caissons</a>
+    <a href="#contact">Contact</a>
+  </nav>
+  <span class="spacer"></span>
+  <a class="home-dealer" href="dealer.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    Dealer
   </a>
+  <a class="home-cta" href="#contact">Demander une soumission</a>
+  <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</header>
 
-  <!-- Panneau droit : Impression 3D (clair) -->
-  <a class="panel threed" href="impression-3d.html" aria-label="Entrer dans l'univers Impression 3D">
-    <span class="fill"></span>
-    <span class="dim"></span>
-    <div class="inner">
-      <span class="eyebrow">Atelier · filament</span>
-      <h2>Impression<br>3D</h2>
-      <p>Pièces sur mesure, prototypes et filament (PLA, PETG, ABS).</p>
-      <span class="enter">Entrer&nbsp;<span class="arw" aria-hidden="true">→</span></span>
+<!-- ======================= HERO ======================= -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <div class="hero-eyebrow"><span class="dot"></span> Audio automobile &amp; impression 3D — Québec</div>
+      <h1>Le son, <span class="accent">imprimé</span> sur mesure.</h1>
+      <p class="hero-sub">Filaments de qualité, spacers et adaptateurs pour tes haut-parleurs, et
+        caissons de sub fabriqués à la main. Pensé et imprimé localement dans la région de Québec.</p>
+      <div class="hero-actions">
+        <a class="btn-hero primary" href="boutique.html">Voir les filaments
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a class="btn-hero ghost" href="#caissons">Caisson sur-mesure</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><b>90+</b><span>couleurs de filament</span></div>
+        <div class="hero-stat"><b>13</b><span>matériaux</span></div>
+        <div class="hero-stat"><b>100 %</b><span>fait à Québec</span></div>
+      </div>
     </div>
-  </a>
+    <div class="hero-visual">
+      <div class="hero-ring"></div>
+      <img src="assets/img/loup_ondes_rouges_1024_transparent.png" alt="Création Audio — loup aux ondes rouges"
+        onerror="this.style.display='none'">
+    </div>
+  </div>
+</section>
 
-  <div class="seam" aria-hidden="true"></div>
-  <p class="splash-hint">Choisissez un côté</p>
-</main>
+<!-- ======================= VALEURS ======================= -->
+<div class="trust">
+  <div class="trust-inner">
+    <div class="trust-item">
+      <span class="trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+      <span class="trust-tx"><b>Ramassage à Québec</b><span>Rencontre locale, sans frais</span></span>
+    </div>
+    <div class="trust-item">
+      <span class="trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6"/><rect x="4" y="9" width="16" height="8" rx="1.5"/><path d="M7 17v4h10v-4"/></svg></span>
+      <span class="trust-tx"><b>Imprimé maison</b><span>Production locale, soignée</span></span>
+    </div>
+    <div class="trust-item">
+      <span class="trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9.5 12l2 2 3.5-4"/></svg></span>
+      <span class="trust-tx"><b>Sans paiement en ligne</b><span>On confirme avant tout</span></span>
+    </div>
+    <div class="trust-item">
+      <span class="trust-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v11H8l-4 3z"/></svg></span>
+      <span class="trust-tx"><b>Réponse rapide</b><span>Messenger &amp; courriel</span></span>
+    </div>
+  </div>
+</div>
 
-<script src="assets/splash.js"></script>
+<!-- ======================= CATÉGORIES ======================= -->
+<section class="section" id="categories">
+  <div class="sec-head">
+    <div>
+      <div class="sec-eyebrow">Nos produits</div>
+      <h2>Trouve ce qu'il te faut</h2>
+    </div>
+  </div>
+  <div class="cats">
+    <a class="cat-tile" href="boutique.html">
+      <span class="cat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4v3M12 17v3M4 12h3M17 12h3"/></svg></span>
+      <h3>Filaments</h3>
+      <p>PLA, PETG, ABS… Choisis ta marque, ton matériau et ta couleur. En bobine ou en recharge.</p>
+      <span class="cat-go">Explorer les filaments
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </a>
+    <a class="cat-tile" href="spacers.html">
+      <span class="cat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="8" r="4"/><circle cx="16" cy="16" r="4"/><path d="M11 11l2 2"/></svg></span>
+      <h3>Spacers &amp; adaptateurs</h3>
+      <p>Pièces imprimées 3D pour monter tes haut-parleurs proprement. Vendues par paire.</p>
+      <span class="cat-go">Voir les spacers
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </a>
+    <a class="cat-tile" href="#caissons">
+      <span class="cat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="14" r="4"/><circle cx="12" cy="7" r="1.3"/></svg></span>
+      <h3>Caissons de sub</h3>
+      <p>Fabriqués sur mesure pour ton véhicule : litrage, évent, finition. Demande une soumission.</p>
+      <span class="cat-go">Demander un devis
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </a>
+  </div>
+</section>
+
+<!-- ======================= PRODUITS VEDETTES ======================= -->
+<div class="feat-wrap">
+  <section class="section">
+    <div class="sec-head">
+      <div>
+        <div class="sec-eyebrow">Sélection</div>
+        <h2>Produits vedettes</h2>
+      </div>
+      <span class="grow"></span>
+      <a class="sec-link" href="boutique.html">Toute la boutique →</a>
+    </div>
+    <div class="feat-grid" id="feat-grid"><p class="feat-empty">Chargement…</p></div>
+  </section>
+</div>
+
+<!-- ======================= CAISSONS (soumission) ======================= -->
+<section class="section" id="caissons">
+  <div class="sec-head">
+    <div>
+      <div class="sec-eyebrow">Sur-mesure</div>
+      <h2>Un caisson pensé pour ton char</h2>
+      <p>On conçoit et fabrique ton caisson selon ton véhicule, ton sub et le son que tu recherches —
+        litrage, type d'évent, finition. Écris-nous avec les détails, on te fait une soumission.</p>
+    </div>
+  </div>
+  <div class="hero-actions">
+    <a class="btn-hero primary" href="https://m.me/61591945465745" target="_blank" rel="noopener">Écrire sur Messenger</a>
+    <a class="btn-hero ghost" href="mailto:contact@creationaudio.ca?subject=Soumission%20caisson%20de%20sub" style="color:var(--ink); border-color:var(--line)">Écrire par courriel</a>
+  </div>
+</section>
+
+<!-- ======================= CONTACT / CTA ======================= -->
+<div class="cta-band" id="contact">
+  <div class="cta-inner">
+    <div class="tx">
+      <h2>Une question ? Un projet ?</h2>
+      <p>Filament, spacer ou caisson : écris-nous, on répond vite. Aucun paiement en ligne — on confirme
+        la disponibilité et un ramassage dans la région de Québec.</p>
+    </div>
+    <div class="cta-actions">
+      <a class="btn-hero primary" href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
+      <a class="btn-hero ghost" href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= FOOTER ======================= -->
+<footer class="home-foot">
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <a class="brand" href="index.html"><span class="d"></span> Création Audio</a>
+      <p>Audio automobile &amp; impression 3D dans la région de Québec. Filaments, spacers et caissons
+        de sub sur-mesure, faits localement.</p>
+    </div>
+    <div class="foot-col">
+      <h4>Boutique</h4>
+      <a href="boutique.html">Filaments</a>
+      <a href="spacers.html">Spacers &amp; adaptateurs</a>
+      <a href="#caissons">Caissons de sub</a>
+    </div>
+    <div class="foot-col">
+      <h4>Contact</h4>
+      <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
+      <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
+      <a href="#contact">Ramassage — Québec</a>
+      <a href="dealer.html">Espace dealer</a>
+    </div>
+  </div>
+  <div class="foot-bottom">© <span id="year"></span> Création Audio — Fait à Québec.</div>
+</footer>
+
+<!-- Menu mobile -->
+<div class="nav-backdrop" id="nav-backdrop" hidden></div>
+<aside class="nav-drawer" id="nav-drawer" aria-label="Menu">
+  <button class="close" id="nav-close" type="button" aria-label="Fermer">&times;</button>
+  <a href="index.html">Accueil</a>
+  <a href="boutique.html">Filaments</a>
+  <a href="spacers.html">Spacers</a>
+  <a href="#caissons">Caissons</a>
+  <a href="#contact">Contact</a>
+  <a href="dealer.html">Espace dealer</a>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/supabase-config.js?v=1"></script>
+<script src="assets/supabase-client.js?v=1"></script>
+<script src="assets/nav.js?v=1"></script>
+<script src="assets/accueil.js?v=2"></script>
 </body>
 </html>
