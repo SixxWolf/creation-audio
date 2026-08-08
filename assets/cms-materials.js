@@ -87,7 +87,7 @@ window.CA = window.CA || {};
 
   /* ---- interactions ---- */
   if (newBtn) newBtn.addEventListener('click', function () { openEditor(null); });
-  if (cancelBtn) cancelBtn.addEventListener('click', closeEditor);
+  if (cancelBtn) cancelBtn.addEventListener('click', function () { var nm = editingName; closeEditor(); focusRow(nm, true); });
   if (editor) editor.addEventListener('submit', onSave);
   if (dropEl) dropEl.addEventListener('click', function () { fileEl.click(); });
   if (fileEl) fileEl.addEventListener('change', function () {
@@ -162,7 +162,24 @@ window.CA = window.CA || {};
   }
 
   /* ---- éditeur ---- */
-  function openEditor(row) {
+  // remet le formulaire à sa place d'origine (juste avant la liste)
+  function moveEditorHome() {
+    if (listEl && listEl.parentNode && editor.nextSibling !== listEl) {
+      listEl.parentNode.insertBefore(editor, listEl);
+    }
+    editor.classList.remove('is-inline');
+  }
+  // scrolle vers une ligne matériau et la fait clignoter (repère « tu es ici »)
+  function focusRow(name, gentle) {
+    if (!name) return;
+    var el = document.getElementById('mat-' + slug(name));
+    if (!el) return;
+    el.scrollIntoView(gentle ? { block: 'nearest' } : { behavior: 'smooth', block: 'center' });
+    el.classList.add('flash');
+    setTimeout(function () { el.classList.remove('flash'); }, 1200);
+  }
+
+  function openEditor(row, rowEl) {
     editingName = row ? row.name : null;
     pendingFile = null;
     editorTitle.textContent = row ? ('Modifier « ' + row.name + ' »') : 'Nouveau matériau';
@@ -188,12 +205,19 @@ window.CA = window.CA || {};
     }
     syncFormatUI();
     statusEl.textContent = '';
-    editor.hidden = false;
     section.hidden = false; if (toggleBtn) { toggleBtn.textContent = 'Masquer'; toggleBtn.setAttribute('aria-expanded', 'true'); }
-    nameI.focus();
-    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // position : sous la ligne cliquée (modification) ou en haut (nouveau matériau)
+    if (rowEl && rowEl.parentNode) {
+      rowEl.insertAdjacentElement('afterend', editor);
+      editor.classList.add('is-inline');
+    } else {
+      moveEditorHome();
+    }
+    editor.hidden = false;
+    nameI.focus({ preventScroll: true });
+    editor.scrollIntoView({ behavior: 'smooth', block: rowEl ? 'nearest' : 'start' });
   }
-  function closeEditor() { editor.hidden = true; editingName = null; }
+  function closeEditor() { moveEditorHome(); editor.hidden = true; editingName = null; }
 
   function onSave(e) {
     e.preventDefault();
@@ -235,9 +259,14 @@ window.CA = window.CA || {};
       if (pendingFile && oldPath && res.data[0].image_path !== oldPath) {
         sb.storage.from(BUCKET).remove([oldPath]).then(null, function () {});
       }
+      var wasEdit = !!editingName;   // modification d'un matériau existant ? (sinon = nouveau)
       closeEditor();
-      var savedSlug = slug(name);
-      CA.loadMaterials().then(function () { jumpTo(savedSlug); }, renderError);
+      // modification : on recharge en place et on reste sur la ligne (pas de saut vers le bas).
+      // nouveau matériau : on saute dessus (utile pour enchaîner sur ses couleurs).
+      var savedName = name;
+      CA.loadMaterials().then(function () {
+        if (wasEdit) focusRow(savedName, true); else jumpTo(slug(savedName));
+      }, renderError);
     }, function (err) {
       saveBtn.disabled = false;
       statusEl.textContent = 'Erreur : ' + (err && err.message ? err.message : err);
@@ -265,6 +294,7 @@ window.CA = window.CA || {};
     return '<span class="card-margin ' + (m >= 0 ? 'pos' : 'neg') + '">' + label + ' ' + money(m) + (s > 0 ? ' · ' + pct + '%' : '') + '</span>';
   }
   function render() {
+    moveEditorHome();   // sort le formulaire de la liste avant de la reconstruire (sinon il serait effacé)
     var list = brandMaterials();
     if (!list.length) {
       listEl.innerHTML = '<p class="empty">Aucun matériau pour <b>' + esc(CA.currentBrand || '—') + '</b>.<br>' +
@@ -301,7 +331,7 @@ window.CA = window.CA || {};
     $$('.mat-row', listEl).forEach(function (el) {
       var name = el.getAttribute('data-name');
       var row = CA.materialOf(CA.currentBrand, name);
-      $('.mat-edit', el).addEventListener('click', function () { openEditor(row); });
+      $('.mat-edit', el).addEventListener('click', function () { openEditor(row, el); });
       $('.mat-del', el).addEventListener('click', function () { del(row); });
       wireDrag(el);
     });
