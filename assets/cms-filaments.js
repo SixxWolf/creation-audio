@@ -88,7 +88,7 @@
     pendingFile = f;
     preview.src = URL.createObjectURL(f); preview.hidden = false; dropHint.hidden = true;
   });
-  if (cancelBtn) cancelBtn.addEventListener('click', closeEditor);
+  if (cancelBtn) cancelBtn.addEventListener('click', function () { var id = editingId; closeEditor(); focusCard(id); });
   if (editor) editor.addEventListener('submit', onSave);
   // changer de matériau : réinitialise les formats aux formats offerts par ce matériau
   if (materialSel) materialSel.addEventListener('change', function () { resetOffersToMaterial(); syncMaterialUI(); });
@@ -142,7 +142,24 @@
   }
 
   /* ---- éditeur ---- */
-  function openEditor(row) {
+  // remet le formulaire à sa place d'origine (juste avant la liste, en haut)
+  function moveEditorHome() {
+    if (listEl && listEl.parentNode && editor.nextSibling !== listEl) {
+      listEl.parentNode.insertBefore(editor, listEl);
+    }
+    editor.classList.remove('is-inline');
+  }
+  // scrolle vers une carte et la fait clignoter (repère visuel « tu es ici »)
+  function focusCard(id) {
+    if (!id) return;
+    var el = $$('.card', listEl).filter(function (c) { return c.getAttribute('data-id') === String(id); })[0];
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('flash');
+    setTimeout(function () { el.classList.remove('flash'); }, 1200);
+  }
+
+  function openEditor(row, cardEl) {
     editingId = row ? row.id : null;
     pendingFile = null;
     editorTitle.textContent = row ? 'Modifier le filament' : 'Nouveau filament';
@@ -164,11 +181,18 @@
     else { preview.hidden = true; preview.removeAttribute('src'); dropHint.hidden = false; }
     syncMaterialUI();
     statusEl.textContent = '';
+    // position : sous la carte cliquée (édition) ou en haut (nouveau filament)
+    if (cardEl && cardEl.parentNode) {
+      cardEl.insertAdjacentElement('afterend', editor);
+      editor.classList.add('is-inline');
+    } else {
+      moveEditorHome();
+    }
     editor.hidden = false;
-    nameI.focus();
-    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    nameI.focus({ preventScroll: true });
+    editor.scrollIntoView({ behavior: 'smooth', block: cardEl ? 'nearest' : 'start' });
   }
-  function closeEditor() { editor.hidden = true; editingId = null; pendingFile = null; }
+  function closeEditor() { moveEditorHome(); editor.hidden = true; editingId = null; pendingFile = null; }
 
   function uploadPhoto(file) {
     var ext = (String(file.name).split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
@@ -222,9 +246,9 @@
       if (pendingFile && oldPath && res.data[0].image_path !== oldPath) {
         sb.storage.from(BUCKET).remove([oldPath]).then(null, function () {});
       }
+      var savedId = (res.data && res.data[0] && res.data[0].id) || editingId;
       closeEditor();
-      load();
-      if (listEl) listEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      load().then(function () { focusCard(savedId); });   // reste sur le filament modifié/créé
     }, function (err) {
       saveBtn.disabled = false;
       statusEl.textContent = 'Erreur : ' + (err && err.message ? err.message : err);
@@ -313,6 +337,7 @@
   function slug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 
   function render() {
+    moveEditorHome();   // sort le formulaire de la liste avant de la reconstruire (sinon il serait effacé)
     if (!cache.length) {
       listEl.innerHTML = '<p class="empty">Aucun filament pour l\'instant.<br>' +
         'Clique «&nbsp;+ Nouveau filament&nbsp;» pour créer le premier.</p>';
@@ -329,7 +354,7 @@
     $$('.card', listEl).forEach(function (card) {
       var id = card.getAttribute('data-id');
       var row = cache.filter(function (x) { return String(x.id) === id; })[0];
-      $('.card-edit', card).addEventListener('click', function () { openEditor(row); });
+      $('.card-edit', card).addEventListener('click', function () { openEditor(row, card); });
       $('.card-del', card).addEventListener('click', function () { del(row); });
       wireDrag(card);
     });

@@ -126,6 +126,9 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
   transition:box-shadow .18s, border-color .18s; }
 .card.dragging { opacity:.5; }
 .card.drop-target { border-color:var(--ember); box-shadow:0 0 0 2px rgba(255,106,43,.25); }
+.card.flash { box-shadow:0 0 0 2px var(--ember); }
+/* éditeur ouvert directement sous la carte cliquée : occupe toute la largeur de la grille */
+.editor.is-inline { grid-column:1 / -1; margin:4px 0 10px; scroll-margin-top:14px; }
 .card.is-hidden { opacity:.62; }
 .card-thumb { position:relative; aspect-ratio:1/1; background:#fff; display:flex;
   align-items:center; justify-content:center; }
