@@ -1,0 +1,44 @@
+/* =========================================================
+   Création Audio V2 — Portail dealer (privé)
+   Réutilise header.css (barre/marque) + boutique.css (cartes
+   spacer + panier). Ce fichier ajoute : connexion, écran d'accès
+   refusé, bouton dealer, badge de prix dealer.
+   ========================================================= */
+
+/* Barre : bouton déconnexion + badge */
+.dl-badge { font-size:.62rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#fff;
+  background:var(--ember); border-radius:100px; padding:3px 9px; margin-left:2px; }
+.dl-logout { font:inherit; font-weight:600; font-size:.85rem; cursor:pointer; color:var(--ink);
+  background:transparent; border:1.5px solid var(--line); border-radius:100px; padding:7px 14px; }
+.dl-logout:hover { border-color:var(--ember); color:var(--ember-dim); }
+
+/* Connexion + accès refusé */
+.dl-center { min-height:70vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+.dl-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-lg);
+  padding:30px; width:100%; max-width:380px; box-shadow:var(--shadow); }
+.dl-card h1 { font-size:1.3rem; margin-bottom:6px; }
+.dl-card p { color:var(--muted); font-size:.92rem; margin:0 0 18px; line-height:1.5; }
+.dl-card .field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+.dl-card label { font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.dl-card input { font:inherit; color:var(--ink); background:var(--paper); border:1.5px solid var(--line);
+  border-radius:var(--radius-sm); padding:10px 12px; width:100%; }
+.dl-card input:focus { outline:none; border-color:var(--ember); }
+.dl-submit { width:100%; justify-content:center; cursor:pointer; font:inherit; font-weight:700; color:#fff;
+  background:var(--ember); border:1.5px solid var(--ember); border-radius:100px; padding:12px; }
+.dl-submit:hover { background:var(--ember-dim); border-color:var(--ember-dim); }
+.dl-submit:disabled { opacity:.55; cursor:not-allowed; }
+.dl-status { color:var(--muted); font-size:.85rem; margin-top:12px; min-height:1.2em; }
+.dl-gate-actions { margin-top:18px; }
+
+/* Bandeau intro dealer */
+.dl-hello { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px;
+  background:var(--wash); border:1px solid var(--line); border-radius:var(--radius); padding:12px 16px; }
+.dl-hello b { color:var(--ink); }
+.dl-hello .muted { font-size:.9rem; }
+
+/* Bouton ajouter (carte spacer) — style dédié dealer */
+.dl-add { margin-top:auto; width:100%; cursor:pointer; font:inherit; font-weight:700; color:#fff;
+  background:var(--ember); border:none; border-radius:100px; padding:11px 14px; transition:background .16s, transform .1s; }
+.dl-add:hover { background:var(--ember-dim); }
+.dl-add:active { transform:translateY(1px); }
+.dl-add:disabled { background:var(--muted); cursor:not-allowed; }

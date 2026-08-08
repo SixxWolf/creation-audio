@@ -1,0 +1,52 @@
+/* =========================================================
+   Création Audio V2 — EN-TÊTE PARTAGÉE (accueil + boutique + spacers)
+   Source unique de vérité pour la barre du haut : même marque, même
+   navigation, même menu mobile sur toutes les pages publiques.
+   À charger APRÈS tokens.css, AVANT la CSS spécifique de la page.
+   ========================================================= */
+
+.home-top { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:18px;
+  padding:12px 24px; background:color-mix(in srgb, var(--paper) 90%, transparent);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--line); }
+.brand { display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.02em; text-decoration:none; color:var(--ink); }
+.brand .d { width:11px; height:11px; border-radius:50%; background:var(--ember); box-shadow:0 0 10px 1px rgba(255,106,43,.6); flex:none; }
+.brand small { font-weight:600; color:var(--muted); letter-spacing:.14em; text-transform:uppercase; font-size:.62rem; }
+
+.home-nav { display:flex; align-items:center; gap:4px; margin-left:8px; }
+.home-nav a { text-decoration:none; color:var(--muted); font-weight:600; font-size:.92rem; padding:8px 12px; border-radius:100px; transition:color .15s, background .15s; }
+.home-nav a:hover { color:var(--ink); background:var(--wash); }
+.home-nav a.is-active { color:var(--ink); }
+
+.home-top .spacer { flex:1; }
+
+/* Bouton d'accès rapide au portail dealer (privé) */
+.home-dealer { display:inline-flex; align-items:center; gap:6px; height:40px; padding:0 15px;
+  text-decoration:none; font-weight:700; font-size:.88rem; color:var(--ink); background:transparent;
+  border:1.5px solid var(--line); border-radius:100px; white-space:nowrap; transition:border-color .16s, color .16s; }
+.home-dealer:hover { border-color:var(--ember); color:var(--ember-dim); }
+.home-dealer svg { width:15px; height:15px; }
+
+/* Contrôles de droite (CTA accueil / panier boutique) : même hauteur -> en-tête identique partout. */
+.home-cta, .home-top .cart-btn { height:40px; display:inline-flex; align-items:center; padding-top:0; padding-bottom:0; }
+.home-cta { text-decoration:none; font-weight:700; font-size:.9rem; color:#fff; background:var(--ember);
+  border:1.5px solid var(--ember); border-radius:100px; padding-left:18px; padding-right:18px; transition:background .16s, transform .1s; white-space:nowrap; }
+.home-cta:hover { background:var(--ember-dim); border-color:var(--ember-dim); }
+.home-cta:active { transform:translateY(1px); }
+
+.nav-burger { display:none; background:none; border:none; cursor:pointer; padding:6px; flex-direction:column; gap:5px; }
+.nav-burger span { display:block; width:24px; height:2px; background:var(--ink); border-radius:2px; }
+
+/* Menu mobile (tiroir) */
+.nav-backdrop { position:fixed; inset:0; background:rgba(20,22,26,.5); z-index:40; }
+.nav-drawer { position:fixed; top:0; right:0; bottom:0; width:262px; max-width:82vw; z-index:50; background:var(--paper);
+  box-shadow:var(--shadow); padding:18px; transform:translateX(100%); transition:transform .22s ease;
+  display:flex; flex-direction:column; gap:4px; }
+.nav-drawer.open { transform:none; }
+.nav-drawer .close { align-self:flex-end; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--muted); }
+.nav-drawer a { text-decoration:none; color:var(--ink); font-weight:600; padding:12px 10px; border-radius:10px; }
+.nav-drawer a:hover { background:var(--wash); }
+
+@media (max-width:720px) {
+  .home-nav, .home-dealer { display:none; }
+  .nav-burger { display:flex; }
+}

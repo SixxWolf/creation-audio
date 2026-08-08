@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Création Audio — Spacers 3D</title>
+<meta name="description" content="Adaptateurs et entretoises imprimés 3D — Création Audio, région de Québec.">
+<link rel="canonical" href="https://creationaudio.ca/spacers.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Création Audio">
+<meta property="og:locale" content="fr_CA">
+<meta property="og:url" content="https://creationaudio.ca/spacers.html">
+<meta property="og:title" content="Création Audio — Spacers 3D">
+<meta property="og:description" content="Adaptateurs et entretoises imprimés 3D — Création Audio, région de Québec.">
+<meta property="og:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/img/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css?v=2">
+<link rel="stylesheet" href="assets/header.css?v=3">
+<link rel="stylesheet" href="assets/boutique.css?v=18">
+</head>
+<body>
+
+<header class="home-top">
+  <a class="brand" href="index.html"><span class="d"></span> Création Audio</a>
+  <nav class="home-nav" aria-label="Navigation principale">
+    <a href="index.html">Accueil</a>
+    <a href="boutique.html">Filaments</a>
+    <a href="spacers.html" class="is-active">Spacers</a>
+    <a href="index.html#caissons">Caissons</a>
+    <a href="index.html#contact">Contact</a>
+  </nav>
+  <span class="spacer"></span>
+  <a class="home-dealer" href="dealer.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    Dealer
+  </a>
+  <button class="cart-btn" id="cart-btn" type="button" aria-label="Ouvrir le panier">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" width="20" height="20">
+      <path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>
+    <span class="cart-count" id="cart-count">0</span>
+  </button>
+  <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+
+<main class="shop">
+  <div class="shop-head">
+    <div class="shop-eyebrow">Impression 3D</div>
+    <h1>Spacers &amp; adaptateurs</h1>
+    <p class="muted">Pièces imprimées 3D pour ton installation audio — <b>vendues par paire</b>. Ramassage région de Québec.</p>
+  </div>
+  <div class="shop-grid" id="spacers-grid"><p class="muted">Chargement…</p></div>
+</main>
+
+<!-- Panier -->
+<div class="cart-backdrop" id="cart-backdrop" hidden></div>
+<aside class="cart-panel" id="cart-panel" role="dialog" aria-modal="true" aria-label="Ma sélection">
+  <div class="cart-phead">
+    <h2>Ma sélection</h2>
+    <button type="button" class="cart-close" id="cart-close" aria-label="Fermer">&times;</button>
+  </div>
+  <div class="cart-items" id="cart-items"></div>
+  <div class="cart-foot">
+    <div class="cart-line cart-line-total"><span>Total estimé</span><span id="cart-total">0,00 $</span></div>
+    <button type="button" class="cart-order" id="cart-order">Copier ma liste &amp; écrire sur Messenger</button>
+    <button type="button" class="cart-order cart-email" id="cart-email">Écrire par courriel</button>
+    <p class="cart-msg" id="cart-msg" role="status"></p>
+    <button type="button" class="cart-clear" id="cart-clear">Vider le panier</button>
+    <p class="cart-note">Aucun paiement en ligne — je confirme la dispo et un ramassage à Québec.</p>
+  </div>
+</aside>
+
+<div class="toast" id="toast" hidden></div>
+
+<!-- Menu mobile (en-tête partagée) -->
+<div class="nav-backdrop" id="nav-backdrop" hidden></div>
+<aside class="nav-drawer" id="nav-drawer" aria-label="Menu">
+  <button class="close" id="nav-close" type="button" aria-label="Fermer">&times;</button>
+  <a href="index.html">Accueil</a>
+  <a href="boutique.html">Filaments</a>
+  <a href="spacers.html">Spacers</a>
+  <a href="index.html#caissons">Caissons</a>
+  <a href="index.html#contact">Contact</a>
+  <a href="dealer.html">Espace dealer</a>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/supabase-config.js?v=1"></script>
+<script src="assets/supabase-client.js?v=1"></script>
+<script src="assets/nav.js?v=1"></script>
+<script src="assets/spacers.js?v=7"></script>
+</body>
+</html>

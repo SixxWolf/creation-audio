@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /dealer.html
+
+Sitemap: https://creationaudio.ca/sitemap.xml

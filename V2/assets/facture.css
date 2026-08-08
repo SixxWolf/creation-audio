@@ -1,0 +1,279 @@
+/* =========================================================
+   Création Audio V2 — Facturation (Phase 4)
+   Barre de gabarit, catalogue cliquable, document facture,
+   marge privée, styles d'impression.
+   ========================================================= */
+
+/* ---- Onglet Caissons (lanceur) ---- */
+.cai-intro { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-lg);
+  padding:22px; max-width:640px; box-shadow:var(--shadow-sm); }
+.cai-intro p { margin:0 0 16px; color:var(--muted); }
+.cai-intro b { color:var(--ink); }
+
+/* ---- Barre gabarit + client ---- */
+.fx-bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+.fx-seg { display:inline-flex; gap:2px; background:var(--wash); border:1px solid var(--line);
+  border-radius:100px; padding:3px; }
+.fx-seg-btn, .fx-cli-btn { font:inherit; font-weight:600; cursor:pointer; border:none; background:none;
+  color:var(--muted); border-radius:100px; padding:8px 16px; transition:background .15s, color .15s; white-space:nowrap; }
+.fx-seg-btn:hover, .fx-cli-btn:hover { color:var(--ink); }
+.fx-seg-btn.is-active, .fx-cli-btn.is-active { background:var(--ink); color:#fff; }
+.fx-seg-sm .fx-cli-btn { padding:6px 13px; font-size:.85rem; }
+.fx-check { display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--ink);
+  font-weight:500; cursor:pointer; white-space:nowrap; }
+.fx-check input { width:auto; }
+
+/* ---- Bloc infos client ---- */
+.fx-meta { margin-bottom:20px; }
+.fx-company { margin-top:6px; border-top:1px solid var(--line); padding-top:14px; }
+.fx-company > summary { cursor:pointer; font-weight:600; font-size:.9rem; list-style:none; }
+.fx-company > summary::-webkit-details-marker { display:none; }
+.fx-company > summary::before { content:"▸ "; color:var(--ember); }
+.fx-company[open] > summary::before { content:"▾ "; }
+.fx-logo-prev img { max-height:44px; max-width:150px; border:1px solid var(--line); border-radius:8px;
+  padding:4px; background:#fff; object-fit:contain; }
+
+/* ---- Disposition catalogue / facture ---- */
+.fx-layout { display:grid; grid-template-columns:minmax(280px, 360px) 1fr; gap:22px; align-items:start; }
+.fx-side { position:sticky; top:76px; display:flex; flex-direction:column; gap:12px; }
+.fx-picker { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:var(--shadow-sm); overflow:hidden; }
+.fx-picker-head { display:flex; flex-direction:column; gap:10px; padding:12px; border-bottom:1px solid var(--line); }
+.fx-picker-head input[type=search] { width:100%; padding:9px 11px; border:1.5px solid var(--line);
+  border-radius:var(--radius-sm); font:inherit; }
+.fx-filters { display:flex; gap:8px; }
+.fx-filters select { flex:1; min-width:0; padding:8px 10px; border:1.5px solid var(--line);
+  border-radius:var(--radius-sm); font:inherit; background:var(--paper); color:var(--ink); cursor:pointer; }
+.fx-filters select:focus { outline:none; border-color:var(--ember); }
+.fx-type { display:inline-flex; gap:2px; background:var(--wash); border:1px solid var(--line);
+  border-radius:100px; padding:3px; align-self:flex-start; }
+.fx-type-btn { font:inherit; font-weight:600; font-size:.82rem; cursor:pointer; border:none; background:none;
+  color:var(--muted); border-radius:100px; padding:5px 13px; }
+.fx-type-btn.is-active { background:var(--ink); color:#fff; }
+.fx-catalog { max-height:62vh; overflow:auto; padding:12px; }
+
+.pk-group { margin-bottom:14px; }
+.pk-group-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); margin:0 0 8px; }
+.pk-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(88px,1fr)); gap:8px; }
+.pk-grid-cards { grid-template-columns:repeat(auto-fill, minmax(104px,1fr)); }
+.pk-cell { position:relative; display:flex; flex-direction:column; align-items:center; gap:5px;
+  border:1.5px solid var(--line); border-radius:10px; background:var(--paper); cursor:pointer;
+  padding:9px 6px; font:inherit; text-align:center; transition:border-color .15s, box-shadow .15s; }
+.pk-cell:hover { border-color:var(--ember); }
+.pk-cell.sel { border-color:var(--ember); box-shadow:0 0 0 2px rgba(255,106,43,.18); }
+.pk-sw { width:24px; height:24px; border-radius:50%; border:1.5px solid rgba(0,0,0,.15); flex:none; }
+.pk-name { font-size:.76rem; font-weight:600; line-height:1.2; word-break:break-word; }
+.pk-price { font-size:.74rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.pk-card .pk-img { width:100%; aspect-ratio:1/1; object-fit:contain; background:#fff; border-radius:8px; }
+.pk-card .pk-noimg { display:block; background:var(--wash); }
+.pk-badge { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 5px;
+  background:var(--ember); color:#fff; font-size:.68rem; font-weight:700; border-radius:100px;
+  display:flex; align-items:center; justify-content:center; }
+.pk-badge:empty { display:none; }
+
+/* ---- Panneau caisson ---- */
+.fx-caisson { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:var(--shadow-sm); padding:16px; }
+.fx-caisson h3 { font-size:.95rem; }
+.fx-spec-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
+.fx-spec-grid .field { gap:5px; }
+.fx-caisson .btn { margin-right:6px; margin-top:4px; }
+.fx-freeline { align-self:flex-start; }
+
+/* ---- Colonne facture ---- */
+.fx-main { min-width:0; }
+.fx-invoice { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-lg);
+  box-shadow:var(--shadow); padding:30px; }
+.inv-empty { color:var(--muted); text-align:center; padding:50px 20px; }
+
+.inv-top { display:flex; justify-content:space-between; gap:20px; align-items:flex-start;
+  border-bottom:2px solid var(--ink); padding-bottom:16px; margin-bottom:16px; }
+.inv-logo { max-height:56px; max-width:200px; object-fit:contain; margin-bottom:8px; display:block; }
+.inv-co-name { font-size:1.2rem; font-weight:700; }
+.inv-co-tag { color:var(--muted); font-size:.85rem; margin-top:2px; }
+.inv-co-meta { color:var(--muted); font-size:.8rem; margin-top:8px; white-space:pre-line; line-height:1.5; }
+.inv-title { text-align:right; flex:none; }
+.inv-title h1 { font-size:1.5rem; letter-spacing:.04em; }
+.inv-meta { color:var(--muted); font-size:.85rem; margin-top:6px; font-variant-numeric:tabular-nums; }
+
+.inv-billto { margin-bottom:12px; }
+.inv-billto .lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.inv-billto .who { font-weight:700; font-size:1.02rem; }
+.inv-cli-tag { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  color:#fff; background:var(--ember); border-radius:100px; padding:2px 8px; vertical-align:middle; }
+.inv-specs { background:var(--wash); border:1px solid var(--line); border-radius:var(--radius-sm);
+  padding:9px 12px; font-size:.85rem; margin-bottom:14px; }
+.inv-specs .lbl { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--ember); margin-right:8px; }
+
+.inv-table { width:100%; border-collapse:collapse; margin-bottom:14px; }
+.inv-table th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); font-weight:700; padding:8px 8px; border-bottom:1.5px solid var(--line); }
+.inv-table th.num, .inv-table td.num { text-align:right; }
+.inv-table td { padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:middle; font-size:.9rem; }
+.inv-sw { vertical-align:-2px; margin-right:6px; }
+.inv-mat { color:var(--muted); font-size:.78rem; }
+.inv-qty, .inv-price { width:78px; text-align:right; padding:6px 8px; border:1.5px solid var(--line);
+  border-radius:8px; font:inherit; font-variant-numeric:tabular-nums; }
+.inv-price { width:92px; }
+.inv-label { width:100%; padding:6px 8px; border:1.5px solid var(--line); border-radius:8px; font:inherit; }
+.inv-del { border:none; background:none; color:var(--muted); cursor:pointer; font-size:1.15rem; line-height:1; padding:2px 6px; }
+.inv-del:hover { color:var(--bad); }
+
+.inv-tot { margin-left:auto; width:min(320px, 100%); }
+.inv-tot .line { display:flex; justify-content:space-between; padding:5px 0; font-variant-numeric:tabular-nums; }
+.inv-tot .taxno { color:var(--muted); font-size:.75rem; font-weight:400; }
+.inv-tot .grand { border-top:2px solid var(--ink); margin-top:6px; padding-top:10px; font-weight:700; font-size:1.1rem; }
+.inv-pay { margin-top:16px; background:var(--wash); border-radius:var(--radius-sm); padding:10px 13px; font-size:.88rem; }
+.inv-pay .lbl { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-right:8px; }
+.inv-foot { margin-top:18px; color:var(--muted); font-size:.78rem; text-align:center; border-top:1px solid var(--line); padding-top:12px; }
+
+/* ---- Marge privée + actions ---- */
+.fx-margin { display:flex; align-items:baseline; gap:12px; margin-top:14px; padding:12px 16px;
+  background:var(--wash); border:1px dashed var(--line); border-radius:var(--radius-sm); }
+.fx-margin-k { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.fx-margin-v { font-weight:700; font-size:1.1rem; font-variant-numeric:tabular-nums; }
+.fx-margin-v.pos { color:var(--good); } .fx-margin-v.neg { color:var(--bad); }
+.fx-margin-sub { color:var(--muted); font-size:.82rem; font-variant-numeric:tabular-nums; }
+
+.fx-actions { display:flex; align-items:center; gap:10px; margin-top:16px; flex-wrap:wrap; }
+
+@media (max-width:900px) {
+  .fx-layout { grid-template-columns:1fr; }
+  .fx-side { position:static; }
+  .fx-invoice { padding:18px; }
+}
+@media (max-width:640px) {
+  .fx-spec-grid { grid-template-columns:1fr; }
+  .inv-top { flex-direction:column; }
+  .inv-title { text-align:left; }
+}
+
+/* conteneur de réimpression (historique) : masqué à l'écran */
+#hist-print { display:none; }
+.inv-cancelled { color:var(--bad); font-weight:800; letter-spacing:.08em; border:2px solid var(--bad);
+  border-radius:8px; padding:4px 12px; display:inline-block; margin-bottom:12px; }
+
+/* ---- Impression : uniquement le document facture ---- */
+@media print {
+  /* marge de page à 0 -> le navigateur n'imprime plus son en-tête/pied
+     (date, titre, URL, n° de page) ; les vraies marges sont dans le doc. */
+  @page { margin: 0; }
+  body { background:#fff; }
+  .no-print, .no-print * { visibility:hidden !important; }
+
+  /* Impression depuis la Facturation (aperçu éditable) */
+  body:not(.printing-hist) * { visibility:hidden; }
+  body:not(.printing-hist) #fx-invoice, body:not(.printing-hist) #fx-invoice * { visibility:visible; }
+  body:not(.printing-hist) #fx-invoice { position:absolute; left:0; top:0; width:100%;
+    border:none; box-shadow:none; border-radius:0; margin:0; padding:16mm 14mm; }
+
+  /* Réimpression depuis l'Historique (document figé) */
+  body.printing-hist * { visibility:hidden; }
+  body.printing-hist #hist-print { display:block; }
+  body.printing-hist #hist-print, body.printing-hist #hist-print * { visibility:visible; }
+  body.printing-hist #hist-print { position:absolute; left:0; top:0; width:100%;
+    border:none; box-shadow:none; border-radius:0; margin:0; padding:16mm 14mm; }
+
+  /* champs éditables -> texte simple, sans cadre, à l'impression */
+  .inv-qty, .inv-price, .inv-label {
+    border:none !important; box-shadow:none !important; background:transparent !important;
+    padding:0 !important; -webkit-appearance:none; appearance:none; }
+}
+
+/* =========================================================
+   Historique
+   ========================================================= */
+.hist-bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+.hist-bar input[type=search] { flex:1; min-width:200px; padding:9px 12px; border:1.5px solid var(--line);
+  border-radius:var(--radius-sm); font:inherit; }
+.hist-fbtn { font:inherit; font-weight:600; font-size:.85rem; cursor:pointer; border:none; background:none;
+  color:var(--muted); border-radius:100px; padding:6px 14px; }
+.hist-fbtn.is-active { background:var(--ink); color:#fff; }
+
+/* Séparation par type de facture */
+.hist-cats { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+.hist-cbtn { display:inline-flex; align-items:center; gap:7px; font:inherit; font-weight:600; font-size:.86rem;
+  cursor:pointer; border:1.5px solid var(--line); background:var(--paper); color:var(--ink);
+  border-radius:100px; padding:7px 14px; transition:border-color .15s, background .15s, color .15s; }
+.hist-cbtn:hover { border-color:var(--ember); }
+.hist-cbtn.is-active { background:var(--ink); color:#fff; border-color:var(--ink); }
+.hist-cnt { min-width:20px; height:19px; padding:0 6px; border-radius:100px; background:var(--wash); color:var(--muted);
+  font-size:.72rem; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+.hist-cbtn.is-active .hist-cnt { background:rgba(255,255,255,.22); color:#fff; }
+
+.hist-list { display:flex; flex-direction:column; gap:8px; }
+.hist-row { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-sm); overflow:hidden; }
+.hist-row.is-cancelled { opacity:.62; }
+.hist-head { display:flex; align-items:center; gap:12px; padding:12px 14px; cursor:pointer; flex-wrap:wrap; }
+.hist-head:hover { background:var(--wash); }
+.hist-num { font-weight:700; font-variant-numeric:tabular-nums; }
+.hist-cat { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+  background:var(--wash); border:1px solid var(--line); border-radius:100px; padding:2px 8px; }
+.hist-dealer { font-size:.6rem; font-weight:700; text-transform:uppercase; color:#fff; background:var(--ember);
+  border-radius:100px; padding:1px 7px; }
+.hist-annul { font-size:.62rem; font-weight:700; text-transform:uppercase; color:#fff; background:var(--bad);
+  border-radius:100px; padding:2px 8px; }
+.hist-client { color:var(--muted); font-size:.9rem; }
+.hist-head .grow { flex:1; }
+.hist-date { color:var(--muted); font-size:.84rem; }
+.hist-total { font-weight:700; font-variant-numeric:tabular-nums; min-width:90px; text-align:right; }
+.hist-detail { display:none; padding:0 14px; }
+.hist-row.open .hist-detail { display:block; padding:6px 14px 14px; border-top:1px solid var(--line); }
+
+.hist-lines { width:100%; border-collapse:collapse; margin:8px 0; font-size:.88rem; }
+.hist-lines th { text-align:left; font-size:.66rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:700; padding:5px 6px; }
+.hist-lines th.num, .hist-lines td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.hist-lines td { padding:6px 6px; border-top:1px solid var(--line); }
+.hd-meta { color:var(--muted); font-size:.8rem; }
+.hd-note { color:var(--muted); font-size:.84rem; white-space:pre-line; margin:6px 0; }
+.hist-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:8px; }
+.hist-actions .grow { flex:1; }
+.hd-sum { font-size:.86rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.hd-sum b { color:var(--ink); }
+.hd-stock { font-size:.7rem; font-weight:600; color:var(--muted); background:var(--wash); border:1px solid var(--line); border-radius:100px; padding:2px 8px; }
+.hd-stock.ok { color:var(--good); background:var(--good-wash); border-color:var(--good-wash); }
+
+/* =========================================================
+   Statistiques
+   ========================================================= */
+.stat-periods { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px; }
+.stat-pbtn { font:inherit; font-weight:600; font-size:.85rem; cursor:pointer; border:1.5px solid var(--line);
+  background:var(--paper); color:var(--ink); border-radius:100px; padding:7px 14px; }
+.stat-pbtn:hover { border-color:var(--ember); }
+.stat-pbtn.is-active { background:var(--ink); color:#fff; border-color:var(--ink); }
+
+.stat-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-bottom:22px; }
+.stat-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow-sm); }
+.stat-card-label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+.stat-card-value { font-size:1.5rem; font-weight:700; font-variant-numeric:tabular-nums; margin-top:4px; }
+.stat-card-sub { font-size:.78rem; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
+.stat-pct { font-size:.8rem; font-weight:700; padding:1px 7px; border-radius:100px; vertical-align:middle; }
+.stat-pct.pos { background:var(--good-wash); color:var(--good); } .stat-pct.neg { background:var(--bad-wash); color:var(--bad); }
+
+.stat-cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.stat-panel { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow-sm); }
+.stat-panel h2 { font-size:1rem; margin-bottom:12px; }
+
+.stat-catrow { display:flex; align-items:center; gap:10px; margin:8px 0; }
+.stat-catname { width:78px; font-size:.85rem; font-weight:600; flex:none; }
+.stat-catval { width:88px; text-align:right; font-size:.85rem; font-variant-numeric:tabular-nums; flex:none; }
+.stat-bar { flex:1; height:8px; background:var(--wash); border-radius:100px; overflow:hidden; }
+.stat-bar-fill { display:block; height:100%; background:var(--ember); border-radius:100px; }
+
+.stat-toprow { padding:9px 0; border-top:1px solid var(--line); }
+.stat-toprow:first-child { border-top:none; }
+.stat-topmain { display:flex; align-items:center; gap:10px; }
+.stat-topname { flex:1; font-size:.88rem; font-weight:600; min-width:0; }
+.stat-topmeta { color:var(--muted); font-weight:400; font-size:.78rem; }
+.stat-topmain .stat-bar { max-width:120px; }
+.stat-topnums { display:flex; align-items:center; gap:10px; margin-top:4px; font-variant-numeric:tabular-nums; }
+.stat-topqty { font-size:.8rem; color:var(--muted); }
+.stat-toprev { font-size:.86rem; font-weight:700; }
+.stat-topmargin { font-size:.74rem; font-weight:600; padding:1px 7px; border-radius:100px; }
+.stat-topmargin.pos { background:var(--good-wash); color:var(--good); } .stat-topmargin.neg { background:var(--bad-wash); color:var(--bad); }
+
+@media (max-width:720px) {
+  .stat-cols { grid-template-columns:1fr; }
+}

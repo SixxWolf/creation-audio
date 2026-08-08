@@ -1,0 +1,37 @@
+/* =========================================================
+   Création Audio V2 — design tokens
+   Police : Inter (chargée via Google Fonts dans le <head>).
+   Identité reprise de la V1 : loup / ondes rouges, ember #FF6A2B.
+   ========================================================= */
+:root {
+  /* Couleurs (héritées V1) */
+  --paper:#FFFFFF; --wash:#F6F6F4; --ink:#181A1F; --muted:#6C727C;
+  --line:#E7E7E2; --charcoal:#14161A; --charcoal-2:#1B1E24;
+  --ember:#FF6A2B; --ember-dim:#E24E15; --neon:#EF3E82;
+  --good:#1F9D57; --good-wash:#E7F6EE; --bad:#D2321F; --bad-wash:#FBEAE7;
+
+  /* Typographie — une seule famille : Inter */
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --mono: 'Inter', ui-monospace, 'Cascadia Code', Menlo, monospace; /* prix : mêmes glyphes, tabular-nums */
+
+  /* Formes / rythme */
+  --radius:14px; --radius-lg:20px; --radius-sm:10px;
+  --shadow-sm:0 1px 2px rgba(20,22,26,.06), 0 1px 3px rgba(20,22,26,.04);
+  --shadow:0 6px 24px rgba(20,22,26,.08);
+  --gap:16px;
+}
+
+* { box-sizing:border-box; }
+/* garantit que [hidden] masque toujours, même face à un display de classe
+   (ex. .login-wrap{display:flex}) — sinon l'écran de connexion reste visible. */
+[hidden] { display:none !important; }
+html { -webkit-text-size-adjust:100%; }
+body {
+  margin:0; font-family:var(--font); color:var(--ink); background:var(--wash);
+  font-size:15px; line-height:1.5; font-feature-settings:'cv02','cv03','cv04','cv11';
+  -webkit-font-smoothing:antialiased;
+}
+.money, .num { font-variant-numeric:tabular-nums; }
+h1,h2,h3 { margin:0; font-weight:700; letter-spacing:-0.01em; }
+a { color:inherit; }
+.muted { color:var(--muted); }
