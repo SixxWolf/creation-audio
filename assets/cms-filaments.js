@@ -88,7 +88,7 @@
     pendingFile = f;
     preview.src = URL.createObjectURL(f); preview.hidden = false; dropHint.hidden = true;
   });
-  if (cancelBtn) cancelBtn.addEventListener('click', function () { var id = editingId; closeEditor(); focusCard(id); });
+  if (cancelBtn) cancelBtn.addEventListener('click', function () { var id = editingId; closeEditor(); focusCard(id, true); });
   if (editor) editor.addEventListener('submit', onSave);
   // changer de matériau : réinitialise les formats aux formats offerts par ce matériau
   if (materialSel) materialSel.addEventListener('change', function () { resetOffersToMaterial(); syncMaterialUI(); });
@@ -150,11 +150,12 @@
     editor.classList.remove('is-inline');
   }
   // scrolle vers une carte et la fait clignoter (repère visuel « tu es ici »)
-  function focusCard(id) {
+  function focusCard(id, gentle) {
     if (!id) return;
     var el = $$('.card', listEl).filter(function (c) { return c.getAttribute('data-id') === String(id); })[0];
     if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // gentle = scroll instantané minimal (ne bouge pas si la carte est déjà visible)
+    el.scrollIntoView(gentle ? { block: 'nearest' } : { behavior: 'smooth', block: 'center' });
     el.classList.add('flash');
     setTimeout(function () { el.classList.remove('flash'); }, 1200);
   }
@@ -248,7 +249,7 @@
       }
       var savedId = (res.data && res.data[0] && res.data[0].id) || editingId;
       closeEditor();
-      load().then(function () { focusCard(savedId); });   // reste sur le filament modifié/créé
+      load(true).then(function () { focusCard(savedId, true); });   // recharge en place, reste sur le filament
     }, function (err) {
       saveBtn.disabled = false;
       statusEl.textContent = 'Erreur : ' + (err && err.message ? err.message : err);
@@ -256,8 +257,10 @@
   }
 
   /* ---- chargement liste (marque courante) ---- */
-  function load() {
-    listEl.innerHTML = '<p class="muted">Chargement…</p>';
+  function load(silent) {
+    // silent === true : rechargement en place (après enregistrement) — on NE vide PAS
+    // la liste, sinon la page s'effondre et le navigateur saute en haut.
+    if (silent !== true) listEl.innerHTML = '<p class="muted">Chargement…</p>';
     return sb.from('products').select('*').eq('type', TYPE).eq('brand', window.CA.currentBrand || '')
       .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
       .then(function (res) {
