@@ -66,8 +66,8 @@
   var matFilter = 'all';         // filtre matériau (catalogue filament)
   var lines = [];                // lignes de la facture
   var saved = false;             // verrou anti-double-enregistrement
-  var catalog = { filament: [], spacer: [] };
-  var catalogLoaded = { filament: false, spacer: false };
+  var catalog = { filament: [], spacer: [], accessory: [] };
+  var catalogLoaded = { filament: false, spacer: false, accessory: false };
   var lastAutoNumber = '';   // dernier n° auto proposé (E2 : détecte une saisie manuelle)
 
   /* ---------- éléments ---------- */
@@ -278,7 +278,8 @@
   function buildPicker() {
     if (cat === 'caisson') return;
     var items = catalog[cat] || [];
-    if (!items.length) { elCatalog.innerHTML = '<p class="empty">Aucun ' + cat + ' dans le catalogue.</p>'; return; }
+    var catLabel = { filament: 'filament', spacer: 'spacer', accessory: 'accessoire' }[cat] || cat;
+    if (!items.length) { elCatalog.innerHTML = '<p class="empty">Aucun ' + catLabel + ' dans le catalogue.</p>'; return; }
 
     if (cat === 'filament') {
       refreshFilterOptions();
@@ -303,7 +304,7 @@
               '<span class="pk-badge"></span></button>';
           }).join('') + '</div></div>';
       }).join('');
-    } else { // spacer
+    } else if (cat === 'spacer') {
       elCatalog.innerHTML = '<div class="pk-grid pk-grid-cards">' + items.map(function (p) {
         var url = publicUrl(p.image_path);
         return '<button type="button" class="pk-cell pk-card" data-id="' + esc(p.id) + '" data-search="' +
@@ -311,6 +312,16 @@
           (url ? '<img class="pk-img" src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="pk-img pk-noimg"></span>') +
           '<span class="pk-name">' + esc(p.name) + '</span>' +
           '<span class="pk-price">' + money(isDealer() ? (p.dealer_price != null ? p.dealer_price : p.sell_price) : p.sell_price) + '</span>' +
+          '<span class="pk-badge"></span></button>';
+      }).join('') + '</div>';
+    } else { // accessory
+      elCatalog.innerHTML = '<div class="pk-grid pk-grid-cards">' + items.map(function (p) {
+        var url = publicUrl(p.image_path);
+        return '<button type="button" class="pk-cell pk-card" data-id="' + esc(p.id) + '" data-search="' +
+          esc((p.name || '').toLowerCase()) + '">' +
+          (url ? '<img class="pk-img" src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="pk-img pk-noimg"></span>') +
+          '<span class="pk-name">' + esc(p.name) + '</span>' +
+          '<span class="pk-price">' + money(p.sell_price) + '</span>' +
           '<span class="pk-badge"></span></button>';
       }).join('') + '</div>';
     }
@@ -365,6 +376,10 @@
       base = filBase(p, kind); cost = filCost(p, kind); tiers = filTiers(p, kind);
       label = p.name; hex = p.hex;
       meta = [p.brand, p.material, (kind === 'refill' ? 'Recharge' : 'Avec bobine')].filter(Boolean).join(' · ');
+    } else if (cat === 'accessory') {
+      kind = 'unit';
+      base = p.sell_price; cost = p.cost_price; tiers = [];
+      label = p.name; meta = 'Accessoire';
     } else { // spacer : deux tarifs (client / dealer)
       kind = 'unit';
       sp = spacerDual(p);

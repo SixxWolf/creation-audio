@@ -21,7 +21,7 @@
   }
   function money(n) { return (Number(n) || 0).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD' }); }
   function pct(part, whole) { return whole > 0 ? Math.round(part / whole * 100) : 0; }
-  var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', caisson: 'Caisson', mixte: 'Mixte' };
+  var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', caisson: 'Caisson', mixte: 'Mixte' };
 
   var loaded = false, invoices = [], linesByInv = {}, periodDays = 30;
   var bodyEl = $('#stat-body'), refreshBtn = $('#stat-refresh');
