@@ -75,7 +75,8 @@
       elTax = $('#fx-tax'),
       elCliName = $('#fx-cli-name'), elCliEmail = $('#fx-cli-email'), elCliPhone = $('#fx-cli-phone'),
       elCliAddress = $('#fx-cli-address'), elCliCity = $('#fx-cli-city'), elCliHint = $('#fx-cli-hint'),
-      elDealerField = $('#fx-dealer-field'), elDealerSelect = $('#fx-dealer-select'), elClientList = $('#fx-client-list'),
+      elDealerField = $('#fx-dealer-field'), elDealerSelect = $('#fx-dealer-select'),
+      elClientField = $('#fx-client-field'), elClientSearch = $('#fx-client-search'), elClientResults = $('#fx-client-results'),
       elNumber = $('#fx-number'), elDate = $('#fx-date'), elNote = $('#fx-note'),
       elSearch = $('#fx-search'), elType = $('#fx-type'), elCatalog = $('#fx-catalog'),
       elFilters = $('#fx-filters'), elBrand = $('#fx-brand'), elMaterial = $('#fx-material'),
@@ -236,11 +237,59 @@
   }
   function contactStr() { return [norm(elCliEmail.value), norm(elCliPhone.value)].filter(Boolean).join(' · '); }
 
-  // datalist des clients connus (autocomplétion sur « Client / entreprise »)
-  function buildClientList() {
-    if (!elClientList) return;
+  // combobox de recherche client (barre + liste filtrable, comme le catalogue)
+  function clientById(id) {
     var list = (window.CA.clients && window.CA.clients.list) || [];
-    elClientList.innerHTML = list.map(function (c) { return '<option value="' + esc(c.name) + '"></option>'; }).join('');
+    return list.filter(function (c) { return String(c.id) === String(id); })[0] || null;
+  }
+  function clientMatches(q) {
+    q = norm(q).toLowerCase();
+    var list = (window.CA.clients && window.CA.clients.list) || [];
+    if (!q) return list.slice(0, 60);
+    return list.filter(function (c) {
+      return (norm(c.name) + ' ' + norm(c.email) + ' ' + norm(c.phone)).toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 60);
+  }
+  function hideClientResults() { if (elClientResults) elClientResults.hidden = true; }
+  function renderClientResults() {
+    if (!elClientResults) return;
+    var rows = clientMatches(elClientSearch ? elClientSearch.value : '');
+    if (!rows.length) {
+      elClientResults.innerHTML = '<div class="fx-combo-empty">Aucun client trouvé. Remplis les champs pour en créer un.</div>';
+    } else {
+      elClientResults.innerHTML = rows.map(function (c) {
+        var ct = [c.email, c.phone].filter(Boolean).join(' · ');
+        var loc = [c.address, c.city].filter(Boolean).join(', ');
+        var sub = [ct, loc].filter(Boolean).join(' — ');
+        return '<button type="button" class="fx-combo-item" data-id="' + esc(c.id) + '">' +
+          '<span class="nm">' + esc(c.name) + '</span>' +
+          (sub ? '<span class="ct">' + esc(sub) + '</span>' : '') + '</button>';
+      }).join('');
+      $$('.fx-combo-item', elClientResults).forEach(function (b) {
+        // mousedown : sélectionne AVANT le blur de la barre de recherche
+        b.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          var c = clientById(b.getAttribute('data-id'));
+          if (c) selectClient(c);
+        });
+      });
+    }
+    elClientResults.hidden = false;
+  }
+  function selectClient(c) {
+    setClientFields({ name: c.name || '', email: c.email || '', phone: c.phone || '', address: c.address || '', city: c.city || '' });
+    if (elClientSearch) elClientSearch.value = '';
+    hideClientResults();
+    if (saved) unlock();
+    render();
+  }
+  // rafraîchit la liste ouverte quand le carnet change / se charge
+  function buildClientList() { if (elClientResults && !elClientResults.hidden) renderClientResults(); }
+  if (elClientSearch) {
+    elClientSearch.addEventListener('input', renderClientResults);
+    elClientSearch.addEventListener('focus', renderClientResults);
+    elClientSearch.addEventListener('blur', function () { setTimeout(hideClientResults, 150); });
+    elClientSearch.addEventListener('keydown', function (e) { if (e.key === 'Escape') hideClientResults(); });
   }
   // remplit les coordonnées quand le nom saisi correspond exactement à un client connu
   function autofillClientByName() {
@@ -285,6 +334,9 @@
     });
     var isDlr = clientType === 'dealer';
     if (elDealerField) elDealerField.hidden = !isDlr;
+    if (elClientField) elClientField.hidden = isDlr;
+    if (elClientSearch) elClientSearch.value = '';
+    hideClientResults();
     if (!keepFields) {
       setClientFields({});
       if (elDealerSelect) elDealerSelect.value = '';

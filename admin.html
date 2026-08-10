@@ -14,7 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=2">
 <link rel="stylesheet" href="assets/admin.css?v=6">
-<link rel="stylesheet" href="assets/facture.css?v=5">
+<link rel="stylesheet" href="assets/facture.css?v=6">
 </head>
 <body>
 
@@ -658,10 +658,17 @@
             <select id="fx-dealer-select"><option value="">— choisir un dealer —</option></select>
             <span class="hint">Gérés dans l'onglet Dealers · les prix dealer s'appliquent.</span>
           </div>
+          <div class="field" id="fx-client-field">
+            <label class="lbl" for="fx-client-search">Trouver un client</label>
+            <div class="fx-combo">
+              <input type="search" id="fx-client-search" placeholder="Rechercher (nom, courriel, téléphone)…" autocomplete="off">
+              <div class="fx-combo-list" id="fx-client-results" hidden></div>
+            </div>
+            <span class="hint">Choisis un client existant, ou remplis les champs ci-dessous pour en créer un nouveau.</span>
+          </div>
           <div class="field">
-            <label class="lbl" for="fx-cli-name">Client / entreprise <span class="hint">(tape pour retrouver un client)</span></label>
-            <input type="text" id="fx-cli-name" placeholder="Nom ou raison sociale" autocomplete="off" list="fx-client-list">
-            <datalist id="fx-client-list"></datalist>
+            <label class="lbl" for="fx-cli-name">Client / entreprise</label>
+            <input type="text" id="fx-cli-name" placeholder="Nom ou raison sociale" autocomplete="off">
           </div>
           <div class="field">
             <label class="lbl" for="fx-cli-email">Courriel <span class="hint">(optionnel)</span></label>
@@ -868,7 +875,7 @@
 <script src="assets/cms-inventory.js?v=4"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
-<script src="assets/cms-facturation.js?v=8"></script>
+<script src="assets/cms-facturation.js?v=9"></script>
 <script src="assets/cms-historique.js?v=3"></script>
 <script src="assets/cms-statistiques.js?v=2"></script>
 </body>
