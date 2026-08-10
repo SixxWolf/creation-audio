@@ -127,7 +127,7 @@
     listEl.innerHTML = rows.map(function (inv) {
       var cancelled = inv.status === 'cancelled';
       var badge = '<span class="hist-cat">' + esc(CAT_LABEL[inv.category] || inv.category || '—') + '</span>';
-      var dealer = inv.client_type === 'olivier' ? '<span class="hist-dealer">Dealer</span>' : '';
+      var dealer = (inv.client_type === 'dealer' || inv.client_type === 'olivier') ? '<span class="hist-dealer">Dealer</span>' : '';
       return '<div class="hist-row' + (cancelled ? ' is-cancelled' : '') + '" data-id="' + esc(inv.id) + '">' +
         '<div class="hist-head">' +
           '<span class="hist-num">' + esc(inv.number || '—') + '</span>' + badge +
@@ -222,7 +222,7 @@
     if (co.email) meta.push(co.email);
     if (co.phone) meta.push(co.phone);
 
-    var dealer = inv.client_type === 'olivier' ? ' <span class="inv-cli-tag">Dealer</span>' : '';
+    var dealer = (inv.client_type === 'dealer' || inv.client_type === 'olivier') ? ' <span class="inv-cli-tag">Dealer</span>' : '';
     var billto = (inv.client_name || inv.client_contact || inv.client_address || inv.client_city)
       ? '<div class="inv-billto"><div class="lbl">Facturé à</div>' +
         (inv.client_name ? '<div class="who">' + esc(inv.client_name) + dealer + '</div>' : '') +

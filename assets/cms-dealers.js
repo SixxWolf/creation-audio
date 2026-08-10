@@ -21,9 +21,17 @@
   var loaded = false, editing = null, cache = [];
   var editor = $('#dl-editor'), editorTitle = $('#dl-editor-title'),
       emailI = $('#dl-email'), nameI = $('#dl-name'),
+      phoneI = $('#dl-phone'), addressI = $('#dl-address'), cityI = $('#dl-city'),
       statusEl = $('#dl-status'), listEl = $('#dl-list'),
       newBtn = $('#dl-new'), refreshBtn = $('#dl-refresh'),
       saveBtn = $('#dl-save'), cancelBtn = $('#dl-cancel');
+
+  /* ---- cache partagé (la facturation s'en sert pour son menu dealer) ---- */
+  CA.dealers = { list: [], loaded: false };
+  var listeners = [];
+  CA.onDealersChange = function (cb) { if (typeof cb === 'function') listeners.push(cb); };
+  function notify() { listeners.forEach(function (cb) { try { cb(CA.dealers); } catch (e) {} }); }
+  CA.loadDealers = function () { return load(); };
 
   var prevOnTab = window.CA.onTab;
   window.CA.onTab = function (name) {
@@ -42,6 +50,9 @@
     emailI.value = row ? row.email : '';
     emailI.readOnly = !!row;               // le courriel = clé/identité
     nameI.value = row && row.name ? row.name : '';
+    phoneI.value = row && row.phone ? row.phone : '';
+    addressI.value = row && row.address ? row.address : '';
+    cityI.value = row && row.city ? row.city : '';
     statusEl.textContent = '';
     editor.hidden = false;
     emailI.focus();
@@ -53,7 +64,8 @@
     e.preventDefault();
     var email = (emailI.value || '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { statusEl.textContent = 'Courriel invalide.'; return; }
-    var row = { email: email, name: nameI.value.trim() || null };
+    var row = { email: email, name: nameI.value.trim() || null,
+      phone: phoneI.value.trim() || null, address: addressI.value.trim() || null, city: cityI.value.trim() || null };
     saveBtn.disabled = true; statusEl.textContent = 'Enregistrement…';
     sb.from('dealers').upsert(row, { onConflict: 'email' }).select().then(function (res) {
       saveBtn.disabled = false;
@@ -73,12 +85,15 @@
   }
 
   function load() {
-    listEl.innerHTML = '<p class="muted">Chargement…</p>';
-    sb.from('dealers').select('*').order('created_at', { ascending: true }).then(function (res) {
-      if (res.error) { listEl.innerHTML = '<p class="empty">Impossible de charger.<br>As-tu relancé <strong>schema-v2.sql</strong> ?</p>'; return; }
+    if (loaded) listEl.innerHTML = '<p class="muted">Chargement…</p>';
+    return sb.from('dealers').select('*').order('created_at', { ascending: true }).then(function (res) {
+      if (res.error) { if (loaded) listEl.innerHTML = '<p class="empty">Impossible de charger.<br>As-tu relancé <strong>schema-v2.sql</strong> ?</p>'; return []; }
       cache = res.data || [];
-      render();
-    }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
+      CA.dealers = { list: cache, loaded: true };
+      notify();
+      if (loaded) render();
+      return cache;
+    }, function () { if (loaded) listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; return []; });
   }
 
   function render() {
@@ -87,10 +102,11 @@
       return;
     }
     listEl.innerHTML = cache.map(function (d) {
+      var contact = [d.email, d.phone].filter(Boolean).join(' · ');
       return '<div class="mat-row" data-email="' + esc(d.email) + '">' +
         '<div class="mat-main">' +
           '<div class="mat-name">' + esc(d.name || d.email) + '</div>' +
-          '<div class="mat-prices"><span>' + esc(d.email) + '</span></div>' +
+          '<div class="mat-prices"><span>' + esc(contact) + '</span></div>' +
         '</div>' +
         '<div class="mat-actions">' +
           '<button class="btn btn-ghost btn-sm dl-edit" type="button">Modifier</button>' +

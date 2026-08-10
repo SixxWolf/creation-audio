@@ -449,6 +449,36 @@ create view public.products_dealer with (security_invoker = off) as
 grant select on public.products_dealer to authenticated;
 
 -- ------------------------------------------------------------
+-- CARNET DE CLIENTS (facturation) — nom, courriel, téléphone…
+-- Mémorise les clients pour les resuggérer sur une facture.
+-- Géré dans l'admin (onglet Clients) + auto-mémorisé à chaque facture.
+-- Les DEALERS de facturation, eux, viennent de la table `dealers`
+-- (mêmes comptes que le portail) — on l'enrichit de coordonnées ci-dessous.
+-- ------------------------------------------------------------
+create table if not exists public.clients (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  email      text,
+  phone      text,
+  address    text,
+  city       text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.clients enable row level security;
+drop policy if exists clients_admin_all on public.clients;
+create policy clients_admin_all on public.clients for all to authenticated
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+-- évite les doublons de courriel (insensible à la casse) ; les courriels vides sont permis
+create unique index if not exists clients_email_uidx on public.clients (lower(email)) where email is not null and email <> '';
+
+-- coordonnées facturation sur les dealers (le menu dealer les pré-remplit)
+alter table public.dealers add column if not exists phone   text;
+alter table public.dealers add column if not exists address text;
+alter table public.dealers add column if not exists city    text;
+
+-- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
 select count(*) as produits_v2 from public.products;

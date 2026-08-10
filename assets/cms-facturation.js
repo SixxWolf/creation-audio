@@ -20,7 +20,6 @@
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var BUCKET = 'products';
   var LS_CO = 'ca_v2_facture_company';
-  var LS_OLIVIER = 'ca_v2_facture_client_olivier';   // coordonnées mémorisées du dealer
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -29,6 +28,7 @@
   }
   function money(n) { return (Number(n) || 0).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD' }); }
   function num(v) { var n = parseFloat(v); return isFinite(n) ? n : null; }
+  function norm(s) { return String(s == null ? '' : s).trim(); }
   function todayISO() { var d = new Date(), p = function (x) { return (x < 10 ? '0' : '') + x; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
   function fmtDateFR(iso) {
     if (!iso) return '';
@@ -59,7 +59,7 @@
   /* ---------- état ---------- */
   var loaded = false;
   var cat = 'filament';          // gabarit courant (pilote la colonne gauche)
-  var clientType = 'client';     // 'client' | 'olivier'
+  var clientType = 'client';     // 'client' | 'dealer'  (legacy 'olivier' => dealer)
   var taxEnabled = false;
   var pickerKind = 'spool';      // filament : bobine | recharge
   var brandFilter = 'all';       // filtre marque (catalogue filament)
@@ -73,8 +73,9 @@
   /* ---------- éléments ---------- */
   var elReset = $('#fx-reset'), elNextHint = $('#fx-nexthint'),
       elTax = $('#fx-tax'),
-      elCliName = $('#fx-cli-name'), elCliContact = $('#fx-cli-contact'),
+      elCliName = $('#fx-cli-name'), elCliEmail = $('#fx-cli-email'), elCliPhone = $('#fx-cli-phone'),
       elCliAddress = $('#fx-cli-address'), elCliCity = $('#fx-cli-city'), elCliHint = $('#fx-cli-hint'),
+      elDealerField = $('#fx-dealer-field'), elDealerSelect = $('#fx-dealer-select'), elClientList = $('#fx-client-list'),
       elNumber = $('#fx-number'), elDate = $('#fx-date'), elNote = $('#fx-note'),
       elSearch = $('#fx-search'), elType = $('#fx-type'), elCatalog = $('#fx-catalog'),
       elFilters = $('#fx-filters'), elBrand = $('#fx-brand'), elMaterial = $('#fx-material'),
@@ -165,6 +166,11 @@
     loadNextNumberHint();
     Promise.resolve(window.CA.loadMaterials ? window.CA.loadMaterials() : null)
       .then(function () { loadCatalog('filament'); }, function () { loadCatalog('filament'); });
+    // carnet clients (autocomplétion) + dealers (menu) — chargés et tenus à jour
+    if (window.CA.loadClients) window.CA.loadClients().then(buildClientList, function () {}); else buildClientList();
+    if (window.CA.loadDealers) window.CA.loadDealers().then(buildDealerSelect, function () {}); else buildDealerSelect();
+    if (window.CA.onClientsChange) window.CA.onClientsChange(buildClientList);
+    if (window.CA.onDealersChange) window.CA.onDealersChange(buildDealerSelect);
     render();
   }
 
@@ -218,21 +224,71 @@
     b.addEventListener('click', function () { setClientType(b.getAttribute('data-cli')); });
   });
 
-  /* ---------- profil client (Olivier mémorisé) ---------- */
-  function clientFields() { return { name: elCliName.value, contact: elCliContact.value, address: elCliAddress.value, city: elCliCity.value }; }
+  /* ---------- carnet clients / dealers ---------- */
+  function clientFields() {
+    return { name: norm(elCliName.value), email: norm(elCliEmail.value), phone: norm(elCliPhone.value),
+             address: norm(elCliAddress.value), city: norm(elCliCity.value) };
+  }
   function setClientFields(p) {
     p = p || {};
-    elCliName.value = p.name || ''; elCliContact.value = p.contact || '';
+    elCliName.value = p.name || ''; elCliEmail.value = p.email || ''; elCliPhone.value = p.phone || '';
     elCliAddress.value = p.address || ''; elCliCity.value = p.city || '';
   }
-  function loadOlivierProfile() { try { return JSON.parse(localStorage.getItem(LS_OLIVIER)) || {}; } catch (e) { return {}; } }
-  function saveOlivierProfile() { try { localStorage.setItem(LS_OLIVIER, JSON.stringify(clientFields())); } catch (e) {} }
+  function contactStr() { return [norm(elCliEmail.value), norm(elCliPhone.value)].filter(Boolean).join(' · '); }
+
+  // datalist des clients connus (autocomplétion sur « Client / entreprise »)
+  function buildClientList() {
+    if (!elClientList) return;
+    var list = (window.CA.clients && window.CA.clients.list) || [];
+    elClientList.innerHTML = list.map(function (c) { return '<option value="' + esc(c.name) + '"></option>'; }).join('');
+  }
+  // remplit les coordonnées quand le nom saisi correspond exactement à un client connu
+  function autofillClientByName() {
+    if (clientType !== 'client') return;
+    var name = norm(elCliName.value).toLowerCase();
+    if (!name) return;
+    var list = (window.CA.clients && window.CA.clients.list) || [];
+    var c = list.filter(function (x) { return norm(x.name).toLowerCase() === name; })[0];
+    if (!c) return;
+    elCliEmail.value = c.email || ''; elCliPhone.value = c.phone || '';
+    elCliAddress.value = c.address || ''; elCliCity.value = c.city || '';
+    if (saved) unlock();
+    render();
+  }
+
+  // menu déroulant des dealers (table dealers)
+  function buildDealerSelect() {
+    if (!elDealerSelect) return;
+    var list = (window.CA.dealers && window.CA.dealers.list) || [];
+    var cur = elDealerSelect.value;
+    elDealerSelect.innerHTML = '<option value="">— choisir un dealer —</option>' +
+      list.map(function (d) { return '<option value="' + esc(d.email) + '">' + esc(d.name || d.email) + '</option>'; }).join('');
+    if (cur) elDealerSelect.value = cur;
+  }
+  function dealerByEmail(email) {
+    var list = (window.CA.dealers && window.CA.dealers.list) || [];
+    return list.filter(function (d) { return d.email === email; })[0] || null;
+  }
+  if (elDealerSelect) elDealerSelect.addEventListener('change', function () {
+    var d = dealerByEmail(this.value);
+    if (!d) return;
+    setClientFields({ name: d.name || d.email || '', email: d.email || '', phone: d.phone || '', address: d.address || '', city: d.city || '' });
+    if (saved) unlock();
+    render();
+  });
+
   function setClientType(type, keepFields) {
-    clientType = (type === 'olivier') ? 'olivier' : 'client';
-    $$('.fx-cli-btn').forEach(function (x) { x.classList.toggle('is-active', x.getAttribute('data-cli') === clientType); });
+    clientType = (type === 'dealer' || type === 'olivier') ? 'dealer' : 'client';
+    $$('.fx-cli-btn').forEach(function (x) {
+      var v = x.getAttribute('data-cli');
+      x.classList.toggle('is-active', v === clientType || (clientType === 'dealer' && v === 'olivier'));
+    });
+    var isDlr = clientType === 'dealer';
+    if (elDealerField) elDealerField.hidden = !isDlr;
     if (!keepFields) {
-      if (clientType === 'olivier') { setClientFields(loadOlivierProfile()); elCliHint.textContent = 'Coordonnées mémorisées pour Olivier — modifie-les, c\'est retenu.'; }
-      else { setClientFields({}); elCliHint.textContent = ''; }
+      setClientFields({});
+      if (elDealerSelect) elDealerSelect.value = '';
+      elCliHint.textContent = isDlr ? 'Choisis un dealer — ses coordonnées et les prix dealer s\'appliquent.' : '';
     }
     repriceSpacers();                       // bascule prix client <-> dealer sur les lignes spacer
     if (cat === 'spacer') buildPicker();    // rafraîchit les prix affichés dans le catalogue
@@ -363,7 +419,7 @@
   /* ---------- ajout de lignes ---------- */
   function prodById(id) { var arr = catalog[cat] || []; return arr.filter(function (p) { return String(p.id) === String(id); })[0] || null; }
 
-  function isDealer() { return clientType === 'olivier'; }
+  function isDealer() { return clientType === 'dealer'; }
   // spacer : prix client (à plat) OU prix dealer (+ rabais quantité) selon le type de client
   function spacerDual(p) { return { client: +p.sell_price || 0, dealer: +(p.dealer_price != null ? p.dealer_price : p.sell_price) || 0, tiers: p.tiers || [] }; }
 
@@ -454,9 +510,9 @@
     if (co.email) meta.push(co.email);
     if (co.phone) meta.push(co.phone);
 
-    var cliName = elCliName.value.trim(), cliContact = elCliContact.value.trim(),
+    var cliName = elCliName.value.trim(), cliContact = contactStr(),
         cliAddress = elCliAddress.value.trim(), cliCity = elCliCity.value.trim();
-    var cliTag = clientType === 'olivier' ? ' <span class="inv-cli-tag">Dealer</span>' : '';
+    var cliTag = clientType === 'dealer' ? ' <span class="inv-cli-tag">Dealer</span>' : '';
     var billto = (cliName || cliContact || cliAddress || cliCity)
       ? '<div class="inv-billto"><div class="lbl">Facturé à</div>' +
         (cliName ? '<div class="who">' + esc(cliName) + cliTag + '</div>' : '') +
@@ -548,10 +604,11 @@
   [elNote, elDate, cxVehicle, cxLitrage, cxEvent, cxFinition].forEach(function (el) {
     if (el) el.addEventListener('input', function () { render(); });
   });
-  // champs client : re-render + mémorisation auto du profil Olivier
-  [elCliName, elCliContact, elCliAddress, elCliCity].forEach(function (el) {
-    if (el) el.addEventListener('input', function () { if (clientType === 'olivier') saveOlivierProfile(); render(); });
+  // champs client : re-render ; le nom déclenche l'autocomplétion depuis le carnet
+  [elCliName, elCliEmail, elCliPhone, elCliAddress, elCliCity].forEach(function (el) {
+    if (el) el.addEventListener('input', function () { render(); });
   });
+  if (elCliName) elCliName.addEventListener('change', autofillClientByName);
   if (elTax) elTax.addEventListener('change', function () { taxEnabled = this.checked; render(); });
 
   /* ---------- enregistrement ---------- */
@@ -590,7 +647,7 @@
       var invoice = {
         number: number,
         client_name: elCliName.value.trim() || null,
-        client_contact: elCliContact.value.trim() || null,
+        client_contact: contactStr() || null,
         client_address: elCliAddress.value.trim() || null,
         client_city: elCliCity.value.trim() || null,
         client_type: clientType,
@@ -622,6 +679,10 @@
     }).then(function (inv) {
       lock();
       render();
+      // auto-mémorisation du client (mode client seulement ; les dealers = onglet Dealers)
+      if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value)) {
+        window.CA.rememberClient(clientFields());
+      }
       elStatus.textContent = '✓ Facture ' + inv.number + ' enregistrée' + (elDeduct.checked ? ', stock déduit.' : '.');
       loadNextNumberHint();
       // recharge les stocks du catalogue (badges/plafonds à jour)
@@ -669,10 +730,10 @@
     var L = [];
     L.push(co.name); if (co.tagline) L.push(co.tagline);
     L.push('FACTURE ' + (elNumber.value || '') + '   ' + fmtDateFR(elDate.value || todayISO()));
-    var cli = elCliName.value.trim(); if (cli) L.push('Facturé à : ' + cli + (clientType === 'olivier' ? ' (dealer)' : ''));
+    var cli = elCliName.value.trim(); if (cli) L.push('Facturé à : ' + cli + (clientType === 'dealer' ? ' (dealer)' : ''));
     if (elCliAddress.value.trim()) L.push(elCliAddress.value.trim());
     if (elCliCity.value.trim()) L.push(elCliCity.value.trim());
-    if (elCliContact.value.trim()) L.push(elCliContact.value.trim());
+    if (contactStr()) L.push(contactStr());
     var specs = specsText(); if (specs) L.push('Caisson — ' + specs);
     L.push('');
     lines.forEach(function (l) { L.push(l.qty + ' × ' + (l.label || '(article)') + (l.meta ? ' (' + l.meta + ')' : '') + '  —  ' + money(l.qty * l.price)); });
@@ -698,7 +759,7 @@
   if (elEmail) elEmail.addEventListener('click', function () {
     if (!lines.length) { elStatus.textContent = 'Ajoute d\'abord des articles à la facture.'; return; }
     var co = readCompanyForm();
-    var email = extractEmail(elCliContact.value);
+    var email = norm(elCliEmail.value) || extractEmail(contactStr());
     var subject = 'Facture ' + (elNumber.value || '') + ' — ' + (co.name || 'Création Audio');
     var body = 'Bonjour' + (elCliName.value.trim() ? ' ' + elCliName.value.trim() : '') + ',\n\n' +
       'Voici votre facture. La version PDF mise en forme est jointe à ce courriel.\n\n' +
@@ -709,7 +770,7 @@
     window.location.href = href;
     elStatus.textContent = email
       ? 'Brouillon ouvert. Pense à joindre le PDF (bouton « Imprimer / PDF ») pour le format exact.'
-      : 'Astuce : mets le courriel du client dans « Contact » pour l\'adresser automatiquement.';
+      : 'Astuce : remplis le champ « Courriel » du client pour l\'adresser automatiquement.';
   });
 
   /* ---------- entreprise : sauver / logo ---------- */
