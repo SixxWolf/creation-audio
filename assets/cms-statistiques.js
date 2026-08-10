@@ -72,6 +72,18 @@
     });
   }
 
+  // gabarit d'UNE ligne de facture (pour ventiler une facture mixte) :
+  //  - bobine/recharge      -> filament
+  //  - unité + méta « Accessoire » -> accessoire ; sinon -> spacer
+  //  - ligne libre          -> gabarit de la facture si net, sinon caisson
+  function lineCat(l, inv) {
+    var k = l.kind;
+    if (k === 'spool' || k === 'refill') return 'filament';
+    if (k === 'unit') return /accessoire/i.test(l.meta || '') ? 'accessory' : 'spacer';
+    if (k === 'free') { var c = inv.category; return (c && c !== 'mixte') ? c : 'caisson'; }
+    return inv.category || 'mixte';
+  }
+
   function render() {
     var rows = inScope();
     var n = rows.length;
@@ -79,12 +91,21 @@
     var byCat = {}, prod = {};
     rows.forEach(function (inv) {
       ca += (+inv.subtotal) || 0; cost += (+inv.cost_total) || 0; collected += (+inv.total) || 0;
-      var c = inv.category || 'mixte'; byCat[c] = (byCat[c] || 0) + ((+inv.subtotal) || 0);
-      (linesByInv[inv.id] || []).forEach(function (l) {
-        var key = l.product_id || ('free:' + (l.label || ''));
-        var p = prod[key] || (prod[key] = { label: l.label || '(ligne)', meta: l.meta || '', qty: 0, rev: 0, cost: 0 });
-        p.qty += (+l.qty) || 0; p.rev += (+l.line_total) || 0; p.cost += ((+l.unit_cost) || 0) * ((+l.qty) || 0);
-      });
+      var lns = linesByInv[inv.id] || [];
+      if (lns.length) {
+        lns.forEach(function (l) {
+          // ventilation par gabarit AU NIVEAU DE LA LIGNE : une facture mixte
+          // répartit ses filaments et ses accessoires dans les bonnes cases.
+          var lc = lineCat(l, inv);
+          byCat[lc] = (byCat[lc] || 0) + ((+l.line_total) || 0);
+          var key = l.product_id || ('free:' + (l.label || ''));
+          var p = prod[key] || (prod[key] = { label: l.label || '(ligne)', meta: l.meta || '', qty: 0, rev: 0, cost: 0 });
+          p.qty += (+l.qty) || 0; p.rev += (+l.line_total) || 0; p.cost += ((+l.unit_cost) || 0) * ((+l.qty) || 0);
+        });
+      } else {
+        // repli : facture dont les lignes n'ont pas pu être chargées
+        var c = inv.category || 'mixte'; byCat[c] = (byCat[c] || 0) + ((+inv.subtotal) || 0);
+      }
     });
     var margin = ca - cost, avg = n ? ca / n : 0;
 
