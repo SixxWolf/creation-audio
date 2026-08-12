@@ -528,6 +528,12 @@
 
   function afterChange() { if (saved) unlock(); render(); }
 
+  // catégorie d'une ligne libre (pour les statistiques « Ventes par gabarit »)
+  var PTYPE_OPTS = [['filament', 'Filament'], ['spacer', 'Spacer'], ['accessory', 'Accessoire'], ['caisson', 'Caisson'], ['divers', 'Divers']];
+  function catOptions(sel) {
+    return PTYPE_OPTS.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === sel ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
+  }
+
   /* ---------- totaux ---------- */
   function totals() {
     var co = readCompanyForm();
@@ -578,7 +584,8 @@
 
     var rows = lines.map(function (l, i) {
       var descCell = (l.kind === 'free')
-        ? '<input class="inv-label" type="text" value="' + esc(l.label) + '" data-i="' + i + '" placeholder="Description">'
+        ? '<input class="inv-label" type="text" value="' + esc(l.label) + '" data-i="' + i + '" placeholder="Description">' +
+          '<select class="inv-cat no-print" data-i="' + i + '" title="Catégorie (pour les statistiques)">' + catOptions(l.ptype || 'divers') + '</select>'
         : swatchSVG(l.hex) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(l.meta) + '</span>' : '');
       return '<tr data-i="' + i + '">' +
         '<td>' + descCell + '</td>' +
@@ -636,6 +643,9 @@
     });
     $$('.inv-label', elInvoice).forEach(function (inp) {
       inp.addEventListener('input', function () { var l = lines[+this.getAttribute('data-i')]; if (l) l.label = this.value; });
+    });
+    $$('.inv-cat', elInvoice).forEach(function (sel) {
+      sel.addEventListener('change', function () { var l = lines[+this.getAttribute('data-i')]; if (l) { l.ptype = this.value; afterChange(); } });
     });
     $$('.inv-del', elInvoice).forEach(function (b) {
       b.addEventListener('click', function () { lines.splice(+this.getAttribute('data-i'), 1); afterChange(); });
@@ -717,7 +727,7 @@
         var inv = r2.data[0];
         var lineRows = valid.map(function (l, i) {
           return { invoice_id: inv.id, product_id: l.productId, label: l.label || null, meta: l.meta || null,
-            kind: l.kind, qty: l.qty, unit_price: round2(l.price), unit_cost: round2(l.cost),
+            kind: l.kind, ptype: l.ptype || null, qty: l.qty, unit_price: round2(l.price), unit_cost: round2(l.cost),
             line_total: round2(l.qty * l.price), sort_order: i };
         });
         return sb.from('invoice_lines').insert(lineRows).then(function (r3) {

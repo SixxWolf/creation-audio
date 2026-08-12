@@ -21,7 +21,7 @@
   }
   function money(n) { return (Number(n) || 0).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD' }); }
   function pct(part, whole) { return whole > 0 ? Math.round(part / whole * 100) : 0; }
-  var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', caisson: 'Caisson', mixte: 'Mixte' };
+  var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', caisson: 'Caisson', divers: 'Divers', mixte: 'Mixte' };
 
   var loaded = false, invoices = [], linesByInv = {}, periodDays = 30;
   var bodyEl = $('#stat-body'), refreshBtn = $('#stat-refresh');
@@ -72,15 +72,17 @@
     });
   }
 
-  // gabarit d'UNE ligne de facture (pour ventiler une facture mixte) :
-  //  - bobine/recharge      -> filament
-  //  - unité + méta « Accessoire » -> accessoire ; sinon -> spacer
-  //  - ligne libre          -> gabarit de la facture si net, sinon caisson
+  // gabarit d'UNE ligne de facture (pour ventiler une facture mixte).
+  //  - catégorie stockée (ptype) prioritaire — choisie à la facturation ;
+  //  - repli pour les anciennes lignes sans ptype :
+  //      bobine/recharge -> filament ; unité+« Accessoire » -> accessoire, sinon spacer ;
+  //      ligne libre non catégorisée -> divers.
   function lineCat(l, inv) {
+    if (l.ptype) return l.ptype;
     var k = l.kind;
     if (k === 'spool' || k === 'refill') return 'filament';
     if (k === 'unit') return /accessoire/i.test(l.meta || '') ? 'accessory' : 'spacer';
-    if (k === 'free') { var c = inv.category; return (c && c !== 'mixte') ? c : 'caisson'; }
+    if (k === 'free') return 'divers';
     return inv.category || 'mixte';
   }
 
@@ -98,7 +100,9 @@
           // répartit ses filaments et ses accessoires dans les bonnes cases.
           var lc = lineCat(l, inv);
           byCat[lc] = (byCat[lc] || 0) + ((+l.line_total) || 0);
-          var key = l.product_id || ('free:' + (l.label || ''));
+          // regroupe par produit ET format (bobine/recharge/unité) — sinon on
+          // fusionnerait à tort les ventes bobine et recharge d'une même couleur.
+          var key = l.product_id ? (l.product_id + '|' + (l.kind || '')) : ('free:' + (l.label || ''));
           var p = prod[key] || (prod[key] = { label: l.label || '(ligne)', meta: l.meta || '', qty: 0, rev: 0, cost: 0 });
           p.qty += (+l.qty) || 0; p.rev += (+l.line_total) || 0; p.cost += ((+l.unit_cost) || 0) * ((+l.qty) || 0);
         });

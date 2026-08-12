@@ -478,6 +478,11 @@ alter table public.dealers add column if not exists phone   text;
 alter table public.dealers add column if not exists address text;
 alter table public.dealers add column if not exists city    text;
 
+-- gabarit de CHAQUE ligne de facture (filament/spacer/accessory/caisson/divers).
+-- Permet aux statistiques de ventiler correctement, y compris les lignes libres
+-- (dont la catégorie est choisie à la main dans l'éditeur de facture).
+alter table public.invoice_lines add column if not exists ptype text;
+
 -- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
