@@ -140,6 +140,10 @@ alter table public.materials alter column cost_spool drop default;
 alter table public.materials add column if not exists description text;
 alter table public.materials add column if not exists image_path  text;
 alter table public.materials add column if not exists brand text not null default 'Bambu Lab';
+-- Fiche détaillée (bas de la page filament en boutique) :
+alter table public.materials add column if not exists long_desc text;                        -- description longue (paragraphes)
+alter table public.materials add column if not exists specs   jsonb not null default '[]'::jsonb; -- specs : [{k,v}] libres (ajout/suppr. à volonté)
+alter table public.materials add column if not exists gallery jsonb not null default '[]'::jsonb; -- galerie « prints » : liste de chemins d'images (bucket products)
 -- clé primaire = (brand, name) : on retire l'ancienne (sur name) et on pose la composite
 alter table public.materials drop constraint if exists materials_pkey;
 alter table public.materials add  constraint materials_pkey primary key (brand, name);
@@ -179,6 +183,9 @@ with (security_invoker = off) as
     case when m.name is not null then m.tiers_refill else p.tiers_2 end as tiers_2,
     m.description as material_desc,
     m.image_path  as material_image,   -- image vitrine choisie à la main pour le matériau (E4)
+    m.long_desc   as material_long_desc, -- fiche : description longue
+    m.specs       as material_specs,     -- fiche : specs libres [{k,v}]
+    m.gallery     as material_gallery,   -- fiche : galerie « prints » (chemins d'images)
     m.sort_order  as material_sort,    -- ordre des matériaux (drag-and-drop admin) -> pilote l'ordre boutique
     p.qty, p.qty_2, p.size, p.sort_order
   from public.products p

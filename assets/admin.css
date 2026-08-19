@@ -116,6 +116,30 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 .tier-del { border:none; background:none; color:var(--muted); cursor:pointer; font-size:1rem; line-height:1; padding:4px; }
 .tier-del:hover { color:var(--bad); }
 
+/* Fiche détaillée (matériau) : séparateur + specs + galerie */
+.fiche-sep { border-top:1px solid var(--line); margin-top:6px; padding-top:14px; }
+.fiche-title { font-size:1rem; font-weight:700; margin:0; }
+
+.specs { display:flex; flex-direction:column; gap:8px; }
+.spec-row { display:flex; align-items:center; gap:8px; }
+.spec-row .spec-k { width:38%; min-width:120px; }
+.spec-row .spec-v { flex:1; min-width:100px; }
+.spec-del { border:none; background:none; color:var(--muted); cursor:pointer; font-size:1rem; line-height:1; padding:4px; }
+.spec-del:hover { color:var(--bad); }
+
+.gallery-grid { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+.gthumb { position:relative; width:96px; height:96px; border-radius:var(--radius-sm); overflow:hidden;
+  border:1px solid var(--line); background:var(--wash); cursor:grab; }
+.gthumb img { width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+.gthumb.dragging { opacity:.4; }
+.gthumb.drop-target { border-color:var(--ember); box-shadow:0 0 0 2px rgba(255,106,43,.25); }
+.gthumb .gdel { position:absolute; top:3px; right:3px; width:22px; height:22px; border:none; border-radius:50%;
+  background:rgba(20,22,26,.72); color:#fff; cursor:pointer; font-size:.9rem; line-height:22px; text-align:center; padding:0; }
+.gthumb .gdel:hover { background:var(--bad); }
+.gthumb .gtag { position:absolute; left:0; bottom:0; right:0; background:var(--ember); color:#fff;
+  font-size:.62rem; font-weight:700; letter-spacing:.04em; text-align:center; padding:2px 0; text-transform:uppercase; }
+.gthumb.uploading { display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:.72rem; }
+
 .editor-actions { display:flex; align-items:center; gap:10px; margin-top:18px; }
 .status { color:var(--muted); font-size:.85rem; min-height:1.2em; }
 

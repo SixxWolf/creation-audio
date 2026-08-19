@@ -37,6 +37,81 @@ window.CA = window.CA || {};
     return sb.storage.from(BUCKET).upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined })
       .then(function (res) { if (res.error) throw res.error; return path; });
   }
+  function uploadGalleryImage(file) {
+    var ext = (String(file.name).split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    var path = 'material/gallery/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+    return sb.storage.from(BUCKET).upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined })
+      .then(function (res) { if (res.error) throw res.error; return path; });
+  }
+
+  /* ---- specs libres (fiche détaillée) ---- */
+  function addSpecRow(k, v) {
+    var row = document.createElement('div');
+    row.className = 'spec-row';
+    row.innerHTML =
+      '<input type="text" class="spec-k" placeholder="Température de buse" autocomplete="off">' +
+      '<input type="text" class="spec-v" placeholder="190–230 °C" autocomplete="off">' +
+      '<button type="button" class="spec-del" aria-label="Retirer cette spec">✕</button>';
+    $('.spec-k', row).value = k || '';
+    $('.spec-v', row).value = v || '';
+    $('.spec-del', row).addEventListener('click', function () { row.remove(); });
+    specsEl.appendChild(row);
+    return row;
+  }
+  function collectSpecs() {
+    return $$('.spec-row', specsEl).map(function (row) {
+      return { k: $('.spec-k', row).value.trim(), v: $('.spec-v', row).value.trim() };
+    }).filter(function (s) { return s.k || s.v; });
+  }
+  function normalizeSpecs(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map(function (s) {
+      return { k: String(s && s.k != null ? s.k : '').trim(), v: String(s && s.v != null ? s.v : '').trim() };
+    }).filter(function (s) { return s.k || s.v; });
+  }
+
+  /* ---- galerie « prints » (fiche détaillée) ---- */
+  function normalizeGallery(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(function (p) { return typeof p === 'string' && p; });
+  }
+  var gDragI = null;
+  function wireGalleryDrag(el) {
+    el.addEventListener('dragstart', function (e) {
+      gDragI = parseInt(el.dataset.i, 10); el.classList.add('dragging');
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', ''); } catch (_) {} }
+    });
+    el.addEventListener('dragend', function () {
+      gDragI = null; el.classList.remove('dragging');
+      $$('.gthumb', galleryEl).forEach(function (c) { c.classList.remove('drop-target'); });
+    });
+    el.addEventListener('dragover', function (e) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; });
+    el.addEventListener('dragenter', function () { if (parseInt(el.dataset.i, 10) !== gDragI) el.classList.add('drop-target'); });
+    el.addEventListener('dragleave', function () { el.classList.remove('drop-target'); });
+    el.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var to = parseInt(el.dataset.i, 10);
+      if (gDragI == null || gDragI === to) return;
+      var moved = galleryItems.splice(gDragI, 1)[0];
+      galleryItems.splice(to, 0, moved);
+      renderGallery();
+    });
+  }
+  function renderGallery() {
+    if (!galleryEl) return;
+    galleryEl.innerHTML = '';
+    galleryItems.forEach(function (it, i) {
+      var url = it.url || (it.path ? publicUrl(it.path) : '');
+      var d = document.createElement('div');
+      d.className = 'gthumb'; d.setAttribute('draggable', 'true'); d.dataset.i = i;
+      d.innerHTML = '<img src="' + esc(url) + '" alt="">' +
+        '<button type="button" class="gdel" aria-label="Retirer">✕</button>' +
+        (i === 0 ? '<span class="gtag">En avant</span>' : '');
+      $('.gdel', d).addEventListener('click', function () { galleryItems.splice(i, 1); renderGallery(); });
+      wireGalleryDrag(d);
+      galleryEl.appendChild(d);
+    });
+  }
 
   /* ---- cache partagé + abonnements (toutes marques confondues) ---- */
   CA.materials = { list: [], loaded: false };
@@ -71,12 +146,17 @@ window.CA = window.CA || {};
       tiersSpoolEl = $('#m-tiers-spool'), tierAddSpool = $('#m-tier-add-spool'),
       tiersRefillEl = $('#m-tiers-refill'), tierAddRefill = $('#m-tier-add-refill'),
       descI = $('#m-desc'),
+      longDescI = $('#m-long-desc'),
+      specsEl = $('#m-specs'), specAddBtn = $('#m-spec-add'),
+      galleryEl = $('#m-gallery'), galleryAddBtn = $('#m-gallery-add'), galleryFileEl = $('#m-gallery-file'),
       dropEl = $('#m-drop'), fileEl = $('#m-file'), previewEl = $('#m-preview'), dropHintEl = $('#m-drop-hint'),
       statusEl = $('#m-status'), listEl = $('#m-list'),
       newBtn = $('#m-new'), toggleBtn = $('#m-toggle'), section = $('#m-section'),
       saveBtn = $('#m-save'), cancelBtn = $('#m-cancel');
 
   var editingName = null, pendingFile = null;
+  // galerie en cours d'édition : chaque item = { path } (déjà en base) ou { file, url } (nouveau)
+  var galleryItems = [], oldGalleryPaths = [];
 
   /* ---- chargement quand l'admin est prêt ---- */
   // se réaffiche (liste + nav latérale) à chaque changement de matériaux,
@@ -95,6 +175,15 @@ window.CA = window.CA || {};
     if (!f) return;
     pendingFile = f;
     previewEl.src = URL.createObjectURL(f); previewEl.hidden = false; dropHintEl.hidden = true;
+  });
+  if (specAddBtn) specAddBtn.addEventListener('click', function () { addSpecRow('', '').querySelector('.spec-k').focus(); });
+  if (galleryAddBtn) galleryAddBtn.addEventListener('click', function () { galleryFileEl.click(); });
+  if (galleryFileEl) galleryFileEl.addEventListener('change', function () {
+    Array.prototype.slice.call(galleryFileEl.files || []).forEach(function (f) {
+      galleryItems.push({ file: f, url: URL.createObjectURL(f) });
+    });
+    galleryFileEl.value = '';
+    renderGallery();
   });
   if (toggleBtn) toggleBtn.addEventListener('click', function () {
     var hide = section.hidden = !section.hidden;
@@ -188,6 +277,12 @@ window.CA = window.CA || {};
     hasSpoolI.checked = row ? (row.sell_spool != null) : true;
     hasRefillI.checked = row ? (row.sell_refill != null) : false;
     descI.value = row && row.description ? row.description : '';
+    longDescI.value = row && row.long_desc ? row.long_desc : '';
+    specsEl.innerHTML = '';
+    normalizeSpecs(row ? row.specs : []).forEach(function (s) { addSpecRow(s.k, s.v); });
+    oldGalleryPaths = normalizeGallery(row ? row.gallery : []);
+    galleryItems = oldGalleryPaths.map(function (p) { return { path: p }; });
+    renderGallery();
     sellSpoolI.value = row && row.sell_spool != null ? row.sell_spool : '';
     sellRefillI.value = row && row.sell_refill != null ? row.sell_refill : '';
     costSpoolI.value = row && row.cost_spool != null ? row.cost_spool : '';
@@ -234,6 +329,8 @@ window.CA = window.CA || {};
       tiers_spool: hasS ? collectTiers(tiersSpoolEl) : [],
       tiers_refill: hasR ? collectTiers(tiersRefillEl) : [],
       description: descI.value.trim() || null,
+      long_desc: longDescI.value.trim() || null,
+      specs: collectSpecs(),
       updated_at: new Date().toISOString()
     };
 
@@ -242,12 +339,18 @@ window.CA = window.CA || {};
 
     var oldPath = (editor && editor.dataset.oldPath) || null;
 
+    var newPhotos = galleryItems.filter(function (it) { return !it.path; }).length;
     saveBtn.disabled = true;
-    statusEl.textContent = pendingFile ? 'Téléversement de l\'image…' : 'Enregistrement…';
+    statusEl.textContent = (pendingFile || newPhotos) ? 'Téléversement des images…' : 'Enregistrement…';
 
-    var chain = pendingFile ? uploadImage(pendingFile) : Promise.resolve(oldPath);
-    chain.then(function (imagePath) {
-      patch.image_path = imagePath || null;
+    // vitrine + galerie téléversées en parallèle ; l'ordre de la galerie est préservé.
+    var vitrineChain = pendingFile ? uploadImage(pendingFile) : Promise.resolve(oldPath);
+    var galleryChain = Promise.all(galleryItems.map(function (it) {
+      return it.path ? Promise.resolve(it.path) : uploadGalleryImage(it.file);
+    }));
+    Promise.all([vitrineChain, galleryChain]).then(function (r) {
+      patch.image_path = r[0] || null;
+      patch.gallery = normalizeGallery(r[1]);
       statusEl.textContent = 'Enregistrement…';
       // upsert sur la clé primaire composite (brand, name)
       return sb.from('materials').upsert(patch, { onConflict: 'brand,name' }).select();
@@ -255,10 +358,14 @@ window.CA = window.CA || {};
       saveBtn.disabled = false;
       if (res.error) { statusEl.textContent = 'Erreur : ' + res.error.message; return; }
       if (!res.data || !res.data.length) { statusEl.textContent = 'Refusé (permissions). Es-tu connecté en admin ?'; return; }
-      // supprime l'ancienne image si elle a été remplacée
+      // supprime l'ancienne image vitrine si elle a été remplacée
       if (pendingFile && oldPath && res.data[0].image_path !== oldPath) {
         sb.storage.from(BUCKET).remove([oldPath]).then(null, function () {});
       }
+      // supprime du stockage les photos de galerie retirées
+      var kept = normalizeGallery(res.data[0].gallery);
+      var removed = oldGalleryPaths.filter(function (p) { return kept.indexOf(p) < 0; });
+      if (removed.length) sb.storage.from(BUCKET).remove(removed).then(null, function () {});
       var wasEdit = !!editingName;   // modification d'un matériau existant ? (sinon = nouveau)
       closeEditor();
       // modification : on recharge en place et on reste sur la ligne (pas de saut vers le bas).

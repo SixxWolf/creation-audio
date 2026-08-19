@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=2">
-<link rel="stylesheet" href="assets/admin.css?v=6">
+<link rel="stylesheet" href="assets/admin.css?v=7">
 <link rel="stylesheet" href="assets/facture.css?v=7">
 </head>
 <body>
@@ -179,6 +179,36 @@
               <label class="lbl">Rabais quantité — Recharge</label>
               <div class="tiers" id="m-tiers-refill"></div>
               <div><button type="button" class="btn btn-ghost btn-sm" id="m-tier-add-refill">+ Ajouter un palier</button></div>
+            </div>
+
+            <!-- ============================================================
+                 FICHE DÉTAILLÉE — bas de la page filament en boutique
+                 (galerie de prints → description → specs ; nuancier auto)
+                 ============================================================ -->
+            <div class="field col-2 fiche-sep">
+              <h3 class="fiche-title">Fiche détaillée <span class="hint">(bas de la page filament — commune à toutes les couleurs)</span></h3>
+            </div>
+
+            <!-- Galerie « prints » -->
+            <div class="field col-2">
+              <label class="lbl">Galerie « Imprimé avec ce filament » <span class="hint">(tes photos — la 1re est mise en avant)</span></label>
+              <div class="gallery-grid" id="m-gallery"></div>
+              <div><button type="button" class="btn btn-ghost btn-sm" id="m-gallery-add">+ Ajouter des photos</button></div>
+              <input type="file" id="m-gallery-file" accept="image/*" multiple hidden>
+              <span class="hint">Glisse les vignettes pour réordonner. Clique ✕ pour retirer une photo.</span>
+            </div>
+
+            <!-- Description longue -->
+            <div class="field col-2">
+              <label class="lbl" for="m-long-desc">Description longue <span class="hint">(un paragraphe par ligne vide)</span></label>
+              <textarea id="m-long-desc" rows="5" placeholder="Le PLA Basic, c'est le filament passe-partout : facile à imprimer, sans odeur…&#10;&#10;Fini mat-satiné, couleurs franches. Idéal pour la déco, les prototypes, les figurines…"></textarea>
+            </div>
+
+            <!-- Specs libres -->
+            <div class="field col-2">
+              <label class="lbl">Spécifications techniques <span class="hint">(autant que tu veux)</span></label>
+              <div class="specs" id="m-specs"></div>
+              <div><button type="button" class="btn btn-ghost btn-sm" id="m-spec-add">+ Ajouter une spec</button></div>
             </div>
           </div>
 
@@ -886,7 +916,7 @@
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/admin-core.js?v=2"></script>
 <script src="assets/cms-brands.js?v=2"></script>
-<script src="assets/cms-materials.js?v=8"></script>
+<script src="assets/cms-materials.js?v=9"></script>
 <script src="assets/cms-filaments.js?v=9"></script>
 <script src="assets/cms-spacers.js?v=5"></script>
 <script src="assets/cms-accessories.js?v=1"></script>

@@ -244,6 +244,9 @@
       return { name: m.name, items: m.items,
         spool: first ? first.sell_price : null, refill: first ? first.sell_price_2 : null,
         desc: first ? first.material_desc : null,
+        longDesc: first ? first.material_long_desc : null,
+        specs: first ? first.material_specs : null,
+        gallery: first ? first.material_gallery : null,
         matImage: first ? first.material_image : null, rep: null };
     });
     pickRepresentatives();
@@ -344,6 +347,76 @@
     '</button>';
   }
 
+  /* ---------- fiche détaillée (bas de page) : galerie → description → specs → nuancier ---------- */
+  var ICON = {
+    cam:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.2"/></svg>',
+    doc:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3h8l4 4v14a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0V3z"/><path d="M14 3v4h4M8 12h8M8 16h6"/></svg>',
+    list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+    pal:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.9 1.3-1.8-.3-.9.3-1.7 1.2-1.7H16a5 5 0 0 0 5-5c0-5-4-8.5-9-8.5z"/><circle cx="7.5" cy="12" r="1"/><circle cx="10" cy="8" r="1"/><circle cx="14.5" cy="8" r="1"/></svg>'
+  };
+  function fsHead(icon, title, sub) {
+    return '<div class="fs-head"><span class="fs-ic">' + icon + '</span><div>' +
+      '<h2>' + esc(title) + '</h2>' + (sub ? '<div class="fs-sub">' + esc(sub) + '</div>' : '') + '</div></div>';
+  }
+  function filsheetHtml() {
+    var m = curMat;
+    var gal = Array.isArray(m.gallery) ? m.gallery.filter(function (x) { return typeof x === 'string' && x; }) : [];
+    var specs = Array.isArray(m.specs) ? m.specs.filter(function (s) { return s && (s.k || s.v); }) : [];
+    var paras = String(m.longDesc || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var colors = (m.items || []).filter(function (it) { return isHex(it.hex) || (it.attrs && Array.isArray(it.attrs.colors)); });
+
+    var blocks = [];
+
+    if (gal.length) {
+      var shots = gal.map(function (path, i) {
+        var u = publicUrl(path);
+        return '<button type="button" class="fs-shot' + (i === 0 ? ' big' : '') + '" data-full="' + esc(u) + '">' +
+          '<img src="' + esc(u) + '" alt="" loading="lazy"></button>';
+      }).join('');
+      blocks.push('<div class="fs-block">' + fsHead(ICON.cam, 'Imprimé avec ce filament', 'Clique pour agrandir') +
+        '<div class="fs-gallery">' + shots + '</div></div>');
+    }
+
+    if (paras.length) {
+      blocks.push('<div class="fs-block">' + fsHead(ICON.doc, 'À propos du ' + m.name) +
+        '<div class="fs-desc">' + paras.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div></div>');
+    }
+
+    if (specs.length) {
+      var cells = specs.map(function (s) {
+        return '<div class="fs-spec"><div class="k">' + esc(s.k) + '</div><div class="v">' + esc(s.v) + '</div></div>';
+      }).join('');
+      blocks.push('<div class="fs-block">' + fsHead(ICON.list, 'Spécifications techniques') +
+        '<div class="fs-specs">' + cells + '</div></div>');
+    }
+
+    if (colors.length >= 2) {
+      var nus = colors.map(function (it) {
+        var meta = [it.code, isHex(it.hex) ? it.hex : ''].filter(Boolean).join(' · ');
+        return '<div class="fs-nu"><span class="fs-chip" style="background:' + esc(swatchBg(it)) + '"></span>' +
+          '<div><div class="nm">' + esc(it.name) + '</div>' + (meta ? '<div class="hx">' + esc(meta) + '</div>' : '') + '</div></div>';
+      }).join('');
+      blocks.push('<div class="fs-block">' + fsHead(ICON.pal, 'Nuancier ' + m.name, colors.length + ' couleurs') +
+        '<div class="fs-nuancier">' + nus + '</div></div>');
+    }
+
+    if (!blocks.length) return '';
+    return '<section class="filsheet">' + blocks.join('') + '</section>';
+  }
+
+  /* visionneuse plein écran (lightbox) — créée à la volée, fermée au clic / Échap */
+  function openLightbox(url) {
+    var ov = document.createElement('div');
+    ov.className = 'fs-lightbox';
+    ov.innerHTML = '<button type="button" class="fs-lb-close" aria-label="Fermer">&times;</button><img src="' + esc(url) + '" alt="">';
+    function close() { document.removeEventListener('keydown', onKey); if (ov.parentNode) ov.parentNode.removeChild(ov); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    ov.addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(ov);
+    requestAnimationFrame(function () { ov.classList.add('show'); });
+  }
+
   function renderConfig() {
     var p = curColor, url = publicUrl(p.image_path);
     var stock = stockOf(p, curType), out = stock <= 0;
@@ -415,7 +488,8 @@
 
           '<div class="cfg-accs">' + accHtml + '</div>' +
         '</div>' +
-      '</div>';
+      '</div>' +
+      filsheetHtml();
 
     wireConfig();
   }
@@ -445,6 +519,9 @@
     });
     $$('.cfg-acc-add', configEl).forEach(function (b) {
       b.addEventListener('click', function () { if (b.disabled) return; addAccessory(b.getAttribute('data-acc')); });
+    });
+    $$('.fs-shot', configEl).forEach(function (b) {
+      b.addEventListener('click', function () { openLightbox(b.getAttribute('data-full')); });
     });
   }
 
