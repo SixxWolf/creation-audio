@@ -418,7 +418,11 @@
   }
 
   function renderConfig() {
-    var p = curColor, url = publicUrl(p.image_path);
+    var p = curColor;
+    // image dynamique selon le format : recharge -> attrs.img_refill, bobine -> attrs.img_spool ;
+    // repli sur l'image principale de la couleur.
+    var fmtImg = p.attrs && p.attrs['img_' + (curType === 'refill' ? 'refill' : 'spool')];
+    var url = publicUrl(fmtImg || p.image_path);
     var stock = stockOf(p, curType), out = stock <= 0;
     var price = baseOf(p, curType);
     var tiers = normalizeTiers(tiersOf(p, curType));
