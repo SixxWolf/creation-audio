@@ -77,6 +77,74 @@
   function baseOf(p, type) { return type === 'refill' ? p.sell_price_2 : p.sell_price; }
   function tiersOf(p, type) { return type === 'refill' ? p.tiers_2 : p.tiers; }
 
+  /* =========================================================
+     Routage : chaque étape (marque -> matériau -> couleur) a sa
+     propre adresse (#/m/Marque/Matériau/idCouleur). Le bouton
+     « retour » du navigateur revient donc à l'étape précédente
+     — et la dernière couleur cliquée — au lieu de la page d'accueil.
+     ========================================================= */
+  var dataReady = false;
+  function slug(s) { return encodeURIComponent(String(s == null ? '' : s)); }
+  function unslug(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
+  function routeFor(brand, material, colorId) {
+    var h = '#/m/' + slug(brand);
+    if (material) h += '/' + slug(material);
+    if (material && colorId) h += '/' + slug(colorId);
+    return h;
+  }
+  function currentRoute() {
+    var h = location.hash.replace(/^#\/?/, '');
+    if (!h) return { screen: 'brands' };
+    var parts = h.split('/').map(unslug);
+    if (parts[0] !== 'm' || !parts[1]) return { screen: 'brands' };
+    return { screen: 'material', brand: parts[1], material: parts[2] || null, colorId: parts[3] || null };
+  }
+  // Naviguer = changer le hash : le navigateur empile une entrée d'historique,
+  // hashchange déclenche applyRoute(). Pousser la même cible => simple re-rendu.
+  function pushRoute(hash) { if (location.hash === hash) applyRoute(); else location.hash = hash; }
+  function replaceRoute(hash) { history.replaceState(null, '', hash); applyRoute(); }
+  window.addEventListener('hashchange', function () { applyRoute(); });
+
+  function defaultColorOf(m) {
+    return m.items.filter(function (p) { return stockOf(p, 'spool') > 0 || stockOf(p, 'refill') > 0; })[0] || m.items[0];
+  }
+  // Changement de couleur « léger » : pas de remontée en haut de page, on garde
+  // le format (recharge/bobine) s'il reste offert. Utilisé quand on est déjà
+  // sur l'écran couleurs (clic pastille ou retour navigateur entre 2 couleurs).
+  function selectColor(id) {
+    var np = byId[id]; if (!np || !curMat) return;
+    curColor = np;
+    if (curType === 'refill' && !hasRefill(curColor)) curType = 'spool';
+    if (curType === 'spool' && !hasSpool(curColor)) curType = 'refill';
+    curQty = 1; renderConfig();
+  }
+  function showBrandsScreen() {
+    screenMat.hidden = true; screenCol.hidden = true; screenBrands.hidden = false;
+    setNavActive(null); setShopScreen('brands');
+  }
+  function showMaterialsScreen() {
+    screenBrands.hidden = true; screenCol.hidden = true; screenMat.hidden = false;
+    setNavActive(null); setShopScreen('materials');
+  }
+  // Rend l'écran correspondant à l'URL courante, sans jamais re-toucher au hash.
+  function applyRoute() {
+    if (!dataReady) return;                         // rejoué une fois les données chargées
+    var r = currentRoute();
+    if (r.screen === 'brands') {
+      if (brandsData.length === 1) { replaceRoute(routeFor(brandsData[0].name)); return; }
+      showBrandsScreen();
+      return;
+    }
+    if (!brandsData.some(function (b) { return b.name === r.brand; })) { replaceRoute('#/'); return; }
+    if (curBrand !== r.brand) openBrand(r.brand);   // (re)construit les matériaux de la marque
+    if (!r.material) { showMaterialsScreen(); return; }
+    var m = materials.filter(function (x) { return x.name === r.material; })[0];
+    if (!m) { showMaterialsScreen(); return; }
+    var sameMat = curMat && curMat.name === r.material && !screenCol.hidden;
+    if (sameMat) selectColor((r.colorId && byId[r.colorId] ? byId[r.colorId] : defaultColorOf(m)).id);
+    else openMaterial(r.material, r.colorId);
+  }
+
   function load() {
     if (!sb) { brandGrid.innerHTML = '<p class="empty">Boutique momentanément indisponible.</p>'; return; }
     Promise.all([
@@ -101,6 +169,8 @@
       });
       buildBrands();
       renderBrands();
+      dataReady = true;
+      applyRoute();          // honore l'URL courante (lien direct / retour navigateur)
       renderCart();
     }, function () { brandGrid.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
@@ -125,10 +195,7 @@
   }
 
   function renderBrands() {
-    setShopScreen('brands');
     if (!brandsData.length) { brandGrid.innerHTML = '<p class="empty">Aucun filament disponible pour le moment.</p>'; return; }
-    // une seule marque : on entre direct dans ses matériaux
-    if (brandsData.length === 1) { openBrand(brandsData[0].name, true); return; }
     brandGrid.innerHTML = brandsData.map(function (b) {
       var url = b.logo ? publicUrl(b.logo) : (b.rep ? publicUrl(b.rep.image_path) : '');
       var media = url ? '<img src="' + esc(url) + '" alt="' + esc(b.name) + '" loading="lazy">'
@@ -143,11 +210,11 @@
       '</button>';
     }).join('');
     $$('.mat-card', brandGrid).forEach(function (c) {
-      c.addEventListener('click', function () { openBrand(c.getAttribute('data-brand')); });
+      c.addEventListener('click', function () { pushRoute(routeFor(c.getAttribute('data-brand'))); });
     });
   }
 
-  function openBrand(name, skipHistory) {
+  function openBrand(name) {
     curBrand = name;
     buildMaterials();
     matEyebrow.textContent = name;
@@ -160,10 +227,7 @@
     setShopScreen('materials');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-  if (backBrands) backBrands.addEventListener('click', function () {
-    screenMat.hidden = true; screenCol.hidden = true; screenBrands.hidden = false; setNavActive(null);
-    setShopScreen('brands');
-  });
+  if (backBrands) backBrands.addEventListener('click', function () { pushRoute('#/'); });
 
   function buildMaterials() {
     var map = {}, order = [];
@@ -221,7 +285,7 @@
       '</button>';
     }).join('');
     $$('.mat-card', matGrid).forEach(function (c) {
-      c.addEventListener('click', function () { openMaterial(c.getAttribute('data-mat')); });
+      c.addEventListener('click', function () { pushRoute(routeFor(curBrand, c.getAttribute('data-mat'))); });
     });
   }
 
@@ -234,7 +298,7 @@
       return '<button type="button" class="shop-nav-link" data-mat="' + esc(m.name) + '">' + esc(m.name) + '</button>';
     }).join('');
     $$('.shop-nav-link', nav).forEach(function (b) {
-      b.addEventListener('click', function () { openMaterial(b.getAttribute('data-mat')); });
+      b.addEventListener('click', function () { pushRoute(routeFor(curBrand, b.getAttribute('data-mat'))); });
     });
   }
   function setNavActive(name) {
@@ -246,11 +310,13 @@
   /* ---------- configurateur (écran couleur) ---------- */
   var curMat = null, curColor = null, curType = 'refill', curQty = 1;
 
-  function openMaterial(name) {
+  function openMaterial(name, colorId) {
     curMat = materials.filter(function (x) { return x.name === name; })[0];
     if (!curMat) return;
-    // couleur par défaut : la 1re avec du stock, sinon la 1re
-    curColor = curMat.items.filter(function (p) { return stockOf(p, 'spool') > 0 || stockOf(p, 'refill') > 0; })[0] || curMat.items[0];
+    // couleur ciblée par l'URL si elle appartient à ce matériau ;
+    // sinon la 1re avec du stock, sinon la 1re
+    var wanted = colorId ? byId[colorId] : null;
+    curColor = (wanted && wanted.material === curMat.name) ? wanted : defaultColorOf(curMat);
     curType = defaultType(curColor);
     curQty = 1;
     renderConfig();
@@ -264,7 +330,7 @@
     if (hasSpool(p) && stockOf(p, 'spool') > 0) return 'spool';
     return hasRefill(p) ? 'refill' : 'spool';
   }
-  backBtn.addEventListener('click', function () { screenCol.hidden = true; screenMat.hidden = false; setNavActive(null); setShopScreen('materials'); });
+  backBtn.addEventListener('click', function () { pushRoute(routeFor(curBrand)); });
 
   function typeCard(type, label) {
     var offered = type === 'refill' ? hasRefill(curColor) : hasSpool(curColor);
@@ -359,13 +425,9 @@
       b.addEventListener('click', function () { curType = b.getAttribute('data-type'); curQty = 1; renderConfig(); });
     });
     $$('.cfg-sw', configEl).forEach(function (b) {
-      b.addEventListener('click', function () {
-        curColor = byId[b.getAttribute('data-id')];
-        // garder le type s'il est offert, sinon basculer
-        if (curType === 'refill' && !hasRefill(curColor)) curType = 'spool';
-        if (curType === 'spool' && !hasSpool(curColor)) curType = 'refill';
-        curQty = 1; renderConfig();
-      });
+      // chaque couleur = sa propre entrée d'historique -> le retour navigateur
+      // ramène à la couleur précédemment cliquée (comme les gros sites).
+      b.addEventListener('click', function () { pushRoute(routeFor(curBrand, curMat.name, b.getAttribute('data-id'))); });
     });
     var qv = $('.cfg-q-val', configEl);
     var maxStock = stockOf(curColor, curType);
