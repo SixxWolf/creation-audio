@@ -71,6 +71,14 @@
       newBtn = $('#f-new'), refreshBtn = $('#f-refresh'),
       saveBtn = $('#f-save'), cancelBtn = $('#f-cancel');
 
+  // Images par format (recharge / avec bobine), stockées dans attrs.img_refill / attrs.img_spool.
+  // Repli : l'image principale (image_path). Affichage dynamique en boutique selon le format choisi.
+  var fmtState = { spool: { pending: null, cleared: false, old: null }, refill: { pending: null, cleared: false, old: null } };
+  function fmtEls(key) {
+    return { drop: $('#f-drop-' + key), file: $('#f-file-' + key), preview: $('#f-preview-' + key),
+             hint: $('#f-drop-hint-' + key), clear: $('#f-img-' + key + '-clear'), wrap: $('#f-img-' + key + '-wrap') };
+  }
+
   /* ---- chargement : piloté par la marque courante ---- */
   function ensureMaterials() { return (window.CA.materials && window.CA.materials.loaded) ? Promise.resolve() : (window.CA.loadMaterials ? window.CA.loadMaterials() : Promise.resolve()); }
   // (re)charge les filaments de la marque courante quand elle change
@@ -102,6 +110,20 @@
     if (!f) return;
     pendingFile = f;
     preview.src = URL.createObjectURL(f); preview.hidden = false; dropHint.hidden = true;
+  });
+  // zones d'image par format (recharge / avec bobine)
+  ['spool', 'refill'].forEach(function (key) {
+    var e = fmtEls(key), st = fmtState[key];
+    if (e.drop) e.drop.addEventListener('click', function () { e.file.click(); });
+    if (e.file) e.file.addEventListener('change', function () {
+      var f = e.file.files && e.file.files[0]; if (!f) return;
+      st.pending = f; st.cleared = false;
+      e.preview.src = URL.createObjectURL(f); e.preview.hidden = false; e.hint.hidden = true; e.clear.hidden = false;
+    });
+    if (e.clear) e.clear.addEventListener('click', function () {
+      st.pending = null; st.cleared = true; if (e.file) e.file.value = '';
+      e.preview.hidden = true; e.preview.removeAttribute('src'); e.hint.hidden = false; e.clear.hidden = true;
+    });
   });
   if (cancelBtn) cancelBtn.addEventListener('click', function () { var id = editingId; closeEditor(); focusCard(id, true); });
   if (editor) editor.addEventListener('submit', onSave);
@@ -189,6 +211,10 @@
     var hasR = matHasR && offerRefillI.checked;
     if (qtyWrap) qtyWrap.style.display = hasS ? '' : 'none';
     if (qty2Wrap) qty2Wrap.style.display = hasR ? '' : 'none';
+    // n'expose l'image d'un format que si ce format est offert pour cette couleur
+    var eS = fmtEls('spool'), eR = fmtEls('refill');
+    if (eS.wrap) eS.wrap.style.display = hasS ? '' : 'none';
+    if (eR.wrap) eR.wrap.style.display = hasR ? '' : 'none';
     if (!hasS && qtyI) qtyI.value = 0;
     if (!hasR && qty2I) qty2I.value = '';
     if (!mat) { pricePreview.textContent = materialSel.value ? 'matériau introuvable' : 'choisis un matériau'; return; }
@@ -242,6 +268,17 @@
     var url = row && row.image_path ? publicUrl(row.image_path) : '';
     if (url) { preview.src = url; preview.hidden = false; dropHint.hidden = true; }
     else { preview.hidden = true; preview.removeAttribute('src'); dropHint.hidden = false; }
+    // images par format
+    ['spool', 'refill'].forEach(function (key) {
+      var e = fmtEls(key), st = fmtState[key];
+      st.pending = null; st.cleared = false;
+      var path = row && row.attrs && row.attrs['img_' + key] ? row.attrs['img_' + key] : '';
+      st.old = path || null;
+      var u = path ? publicUrl(path) : '';
+      if (u) { e.preview.src = u; e.preview.hidden = false; e.hint.hidden = true; e.clear.hidden = false; }
+      else { e.preview.hidden = true; e.preview.removeAttribute('src'); e.hint.hidden = false; e.clear.hidden = true; }
+      if (e.file) e.file.value = '';
+    });
     syncMaterialUI();
     statusEl.textContent = '';
     // position : sous la carte cliquée (édition) ou en haut (nouveau filament)
@@ -306,13 +343,24 @@
       updated_at: new Date().toISOString()
     };
     var oldPath = editor.dataset.oldPath || null;
+    // résout le chemin final de chaque image de format : nouveau fichier -> upload,
+    // « retiré » -> null, sinon on conserve l'ancien.
+    var fmtUploads = ['spool', 'refill'].map(function (key) {
+      var st = fmtState[key];
+      if (st.pending) return uploadPhoto(st.pending).then(function (p) { return { key: key, path: p }; });
+      return Promise.resolve({ key: key, path: st.cleared ? null : (st.old || null) });
+    });
+    var anyPending = pendingFile || fmtState.spool.pending || fmtState.refill.pending;
 
     saveBtn.disabled = true;
-    statusEl.textContent = pendingFile ? 'Téléversement de l\'image…' : 'Enregistrement…';
+    statusEl.textContent = anyPending ? 'Téléversement des images…' : 'Enregistrement…';
 
-    var chain = pendingFile ? uploadPhoto(pendingFile) : Promise.resolve(oldPath);
-    chain.then(function (imagePath) {
-      patch.image_path = imagePath;
+    var mainChain = pendingFile ? uploadPhoto(pendingFile) : Promise.resolve(oldPath);
+    Promise.all([mainChain, Promise.all(fmtUploads)]).then(function (r) {
+      patch.image_path = r[0];
+      // attrs === patch.attrs (même référence) : on y range les images de format
+      r[1].forEach(function (f) { if (f.path) attrs['img_' + f.key] = f.path; else delete attrs['img_' + f.key]; });
+      statusEl.textContent = 'Enregistrement…';
       if (editingId) return sb.from('products').update(patch).eq('id', editingId).select();
       patch.sort_order = cache.length ? (Math.max.apply(null, cache.map(function (x) { return x.sort_order || 0; })) + 1) : 0;
       return sb.from('products').insert(patch).select();
@@ -323,6 +371,14 @@
       if (pendingFile && oldPath && res.data[0].image_path !== oldPath) {
         sb.storage.from(BUCKET).remove([oldPath]).then(null, function () {});
       }
+      // supprime du stockage les images de format remplacées ou retirées
+      var savedAttrs = res.data[0].attrs || {};
+      var removedFmt = [];
+      ['spool', 'refill'].forEach(function (key) {
+        var oldP = fmtState[key].old, newP = savedAttrs['img_' + key] || null;
+        if (oldP && oldP !== newP) removedFmt.push(oldP);
+      });
+      if (removedFmt.length) sb.storage.from(BUCKET).remove(removedFmt).then(null, function () {});
       var savedId = (res.data && res.data[0] && res.data[0].id) || editingId;
       var wasEdit = !!editingId;   // modification d'un filament existant ? (sinon = nouvel ajout)
       closeEditor();
@@ -448,7 +504,8 @@
     sb.from('products').delete().eq('id', row.id).select().then(function (res) {
       if (res.error) { window.alert('Erreur : ' + res.error.message); return; }
       if (!res.data || !res.data.length) { window.alert('Suppression refusée (permissions).'); return; }
-      if (row.image_path) sb.storage.from(BUCKET).remove([row.image_path]).then(null, function () {});
+      var toRemove = [row.image_path, row.attrs && row.attrs.img_spool, row.attrs && row.attrs.img_refill].filter(Boolean);
+      if (toRemove.length) sb.storage.from(BUCKET).remove(toRemove).then(null, function () {});
       load();
     });
   }

@@ -288,14 +288,40 @@
             </select>
           </div>
 
-          <!-- Image -->
+          <!-- Image principale (défaut + tuiles + panier) -->
           <div class="field col-2">
-            <label class="lbl">Image</label>
+            <label class="lbl">Image principale</label>
             <div class="drop" id="f-drop">
               <img id="f-preview" alt="" hidden>
               <span class="drop-hint" id="f-drop-hint">Clique pour choisir une image (JPG/PNG).</span>
             </div>
             <input type="file" id="f-file" accept="image/*" hidden>
+          </div>
+
+          <!-- Images par format (optionnel) : affichées dynamiquement en boutique
+               selon le format choisi (recharge / avec bobine). Repli = image principale. -->
+          <div class="field col-2">
+            <label class="lbl">Images par format <span class="hint">(optionnel — sinon l'image principale est utilisée)</span></label>
+            <div class="row-2">
+              <div id="f-img-refill-wrap">
+                <span class="hint">Quand « Recharge » est sélectionnée</span>
+                <div class="drop" id="f-drop-refill">
+                  <img id="f-preview-refill" alt="" hidden>
+                  <span class="drop-hint" id="f-drop-hint-refill">Image recharge (optionnel)</span>
+                </div>
+                <input type="file" id="f-file-refill" accept="image/*" hidden>
+                <button type="button" class="btn btn-ghost btn-sm" id="f-img-refill-clear" hidden>Retirer</button>
+              </div>
+              <div id="f-img-spool-wrap">
+                <span class="hint">Quand « Avec bobine » est sélectionnée</span>
+                <div class="drop" id="f-drop-spool">
+                  <img id="f-preview-spool" alt="" hidden>
+                  <span class="drop-hint" id="f-drop-hint-spool">Image avec bobine (optionnel)</span>
+                </div>
+                <input type="file" id="f-file-spool" accept="image/*" hidden>
+                <button type="button" class="btn btn-ghost btn-sm" id="f-img-spool-clear" hidden>Retirer</button>
+              </div>
+            </div>
           </div>
 
           <!-- Formats vendus pour CETTE couleur (limités aux formats du matériau) -->
@@ -917,7 +943,7 @@
 <script src="assets/admin-core.js?v=2"></script>
 <script src="assets/cms-brands.js?v=2"></script>
 <script src="assets/cms-materials.js?v=9"></script>
-<script src="assets/cms-filaments.js?v=9"></script>
+<script src="assets/cms-filaments.js?v=10"></script>
 <script src="assets/cms-spacers.js?v=5"></script>
 <script src="assets/cms-accessories.js?v=1"></script>
 <script src="assets/cms-inventory.js?v=4"></script>
