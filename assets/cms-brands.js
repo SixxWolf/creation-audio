@@ -74,7 +74,7 @@ window.CA = window.CA || {};
   function renderBar() {
     if (!bar) return;
     var chips = CA.brands.list.map(function (b) {
-      return '<button type="button" class="brand-chip' + (b.name === CA.currentBrand ? ' is-active' : '') + '" data-brand="' + esc(b.name) + '">' + esc(b.name) + '</button>';
+      return '<button type="button" class="brand-chip' + (b.name === CA.currentBrand ? ' is-active' : '') + '" draggable="true" title="Glisser pour réordonner" data-brand="' + esc(b.name) + '">' + esc(b.name) + '</button>';
     }).join('');
     bar.innerHTML =
       '<span class="brand-bar-label">Marque</span>' +
@@ -91,12 +91,55 @@ window.CA = window.CA || {};
 
     $$('.brand-chip', bar).forEach(function (c) {
       c.addEventListener('click', function () { CA.setBrand(c.getAttribute('data-brand')); });
+      wireBrandDrag(c);
     });
     var nb = $('#brand-new'); if (nb) nb.addEventListener('click', addBrand);
     var rb = $('#brand-rename'); if (rb) rb.addEventListener('click', renameBrand);
     var db = $('#brand-del'); if (db) db.addEventListener('click', deleteBrand);
     var ib = $('#brand-image'); if (ib) ib.addEventListener('click', function () { fileInput.click(); });
     var ir = $('#brand-image-rm'); if (ir) ir.addEventListener('click', removeLogo);
+  }
+
+  /* ---- glisser-déposer : réordonner les marques (pilote l'ordre en boutique) ---- */
+  var bDrag = null;
+  function wireBrandDrag(el) {
+    el.addEventListener('dragstart', function (e) {
+      bDrag = el.getAttribute('data-brand'); el.classList.add('dragging');
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', bDrag); } catch (_) {} }
+    });
+    el.addEventListener('dragend', function () {
+      bDrag = null; el.classList.remove('dragging');
+      $$('.brand-chip', bar).forEach(function (c) { c.classList.remove('drop-target'); });
+    });
+    el.addEventListener('dragover', function (e) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; });
+    el.addEventListener('dragenter', function () { if (el.getAttribute('data-brand') !== bDrag) el.classList.add('drop-target'); });
+    el.addEventListener('dragleave', function () { el.classList.remove('drop-target'); });
+    el.addEventListener('drop', function (e) {
+      e.preventDefault();
+      var target = el.getAttribute('data-brand');
+      if (!bDrag || bDrag === target) return;
+      reorderBrands(bDrag, target);
+    });
+  }
+  function reorderBrands(fromName, toName) {
+    var seq = CA.brands.list.slice();
+    var names = seq.map(function (b) { return b.name; });
+    var from = names.indexOf(fromName), to = names.indexOf(toName);
+    if (from < 0 || to < 0) return;
+    var moved = seq.splice(from, 1)[0];
+    seq.splice(to, 0, moved);
+    CA.brands.list = seq;
+    renderBar();
+    persistBrandOrder(seq);
+  }
+  function persistBrandOrder(seq) {
+    var updates = seq.map(function (b, i) {
+      if (b.sort_order === i) return null;
+      b.sort_order = i;
+      return sb.from('brands').update({ sort_order: i }).eq('name', b.name);
+    }).filter(Boolean);
+    if (!updates.length) return;
+    Promise.all(updates).then(null, function () {});
   }
 
   function uploadLogo(file) {

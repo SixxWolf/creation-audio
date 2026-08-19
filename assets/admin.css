@@ -61,6 +61,9 @@ main { max-width:1180px; margin:0 auto; padding:22px 20px 80px; }
   color:var(--ink); border-radius:100px; padding:7px 15px; transition:border-color .16s, background .16s, color .16s; }
 .brand-chip:hover { border-color:var(--ember); }
 .brand-chip.is-active { background:var(--ink); color:#fff; border-color:var(--ink); }
+.brand-chip[draggable="true"] { cursor:grab; }
+.brand-chip.dragging { opacity:.4; }
+.brand-chip.drop-target { border-color:var(--ember); box-shadow:0 0 0 2px rgba(255,106,43,.25); }
 .brand-bar-actions { display:flex; gap:6px; margin-left:auto; flex-wrap:wrap; align-items:center; }
 .brand-logo-thumb { height:34px; max-width:104px; object-fit:contain; border:1px solid var(--line);
   border-radius:8px; padding:3px 6px; background:#fff; }

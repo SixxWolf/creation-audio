@@ -183,6 +183,13 @@
       if (!map[key]) { map[key] = { name: key, items: [] }; order.push(key); }
       map[key].items.push(p);
     });
+    // ordre des marques = sort_order défini dans l'admin (glisser-déposer) ;
+    // tri stable => les marques sans entrée gardent leur ordre d'apparition.
+    order.sort(function (a, b) {
+      var oa = brandInfo[a] && brandInfo[a].sort_order != null ? brandInfo[a].sort_order : 9999;
+      var ob = brandInfo[b] && brandInfo[b].sort_order != null ? brandInfo[b].sort_order : 9999;
+      return oa - ob;
+    });
     brandsData = order.map(function (k) {
       var items = map[k].items;
       var mats = {}; items.forEach(function (p) { mats[p.material || 'Autres'] = 1; });
