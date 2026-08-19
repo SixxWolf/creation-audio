@@ -223,11 +223,29 @@
             <input type="text" id="f-code" placeholder="Ex. 10100" autocomplete="off" inputmode="numeric">
             <span class="hint">Sert au rattachement automatique en réception de commande.</span>
           </div>
-          <div class="field">
-            <label class="lbl" for="f-hex">Couleur (pastille)</label>
-            <div class="inline">
+          <div class="field col-2">
+            <label class="lbl inline" style="gap:12px; justify-content:space-between; flex-wrap:wrap">
+              <span>Couleur (pastille)</span>
+              <span class="inline" style="gap:7px; font-weight:600">
+                <input type="checkbox" id="f-multi" style="width:auto"> Multi-colore (bi/tri-colore)
+              </span>
+            </label>
+            <!-- mono : une seule couleur -->
+            <div class="inline" id="f-hex-wrap">
               <input type="color" id="f-hex-picker" value="#888888">
               <input type="text" id="f-hex" placeholder="#888888" autocomplete="off" style="max-width:120px">
+            </div>
+            <!-- multi : deux couleurs ou plus -->
+            <div id="f-colors-wrap" hidden style="padding-top:4px">
+              <div id="f-colors-list"></div>
+              <div class="inline" style="gap:16px; align-items:center; padding-top:8px; flex-wrap:wrap">
+                <button type="button" class="btn btn-ghost" id="f-color-add">+ Ajouter une couleur</button>
+                <span class="inline" style="gap:8px; align-items:center">
+                  <span class="hint">Aperçu&nbsp;:</span>
+                  <span id="f-colors-preview" class="swatch" style="border-radius:50%"></span>
+                </span>
+              </div>
+              <span class="hint">La pastille est découpée en parts égales (moitié-moitié pour deux couleurs). Minimum deux couleurs.</span>
             </div>
           </div>
           <div class="field">

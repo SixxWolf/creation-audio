@@ -44,6 +44,18 @@
     normalizeTiers(tiers).forEach(function (t) { if (qty >= t.min) p = t.price; });
     return p;
   }
+  // Pastille couleur : dégradé à parts égales si le filament est multi-colore
+  // (attrs.colors = 2+ couleurs), sinon couleur pleine (hex). Repli : #ccc.
+  function isHex(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v); }
+  function swatchBg(p) {
+    var cs = p && p.attrs && Array.isArray(p.attrs.colors) ? p.attrs.colors.filter(isHex) : [];
+    if (cs.length >= 2) {
+      var n = cs.length, parts = [];
+      for (var i = 0; i < n; i++) { parts.push(cs[i] + ' ' + (100 * i / n) + '%', cs[i] + ' ' + (100 * (i + 1) / n) + '%'); }
+      return 'linear-gradient(90deg,' + parts.join(',') + ')';
+    }
+    return cs[0] || (p && isHex(p.hex) ? p.hex : '#ccc');
+  }
 
   /* ---------- données ---------- */
   var products = [], byId = {}, materials = [], brandsData = [], curBrand = null, brandInfo = {};
@@ -120,7 +132,7 @@
     brandGrid.innerHTML = brandsData.map(function (b) {
       var url = b.logo ? publicUrl(b.logo) : (b.rep ? publicUrl(b.rep.image_path) : '');
       var media = url ? '<img src="' + esc(url) + '" alt="' + esc(b.name) + '" loading="lazy">'
-                      : '<span class="mat-swatch" style="background:' + esc(b.rep && b.rep.hex || '#ccc') + '"></span>';
+                      : '<span class="mat-swatch" style="background:' + esc(swatchBg(b.rep)) + '"></span>';
       return '<button class="mat-card' + (b.logo ? ' has-logo' : '') + '" type="button" data-brand="' + esc(b.name) + '">' +
         '<div class="mat-media">' + media + '</div>' +
         '<div class="mat-info">' +
@@ -197,7 +209,7 @@
       // image vitrine choisie à la main (E4) ; repli sur la couleur représentative
       var url = m.matImage ? publicUrl(m.matImage) : (m.rep ? publicUrl(m.rep.image_path) : '');
       var media = url ? '<img src="' + esc(url) + '" alt="' + esc(m.name) + '" loading="lazy">'
-                      : '<span class="mat-swatch" style="background:' + esc(m.rep && m.rep.hex || '#ccc') + '"></span>';
+                      : '<span class="mat-swatch" style="background:' + esc(swatchBg(m.rep)) + '"></span>';
       return '<button class="mat-card" type="button" data-mat="' + esc(m.name) + '">' +
         '<div class="mat-media">' + media + '</div>' +
         '<div class="mat-info">' +
@@ -279,7 +291,7 @@
       var out = stockOf(it, curType) <= 0;
       return '<button type="button" class="cfg-sw' + (it.id === p.id ? ' is-active' : '') + (out ? ' is-out' : '') + '" ' +
         'data-id="' + esc(it.id) + '" title="' + esc(it.name) + (out ? ' — rupture en ' + (curType === 'refill' ? 'recharge' : 'bobine') : '') +
-        '" style="background:' + esc(it.hex || '#ccc') + '"></button>';
+        '" style="background:' + esc(swatchBg(it)) + '"></button>';
     }).join('');
 
     var descLines = String(curMat.desc || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -304,7 +316,7 @@
     configEl.innerHTML =
       '<div class="cfg-grid">' +
         '<div class="cfg-media">' +
-          (url ? '<img src="' + esc(url) + '" alt="' + esc(p.name) + '">' : '<span class="cfg-swatch-lg" style="background:' + esc(p.hex || '#ccc') + '"></span>') +
+          (url ? '<img src="' + esc(url) + '" alt="' + esc(p.name) + '">' : '<span class="cfg-swatch-lg" style="background:' + esc(swatchBg(p)) + '"></span>') +
         '</div>' +
         '<div class="cfg-panel">' +
           '<div class="cfg-eyebrow">' + esc(curBrand || '') + ' · ' + esc(curMat.name) + '</div>' +
@@ -441,7 +453,7 @@
     var m = metaOf(it);
     if (it.type === 'accessory') return m && m.img ? '<img src="' + esc(m.img) + '" alt="">' : '<span class="citem-sw" style="background:#ddd"></span>';
     var url = publicUrl(m.image_path);
-    return url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:' + esc(m.hex || '#ccc') + '"></span>';
+    return url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:' + esc(swatchBg(m)) + '"></span>';
   }
 
   function renderCart() {

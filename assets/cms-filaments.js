@@ -22,6 +22,19 @@
     });
   }
   function money(n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; }
+  function isHex(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v); }
+  function normHex(v) { v = String(v == null ? '' : v).trim(); if (v && v[0] !== '#') v = '#' + v; return isHex(v) ? v.toLowerCase() : null; }
+  // fond CSS d'une pastille : dégradé à parts égales si 2+ couleurs, sinon couleur pleine.
+  function swatchBg(hex, colors) {
+    var cs = (Array.isArray(colors) ? colors : []).filter(isHex);
+    if (cs.length >= 2) {
+      var n = cs.length, parts = [];
+      for (var i = 0; i < n; i++) { parts.push(cs[i] + ' ' + (100 * i / n) + '%', cs[i] + ' ' + (100 * (i + 1) / n) + '%'); }
+      return 'linear-gradient(90deg,' + parts.join(',') + ')';
+    }
+    return cs[0] || (isHex(hex) ? hex : null);
+  }
+  function colorsOf(row) { return row && row.attrs && Array.isArray(row.attrs.colors) ? row.attrs.colors.filter(isHex) : []; }
   function num(v) { var n = parseFloat(v); return isFinite(n) ? n : null; }
   function publicUrl(path) {
     if (!path) return '';
@@ -48,6 +61,8 @@
   var editor = $('#f-editor'), editorTitle = $('#f-editor-title'),
       fileInput = $('#f-file'), drop = $('#f-drop'), preview = $('#f-preview'), dropHint = $('#f-drop-hint'),
       nameI = $('#f-name'), materialSel = $('#f-material'), codeI = $('#f-code'), hexI = $('#f-hex'), hexPick = $('#f-hex-picker'),
+      multiI = $('#f-multi'), hexWrap = $('#f-hex-wrap'), colorsWrap = $('#f-colors-wrap'),
+      colorsList = $('#f-colors-list'), colorAddBtn = $('#f-color-add'), colorsPreview = $('#f-colors-preview'),
       sizeI = $('#f-size'),
       qtyI = $('#f-qty'), qty2I = $('#f-qty2'), qtyWrap = $('#f-qty-wrap'), qty2Wrap = $('#f-qty2-wrap'), activeI = $('#f-active'),
       offerSpoolI = $('#f-offer-spool'), offerRefillI = $('#f-offer-refill'),
@@ -100,6 +115,48 @@
     var v = hexI.value.trim();
     if (/^#?[0-9a-fA-F]{6}$/.test(v)) hexPick.value = v[0] === '#' ? v : '#' + v;
   });
+
+  /* ---- multi-colore (bi/tri-colore…) ---- */
+  function currentColors() { return $$('.fc-hex', colorsList).map(function (i) { return normHex(i.value); }).filter(Boolean); }
+  function updateColorsPreview() {
+    if (colorsPreview) colorsPreview.style.background = swatchBg(null, currentColors()) || 'transparent';
+  }
+  function colorRow(hex) {
+    var row = document.createElement('div');
+    row.className = 'inline color-row';
+    row.style.cssText = 'gap:8px; margin-bottom:6px';
+    row.innerHTML =
+      '<input type="color" class="fc-pick" value="' + (isHex(hex) ? hex : '#888888') + '">' +
+      '<input type="text" class="fc-hex" placeholder="#888888" autocomplete="off" style="max-width:120px" value="' + (isHex(hex) ? hex : '') + '">' +
+      '<button type="button" class="btn btn-ghost fc-del" title="Retirer">✕</button>';
+    var pick = $('.fc-pick', row), txt = $('.fc-hex', row), del = $('.fc-del', row);
+    pick.addEventListener('input', function () { txt.value = pick.value; updateColorsPreview(); });
+    txt.addEventListener('input', function () { var h = normHex(txt.value); if (h) pick.value = h; updateColorsPreview(); });
+    del.addEventListener('click', function () { if (row.parentNode) row.parentNode.removeChild(row); syncColorRows(); updateColorsPreview(); });
+    return row;
+  }
+  // garantit un minimum de 2 lignes ; désactive « retirer » quand il n'en reste que 2.
+  function syncColorRows() {
+    var rows = $$('.color-row', colorsList);
+    while (rows.length < 2) { colorsList.appendChild(colorRow('')); rows = $$('.color-row', colorsList); }
+    $$('.fc-del', colorsList).forEach(function (b) { b.disabled = rows.length <= 2; });
+  }
+  function setColors(list) {
+    colorsList.innerHTML = '';
+    var seed = (list && list.length) ? list : ['', ''];
+    seed.forEach(function (h) { colorsList.appendChild(colorRow(isHex(h) ? h : '')); });
+    syncColorRows(); updateColorsPreview();
+  }
+  function setMultiMode(on) {
+    if (multiI) multiI.checked = !!on;
+    if (hexWrap) hexWrap.hidden = !!on;
+    if (colorsWrap) colorsWrap.hidden = !on;
+  }
+  if (multiI) multiI.addEventListener('change', function () {
+    setMultiMode(multiI.checked);
+    if (multiI.checked) { if (!$$('.color-row', colorsList).length) setColors([normHex(hexI.value)]); else syncColorRows(); updateColorsPreview(); }
+  });
+  if (colorAddBtn) colorAddBtn.addEventListener('click', function () { colorsList.appendChild(colorRow('')); syncColorRows(); updateColorsPreview(); });
 
   /* ---- sélecteur de matériau (marque courante) ---- */
   function populateMaterialSelect(selected) {
@@ -169,6 +226,11 @@
     codeI.value = row && row.code ? row.code : '';
     var hex = row && row.hex ? row.hex : '#888888';
     hexI.value = hex; hexPick.value = /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : '#888888';
+    // multi-colore : reconstruit depuis attrs.colors si présent (2+ couleurs)
+    var cols = colorsOf(row);
+    var multi = cols.length >= 2;
+    setMultiMode(multi);
+    setColors(multi ? cols : [normHex(hex)]);   // en mono, on pré-remplit la 1re ligne pour un basculement fluide
     sizeI.value = row && row.size ? row.size : '1x1';
     qtyI.value = row && row.qty != null ? row.qty : 0;
     qty2I.value = row && row.qty_2 != null ? row.qty_2 : '';
@@ -208,11 +270,24 @@
     if (!name) { nameI.focus(); return; }
     var hex = hexI.value.trim(); if (hex && hex[0] !== '#') hex = '#' + hex;
     if (hex && !/^#[0-9a-fA-F]{6}$/.test(hex)) hex = null;
+    // multi-colore : au moins 2 couleurs valides ; hex représentatif = la 1re
+    var multi = !!(multiI && multiI.checked);
+    var colorsArr = null;
+    if (multi) {
+      colorsArr = currentColors();
+      if (colorsArr.length < 2) { statusEl.textContent = 'Ajoute au moins deux couleurs valides (#RRGGBB).'; return; }
+      hex = colorsArr[0];
+    }
     var mat = matOf(window.CA.currentBrand, materialSel.value);
     // format effectif = matériau l'offre ET la case couleur est cochée
     var hasS = matHasSpool(mat) && offerSpoolI.checked;
     var hasR = matHasRefillM(mat) && offerRefillI.checked;
     if (mat && !hasS && !hasR) { statusEl.textContent = 'Coche au moins un format vendu pour cette couleur.'; return; }
+
+    // conserve les autres clés attrs éventuelles ; n'écrit/efface que « colors »
+    var existing = cache.filter(function (r) { return r.id === editingId; })[0];
+    var attrs = Object.assign({}, (existing && existing.attrs) || {});
+    if (colorsArr) attrs.colors = colorsArr; else delete attrs.colors;
 
     var patch = {
       type: TYPE,
@@ -221,6 +296,7 @@
       material: materialSel.value || null,
       code: codeI.value.trim() || null,
       hex: hex,
+      attrs: attrs,
       size: sizeI.value || '1x1',
       offer_spool: !!offerSpoolI.checked,
       offer_refill: !!offerRefillI.checked,
@@ -302,7 +378,7 @@
     return '<article class="card' + (r.active ? '' : ' is-hidden') + '" data-id="' + esc(r.id) + '" draggable="true">' +
       '<div class="card-thumb">' +
         (url ? '<img src="' + esc(url) + '" alt="' + esc(r.name) + '" loading="lazy">' : '<span class="card-noimg">Pas d\'image</span>') +
-        (r.hex ? '<span class="card-pastille" style="background:' + esc(r.hex) + '"></span>' : '') +
+        (function () { var bg = swatchBg(r.hex, colorsOf(r)); return bg ? '<span class="card-pastille" style="background:' + esc(bg) + '"></span>' : ''; })() +
         (outAll ? '<span class="badge badge-out">Rupture</span>' : '') +
         (r.active ? '' : '<span class="badge badge-hidden">Masqué</span>') +
         '<span class="drag-handle" title="Glisser pour réordonner (même matériau)">⠿</span>' +
