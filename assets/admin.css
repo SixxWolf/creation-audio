@@ -190,8 +190,11 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 .stk.out { color:var(--bad); border-color:var(--bad-wash); background:var(--bad-wash); font-weight:600; }
 .card-tierline { font-size:.72rem; color:var(--muted); }
 .sp-tiers-break { display:flex; flex-direction:column; gap:5px; margin-top:2px; }
-.sp-tierrow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:.72rem; }
-.sp-tierrow .tp { color:var(--muted); font-variant-numeric:tabular-nums; }
+.sp-tierrow { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; font-size:.72rem; }
+.sp-tierrow .tp { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.sp-tierrow .card-margin { white-space:nowrap; }
+/* cartes spacers un peu plus larges : chaque ligne de palier tient sur une seule ligne */
+#sp-list { grid-template-columns:repeat(auto-fill, minmax(270px,1fr)); }
 .card-actions { display:flex; gap:6px; margin-top:auto; padding-top:6px; }
 .card-actions .btn-ghost { flex:1; padding:6px; font-size:.8rem; }
 
