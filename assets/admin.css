@@ -294,3 +294,104 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
   .grid { grid-template-columns:1fr; }
   .cards { grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); }
 }
+
+/* =========================================================
+   Inventaire V2 — sous-onglets, poste de scan, à commander
+   ========================================================= */
+
+/* ---- sous-onglets ---- */
+.inv-subtabs { display:flex; gap:6px; margin:4px 0 20px; padding:4px; background:var(--wash);
+  border:1px solid var(--line); border-radius:var(--radius); width:fit-content; }
+.inv-subtab { appearance:none; border:none; background:none; cursor:pointer; font:inherit; font-weight:600;
+  color:var(--muted); padding:9px 18px; border-radius:10px; transition:background .15s, color .15s; }
+.inv-subtab:hover { color:var(--ink); }
+.inv-subtab.is-active { background:var(--paper); color:var(--ember-dim); box-shadow:var(--shadow-sm); }
+
+/* ---- poste de scan ---- */
+.scan-station { border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--paper);
+  box-shadow:var(--shadow-sm); padding:18px; margin-bottom:22px; transition:border-color .2s, box-shadow .2s; }
+.scan-station.is-armed { border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.14); }
+.scan-head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.scan-toggle { min-width:210px; }
+.scan-station.is-armed .scan-toggle { background:var(--charcoal); }
+.scan-count { margin-left:auto; display:flex; align-items:baseline; gap:8px; }
+.scan-count-num { font-size:2rem; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink); }
+.scan-count-lbl { color:var(--muted); font-size:.85rem; }
+.scan-inputwrap { margin-top:14px; }
+.scan-input { width:100%; font-size:1.25rem; font-weight:600; letter-spacing:.02em; padding:14px 16px;
+  border:2px dashed var(--line); border-radius:var(--radius); background:var(--wash); color:var(--ink);
+  text-align:center; transition:border-color .15s, background .15s; }
+.scan-input:focus { outline:none; border-color:var(--ember); border-style:solid; background:var(--paper); }
+.scan-input:disabled { opacity:.5; }
+.scan-feedback { min-height:22px; margin-top:10px; text-align:center; font-size:.92rem; font-weight:600; }
+.scan-feedback.ok  { color:var(--good); }
+.scan-feedback.warn { color:var(--ember-dim); }
+.scan-feedback.bad { color:var(--bad); }
+.scan-bump { animation:scanBump .28s ease; }
+@keyframes scanBump { 0%{transform:scale(1)} 40%{transform:scale(1.18)} 100%{transform:scale(1)} }
+
+/* ---- apprentissage code inconnu ---- */
+.scan-learn { margin-top:14px; padding:14px; border:1px solid var(--ember); border-radius:var(--radius);
+  background:var(--bad-wash); }
+.scan-learn-head { font-weight:700; margin-bottom:2px; }
+.scan-learn-head code { background:var(--paper); border:1px solid var(--line); border-radius:6px;
+  padding:2px 7px; font-family:var(--mono); }
+.scan-learn-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+.scan-learn-fil { flex:1; min-width:220px; }
+.scan-learn-fil, .scan-learn-kind { padding:9px 10px; }
+
+.rcp-manual { margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
+.rcp-manual summary { cursor:pointer; color:var(--muted); font-weight:600; font-size:.9rem; }
+.rcp-manual summary:hover { color:var(--ink); }
+
+/* ---- à commander ---- */
+.reorder-summary:empty { display:none; }
+.reorder-card { border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--paper);
+  box-shadow:var(--shadow-sm); padding:18px; }
+.reorder-card.has-miss { border-color:var(--ember); }
+.reorder-card-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+.reorder-card-head h2 { font-size:1.05rem; }
+.reorder-card-head .grow { flex:1; }
+.reorder-total { background:var(--ember); color:#fff; font-weight:700; border-radius:999px; padding:3px 12px; font-size:.85rem; }
+.reorder-total.zero { background:var(--good); }
+.reorder-list { margin:10px 0 0; padding:0; list-style:none; columns:2; column-gap:26px; }
+.reorder-list li { break-inside:avoid; padding:5px 0; border-bottom:1px dashed var(--line); font-size:.92rem;
+  display:flex; align-items:center; gap:8px; }
+.reorder-list .ro-sw { width:14px; height:14px; border-radius:4px; border:1px solid rgba(0,0,0,.15); flex:none; }
+.reorder-list .ro-q { margin-left:auto; font-weight:700; font-variant-numeric:tabular-nums; }
+.reorder-empty { color:var(--good); font-weight:600; }
+
+/* filtre marque → matériau */
+.reorder-filters { display:flex; flex-wrap:wrap; gap:14px; margin:2px 0 6px; }
+.reorder-flabel { display:flex; align-items:center; gap:8px; font-size:.72rem; font-weight:700;
+  text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+.reorder-flabel select { font:inherit; font-size:.9rem; font-weight:500; text-transform:none; letter-spacing:0;
+  color:var(--ink); padding:8px 10px; border:1px solid var(--line); border-radius:var(--radius-sm);
+  background:var(--paper); min-width:160px; }
+
+.reorder-group { margin-top:20px; }
+.reorder-group h3 { font-size:.95rem; margin-bottom:8px; }
+.reorder-group h3 .fil-count { color:var(--muted); font-weight:600; font-size:.8rem; margin-left:6px; }
+.reorder-table-wrap { overflow-x:auto; }
+/* compact : le tableau colle à son contenu (colonnes serrées, pas d'étalement) */
+.reorder-table { width:auto; max-width:100%; border-collapse:collapse; font-size:.9rem; }
+.reorder-table th { text-align:right; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); padding:6px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.reorder-table th.l { text-align:left; }
+.reorder-table td { padding:6px 12px; border-bottom:1px solid var(--line); vertical-align:middle;
+  text-align:right; white-space:nowrap; }
+.reorder-table td.l { text-align:left; padding-right:22px; }
+.reorder-table tr.has-miss { background:var(--bad-wash); }
+.reorder-fil { display:flex; align-items:center; gap:9px; }
+.reorder-fil .ro-sw { width:20px; height:20px; border-radius:6px; border:1px solid rgba(0,0,0,.15); flex:none; }
+.reorder-fil .ro-name { font-weight:600; }
+.reorder-fil .ro-code { color:var(--muted); font-size:.78rem; }
+.reorder-table input.reorder-par { width:52px; text-align:right; padding:5px 6px; }
+.reorder-miss { font-weight:700; color:var(--bad); font-variant-numeric:tabular-nums; }
+.reorder-miss.ok { color:var(--muted); font-weight:500; }
+.reorder-na { color:var(--line); }
+
+@media (max-width:640px) {
+  .reorder-list { columns:1; }
+  .scan-count { margin-left:0; }
+}

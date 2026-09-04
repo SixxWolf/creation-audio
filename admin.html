@@ -13,8 +13,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=2">
-<link rel="stylesheet" href="assets/admin.css?v=8">
+<link rel="stylesheet" href="assets/admin.css?v=12">
 <link rel="stylesheet" href="assets/facture.css?v=7">
+<link rel="stylesheet" href="assets/autoloop.css?v=1">
 </head>
 <body>
 
@@ -58,6 +59,7 @@
     <button class="tab" role="tab" data-tab="facturation">Facturation</button>
     <button class="tab" role="tab" data-tab="historique">Historique</button>
     <button class="tab" role="tab" data-tab="statistiques">Statistiques</button>
+    <button class="tab" role="tab" data-tab="autoloop">AutoLoop</button>
   </nav>
 
   <!-- Menu latéral mobile (ouvert par le hamburger) -->
@@ -74,6 +76,7 @@
       <button class="tab" role="tab" data-tab="facturation">Facturation</button>
       <button class="tab" role="tab" data-tab="historique">Historique</button>
       <button class="tab" role="tab" data-tab="statistiques">Statistiques</button>
+      <button class="tab" role="tab" data-tab="autoloop">AutoLoop</button>
     </nav>
   </aside>
 
@@ -377,58 +380,135 @@
       <div class="panel-head">
         <div>
           <h1>Inventaire</h1>
-          <p class="muted">Réceptionne une commande Bambu : le stock s'ajoute et la commande est archivée.</p>
+          <p class="muted">Réceptionne une commande au scanner et garde un œil sur ce qu'il faut recommander.</p>
         </div>
       </div>
 
-      <!-- Réception -->
-      <form class="editor" id="r-editor">
-        <h2 id="r-editor-title">Nouvelle réception</h2>
-        <div class="grid">
-          <div class="field">
-            <label class="lbl" for="r-order">N° de commande Bambu</label>
-            <input type="text" id="r-order" placeholder="Ex. US2409..." autocomplete="off">
+      <!-- Sous-onglets Inventaire -->
+      <div class="inv-subtabs" role="tablist" aria-label="Sections inventaire">
+        <button type="button" class="inv-subtab is-active" role="tab" data-sub="reception">Réception (scan)</button>
+        <button type="button" class="inv-subtab" role="tab" data-sub="commander">À commander</button>
+      </div>
+
+      <!-- ============ SOUS-ONGLET : RÉCEPTION SCANNABLE ============ -->
+      <div class="inv-subpanel" id="inv-sub-reception" role="tabpanel">
+
+        <!-- Poste de scan -->
+        <div class="scan-station" id="scan-station">
+          <div class="scan-head">
+            <button type="button" class="btn btn-accent scan-toggle" id="scan-toggle" aria-pressed="false">▶ Démarrer la réception</button>
+            <div class="scan-count" id="scan-count" aria-live="polite">
+              <span class="scan-count-num">0</span><span class="scan-count-lbl">article scanné</span>
+            </div>
           </div>
-          <div class="field">
-            <label class="lbl" for="r-date">Date de réception</label>
-            <input type="text" id="r-date" placeholder="AAAA-MM-JJ" autocomplete="off">
+
+          <div class="scan-inputwrap">
+            <input type="text" id="scan-input" class="scan-input" autocomplete="off" autocorrect="off"
+                   autocapitalize="off" spellcheck="false" placeholder="Clique « Démarrer » puis scanne un code-barres…" disabled>
           </div>
-          <div class="field col-2">
-            <label class="lbl" for="r-paste">Coller le texte de la commande (optionnel)</label>
-            <textarea id="r-paste" rows="5" placeholder="Copie-colle le récapitulatif de ta commande Bambu ici, puis clique « Analyser »."></textarea>
-            <div class="inline" style="margin-top:8px; gap:8px">
-              <button type="button" class="btn btn-ghost btn-sm" id="r-parse">Analyser le texte</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="r-add-line">+ Ajouter une ligne</button>
-              <span class="hint" id="r-parse-hint"></span>
+          <div class="scan-feedback" id="scan-feedback" aria-live="polite"></div>
+
+          <!-- Panneau d'apprentissage (code-barres inconnu) -->
+          <div class="scan-learn" id="scan-learn" hidden>
+            <div class="scan-learn-head">
+              <span>Code-barres inconnu&nbsp;: <code id="scan-learn-code"></code></span>
+            </div>
+            <p class="hint">Associe-le une seule fois — il sera mémorisé pour les prochains scans.</p>
+            <div class="scan-learn-row">
+              <select id="scan-learn-fil" class="scan-learn-fil"></select>
+              <select id="scan-learn-kind" class="scan-learn-kind">
+                <option value="spool">Avec bobine</option>
+                <option value="refill">Recharge</option>
+              </select>
+              <button type="button" class="btn btn-accent btn-sm" id="scan-learn-save">Associer + compter</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="scan-learn-cancel">Ignorer</button>
             </div>
           </div>
         </div>
 
-        <!-- Tableau de confirmation -->
-        <div class="rcp-table-wrap">
-          <table class="rcp-table" id="r-table">
-            <thead>
-              <tr><th>Filament</th><th>Type</th><th class="num">Quantité</th><th></th></tr>
-            </thead>
-            <tbody id="r-rows"></tbody>
-          </table>
-          <p class="hint" id="r-empty-hint">Aucune ligne. Colle un texte puis « Analyser », ou « + Ajouter une ligne ».</p>
-        </div>
+        <!-- Réception (n° + date + tableau) -->
+        <form class="editor" id="r-editor">
+          <h2 id="r-editor-title">Nouvelle réception</h2>
+          <div class="grid">
+            <div class="field">
+              <label class="lbl" for="r-order">N° de commande Bambu <span class="hint">(optionnel)</span></label>
+              <input type="text" id="r-order" placeholder="Ex. US2409..." autocomplete="off">
+            </div>
+            <div class="field">
+              <label class="lbl" for="r-date">Date de réception</label>
+              <input type="text" id="r-date" placeholder="AAAA-MM-JJ" autocomplete="off">
+            </div>
+          </div>
 
-        <div class="editor-actions">
-          <button class="btn btn-accent" type="submit" id="r-confirm">Confirmer la réception</button>
-          <button class="btn btn-ghost" type="button" id="r-reset">Vider</button>
-          <span class="status" id="r-status"></span>
-        </div>
-      </form>
+          <!-- Tableau de confirmation (rempli par les scans, corrigeable) -->
+          <div class="rcp-table-wrap">
+            <table class="rcp-table" id="r-table">
+              <thead>
+                <tr><th>Filament</th><th>Type</th><th class="num">Quantité</th><th></th></tr>
+              </thead>
+              <tbody id="r-rows"></tbody>
+            </table>
+            <p class="hint" id="r-empty-hint">Rien pour l'instant. Démarre la réception et scanne tes bobines, ou ajoute une ligne à la main.</p>
+          </div>
 
-      <!-- Historique des réceptions -->
-      <div class="panel-head" style="margin-top:26px">
-        <div><h1 style="font-size:1.1rem">Historique des réceptions</h1></div>
-        <span class="grow"></span>
-        <button class="btn btn-ghost btn-sm" id="r-refresh" type="button">Actualiser</button>
+          <!-- Saisie manuelle (repli sans scanner) -->
+          <details class="rcp-manual">
+            <summary>Saisie manuelle / coller le texte de la commande</summary>
+            <div class="field" style="margin-top:10px">
+              <label class="lbl" for="r-paste">Coller le texte de la commande</label>
+              <textarea id="r-paste" rows="5" placeholder="Copie-colle le récapitulatif de ta commande Bambu ici, puis clique « Analyser »."></textarea>
+              <div class="inline" style="margin-top:8px; gap:8px">
+                <button type="button" class="btn btn-ghost btn-sm" id="r-parse">Analyser le texte</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="r-add-line">+ Ajouter une ligne</button>
+                <span class="hint" id="r-parse-hint"></span>
+              </div>
+            </div>
+          </details>
+
+          <div class="editor-actions">
+            <button class="btn btn-accent" type="submit" id="r-confirm">Confirmer la réception</button>
+            <button class="btn btn-ghost" type="button" id="r-reset">Vider</button>
+            <span class="status" id="r-status"></span>
+          </div>
+        </form>
+
+        <!-- Historique des réceptions -->
+        <div class="panel-head" style="margin-top:26px">
+          <div><h1 style="font-size:1.1rem">Historique des réceptions</h1></div>
+          <span class="grow"></span>
+          <button class="btn btn-ghost btn-sm" id="r-refresh" type="button">Actualiser</button>
+        </div>
+        <div id="r-history" class="mat-rows"></div>
       </div>
-      <div id="r-history" class="mat-rows"></div>
+
+      <!-- ============ SOUS-ONGLET : À COMMANDER ============ -->
+      <div class="inv-subpanel" id="inv-sub-commander" role="tabpanel" hidden>
+
+        <!-- Liste à commander (calculée) -->
+        <div class="reorder-summary" id="reorder-summary" aria-live="polite"></div>
+
+        <div class="panel-head" style="margin-top:22px">
+          <div>
+            <h1 style="font-size:1.1rem">Cibles de stock</h1>
+            <p class="muted">Fixe la quantité à garder en tout temps pour chaque format. Le manque se calcule tout seul.</p>
+          </div>
+          <span class="grow"></span>
+          <label class="fx-check" style="margin-right:6px"><input type="checkbox" id="reorder-onlymiss"> Manques seulement</label>
+          <button class="btn btn-ghost btn-sm" id="reorder-refresh" type="button">Actualiser</button>
+        </div>
+
+        <!-- Filtre marque → matériau (pour saisir les cibles tranquillement) -->
+        <div class="reorder-filters">
+          <label class="reorder-flabel">Marque
+            <select id="reorder-brand"></select>
+          </label>
+          <label class="reorder-flabel">Matériau
+            <select id="reorder-material"></select>
+          </label>
+        </div>
+
+        <div id="reorder-body"></div>
+      </div>
     </section>
 
     <!-- ---------------- Autres onglets (à venir) ---------------- -->
@@ -930,6 +1010,253 @@
 
       <div id="stat-body"><p class="muted">Chargement…</p></div>
     </section>
+
+    <!-- ---------------- AUTOLOOP ---------------- -->
+    <section class="tabpanel" data-panel="autoloop" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>AutoLoop</h1>
+          <p class="muted">Génère tes batchs d'impression multi-loop à partir d'un gcode d'une seule pièce (calibration, éjection, push, cooldown) et calcule tes prix. Indépendant de FarmLoop. 100&nbsp;% local — aucun fichier n'est envoyé sur le web.</p>
+        </div>
+      </div>
+
+      <div class="al-subnav" id="al-subnav" role="tablist" aria-label="Outils AutoLoop">
+        <button class="al-seg" type="button" role="tab" data-view="gcode" aria-selected="true">Générateur de batch</button>
+        <button class="al-seg" type="button" role="tab" data-view="prix" aria-selected="false">Calculateur de prix</button>
+      </div>
+
+      <!-- ===== VUE : GÉNÉRATEUR DE BATCH ===== -->
+      <div class="al-view" data-view="gcode">
+        <div class="al-cols">
+          <!-- Colonne réglages -->
+          <div class="al-main">
+            <div class="al-card">
+              <div class="al-card-head"><span class="al-ic">⬆</span> Gcode brut (une pièce)</div>
+              <div class="al-drop" id="al-drop">
+                <div class="al-drop-ic">＋</div>
+                <p class="al-drop-t">Glisse ton <b>.gcode</b> / <b>.txt</b> ici, ou clique pour choisir</p>
+                <p class="al-drop-s" id="al-file-name">Export direct du slicer (1 pièce) pour la P2S · 100&nbsp;% local</p>
+              </div>
+              <input type="file" id="al-file" accept=".gcode,.txt,.g,.nc,text/plain" hidden>
+            </div>
+
+            <div class="al-card">
+              <div class="al-card-head"><span class="al-ic">🔁</span> Batch</div>
+              <div class="grid">
+                <div class="field">
+                  <label class="lbl" for="al-loops">Nombre de loops (répétitions)</label>
+                  <input type="number" id="al-loops" min="1" step="1" value="12" class="num">
+                  <span class="hint">La pièce sera imprimée puis éjectée, ce nombre de fois.</span>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="al-cal-interval">Recalibrer tous les N loops</label>
+                  <input type="number" id="al-cal-interval" min="0" step="1" value="0" class="num">
+                  <span class="hint">Loop 1 toujours calibré. 0 = seulement le loop 1. Ex. 8 = 1, 9, 17…</span>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="al-loop-pause">Pause entre loops (s)</label>
+                  <input type="number" id="al-loop-pause" min="0" step="1" value="2" class="num">
+                </div>
+              </div>
+            </div>
+
+            <div class="al-card">
+              <div class="al-card-head">
+                <label class="al-switch"><input type="checkbox" id="al-bend-enable" checked> Mouvement de flexion (éjection)</label>
+                <span class="al-note">valeurs par défaut = fichier P2S validé</span>
+              </div>
+              <div class="grid" id="al-bend-fields">
+                <div class="field">
+                  <label class="lbl" for="al-bend-high">Z haut (mm)</label>
+                  <input type="number" id="al-bend-high" min="0" step="1" value="240" class="num">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="al-bend-low">Z bas (mm)</label>
+                  <input type="number" id="al-bend-low" min="0" step="1" value="205" class="num">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="al-bend-speed">Vitesse (F)</label>
+                  <input type="number" id="al-bend-speed" min="1" step="1" value="12000" class="num">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="al-bend-cycles">Nombre de cycles</label>
+                  <input type="number" id="al-bend-cycles" min="0" step="1" value="6" class="num">
+                  <span class="hint">Chaque cycle = 1 montée + 1 descente.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="al-card">
+              <div class="al-card-head"><span class="al-ic">⤓</span> Push (éjection) <span class="al-note">auto : moitié de la hauteur de l'objet</span></div>
+              <div class="grid">
+                <div class="field">
+                  <label class="lbl" for="al-push-pct">Hauteur de push (% de la hauteur de l'objet)</label>
+                  <input type="number" id="al-push-pct" min="0" max="100" step="1" value="50" class="num">
+                  <span class="hint">50 % = max_z_height ÷ 2. Calculé automatiquement selon la pièce.</span>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="al-push-speed">Vitesse de push (F)</label>
+                  <input type="number" id="al-push-speed" min="1" step="1" value="10000" class="num">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="al-clearz">Dégagement Z avant éjection (mm)</label>
+                  <input type="number" id="al-clearz" min="0" step="1" value="105" class="num">
+                  <span class="hint">Recule le plateau avant la flexion. Défaut validé : 105.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="al-card">
+              <div class="al-card-head"><span class="al-ic">❄</span> Cooldown</div>
+              <div class="grid">
+                <div class="field">
+                  <label class="lbl" for="al-cool-mode">Mode</label>
+                  <select id="al-cool-mode">
+                    <option value="temp">Basé sur la température (M190)</option>
+                    <option value="delay">Basé sur le temps (G4)</option>
+                    <option value="none">Aucun</option>
+                  </select>
+                </div>
+                <div class="field" id="al-cool-temp-wrap">
+                  <label class="lbl" for="al-cool-temp">Température cible (°C)</label>
+                  <input type="number" id="al-cool-temp" min="0" step="1" value="45" class="num">
+                </div>
+                <div class="field" id="al-cool-sec-wrap" hidden>
+                  <label class="lbl" for="al-cool-sec">Délai (secondes)</label>
+                  <input type="number" id="al-cool-sec" min="0" step="1" value="60" class="num">
+                </div>
+              </div>
+            </div>
+
+            <div class="al-actions">
+              <button class="btn btn-accent" id="al-process" type="button" disabled>Générer le batch</button>
+              <button class="btn btn-ghost" id="al-download" type="button" disabled>⬇ Télécharger le gcode</button>
+            </div>
+          </div>
+
+          <!-- Colonne rapport -->
+          <aside class="al-side">
+            <div class="al-card al-report-card">
+              <div class="al-card-head"><span class="al-ic">✓</span> Rapport de génération</div>
+              <div id="al-report"><p class="muted">Charge un gcode brut (1 pièce) puis clique « Générer le batch ».</p></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- ===== VUE : CALCULATEUR DE PRIX ===== -->
+      <div class="al-view" data-view="prix" hidden>
+        <div class="al-cols">
+          <!-- Entrées -->
+          <div class="al-main">
+            <div class="al-card">
+              <div class="al-card-head"><span class="al-ic">🖨</span> Impression &amp; matériau</div>
+              <div class="grid">
+                <div class="field">
+                  <label class="lbl">Temps d'impression</label>
+                  <div class="al-inline">
+                    <input type="number" id="ap-time-h" min="0" step="1" value="1" class="num"><span class="al-u">h</span>
+                    <input type="number" id="ap-time-m" min="0" step="1" value="21" class="num"><span class="al-u">min</span>
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ap-weight">Filament (g)</label>
+                  <input type="number" id="ap-weight" min="0" step="0.01" value="73.65" class="num">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ap-loops">Loops (pièces)</label>
+                  <input type="number" id="ap-loops" min="1" step="1" value="1" class="num">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ap-failure">Taux d'échec (%)</label>
+                  <input type="number" id="ap-failure" min="0" step="0.5" value="5" class="num">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ap-filament-kg">Coût filament ($/kg)</label>
+                  <input type="number" id="ap-filament-kg" min="0" step="0.5" value="25" class="money">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ap-consumables">Consommables ($/pièce)</label>
+                  <input type="number" id="ap-consumables" min="0" step="0.05" value="0" class="money">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ap-deprec">Dépréciation imprimante ($/h)</label>
+                  <input type="number" id="ap-deprec" min="0" step="0.05" value="0" class="money">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ap-elec">Électricité ($/h)</label>
+                  <input type="number" id="ap-elec" min="0" step="0.05" value="0" class="money">
+                </div>
+              </div>
+            </div>
+
+            <div class="al-card">
+              <div class="al-card-head"><span class="al-ic">🔧</span> Main d'œuvre
+                <span class="al-note">taux horaire</span>
+                <span class="al-rate">$ <input type="number" id="ap-rate" min="0" step="1" value="60" class="money"> /h</span>
+              </div>
+              <div class="al-labor">
+                <div>
+                  <div class="al-sub">Préparation <span class="al-note">(par batch, amortie sur les loops)</span></div>
+                  <div class="al-lrow"><label for="ap-prep-model">Préparation du modèle</label><input type="number" id="ap-prep-model" min="0" step="0.1" value="0.5" class="num"><span class="al-u">min</span></div>
+                  <div class="al-lrow"><label for="ap-prep-slice">Slicing</label><input type="number" id="ap-prep-slice" min="0" step="0.1" value="0.5" class="num"><span class="al-u">min</span></div>
+                  <div class="al-lrow"><label for="ap-prep-transfer">Transfert &amp; départ</label><input type="number" id="ap-prep-transfer" min="0" step="0.1" value="0.5" class="num"><span class="al-u">min</span></div>
+                  <div class="al-lfoot">Par pièce : <b id="ap-prep-permin">—</b></div>
+                </div>
+                <div>
+                  <div class="al-sub">Post-traitement <span class="al-note">(par pièce)</span></div>
+                  <div class="al-lrow"><label for="ap-post-removal">Décollage du job</label><input type="number" id="ap-post-removal" min="0" step="0.1" value="0.5" class="num"><span class="al-u">min</span></div>
+                  <div class="al-lrow"><label for="ap-post-support">Retrait supports</label><input type="number" id="ap-post-support" min="0" step="0.1" value="1" class="num"><span class="al-u">min</span></div>
+                  <div class="al-lrow"><label for="ap-post-additional">Travail additionnel</label><input type="number" id="ap-post-additional" min="0" step="0.1" value="1" class="num"><span class="al-u">min</span></div>
+                  <div class="al-lfoot">Par pièce : <b id="ap-post-permin">—</b></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="al-card">
+              <div class="al-card-head"><span class="al-ic">💾</span> Profils de prix <span class="al-note">(enregistrés sur cet appareil)</span></div>
+              <div class="al-profiles">
+                <input type="text" id="ap-profile-name" placeholder="Nom du profil (ex. PETG adaptateur)" autocomplete="off">
+                <button class="btn btn-ghost btn-sm" id="ap-profile-save" type="button">Enregistrer</button>
+                <select id="ap-profile-select"><option value="">— profils sauvegardés —</option></select>
+                <button class="btn btn-ghost btn-sm" id="ap-profile-delete" type="button">Supprimer</button>
+                <button class="btn btn-ghost btn-sm" id="ap-export" type="button">Exporter JSON</button>
+                <button class="btn btn-ghost btn-sm" id="ap-import-btn" type="button">Importer JSON</button>
+                <input type="file" id="ap-import" accept="application/json,.json" hidden>
+              </div>
+              <span class="status" id="ap-profile-status"></span>
+            </div>
+          </div>
+
+          <!-- Résumé de coûts -->
+          <aside class="al-side">
+            <div class="al-card al-summary">
+              <div class="al-card-head al-sum-head">Résumé des coûts</div>
+              <div class="al-srow"><span>Filament</span><span id="ap-out-filament">—</span></div>
+              <div class="al-srow"><span>Dépréciation imprimante</span><span id="ap-out-deprec">—</span></div>
+              <div class="al-srow"><span>Électricité</span><span id="ap-out-elec">—</span></div>
+              <div class="al-srow"><span>Consommables</span><span id="ap-out-consumables">—</span></div>
+              <div class="al-srow"><span>Main d'œuvre (prep)</span><span id="ap-out-prep">—</span></div>
+              <div class="al-srow"><span>Main d'œuvre (post)</span><span id="ap-out-post">—</span></div>
+              <div class="al-srow"><span>Ajustement échec <em id="ap-out-failure-pct"></em></span><span id="ap-out-failure">—</span></div>
+              <div class="al-cost"><span>COÛT DE PRODUCTION</span><b id="ap-out-cost">—</b></div>
+
+              <div class="al-margin-row">
+                <label class="lbl" for="ap-margin">Marge <span class="hint">(% du prix de vente)</span></label>
+                <div class="al-inline"><input type="number" id="ap-margin" min="0" max="99" step="1" value="33" class="num"><span class="al-u">%</span></div>
+              </div>
+              <div class="al-srow al-price"><span>Prix de vente</span><b id="ap-out-price">—</b></div>
+              <div class="al-srow al-profit"><span>Profit</span><b id="ap-out-margin-amt">—</b></div>
+            </div>
+
+            <div class="al-card">
+              <div class="al-card-head">Répartition du coût</div>
+              <div id="ap-breakdown" class="al-breakdown"></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- Conteneur d'impression pour la réimpression depuis l'historique (hors flux) -->
@@ -946,11 +1273,12 @@
 <script src="assets/cms-filaments.js?v=10"></script>
 <script src="assets/cms-spacers.js?v=5"></script>
 <script src="assets/cms-accessories.js?v=1"></script>
-<script src="assets/cms-inventory.js?v=4"></script>
+<script src="assets/cms-inventory.js?v=6"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
 <script src="assets/cms-facturation.js?v=10"></script>
 <script src="assets/cms-historique.js?v=3"></script>
 <script src="assets/cms-statistiques.js?v=3"></script>
+<script src="assets/cms-autoloop.js?v=2"></script>
 </body>
 </html>

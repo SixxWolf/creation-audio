@@ -1,0 +1,113 @@
+/* =========================================================
+   Création Audio V2 — AutoLoop
+   Onglet admin : traitement gcode + calculateur de prix.
+   Reprend les tokens/identité (ember) du reste de l'admin.
+   ========================================================= */
+
+/* --- Sous-onglets --------------------------------------- */
+.al-subnav { display:flex; gap:6px; background:var(--wash); border:1px solid var(--line);
+  border-radius:var(--radius); padding:4px; margin-bottom:18px; width:fit-content; max-width:100%; }
+.al-seg { font:inherit; font-weight:600; cursor:pointer; border:0; background:transparent;
+  color:var(--muted); padding:8px 18px; border-radius:var(--radius-sm); white-space:nowrap; }
+.al-seg[aria-selected="true"] { background:var(--paper); color:var(--ink); box-shadow:var(--shadow-sm); }
+.al-seg:hover { color:var(--ink); }
+
+/* --- Disposition 2 colonnes ----------------------------- */
+.al-cols { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:18px; align-items:start; }
+.al-main { display:flex; flex-direction:column; gap:16px; min-width:0; }
+.al-side { display:flex; flex-direction:column; gap:16px; position:sticky; top:14px; }
+
+/* --- Cartes --------------------------------------------- */
+.al-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-lg);
+  padding:16px 18px; box-shadow:var(--shadow-sm); }
+.al-card-head { display:flex; align-items:center; gap:8px; font-weight:700; font-size:.98rem;
+  margin-bottom:14px; flex-wrap:wrap; }
+.al-ic { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:8px;
+  background:var(--ember); color:#fff; font-size:.85rem; }
+.al-note { font-weight:500; font-size:.75rem; color:var(--muted); }
+
+/* --- Zone de dépôt fichier ------------------------------ */
+.al-drop { border:2px dashed var(--ember); border-radius:var(--radius);
+  background:color-mix(in srgb, var(--ember) 5%, transparent); text-align:center;
+  padding:26px 16px; cursor:pointer; transition:background .15s, border-color .15s; }
+.al-drop:hover, .al-drop.drag { background:color-mix(in srgb, var(--ember) 12%, transparent); }
+.al-drop-ic { font-size:1.8rem; color:var(--ember); line-height:1; }
+.al-drop-t { margin:8px 0 4px; font-weight:600; }
+.al-drop-s { margin:0; font-size:.8rem; color:var(--muted); }
+
+/* --- Switch (checkbox stylée) --------------------------- */
+.al-switch { display:inline-flex; align-items:center; gap:9px; font-weight:700; font-size:.98rem;
+  cursor:pointer; margin:0; }
+.al-switch input { width:18px; height:18px; accent-color:var(--ember); }
+
+/* --- Actions gcode -------------------------------------- */
+.al-actions { display:flex; gap:10px; flex-wrap:wrap; }
+
+/* --- Rapport de traitement ------------------------------ */
+.al-report-card .muted { font-size:.85rem; }
+.al-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.al-stat { background:var(--wash); border:1px solid var(--line); border-radius:var(--radius-sm);
+  padding:10px 12px; text-align:center; }
+.al-stat-v { display:block; font-size:1.5rem; font-weight:800; color:var(--ember-dim); line-height:1; }
+.al-stat-l { display:block; font-size:.72rem; color:var(--muted); margin-top:4px; }
+.al-fine { font-size:.78rem; color:var(--muted); margin:0 0 10px; }
+.al-warn { font-size:.85rem; color:var(--bad); background:var(--bad-wash);
+  border:1px solid color-mix(in srgb, var(--bad) 30%, transparent); border-radius:var(--radius-sm); padding:10px 12px; }
+.al-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+.al-table th { text-align:left; color:var(--muted); font-weight:600; font-size:.72rem;
+  text-transform:uppercase; letter-spacing:.05em; padding:4px 8px; border-bottom:1px solid var(--line); }
+.al-table td { padding:5px 8px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+
+/* --- Calculateur : inline & unités ---------------------- */
+.al-inline { display:flex; align-items:center; gap:6px; }
+.al-inline input { width:72px; }
+.al-u { font-size:.8rem; color:var(--muted); }
+.al-rate { margin-left:auto; display:inline-flex; align-items:center; gap:4px; font-weight:600; font-size:.85rem; }
+.al-rate input { width:64px; }
+
+/* --- Main d'œuvre --------------------------------------- */
+.al-labor { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.al-sub { font-weight:700; font-size:.85rem; margin-bottom:8px; }
+.al-lrow { display:grid; grid-template-columns:1fr 70px auto; align-items:center; gap:8px; margin-bottom:6px; }
+.al-lrow label { font-size:.85rem; color:var(--ink); }
+.al-lfoot { font-size:.8rem; color:var(--muted); border-top:1px dashed var(--line); padding-top:6px; margin-top:4px; }
+
+/* --- Profils -------------------------------------------- */
+.al-profiles { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.al-profiles input[type="text"], .al-profiles select { flex:1 1 180px; min-width:150px; }
+
+/* --- Résumé des coûts ----------------------------------- */
+.al-summary { position:relative; }
+.al-sum-head { color:#fff; background:var(--ember); margin:-16px -18px 14px; padding:12px 18px;
+  border-radius:var(--radius-lg) var(--radius-lg) 0 0; }
+.al-srow { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+  font-size:.9rem; padding:5px 0; border-bottom:1px solid var(--line); }
+.al-srow span:last-child, .al-srow b { font-variant-numeric:tabular-nums; }
+.al-srow em { font-style:normal; color:var(--muted); font-size:.78rem; }
+.al-cost { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+  background:color-mix(in srgb, var(--ember) 8%, transparent); border-radius:var(--radius-sm);
+  padding:12px 14px; margin:12px 0; font-weight:800; }
+.al-cost span { font-size:.72rem; letter-spacing:.06em; color:var(--ember-dim); }
+.al-cost b { font-size:1.5rem; color:var(--ember-dim); font-variant-numeric:tabular-nums; }
+.al-margin-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:6px 0 10px; }
+.al-price b { font-size:1.05rem; }
+.al-profit { border-bottom:0; }
+.al-profit b { color:var(--good); }
+
+/* --- Camembert ------------------------------------------ */
+.al-breakdown { display:flex; flex-direction:column; align-items:center; gap:14px; }
+.ap-donut { width:150px; height:150px; border-radius:50%; display:grid; place-items:center; flex:0 0 auto; }
+.ap-donut-hole { width:92px; height:92px; border-radius:50%; background:var(--paper);
+  display:grid; place-items:center; box-shadow:inset 0 0 0 1px var(--line); }
+.ap-donut-hole span { font-weight:800; font-size:.95rem; color:var(--ink); font-variant-numeric:tabular-nums; }
+.al-legend { width:100%; display:flex; flex-direction:column; gap:5px; }
+.ap-leg { display:flex; align-items:center; gap:8px; font-size:.82rem; }
+.ap-dot { width:11px; height:11px; border-radius:3px; flex:0 0 auto; }
+.ap-leg-v { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
+
+/* --- Responsive ----------------------------------------- */
+@media (max-width:900px) {
+  .al-cols { grid-template-columns:1fr; }
+  .al-side { position:static; }
+  .al-labor { grid-template-columns:1fr; }
+}
