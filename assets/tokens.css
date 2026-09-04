@@ -4,11 +4,17 @@
    Identité reprise de la V1 : loup / ondes rouges, ember #FF6A2B.
    ========================================================= */
 :root {
+  color-scheme: light;
   /* Couleurs (héritées V1) */
   --paper:#FFFFFF; --wash:#F6F6F4; --ink:#181A1F; --muted:#6C727C;
   --line:#E7E7E2; --charcoal:#14161A; --charcoal-2:#1B1E24;
   --ember:#FF6A2B; --ember-dim:#E24E15; --neon:#EF3E82;
   --good:#1F9D57; --good-wash:#E7F6EE; --bad:#D2321F; --bad-wash:#FBEAE7;
+
+  /* Rôles sémantiques (permettent le mode sombre sans réécrire le reste) */
+  --fill-strong:#181A1F;        /* remplissage « fort » : bouton plein, chip/segment actif */
+  --fill-strong-hover:#14161A;
+  --thumb-bg:#FFFFFF;           /* fond des vignettes d'image produit (reste clair) */
 
   /* Typographie — une seule famille : Inter */
   --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
@@ -19,6 +25,27 @@
   --shadow-sm:0 1px 2px rgba(20,22,26,.06), 0 1px 3px rgba(20,22,26,.04);
   --shadow:0 6px 24px rgba(20,22,26,.08);
   --gap:16px;
+}
+
+/* =========================================================
+   MODE SOMBRE
+   L'attribut data-theme est posé sur <html> par un petit script en
+   <head> (voir theme.js) : "dark" ou "light". Par défaut il suit le
+   réglage système (prefers-color-scheme) ; le choix manuel est mémorisé.
+   On ne redéfinit QUE les jetons — tout le CSS qui les consomme bascule.
+   La marque (ember / neon) est volontairement conservée telle quelle.
+   ========================================================= */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:#1C1F26; --wash:#141619; --ink:#ECEDF0; --muted:#9BA1AB;
+  --line:#2D323B; --charcoal:#0E1013; --charcoal-2:#22262E;
+  --good:#3FBF74; --good-wash:#153021; --bad:#F0563F; --bad-wash:#3A1712;
+
+  --fill-strong:#3A414D; --fill-strong-hover:#48505E;
+  --thumb-bg:#ECEDEA;          /* vignettes : reste clair pour les photos produit */
+
+  --shadow-sm:0 1px 2px rgba(0,0,0,.40), 0 1px 3px rgba(0,0,0,.30);
+  --shadow:0 10px 30px rgba(0,0,0,.50);
 }
 
 * { box-sizing:border-box; }

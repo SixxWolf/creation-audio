@@ -85,6 +85,7 @@ window.CA = window.CA || {};
           '<button type="button" class="btn btn-ghost btn-sm" id="brand-image">' + (curBrandObj() && curBrandObj().image_path ? 'Changer l\'image' : '+ Image de marque') + '</button>' +
           (curBrandObj() && curBrandObj().image_path ? '<button type="button" class="btn btn-ghost btn-sm" id="brand-image-rm">Retirer l\'image</button>' : '') +
           '<button type="button" class="btn btn-ghost btn-sm" id="brand-rename">Renommer</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm" id="brand-slug" title="Segment d\'URL de la marque en boutique">URL</button>' +
           '<button type="button" class="btn btn-ghost btn-sm" id="brand-del">Supprimer</button>' : '') +
         '<button type="button" class="btn btn-accent btn-sm" id="brand-new">+ Nouvelle marque</button>' +
       '</div>';
@@ -95,6 +96,7 @@ window.CA = window.CA || {};
     });
     var nb = $('#brand-new'); if (nb) nb.addEventListener('click', addBrand);
     var rb = $('#brand-rename'); if (rb) rb.addEventListener('click', renameBrand);
+    var sl = $('#brand-slug'); if (sl) sl.addEventListener('click', editBrandSlug);
     var db = $('#brand-del'); if (db) db.addEventListener('click', deleteBrand);
     var ib = $('#brand-image'); if (ib) ib.addEventListener('click', function () { fileInput.click(); });
     var ir = $('#brand-image-rm'); if (ir) ir.addEventListener('click', removeLogo);
@@ -177,6 +179,22 @@ window.CA = window.CA || {};
       if (!res.data || !res.data.length) { window.alert('Ajout refusé (permissions).'); return; }
       CA.currentBrand = name; remember(name);
       CA.loadBrands();
+    });
+  }
+
+  // URL personnalisée de la marque (segment d'adresse en boutique). Vide => auto (slug du nom).
+  function editBrandSlug() {
+    var b = curBrandObj(); if (!b) return;
+    var auto = CA.slugify(b.name);
+    var val = window.prompt(
+      'URL de la marque « ' + b.name + ' » — segment d\'adresse en boutique.\n' +
+      'Laisse vide pour l\'auto : « ' + auto + ' ».', b.slug || auto);
+    if (val === null) return;                       // annulé
+    var next = CA.slugify(val) || null;             // vide => repli auto côté boutique
+    sb.from('brands').update({ slug: next }).eq('name', b.name).select().then(function (res) {
+      if (res.error) { window.alert('Erreur : ' + res.error.message); return; }
+      if (!res.data || !res.data.length) { window.alert('Refusé (permissions). Es-tu connecté en admin ?'); return; }
+      b.slug = next;
     });
   }
 

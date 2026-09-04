@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Création Audio — Admin V2</title>
+<!-- Thème (anti-flash) : pose data-theme AVANT le rendu -->
+<script>try{var t=localStorage.getItem('ca-theme');document.documentElement.setAttribute('data-theme',t||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'));}catch(e){}</script>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
@@ -12,10 +14,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/tokens.css?v=2">
-<link rel="stylesheet" href="assets/admin.css?v=12">
-<link rel="stylesheet" href="assets/facture.css?v=7">
+<link rel="stylesheet" href="assets/tokens.css?v=3">
+<link rel="stylesheet" href="assets/admin.css?v=14">
+<link rel="stylesheet" href="assets/facture.css?v=8">
 <link rel="stylesheet" href="assets/autoloop.css?v=1">
+<script src="assets/theme.js?v=1" defer></script>
 </head>
 <body>
 
@@ -46,6 +49,7 @@
     <span class="brand"><span class="d"></span> Création Audio <small>Admin V2</small></span>
     <span class="topbar-spacer"></span>
     <span class="who">Connecté&nbsp;: <b id="who-email">…</b></span>
+    <button class="btn btn-ghost btn-sm theme-toggle" id="theme-toggle" type="button" data-theme-toggle aria-label="Basculer le thème">🌙</button>
     <button class="btn btn-ghost btn-sm" id="logout-btn" type="button">Déconnexion</button>
   </header>
 
@@ -90,6 +94,36 @@
       <!-- ===== MARQUES (Bambu Lab, Elegoo, Anycubic…) ===== -->
       <div class="brand-bar" id="brand-bar"></div>
 
+      <!-- ===== GÉNÉRATEUR DE LIEN BOUTIQUE ===== -->
+      <details class="editor" id="lb-panel" style="margin-bottom:18px">
+        <summary style="cursor:pointer; font-weight:700; list-style:none">🔗 Générateur de lien boutique
+          <span class="hint" style="font-weight:400">— choisis marque → matériau → couleur, copie le lien.</span>
+        </summary>
+        <div class="grid" style="margin-top:14px">
+          <div class="field">
+            <label class="lbl" for="lb-brand">Marque</label>
+            <select id="lb-brand"></select>
+          </div>
+          <div class="field">
+            <label class="lbl" for="lb-material">Matériau</label>
+            <select id="lb-material"><option value="">— (marque seule) —</option></select>
+          </div>
+          <div class="field">
+            <label class="lbl" for="lb-color">Couleur</label>
+            <select id="lb-color"><option value="">— (matériau seul) —</option></select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:6px">
+          <label class="lbl" for="lb-url">Lien</label>
+          <div class="inline" style="gap:8px; flex-wrap:wrap">
+            <input type="text" id="lb-url" readonly spellcheck="false" style="flex:1; min-width:240px; font-family:monospace">
+            <button type="button" class="btn btn-accent btn-sm" id="lb-copy">Copier</button>
+            <a class="btn btn-ghost btn-sm" id="lb-open" target="_blank" rel="noopener">Ouvrir</a>
+          </div>
+          <span class="hint" id="lb-status">Le lien se met à jour automatiquement.</span>
+        </div>
+      </details>
+
       <!-- ===== MATÉRIAUX & PRIX (prix/coûts partagés par toutes les couleurs) ===== -->
       <div class="panel-head">
         <div>
@@ -110,6 +144,11 @@
               <label class="lbl" for="m-name">Nom du matériau</label>
               <input type="text" id="m-name" placeholder="PLA Basic" autocomplete="off">
               <span class="hint">Ex. « PLA Basic ». Doit correspondre exactement au matériau choisi sur les filaments.</span>
+            </div>
+            <div class="field">
+              <label class="lbl" for="m-slug">URL (matériau) <span class="hint">(optionnel)</span></label>
+              <input type="text" id="m-slug" placeholder="auto : pla-basic" autocomplete="off" spellcheck="false">
+              <span class="hint">Segment du lien boutique. Vide = généré depuis le nom.</span>
             </div>
             <div class="field">
               <label class="lbl">Formats vendus</label>
@@ -255,6 +294,11 @@
             <label class="lbl" for="f-code">Code Bambu <span class="hint">(optionnel)</span></label>
             <input type="text" id="f-code" placeholder="Ex. 10100" autocomplete="off" inputmode="numeric">
             <span class="hint">Sert au rattachement automatique en réception de commande.</span>
+          </div>
+          <div class="field">
+            <label class="lbl" for="f-slug">URL (couleur) <span class="hint">(optionnel)</span></label>
+            <input type="text" id="f-slug" placeholder="auto : rouge-galaxie" autocomplete="off" spellcheck="false">
+            <span class="hint">Dernier segment du lien boutique. Vide = généré depuis le nom. Les tirets/minuscules sont appliqués automatiquement.</span>
           </div>
           <div class="field col-2">
             <label class="lbl inline" style="gap:12px; justify-content:space-between; flex-wrap:wrap">
@@ -898,6 +942,31 @@
         </details>
       </div>
 
+      <!-- Caisse : scanner de commande + écran client en direct -->
+      <div class="fx-pos no-print" id="fx-pos">
+        <button type="button" class="btn btn-accent fx-scan-toggle" id="fx-scan-toggle" aria-pressed="false">▶ Scanner la commande</button>
+        <input type="text" id="fx-scan-input" class="fx-scan-input" autocomplete="off" autocorrect="off"
+               autocapitalize="off" spellcheck="false" placeholder="Clique « Scanner » puis scanne les articles…" disabled>
+        <label class="fx-check fx-pos-live"><input type="checkbox" id="fx-pos-live"> Caisse en direct</label>
+        <a class="btn btn-ghost btn-sm" id="fx-pos-open" href="caisse.html" target="_blank" rel="noopener">Ouvrir l'écran client ↗</a>
+        <span class="fx-scan-feedback" id="fx-scan-feedback" aria-live="polite"></span>
+
+        <!-- apprentissage d'un code inconnu -->
+        <div class="fx-scan-learn" id="fx-scan-learn" hidden>
+          <div class="fx-scan-learn-head">Code-barres inconnu&nbsp;: <code id="fx-scan-learn-code"></code>
+            <span class="hint">— associe-le une fois, il sera mémorisé.</span></div>
+          <div class="fx-scan-learn-row">
+            <select id="fx-scan-learn-fil" class="fx-scan-learn-fil"></select>
+            <select id="fx-scan-learn-kind" class="fx-scan-learn-kind">
+              <option value="spool">Avec bobine</option>
+              <option value="refill">Recharge</option>
+            </select>
+            <button type="button" class="btn btn-accent btn-sm" id="fx-scan-learn-save">Associer + ajouter</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="fx-scan-learn-cancel">Ignorer</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Corps : catalogue (gauche) + facture (droite) -->
       <div class="fx-layout">
         <!-- Colonne gauche : catalogue OU lignes libres (caisson) -->
@@ -1267,16 +1336,17 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
-<script src="assets/admin-core.js?v=2"></script>
-<script src="assets/cms-brands.js?v=3"></script>
-<script src="assets/cms-materials.js?v=9"></script>
-<script src="assets/cms-filaments.js?v=10"></script>
+<script src="assets/admin-core.js?v=3"></script>
+<script src="assets/cms-brands.js?v=4"></script>
+<script src="assets/cms-materials.js?v=10"></script>
+<script src="assets/cms-filaments.js?v=11"></script>
+<script src="assets/cms-linkbuilder.js?v=1"></script>
 <script src="assets/cms-spacers.js?v=5"></script>
 <script src="assets/cms-accessories.js?v=1"></script>
-<script src="assets/cms-inventory.js?v=6"></script>
+<script src="assets/cms-inventory.js?v=7"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
-<script src="assets/cms-facturation.js?v=10"></script>
+<script src="assets/cms-facturation.js?v=11"></script>
 <script src="assets/cms-historique.js?v=3"></script>
 <script src="assets/cms-statistiques.js?v=3"></script>
 <script src="assets/cms-autoloop.js?v=2"></script>

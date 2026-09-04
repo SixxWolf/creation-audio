@@ -86,18 +86,62 @@
   var dataReady = false;
   function slug(s) { return encodeURIComponent(String(s == null ? '' : s)); }
   function unslug(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
+  // Slug auto-généré à partir d'un libellé : minuscules, accents retirés, séparé par des tirets.
+  // Sert de repli quand aucun slug personnalisé n'est défini dans l'admin.
+  function slugify(s) {
+    return String(s == null ? '' : s)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')   // retire les accents
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  var norm = function (s) { return s || 'Autres'; };       // matériau/marque absent => « Autres »
+  // Slug d'AFFICHAGE : préfère le slug personnalisé saisi dans l'admin, sinon auto depuis le nom.
+  function brandSlugName(brand) { var b = brandInfo[brand]; return (b && b.slug) || slugify(brand); }
+  function matSlugFor(brand, material) {
+    var p = products.filter(function (x) { return norm(x.brand) === brand && norm(x.material) === material; })[0];
+    return (p && p.material_slug) || slugify(material);
+  }
+  function prodSlugFor(colorId) { var p = byId[colorId]; return p ? (p.slug || slugify(p.name)) : slug(colorId); }
+
   function routeFor(brand, material, colorId) {
-    var h = '#/m/' + slug(brand);
-    if (material) h += '/' + slug(material);
-    if (material && colorId) h += '/' + slug(colorId);
+    var h = '#/m/' + brandSlugName(brand);
+    if (material) h += '/' + matSlugFor(brand, material);
+    if (material && colorId) h += '/' + prodSlugFor(colorId);
     return h;
+  }
+  // Résolution segment d'URL -> entité. Accepte le slug perso, le slug auto,
+  // l'ancien nom encodé et (pour la couleur) l'ancien id UUID -> les liens déjà
+  // partagés continuent de fonctionner après l'ajout des slugs.
+  function resolveBrand(seg) {
+    var dec = unslug(seg);
+    var hit = brandsData.filter(function (b) {
+      return brandSlugName(b.name) === seg || slugify(b.name) === seg || b.name === dec;
+    })[0];
+    return hit ? hit.name : dec;
+  }
+  function resolveMaterial(brand, seg) {
+    var dec = unslug(seg);
+    var hit = products.filter(function (p) {
+      if (norm(p.brand) !== brand) return false;
+      return (p.material_slug || slugify(norm(p.material))) === seg || slugify(norm(p.material)) === seg || norm(p.material) === dec;
+    })[0];
+    return hit ? norm(hit.material) : dec;
+  }
+  function resolveColor(brand, material, seg) {
+    var hit = products.filter(function (p) {
+      return norm(p.brand) === brand && norm(p.material) === material &&
+        ((p.slug || slugify(p.name)) === seg || slugify(p.name) === seg || p.id === seg);
+    })[0];
+    return hit ? hit.id : (byId[seg] ? seg : null);
   }
   function currentRoute() {
     var h = location.hash.replace(/^#\/?/, '');
     if (!h) return { screen: 'brands' };
-    var parts = h.split('/').map(unslug);
+    var parts = h.split('/');
     if (parts[0] !== 'm' || !parts[1]) return { screen: 'brands' };
-    return { screen: 'material', brand: parts[1], material: parts[2] || null, colorId: parts[3] || null };
+    var brand = resolveBrand(parts[1]);
+    var material = parts[2] ? resolveMaterial(brand, parts[2]) : null;
+    var colorId = (material && parts[3]) ? resolveColor(brand, material, parts[3]) : null;
+    return { screen: 'material', brand: brand, material: material, colorId: colorId };
   }
   // Naviguer = changer le hash : le navigateur empile une entrée d'historique,
   // hashchange déclenche applyRoute(). Pousser la même cible => simple re-rendu.

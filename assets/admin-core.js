@@ -14,12 +14,20 @@ window.CA = window.CA || {};
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
+  // Slug d'URL partagé par tous les modules CMS (marques, matériaux, couleurs) et
+  // aligné sur celui de la boutique : minuscules, accents retirés, tirets.
+  window.CA.slugify = function (s) {
+    return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  };
+
   var loginWrap = $('#login'), app = $('#app'),
       loginForm = $('#login-form'), emailI = $('#login-email'), passI = $('#login-pass'),
       loginBtn = $('#login-btn'), loginStatus = $('#login-status'),
       whoEmail = $('#who-email'), logoutBtn = $('#logout-btn');
 
   var readyCbs = [], isReady = false;
+  var DEFAULT_TAB = 'filaments', curTab = null;   // onglet courant (routing par hash)
   window.CA.onAdminReady = function (cb) {
     if (isReady) { try { cb(); } catch (e) {} }
     else readyCbs.push(cb);
@@ -34,6 +42,12 @@ window.CA = window.CA || {};
   function fireReady() {
     isReady = true;
     readyCbs.splice(0).forEach(function (cb) { try { cb(); } catch (e) {} });
+    // Lien direct vers un onglet autre que le défaut (ex. #historique) : on déclenche
+    // son chargement paresseux maintenant que l'admin est authentifié. Le défaut
+    // ('filaments') se charge déjà via onAdminReady — on ne le rejoue pas.
+    if (curTab && curTab !== DEFAULT_TAB && window.CA.onTab) {
+      try { window.CA.onTab(curTab); } catch (e) {}
+    }
   }
 
   function showApp(session) {
@@ -85,17 +99,57 @@ window.CA = window.CA || {};
   if (navToggle) navToggle.addEventListener('click', function () { navDrawer.classList.contains('open') ? closeDrawer() : openDrawer(); });
   if (navBackdrop) navBackdrop.addEventListener('click', closeDrawer);
 
-  // --- Onglets (barre du haut + tiroir partagent la classe .tab) ---
+  // --- Onglets + routing par hash (#onglet ou #onglet/sous-onglet) --------------
+  // Chaque onglet (et sous-onglet) porte son URL : le bouton « retour » du
+  // navigateur revient au dernier onglet consulté et un rechargement garde la
+  // position — au lieu de toujours retomber sur l'onglet par défaut.
   var tabs = $$('.tab'), panels = $$('.tabpanel');
-  function activate(name) {
+  var TAB_NAMES = {};
+  tabs.forEach(function (t) { TAB_NAMES[t.dataset.tab] = true; });
+  var subCbs = [];
+
+  function parseHash() {
+    var parts = (location.hash || '').replace(/^#\/?/, '').split('/').filter(Boolean);
+    var tab = (parts[0] && TAB_NAMES[parts[0]]) ? parts[0] : DEFAULT_TAB;
+    return { tab: tab, sub: parts[1] || null };
+  }
+  function hashFor(tab, sub) { return '#' + tab + (sub ? '/' + sub : ''); }
+
+  function activate(name) {                 // bascule le DOM uniquement (pas l'URL)
     tabs.forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.tab === name)); });
     panels.forEach(function (p) { p.hidden = (p.dataset.panel !== name); });
     document.body.setAttribute('data-tab', name);
     closeDrawer();
-    if (window.CA.onTab) try { window.CA.onTab(name); } catch (e) {}
   }
+  // Applique l'URL courante à l'écran (au chargement + à chaque hashchange).
+  function applyRoute() {
+    var r = parseHash();
+    if (r.tab !== curTab) {
+      curTab = r.tab;
+      activate(r.tab);
+      // lazy-load : seulement une fois authentifié (au 1er chargement, isReady=false
+      // et fireReady() rejouera l'onglet ciblé par un lien direct).
+      if (isReady && window.CA.onTab) try { window.CA.onTab(r.tab); } catch (e) {}
+    }
+    subCbs.forEach(function (cb) { try { cb(r.sub, r.tab); } catch (e) {} });
+  }
+  // Naviguer = changer le hash (empile une entrée d'historique) -> applyRoute.
+  function go(tab, sub) {
+    var h = hashFor(tab, sub);
+    if (location.hash === h) applyRoute(); else location.hash = h;
+  }
+  window.addEventListener('hashchange', applyRoute);
   tabs.forEach(function (t) {
-    t.addEventListener('click', function () { activate(t.dataset.tab); });
+    t.addEventListener('click', function () { go(t.dataset.tab, null); });
   });
-  document.body.setAttribute('data-tab', 'filaments');
+
+  // API pour les sous-onglets d'un module (ex. Inventaire : réception / à commander).
+  window.CA.route = {
+    get: parseHash,
+    goSub: function (sub) { go(parseHash().tab, sub); },   // change l'URL du sous-onglet
+    onSub: function (cb) { subCbs.push(cb); }               // cb(sub, tab) à chaque changement d'URL
+  };
+
+  // Position initiale : honore un lien direct (#onglet/sous-onglet) ou un rechargement.
+  applyRoute();
 })();

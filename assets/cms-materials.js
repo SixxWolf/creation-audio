@@ -146,6 +146,7 @@ window.CA = window.CA || {};
       tiersSpoolEl = $('#m-tiers-spool'), tierAddSpool = $('#m-tier-add-spool'),
       tiersRefillEl = $('#m-tiers-refill'), tierAddRefill = $('#m-tier-add-refill'),
       descI = $('#m-desc'),
+      slugI = $('#m-slug'),
       longDescI = $('#m-long-desc'),
       specsEl = $('#m-specs'), specAddBtn = $('#m-spec-add'),
       galleryEl = $('#m-gallery'), galleryAddBtn = $('#m-gallery-add'), galleryFileEl = $('#m-gallery-file'),
@@ -192,6 +193,7 @@ window.CA = window.CA || {};
   });
   if (hasRefillI) hasRefillI.addEventListener('change', syncFormatUI);
   if (hasSpoolI) hasSpoolI.addEventListener('change', syncFormatUI);
+  if (nameI && slugI) nameI.addEventListener('input', function () { slugI.placeholder = 'auto : ' + (CA.slugify(nameI.value) || 'pla-basic'); });
 
   [sellSpoolI, sellRefillI, costSpoolI, costRefillI].forEach(function (el) {
     if (el) el.addEventListener('input', updateMargins);
@@ -277,6 +279,10 @@ window.CA = window.CA || {};
     hasSpoolI.checked = row ? (row.sell_spool != null) : true;
     hasRefillI.checked = row ? (row.sell_refill != null) : false;
     descI.value = row && row.description ? row.description : '';
+    if (slugI) {
+      slugI.value = row && row.slug ? row.slug : '';
+      slugI.placeholder = 'auto : ' + (CA.slugify(row ? row.name : '') || 'pla-basic');
+    }
     longDescI.value = row && row.long_desc ? row.long_desc : '';
     specsEl.innerHTML = '';
     normalizeSpecs(row ? row.specs : []).forEach(function (s) { addSpecRow(s.k, s.v); });
@@ -329,6 +335,7 @@ window.CA = window.CA || {};
       tiers_spool: hasS ? collectTiers(tiersSpoolEl) : [],
       tiers_refill: hasR ? collectTiers(tiersRefillEl) : [],
       description: descI.value.trim() || null,
+      slug: (slugI && CA.slugify(slugI.value)) || null,   // vide => auto (slug du nom) côté boutique
       long_desc: longDescI.value.trim() || null,
       specs: collectSpecs(),
       updated_at: new Date().toISOString()

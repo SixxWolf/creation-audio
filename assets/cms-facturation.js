@@ -558,6 +558,7 @@
       elInvoice.innerHTML = '<p class="inv-empty">Ajoute des articles depuis le catalogue (ou une ligne libre).</p>';
       elMargin.hidden = true;
       refreshPickerBadges();
+      schedulePush();
       return;
     }
     var co = readCompanyForm(), t = totals();
@@ -660,6 +661,7 @@
       '<span class="fx-margin-sub">coût ' + money(t.cost) + '</span>';
 
     refreshPickerBadges();
+    schedulePush();
   }
 
   // re-render sur édition des méta-champs
@@ -680,7 +682,7 @@
     return keys.length === 1 ? keys[0] : (keys.length ? 'mixte' : cat);
   }
   function lock() { saved = true; elSave.disabled = true; elSave.textContent = '✓ Enregistrée'; }
-  function unlock() { saved = false; elSave.disabled = false; elSave.textContent = 'Enregistrer la facture'; }
+  function unlock() { saved = false; justSaved = false; elSave.disabled = false; elSave.textContent = 'Enregistrer la facture'; }
 
   function onSave() {
     if (saved) return;
@@ -740,6 +742,7 @@
       });
     }).then(function (inv) {
       lock();
+      justSaved = true;   // écran client : « Merci » jusqu'au prochain changement / nouvelle facture
       render();
       // auto-mémorisation du client (mode client seulement ; les dealers = onglet Dealers)
       if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value)) {
@@ -844,5 +847,185 @@
   });
   if ($('#co-logo-file')) $('#co-logo-file').addEventListener('change', function () { handleLogoFile(this.files && this.files[0]); });
   if ($('#co-logo-remove')) $('#co-logo-remove').addEventListener('click', function () { logoData = ''; $('#co-logo-file').value = ''; showLogoPreview(); writeCompany(); render(); });
+
+  /* =========================================================
+     CAISSE — scanner de commande + écran client en direct
+     - Un bouton « Scanner la commande » arme une case en attente ;
+       chaque code-barres EAN/UPC ajoute le bon filament (bon format).
+     - Codes inconnus : panneau d'apprentissage (mémorisé dans
+       products.attrs.barcodes, comme l'inventaire) puis ajouté.
+     - « Caisse en direct » pousse le panier vers pos_display ;
+       l'écran client (caisse.html) le lit en direct.
+     ========================================================= */
+  var POS_ID = 'main';
+  var posLive = false, justSaved = false, pushTimer = null;
+
+  /* ----- écran client : payload (aucun coût/marge ni PII client) ----- */
+  function buildPayload() {
+    var t = totals(), co = t.co;
+    var status = justSaved ? 'thanks' : (lines.filter(function (l) { return l.qty > 0; }).length ? 'active' : 'idle');
+    return {
+      status: status,
+      number: (elNumber.value || '').trim(),
+      date: elDate.value || todayISO(),
+      items: lines.filter(function (l) { return l.qty > 0; }).map(function (l) {
+        return { label: l.label || '', meta: l.meta || '', hex: l.hex || null,
+                 qty: l.qty, price: round2(l.price), total: round2(l.qty * l.price) };
+      }),
+      subtotal: round2(t.sub), tax_enabled: taxEnabled,
+      gst_rate: co.gstRate || 0, qst_rate: co.qstRate || 0, gst: round2(t.gst), qst: round2(t.qst),
+      total: round2(t.total),
+      co: { name: co.name || '', tagline: co.tagline || '', logo: co.logo || '' },
+      ts: Date.now()
+    };
+  }
+  function upsertDisplay(payload) {
+    try {
+      var q = sb.from('pos_display').upsert({ id: POS_ID, payload: payload, updated_at: new Date().toISOString() });
+      if (q && q.then) q.then(function () {}, function () {});   // silencieux (table absente = schéma pas relancé)
+    } catch (e) {}
+  }
+  function pushNow() { if (posLive) upsertDisplay(buildPayload()); }
+  function schedulePush() { if (!posLive) return; clearTimeout(pushTimer); pushTimer = setTimeout(pushNow, 250); }
+
+  /* ----- éléments caisse ----- */
+  var elScanToggle = $('#fx-scan-toggle'), elScanInput = $('#fx-scan-input'), elScanFeedback = $('#fx-scan-feedback'),
+      elScanLearn = $('#fx-scan-learn'), elScanLearnCode = $('#fx-scan-learn-code'),
+      elScanLearnFil = $('#fx-scan-learn-fil'), elScanLearnKind = $('#fx-scan-learn-kind'),
+      elScanLearnSave = $('#fx-scan-learn-save'), elScanLearnCancel = $('#fx-scan-learn-cancel'),
+      elPosLive = $('#fx-pos-live'), elPosStation = $('#fx-pos');
+
+  var scanActive = false, learnOpen = false, pendingCode = '';
+
+  function focusScan() { if (elScanInput) try { elScanInput.focus(); } catch (e) {} }
+  function scanFeedback(msg, cls) { if (elScanFeedback) { elScanFeedback.textContent = msg || ''; elScanFeedback.className = 'fx-scan-feedback' + (cls ? ' ' + cls : ''); } }
+
+  function setScanActive(on) {
+    scanActive = !!on;
+    if (elScanInput) { elScanInput.disabled = !scanActive; elScanInput.value = ''; }
+    if (elScanToggle) {
+      elScanToggle.setAttribute('aria-pressed', String(scanActive));
+      elScanToggle.textContent = scanActive ? '⏸ Scan en cours…' : '▶ Scanner la commande';
+    }
+    if (elPosStation) elPosStation.classList.toggle('is-armed', scanActive);
+    if (scanActive) {
+      // le scan a besoin du catalogue filament (attrs.barcodes) même si le gabarit courant est autre
+      if (!catalogLoaded.filament) loadCatalog('filament');
+      if (elPosLive && !elPosLive.checked) { elPosLive.checked = true; setPosLive(true); }  // afficher la caisse au client
+      scanFeedback('En attente d\'un scan…', '');
+      focusScan();
+    } else { closeLearn(); scanFeedback('', ''); }
+  }
+  if (elScanToggle) elScanToggle.addEventListener('click', function () { setScanActive(!scanActive); });
+
+  // garde la case active pendant une session de scan (sans voler le focus d'un champ édité)
+  if (elScanInput) elScanInput.addEventListener('blur', function () {
+    setTimeout(function () {
+      if (!scanActive || learnOpen) return;
+      if (document.activeElement && document.activeElement !== document.body) return;
+      focusScan();
+    }, 40);
+  });
+  if (elScanInput) elScanInput.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== 'Tab') return;
+    e.preventDefault();
+    var code = (elScanInput.value || '').trim();
+    elScanInput.value = '';
+    if (code) processScan(code);
+  });
+
+  function findByBarcode(code) {
+    var fils = catalog.filament || [];
+    for (var i = 0; i < fils.length; i++) {
+      var b = fils[i].attrs && fils[i].attrs.barcodes;
+      if (!b) continue;
+      if (b.spool && String(b.spool) === code) return { p: fils[i], kind: 'spool' };
+      if (b.refill && String(b.refill) === code) return { p: fils[i], kind: 'refill' };
+    }
+    return null;
+  }
+
+  function processScan(code) {
+    var hit = findByBarcode(code);
+    if (!hit) { openLearn(code); return; }
+    var qty = scanAddFilament(hit.p, hit.kind);
+    scanFeedback('✓ ' + hit.p.name + ' · ' + (hit.kind === 'refill' ? 'recharge' : 'bobine') + '  (×' + qty + ')', 'ok');
+    focusScan();
+  }
+
+  // ajoute (ou incrémente) une ligne filament pour un format donné — indépendant du gabarit courant
+  function scanAddFilament(p, kind) {
+    var base = filBase(p, kind), cost = filCost(p, kind), tiers = filTiers(p, kind);
+    var meta = [p.brand, p.material, (kind === 'refill' ? 'Recharge' : 'Avec bobine')].filter(Boolean).join(' · ');
+    var ex = lines.filter(function (l) { return l.productId === String(p.id) && l.kind === kind && !l.manual; })[0];
+    if (ex) { ex.qty += 1; ex.price = tierPrice(ex.base, ex.tiers, ex.qty); }
+    else {
+      lines.push({ id: uid(), productId: String(p.id), ptype: 'filament', kind: kind, label: p.name,
+        meta: meta, hex: p.hex, qty: 1, base: +base || 0, tiers: tiers || [], cost: +cost || 0,
+        price: tierPrice(base, tiers, 1), manual: false, sp: null });
+    }
+    afterChange();
+    return (ex ? ex.qty : 1);
+  }
+
+  /* ----- apprentissage d'un code inconnu (mémorisé dans attrs.barcodes) ----- */
+  function learnOptions() {
+    var fils = (catalog.filament || []).slice().sort(function (a, b) {
+      return ((a.brand || '') + (a.material || '') + (a.name || '')).localeCompare((b.brand || '') + (b.material || '') + (b.name || ''));
+    });
+    return '<option value="">— choisir le filament —</option>' + fils.map(function (p) {
+      return '<option value="' + esc(p.id) + '">' + esc([p.brand, p.material, p.name].filter(Boolean).join(' · ')) + '</option>';
+    }).join('');
+  }
+  function openLearn(code) {
+    if (!elScanLearn) return;
+    if (!catalogLoaded.filament) { loadCatalog('filament'); }
+    pendingCode = code; learnOpen = true;
+    elScanLearnCode.textContent = code;
+    elScanLearnFil.innerHTML = learnOptions(); elScanLearnFil.value = '';
+    elScanLearnKind.value = 'spool';
+    elScanLearn.hidden = false;
+    scanFeedback('⚠ Code inconnu — associe-le une fois.', 'warn');
+    try { elScanLearnFil.focus(); } catch (e) {}
+  }
+  function closeLearn() { learnOpen = false; pendingCode = ''; if (elScanLearn) elScanLearn.hidden = true; }
+  if (elScanLearnFil) elScanLearnFil.addEventListener('change', function () {
+    var p = prodInCatalog('filament', this.value); if (!p) return;
+    var hasS = filOffers(p, 'spool'), hasR = filOffers(p, 'refill');
+    var os = elScanLearnKind.querySelector('option[value="spool"]'), orf = elScanLearnKind.querySelector('option[value="refill"]');
+    if (os) os.disabled = !hasS; if (orf) orf.disabled = !hasR;
+    if (!hasS && hasR) elScanLearnKind.value = 'refill';
+    if (!hasR && hasS) elScanLearnKind.value = 'spool';
+  });
+  if (elScanLearnCancel) elScanLearnCancel.addEventListener('click', function () { scanFeedback('Code ignoré.', 'warn'); closeLearn(); focusScan(); });
+  if (elScanLearnSave) elScanLearnSave.addEventListener('click', function () {
+    var p = prodInCatalog('filament', elScanLearnFil.value);
+    if (!p) { elScanLearnFil.focus(); return; }
+    var kind = elScanLearnKind.value === 'refill' ? 'refill' : 'spool';
+    var code = pendingCode;
+    elScanLearnSave.disabled = true; scanFeedback('Association…', 'warn');
+    var attrs = Object.assign({}, p.attrs || {});
+    attrs.barcodes = Object.assign({}, attrs.barcodes || {});
+    attrs.barcodes[kind] = code;
+    sb.from('products').update({ attrs: attrs, updated_at: new Date().toISOString() }).eq('id', p.id).select()
+      .then(function (res) {
+        elScanLearnSave.disabled = false;
+        if (res.error || !res.data || !res.data.length) { scanFeedback('Échec de l\'association (permissions ?).', 'bad'); return; }
+        p.attrs = res.data[0].attrs || attrs;   // reconnu immédiatement ensuite
+        closeLearn();
+        var qty = scanAddFilament(p, kind);
+        scanFeedback('✓ Associé & ajouté : ' + p.name + ' · ' + (kind === 'refill' ? 'recharge' : 'bobine') + '  (×' + qty + ')', 'ok');
+        focusScan();
+      }, function (err) { elScanLearnSave.disabled = false; scanFeedback('Erreur : ' + (err && err.message ? err.message : err), 'bad'); });
+  });
+  function prodInCatalog(which, id) { return (catalog[which] || []).filter(function (p) { return String(p.id) === String(id); })[0] || null; }
+
+  /* ----- interrupteur « Caisse en direct » ----- */
+  function setPosLive(on) {
+    posLive = !!on;
+    if (posLive) pushNow();
+    else upsertDisplay({ status: 'idle', items: [], co: { name: (readCompanyForm().name || ''), tagline: '', logo: readCompanyForm().logo || '' }, ts: Date.now() });
+  }
+  if (elPosLive) elPosLive.addEventListener('change', function () { setPosLive(this.checked); });
 
 })();

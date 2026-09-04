@@ -17,7 +17,7 @@
 .fx-seg-btn, .fx-cli-btn { font:inherit; font-weight:600; cursor:pointer; border:none; background:none;
   color:var(--muted); border-radius:100px; padding:8px 16px; transition:background .15s, color .15s; white-space:nowrap; }
 .fx-seg-btn:hover, .fx-cli-btn:hover { color:var(--ink); }
-.fx-seg-btn.is-active, .fx-cli-btn.is-active { background:var(--ink); color:#fff; }
+.fx-seg-btn.is-active, .fx-cli-btn.is-active { background:var(--fill-strong); color:#fff; }
 .fx-seg-sm .fx-cli-btn { padding:6px 13px; font-size:.85rem; }
 .fx-check { display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--ink);
   font-weight:500; cursor:pointer; white-space:nowrap; }
@@ -31,7 +31,7 @@
 .fx-company > summary::before { content:"▸ "; color:var(--ember); }
 .fx-company[open] > summary::before { content:"▾ "; }
 .fx-logo-prev img { max-height:44px; max-width:150px; border:1px solid var(--line); border-radius:8px;
-  padding:4px; background:#fff; object-fit:contain; }
+  padding:4px; background:var(--thumb-bg); object-fit:contain; }
 
 /* ---- Disposition catalogue / facture ---- */
 .fx-layout { display:grid; grid-template-columns:minmax(280px, 360px) 1fr; gap:22px; align-items:start; }
@@ -64,7 +64,7 @@
   border-radius:100px; padding:3px; align-self:flex-start; }
 .fx-type-btn { font:inherit; font-weight:600; font-size:.82rem; cursor:pointer; border:none; background:none;
   color:var(--muted); border-radius:100px; padding:5px 13px; }
-.fx-type-btn.is-active { background:var(--ink); color:#fff; }
+.fx-type-btn.is-active { background:var(--fill-strong); color:#fff; }
 .fx-catalog { max-height:62vh; overflow:auto; padding:12px; }
 
 .pk-group { margin-bottom:14px; }
@@ -80,7 +80,7 @@
 .pk-sw { width:24px; height:24px; border-radius:50%; border:1.5px solid rgba(0,0,0,.15); flex:none; }
 .pk-name { font-size:.76rem; font-weight:600; line-height:1.2; word-break:break-word; }
 .pk-price { font-size:.74rem; color:var(--muted); font-variant-numeric:tabular-nums; }
-.pk-card .pk-img { width:100%; aspect-ratio:1/1; object-fit:contain; background:#fff; border-radius:8px; }
+.pk-card .pk-img { width:100%; aspect-ratio:1/1; object-fit:contain; background:var(--thumb-bg); border-radius:8px; }
 .pk-card .pk-noimg { display:block; background:var(--wash); }
 .pk-badge { position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 5px;
   background:var(--ember); color:#fff; font-size:.68rem; font-weight:700; border-radius:100px;
@@ -101,6 +101,19 @@
 .fx-invoice { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-lg);
   box-shadow:var(--shadow); padding:30px; }
 .inv-empty { color:var(--muted); text-align:center; padding:50px 20px; }
+
+/* En mode sombre, le document facture reste « papier blanc » : il est
+   destiné à l'impression, donc l'aperçu doit coller au rendu papier.
+   On re-force localement les jetons en clair. */
+:root[data-theme="dark"] #fx-invoice,
+:root[data-theme="dark"] #hist-print {
+  color-scheme:light;
+  --paper:#FFFFFF; --wash:#F6F6F4; --ink:#181A1F; --muted:#6C727C; --line:#E7E7E2;
+  --charcoal:#14161A; --charcoal-2:#1B1E24; --thumb-bg:#FFFFFF;
+  --good:#1F9D57; --good-wash:#E7F6EE; --bad:#D2321F; --bad-wash:#FBEAE7;
+  --fill-strong:#181A1F; --fill-strong-hover:#14161A;
+  background:var(--paper); color:var(--ink);
+}
 
 .inv-top { display:flex; justify-content:space-between; gap:20px; align-items:flex-start;
   border-bottom:2px solid var(--ink); padding-bottom:16px; margin-bottom:16px; }
@@ -210,7 +223,7 @@
   border-radius:var(--radius-sm); font:inherit; }
 .hist-fbtn { font:inherit; font-weight:600; font-size:.85rem; cursor:pointer; border:none; background:none;
   color:var(--muted); border-radius:100px; padding:6px 14px; }
-.hist-fbtn.is-active { background:var(--ink); color:#fff; }
+.hist-fbtn.is-active { background:var(--fill-strong); color:#fff; }
 
 /* Séparation par type de facture */
 .hist-cats { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
@@ -218,7 +231,7 @@
   cursor:pointer; border:1.5px solid var(--line); background:var(--paper); color:var(--ink);
   border-radius:100px; padding:7px 14px; transition:border-color .15s, background .15s, color .15s; }
 .hist-cbtn:hover { border-color:var(--ember); }
-.hist-cbtn.is-active { background:var(--ink); color:#fff; border-color:var(--ink); }
+.hist-cbtn.is-active { background:var(--fill-strong); color:#fff; border-color:var(--fill-strong); }
 .hist-cnt { min-width:20px; height:19px; padding:0 6px; border-radius:100px; background:var(--wash); color:var(--muted);
   font-size:.72rem; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
 .hist-cbtn.is-active .hist-cnt { background:rgba(255,255,255,.22); color:#fff; }
@@ -262,7 +275,7 @@
 .stat-pbtn { font:inherit; font-weight:600; font-size:.85rem; cursor:pointer; border:1.5px solid var(--line);
   background:var(--paper); color:var(--ink); border-radius:100px; padding:7px 14px; }
 .stat-pbtn:hover { border-color:var(--ember); }
-.stat-pbtn.is-active { background:var(--ink); color:#fff; border-color:var(--ink); }
+.stat-pbtn.is-active { background:var(--fill-strong); color:#fff; border-color:var(--fill-strong); }
 
 .stat-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-bottom:22px; }
 .stat-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow-sm); }

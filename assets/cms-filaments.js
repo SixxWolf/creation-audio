@@ -66,6 +66,7 @@
       sizeI = $('#f-size'),
       qtyI = $('#f-qty'), qty2I = $('#f-qty2'), qtyWrap = $('#f-qty-wrap'), qty2Wrap = $('#f-qty2-wrap'), activeI = $('#f-active'),
       offerSpoolI = $('#f-offer-spool'), offerRefillI = $('#f-offer-refill'),
+      slugI = $('#f-slug'),
       pricePreview = $('#f-price-preview'),
       statusEl = $('#f-status'), listEl = $('#f-list'),
       newBtn = $('#f-new'), refreshBtn = $('#f-refresh'),
@@ -96,6 +97,7 @@
 
   /* ---- interactions ---- */
   if (newBtn) newBtn.addEventListener('click', function () { openEditor(null); });
+  if (nameI && slugI) nameI.addEventListener('input', function () { slugI.placeholder = 'auto : ' + (CA.slugify(nameI.value) || 'rouge-galaxie'); });
   if (refreshBtn) refreshBtn.addEventListener('click', function () {
     (window.CA.loadMaterials ? window.CA.loadMaterials() : Promise.resolve()).then(load, load);
   });
@@ -264,6 +266,10 @@
     offerSpoolI.checked = row ? (row.offer_spool !== false) : true;
     offerRefillI.checked = row ? (row.offer_refill !== false) : true;
     activeI.checked = row ? !!row.active : true;
+    if (slugI) {
+      slugI.value = row && row.slug ? row.slug : '';
+      slugI.placeholder = 'auto : ' + (CA.slugify(row ? row.name : '') || 'rouge-galaxie');
+    }
     editor.dataset.oldPath = row && row.image_path ? row.image_path : '';
     var url = row && row.image_path ? publicUrl(row.image_path) : '';
     if (url) { preview.src = url; preview.hidden = false; dropHint.hidden = true; }
@@ -332,6 +338,7 @@
       name: name,
       material: materialSel.value || null,
       code: codeI.value.trim() || null,
+      slug: (slugI && CA.slugify(slugI.value)) || null,   // vide => auto (slug du nom) côté boutique
       hex: hex,
       attrs: attrs,
       size: sizeI.value || '1x1',

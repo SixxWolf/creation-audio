@@ -1,0 +1,64 @@
+/* =========================================================
+   Création Audio V2 — Écran client (caisse en direct)
+   Plein écran, gros caractères, lisible à distance.
+   ========================================================= */
+* { box-sizing:border-box; }
+html, body { height:100%; margin:0; }
+.caisse-body {
+  font-family:var(--font, 'Inter', system-ui, sans-serif);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(255,106,43,.16), transparent 60%),
+    linear-gradient(180deg, #14161a 0%, #0d0f12 100%);
+  color:#f4f4f2;
+  -webkit-font-smoothing:antialiased;
+}
+.caisse { min-height:100vh; display:flex; flex-direction:column; padding:min(4vh,34px) min(5vw,56px); }
+.caisse-loading { margin:auto; color:#9aa1ab; font-size:1.2rem; }
+
+/* ---- en-tête (marque) ---- */
+.ca-head { display:flex; align-items:center; gap:18px; padding-bottom:22px;
+  border-bottom:1px solid rgba(255,255,255,.10); }
+.ca-logo { height:56px; max-width:180px; object-fit:contain; }
+.ca-name { font-size:1.7rem; font-weight:800; letter-spacing:-.02em; }
+.ca-tag { color:#9aa1ab; font-size:.95rem; margin-top:2px; }
+
+/* ---- écran d'accueil / merci ---- */
+.ca-center { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; gap:14px; }
+.ca-idle-logo { height:min(22vh,150px); max-width:60vw; object-fit:contain; opacity:.96; margin-bottom:8px; }
+.ca-idle-title { font-size:clamp(2.4rem,6vw,4rem); font-weight:800; letter-spacing:-.02em; margin:0; }
+.ca-idle-sub { font-size:clamp(1.1rem,2.4vw,1.6rem); color:#9aa1ab; margin:0; }
+.ca-check { width:clamp(90px,14vw,140px); height:clamp(90px,14vw,140px); border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:clamp(3rem,8vw,5rem); color:#fff;
+  background:var(--good,#1f9d57); box-shadow:0 12px 40px rgba(31,157,87,.4); margin-bottom:6px; }
+.ca-thanks-total { font-size:clamp(2rem,5vw,3.2rem); font-weight:800; color:var(--ember,#ff6a2b); margin:4px 0; }
+
+/* ---- panier actif ---- */
+.ca-cart { flex:1; display:flex; flex-direction:column; min-height:0; padding-top:20px; }
+.ca-cart-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px;
+  color:#9aa1ab; font-size:1rem; text-transform:uppercase; letter-spacing:.14em; font-weight:700; }
+.ca-count { color:var(--ember,#ff6a2b); }
+.ca-items { list-style:none; margin:0; padding:0; overflow-y:auto; flex:1; scrollbar-width:thin; }
+.ca-item { display:grid; grid-template-columns:auto 1fr auto auto auto; align-items:center; gap:16px;
+  padding:16px 6px; border-bottom:1px solid rgba(255,255,255,.08); }
+.ca-sw { width:26px; height:26px; border-radius:8px; border:1px solid rgba(255,255,255,.28); flex:none; }
+.ca-sw[data-empty] { background:repeating-linear-gradient(45deg,#3a3f47,#3a3f47 5px,#2c3037 5px,#2c3037 10px); }
+.ca-it-main { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.ca-it-name { font-size:clamp(1.15rem,2.2vw,1.55rem); font-weight:700; }
+.ca-it-meta { color:#9aa1ab; font-size:.9rem; }
+.ca-it-qty { font-size:clamp(1.05rem,2vw,1.4rem); font-weight:700; color:#c7ccd3; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ca-it-price { font-size:1.05rem; color:#9aa1ab; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; min-width:96px; }
+.ca-it-total { font-size:clamp(1.15rem,2.2vw,1.55rem); font-weight:800; font-variant-numeric:tabular-nums;
+  white-space:nowrap; text-align:right; min-width:120px; }
+
+/* ---- pied (totaux) ---- */
+.ca-foot { margin-top:14px; padding-top:18px; border-top:2px solid rgba(255,255,255,.14); }
+.ca-line { display:flex; justify-content:space-between; align-items:baseline; padding:6px 6px;
+  font-size:clamp(1.1rem,2.2vw,1.5rem); color:#c7ccd3; font-variant-numeric:tabular-nums; }
+.ca-grand { margin-top:6px; font-size:clamp(1.9rem,4.5vw,3rem); font-weight:800; color:#fff; }
+.ca-grand span:last-child { color:var(--ember,#ff6a2b); }
+
+@media (max-width:560px) {
+  .ca-item { grid-template-columns:auto 1fr auto; row-gap:2px; }
+  .ca-it-price { display:none; }
+}

@@ -67,6 +67,9 @@ alter table public.products add column if not exists code         text;
 alter table public.products add column if not exists offer_spool  boolean not null default true;
 alter table public.products add column if not exists offer_refill boolean not null default true;
 alter table public.products add column if not exists brand        text not null default 'Bambu Lab';
+-- slug = dernier segment d'URL choisi dans l'admin pour CETTE couleur (ex. « rouge-galaxie »).
+-- null => la boutique retombe sur un slug auto-généré à partir du nom. Les anciens liens (id UUID) restent valides.
+alter table public.products add column if not exists slug         text;
 
 create index if not exists products_type_idx       on public.products (type);
 create index if not exists products_code_idx       on public.products (code);
@@ -101,6 +104,8 @@ create table if not exists public.brands (
   created_at timestamptz not null default now()
 );
 alter table public.brands add column if not exists image_path text;
+-- slug = segment d'URL de la marque (ex. « bambu-lab ») ; null => auto-généré depuis le nom.
+alter table public.brands add column if not exists slug       text;
 insert into public.brands (name, sort_order) values ('Bambu Lab', 0) on conflict (name) do nothing;
 
 alter table public.brands enable row level security;
@@ -144,6 +149,7 @@ alter table public.materials add column if not exists brand text not null defaul
 alter table public.materials add column if not exists long_desc text;                        -- description longue (paragraphes)
 alter table public.materials add column if not exists specs   jsonb not null default '[]'::jsonb; -- specs : [{k,v}] libres (ajout/suppr. à volonté)
 alter table public.materials add column if not exists gallery jsonb not null default '[]'::jsonb; -- galerie « prints » : liste de chemins d'images (bucket products)
+alter table public.materials add column if not exists slug    text;                            -- segment d'URL du matériau (ex. « pla-basic ») ; null => auto-généré depuis le nom
 -- clé primaire = (brand, name) : on retire l'ancienne (sur name) et on pose la composite
 alter table public.materials drop constraint if exists materials_pkey;
 alter table public.materials add  constraint materials_pkey primary key (brand, name);
@@ -173,6 +179,8 @@ create view public.products_public
 with (security_invoker = off) as
   select
     p.id, p.type, p.name, p.material, p.brand, p.code, p.hex, p.attrs, p.image_path,
+    p.slug,                            -- slug perso de la couleur (null = auto côté boutique)
+    m.slug        as material_slug,    -- slug perso du matériau (null = auto côté boutique)
     -- prix null = format non vendu (bobine ou recharge) quand le matériau existe ;
     -- repli sur le prix porté par le produit uniquement s'il n'a pas de matériau.
     -- respecte aussi les formats désactivés manuellement sur la couleur (offer_spool / offer_refill)
@@ -489,6 +497,47 @@ alter table public.dealers add column if not exists city    text;
 -- Permet aux statistiques de ventiler correctement, y compris les lignes libres
 -- (dont la catégorie est choisie à la main dans l'éditeur de facture).
 alter table public.invoice_lines add column if not exists ptype text;
+
+-- ============================================================
+-- CAISSE EN DIRECT (écran client)
+-- ------------------------------------------------------------
+-- Une ligne par « caisse » (id, ex. 'main'). L'admin y pousse le
+-- panier en cours (payload jsonb : articles + totaux + branding,
+-- AUCUN coût/marge ni coordonnées client). L'écran client (caisse.html,
+-- clé anonyme) le lit en direct (Realtime + repli par sondage).
+-- ============================================================
+create table if not exists public.pos_display (
+  id         text primary key,
+  payload    jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.pos_display enable row level security;
+
+-- Lecture publique (l'écran client tourne sur un autre poste, sans login).
+drop policy if exists pos_display_public_read on public.pos_display;
+create policy pos_display_public_read
+  on public.pos_display for select
+  to anon, authenticated
+  using ( true );
+
+-- Écriture réservée à l'admin (même garde e-mail que le reste).
+drop policy if exists pos_display_admin_write on public.pos_display;
+create policy pos_display_admin_write
+  on public.pos_display for all
+  to authenticated
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+
+-- Mises à jour instantanées via Supabase Realtime (repli : sondage côté client).
+do $$ begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'pos_display'
+  ) then
+    alter publication supabase_realtime add table public.pos_display;
+  end if;
+end $$;
 
 -- ------------------------------------------------------------
 -- Vérification

@@ -86,16 +86,30 @@
      SOUS-ONGLETS
      ========================================================= */
   var subReception = $('#inv-sub-reception'), subCommander = $('#inv-sub-commander');
+  // bascule DOM du sous-onglet (l'URL est gérée par le routing de admin-core)
+  function showSub(sub) {
+    sub = (sub === 'commander') ? 'commander' : 'reception';
+    $$('.inv-subtab').forEach(function (b) {
+      var on = b.getAttribute('data-sub') === sub;
+      b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on));
+    });
+    if (subReception) subReception.hidden = (sub !== 'reception');
+    if (subCommander) subCommander.hidden = (sub !== 'commander');
+    if (sub === 'commander') renderReorder();
+    if (sub === 'reception' && scanActive) focusScan();
+  }
   $$('.inv-subtab').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var sub = btn.getAttribute('data-sub');
-      $$('.inv-subtab').forEach(function (b) { b.classList.toggle('is-active', b === btn); b.setAttribute('aria-selected', String(b === btn)); });
-      if (subReception) subReception.hidden = (sub !== 'reception');
-      if (subCommander) subCommander.hidden = (sub !== 'commander');
-      if (sub === 'commander') renderReorder();
-      if (sub === 'reception' && scanActive) focusScan();
+      // le sous-onglet a son URL (#inventaire/reception|commander) -> retour navigateur OK
+      if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub(sub);
+      else showSub(sub);
     });
   });
+  // applique le sous-onglet quand l'URL change (retour navigateur, lien direct)
+  if (window.CA.route && window.CA.route.onSub) {
+    window.CA.route.onSub(function (sub, tab) { if (tab === 'inventaire') showSub(sub); });
+  }
 
   /* =========================================================
      RÉCEPTION — lignes du tableau (état : [{productId, kind, qty, label}])
