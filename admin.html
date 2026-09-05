@@ -113,14 +113,34 @@
             <select id="lb-color"><option value="">— (matériau seul) —</option></select>
           </div>
         </div>
+        <!-- Segments d'URL modifiables : tape le slug voulu pour chaque niveau -->
         <div class="field" style="margin-top:6px">
-          <label class="lbl" for="lb-url">Lien</label>
+          <label class="lbl">URL — segments modifiables <span class="hint">(vide = auto depuis le nom)</span></label>
+          <div class="grid" id="lb-seg-grid">
+            <div class="field" id="lb-seg-brand-wrap">
+              <label class="lbl" for="lb-seg-brand" style="font-weight:500">Marque</label>
+              <input type="text" id="lb-seg-brand" autocomplete="off" spellcheck="false" style="font-family:monospace">
+            </div>
+            <div class="field" id="lb-seg-material-wrap" hidden>
+              <label class="lbl" for="lb-seg-material" style="font-weight:500">Matériau</label>
+              <input type="text" id="lb-seg-material" autocomplete="off" spellcheck="false" style="font-family:monospace">
+            </div>
+            <div class="field" id="lb-seg-color-wrap" hidden>
+              <label class="lbl" for="lb-seg-color" style="font-weight:500">Couleur</label>
+              <input type="text" id="lb-seg-color" autocomplete="off" spellcheck="false" style="font-family:monospace">
+            </div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:6px">
+          <label class="lbl" for="lb-url">Lien complet</label>
           <div class="inline" style="gap:8px; flex-wrap:wrap">
             <input type="text" id="lb-url" readonly spellcheck="false" style="flex:1; min-width:240px; font-family:monospace">
-            <button type="button" class="btn btn-accent btn-sm" id="lb-copy">Copier</button>
+            <button type="button" class="btn btn-accent btn-sm" id="lb-save">Enregistrer l'URL</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="lb-copy">Copier</button>
             <a class="btn btn-ghost btn-sm" id="lb-open" target="_blank" rel="noopener">Ouvrir</a>
           </div>
-          <span class="hint" id="lb-status">Le lien se met à jour automatiquement.</span>
+          <span class="hint" id="lb-status">Modifie un segment ci-dessus puis « Enregistrer l'URL ».</span>
         </div>
       </details>
 
@@ -1340,7 +1360,7 @@
 <script src="assets/cms-brands.js?v=4"></script>
 <script src="assets/cms-materials.js?v=10"></script>
 <script src="assets/cms-filaments.js?v=11"></script>
-<script src="assets/cms-linkbuilder.js?v=1"></script>
+<script src="assets/cms-linkbuilder.js?v=2"></script>
 <script src="assets/cms-spacers.js?v=5"></script>
 <script src="assets/cms-accessories.js?v=1"></script>
 <script src="assets/cms-inventory.js?v=7"></script>
