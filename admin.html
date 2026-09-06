@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=14">
+<link rel="stylesheet" href="assets/admin.css?v=15">
 <link rel="stylesheet" href="assets/facture.css?v=8">
 <link rel="stylesheet" href="assets/autoloop.css?v=1">
 <script src="assets/theme.js?v=1" defer></script>
@@ -504,11 +504,24 @@
             </div>
           </div>
 
+          <!-- Prix payé : rabais / prix appliqué à toute la commande -->
+          <div class="rcp-pricebar">
+            <span class="rcp-pricebar-lbl">Prix payé sur cette commande</span>
+            <select id="r-disc-mode" aria-label="Type d'ajustement de prix">
+              <option value="pct">Rabais %</option>
+              <option value="fixed">Prix fixe $/u</option>
+            </select>
+            <input type="number" id="r-disc-val" class="num" min="0" step="0.01" placeholder="0" aria-label="Valeur">
+            <button type="button" class="btn btn-ghost btn-sm" id="r-disc-apply">Appliquer à toutes les lignes</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="r-disc-reset">Prix catalogue</button>
+            <span class="hint">Vide = tu as payé le prix catalogue. Chaque ligne reste ajustable.</span>
+          </div>
+
           <!-- Tableau de confirmation (rempli par les scans, corrigeable) -->
           <div class="rcp-table-wrap">
             <table class="rcp-table" id="r-table">
               <thead>
-                <tr><th>Filament</th><th>Type</th><th class="num">Quantité</th><th></th></tr>
+                <tr><th>Filament</th><th>Type</th><th class="num">Quantité</th><th class="num">Prix payé $/u</th><th></th></tr>
               </thead>
               <tbody id="r-rows"></tbody>
             </table>
@@ -1098,6 +1111,19 @@
       </div>
 
       <div id="stat-body"><p class="muted">Chargement…</p></div>
+
+      <details class="stat-retro" id="stat-retro">
+        <summary>Recalculer les marges historiques (coût moyen pondéré)</summary>
+        <div class="stat-retro-body">
+          <p class="muted">Recalcule le coût de chaque vente passée à partir du <strong>coût moyen réellement payé</strong>, tel qu'il était à la date de la facture. Le client ne voit rien changer — le coût est privé. Un aperçu s'affiche d'abord ; rien n'est écrit avant que tu confirmes.</p>
+          <div class="inline" style="gap:8px; flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" id="stat-retro-preview" type="button">Calculer l'aperçu</button>
+            <button class="btn btn-accent btn-sm" id="stat-retro-apply" type="button" hidden>Appliquer les changements</button>
+            <span class="hint" id="stat-retro-status"></span>
+          </div>
+          <div id="stat-retro-out"></div>
+        </div>
+      </details>
     </section>
 
     <!-- ---------------- AUTOLOOP ---------------- -->
@@ -1357,18 +1383,19 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/admin-core.js?v=3"></script>
+<script src="assets/cms-costing.js?v=1"></script>
 <script src="assets/cms-brands.js?v=4"></script>
 <script src="assets/cms-materials.js?v=10"></script>
 <script src="assets/cms-filaments.js?v=11"></script>
 <script src="assets/cms-linkbuilder.js?v=2"></script>
 <script src="assets/cms-spacers.js?v=5"></script>
 <script src="assets/cms-accessories.js?v=1"></script>
-<script src="assets/cms-inventory.js?v=7"></script>
+<script src="assets/cms-inventory.js?v=9"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
-<script src="assets/cms-facturation.js?v=11"></script>
+<script src="assets/cms-facturation.js?v=13"></script>
 <script src="assets/cms-historique.js?v=3"></script>
-<script src="assets/cms-statistiques.js?v=3"></script>
+<script src="assets/cms-statistiques.js?v=4"></script>
 <script src="assets/cms-autoloop.js?v=2"></script>
 </body>
 </html>

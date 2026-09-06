@@ -149,7 +149,13 @@
     return !!p.offer_spool && (m ? m.sell_spool != null : p.sell_price != null);
   }
   function filBase(p, kind) { var m = matOf(p); if (m) return kind === 'refill' ? m.sell_refill : m.sell_spool; return kind === 'refill' ? p.sell_price_2 : p.sell_price; }
-  function filCost(p, kind) { var m = matOf(p); if (m) return (kind === 'refill' ? m.cost_refill : m.cost_spool) || 0; return (kind === 'refill' ? p.cost_price_2 : p.cost_price) || 0; }
+  function filCost(p, kind) {
+    // coût moyen réel (CMP, alimenté par les réceptions) prioritaire sur le coût catalogue
+    var ac = p && p.attrs && p.attrs.avg_cost;
+    if (ac) { var v = kind === 'refill' ? ac.refill : ac.spool; if (v != null && v !== '') return +v; }
+    var m = matOf(p); if (m) return (kind === 'refill' ? m.cost_refill : m.cost_spool) || 0;
+    return (kind === 'refill' ? p.cost_price_2 : p.cost_price) || 0;
+  }
   function filTiers(p, kind) { var m = matOf(p); if (m) return kind === 'refill' ? m.tiers_refill : m.tiers_spool; return kind === 'refill' ? p.tiers_2 : p.tiers; }
 
   /* ---------- chargement ---------- */
@@ -765,7 +771,8 @@
   function round2(n) { return Math.round((+n || 0) * 100) / 100; }
   function deductStock(valid) {
     var calls = valid.filter(function (l) { return l.productId && l.qty > 0; }).map(function (l) {
-      return sb.rpc('receive_stock', { p_product: l.productId, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: -Math.abs(l.qty) });
+      return sb.rpc('receive_stock', { p_product: l.productId, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: -Math.abs(l.qty) })
+        .then(function (res) { if (res && res.error) throw res.error; return res; });   // ne PAS masquer une erreur RPC
     });
     return Promise.all(calls);
   }

@@ -44,13 +44,35 @@
       parseBtn = $('#r-parse'), parseHint = $('#r-parse-hint'), addLineBtn = $('#r-add-line'),
       rowsEl = $('#r-rows'), emptyHint = $('#r-empty-hint'),
       confirmBtn = $('#r-confirm'), resetBtn = $('#r-reset'), statusEl = $('#r-status'),
-      historyEl = $('#r-history'), refreshBtn = $('#r-refresh');
+      historyEl = $('#r-history'), refreshBtn = $('#r-refresh'),
+      discMode = $('#r-disc-mode'), discVal = $('#r-disc-val'), discApply = $('#r-disc-apply'), discReset = $('#r-disc-reset');
+
+  function num(v) { if (v == null || v === '') return null; var n = +v; return isFinite(n) ? n : null; }
+  function round2(n) { return Math.round((+n || 0) * 100) / 100; }
+  function money(n) { return round2(n).toFixed(2).replace('.', ',') + ' $'; }
+  function uniq(a) { var s = {}, o = []; a.forEach(function (x) { if (x != null && !s[x]) { s[x] = 1; o.push(x); } }); return o; }
+  // coût catalogue (référence matériau) pour CE filament + format — sert de défaut
+  function refCostOf(f, kind) {
+    var m = matOf(f);
+    if (m) return num(kind === 'refill' ? m.cost_refill : m.cost_spool);
+    return num(kind === 'refill' ? f.cost_price_2 : f.cost_price);
+  }
+  // prix de vente (référence matériau) pour l'aperçu de marge à la réception
+  function sellOf(f, kind) {
+    var m = matOf(f);
+    if (m) return num(kind === 'refill' ? m.sell_refill : m.sell_spool);
+    return num(kind === 'refill' ? f.sell_price_2 : f.sell_price);
+  }
 
   /* ---- activation quand on ouvre l'onglet ---- */
   var prevOnTab = window.CA.onTab;
   window.CA.onTab = function (name) {
     if (typeof prevOnTab === 'function') prevOnTab(name);
-    if (name === 'inventaire') ensureLoad();
+    if (name !== 'inventaire') return;
+    if (!loaded) { ensureLoad(); return; }
+    // déjà chargé : une vente (facturation) ou une réception a pu changer le stock
+    // depuis la dernière visite -> on relit le stock et on rafraîchit « À commander ».
+    loadFilaments().then(function () { renderReorder(); });
   };
   function ensureLoad() {
     if (loaded) return;
@@ -133,6 +155,33 @@
     return opts.join('');
   }
 
+  // cellule « prix payé » : champ + repère de marge réelle (vente − prix payé)
+  function priceCell(r, f) {
+    var ref = f ? refCostOf(f, r.kind) : null;
+    var val = (r.unitCost != null && r.unitCost !== '') ? r.unitCost : '';
+    var ph = ref != null ? ref.toFixed(2) : '';
+    var input = '<input type="number" class="rcp-price num" min="0" step="0.01" value="' + val + '"' +
+      ' placeholder="' + ph + '" title="Laisse vide pour le prix catalogue">';
+    return input + '<div class="rcp-price-hint">' + priceHint(r, f) + '</div>';
+  }
+  function priceHint(r, f) {
+    if (!f) return '';
+    var paid = num(r.unitCost); var ref = refCostOf(f, r.kind);
+    var eff = paid != null ? paid : ref;               // prix effectif (payé, sinon catalogue)
+    var sell = sellOf(f, r.kind);
+    if (eff == null) return '<span class="muted">—</span>';
+    var bits = [];
+    if (paid != null && ref != null && Math.abs(paid - ref) >= 0.005) {
+      var d = paid - ref;
+      bits.push('<span class="' + (d < 0 ? 'pos' : 'neg') + '">' + (d < 0 ? '' : '+') + money(d) + ' vs catalogue</span>');
+    }
+    if (sell != null) {
+      var m = sell - eff, pct = sell > 0 ? Math.round(m / sell * 100) : 0;
+      bits.push('<span class="' + (m >= 0 ? 'pos' : 'neg') + '">marge ' + money(m) + (sell > 0 ? ' · ' + pct + '%' : '') + '</span>');
+    }
+    return bits.join(' · ') || '<span class="muted">catalogue</span>';
+  }
+
   function renderRows() {
     if (!rows.length) { rowsEl.innerHTML = ''; emptyHint.style.display = ''; updateScanCount(); return; }
     emptyHint.style.display = 'none';
@@ -148,6 +197,7 @@
             '<option value="refill"' + (r.kind === 'refill' ? ' selected' : '') + (hasR ? '' : ' disabled') + '>Recharge</option>' +
           '</select></td>' +
         '<td class="num"><input type="number" class="rcp-qty num" min="0" step="1" value="' + (r.qty != null ? r.qty : '') + '"></td>' +
+        '<td class="num rcp-price-cell">' + priceCell(r, f) + '</td>' +
         '<td><button type="button" class="rcp-row-del" aria-label="Retirer">✕</button></td>' +
       '</tr>';
     }).join('');
@@ -161,15 +211,44 @@
         if (rows[i].kind === 'spool' && !offersSpool(f) && offersRefill(f)) rows[i].kind = 'refill';
         renderRows();
       });
-      $('.rcp-kind', tr).addEventListener('change', function () { rows[i].kind = this.value; });
+      $('.rcp-kind', tr).addEventListener('change', function () { rows[i].kind = this.value; renderRows(); });
       $('.rcp-qty', tr).addEventListener('input', function () { rows[i].qty = Math.max(0, parseInt(this.value, 10) || 0); updateScanCount(); });
+      var priceInp = $('.rcp-price', tr);
+      if (priceInp) priceInp.addEventListener('input', function () {
+        rows[i].unitCost = this.value === '' ? null : Math.max(0, parseFloat(this.value) || 0);
+        var hint = $('.rcp-price-hint', tr);
+        if (hint) hint.innerHTML = priceHint(rows[i], filProd(rows[i].productId));
+      });
       $('.rcp-row-del', tr).addEventListener('click', function () { rows.splice(i, 1); renderRows(); });
     });
     updateScanCount();
   }
 
-  if (addLineBtn) addLineBtn.addEventListener('click', function () { rows.push({ productId: '', kind: 'spool', qty: 1, label: '' }); renderRows(); });
+  if (addLineBtn) addLineBtn.addEventListener('click', function () { rows.push({ productId: '', kind: 'spool', qty: 1, label: '', unitCost: null }); renderRows(); });
   if (resetBtn) resetBtn.addEventListener('click', resetForm);
+
+  // « Prix payé » global : applique un rabais % ou un prix fixe à toutes les lignes
+  if (discApply) discApply.addEventListener('click', function () {
+    var mode = discMode ? discMode.value : 'pct';
+    var v = num(discVal && discVal.value);
+    if (v == null) { statusEl.textContent = 'Entre une valeur à appliquer.'; return; }
+    rows.forEach(function (r) {
+      var f = filProd(r.productId); if (!f) return;
+      if (mode === 'fixed') { r.unitCost = round2(Math.max(0, v)); return; }
+      var ref = refCostOf(f, r.kind);
+      if (ref != null) r.unitCost = round2(Math.max(0, ref * (1 - v / 100)));
+    });
+    renderRows();
+    statusEl.textContent = mode === 'fixed'
+      ? '✓ Prix fixé à ' + money(v) + '/unité sur toutes les lignes.'
+      : '✓ Rabais de ' + v + ' % appliqué sur le prix catalogue de chaque ligne.';
+  });
+  if (discReset) discReset.addEventListener('click', function () {
+    rows.forEach(function (r) { r.unitCost = null; });
+    if (discVal) discVal.value = '';
+    renderRows();
+    statusEl.textContent = 'Prix catalogue rétabli sur toutes les lignes.';
+  });
   function resetForm() {
     rows = []; pasteI.value = ''; orderI.value = ''; dateI.value = todayISO();
     parseHint.textContent = ''; statusEl.textContent = '';
@@ -254,7 +333,7 @@
   function addScanUnit(f, kind) {
     var line = rows.filter(function (r) { return String(r.productId) === String(f.id) && r.kind === kind; })[0];
     if (line) { line.qty = (line.qty | 0) + 1; }
-    else { line = { productId: String(f.id), kind: kind, qty: 1, label: filLabel(f) }; rows.push(line); }
+    else { line = { productId: String(f.id), kind: kind, qty: 1, label: filLabel(f), unitCost: null }; rows.push(line); }
     renderRows();
     return line.qty;
   }
@@ -381,7 +460,8 @@
         productId: f ? String(f.id) : '',
         kind: kind,
         qty: qty,
-        label: material + ' · ' + color + ' (' + code + ')'
+        label: material + ' · ' + color + ' (' + code + ')',
+        unitCost: null
       });
     });
     return out;
@@ -392,7 +472,8 @@
      ========================================================= */
   function applyStock(lines, sign) {
     return Promise.all(lines.filter(function (l) { return l.product_id && l.qty > 0; }).map(function (l) {
-      return sb.rpc('receive_stock', { p_product: l.product_id, p_kind: l.kind, p_qty: sign * l.qty });
+      return sb.rpc('receive_stock', { p_product: l.product_id, p_kind: l.kind, p_qty: sign * l.qty })
+        .then(function (res) { if (res && res.error) throw res.error; return res; });   // ne PAS masquer une erreur RPC
     }));
   }
 
@@ -409,9 +490,15 @@
     var newLinesFor = function (receiptId) {
       return valid.map(function (r) {
         var f = filaments.filter(function (x) { return String(x.id) === String(r.productId); })[0];
-        return { receipt_id: receiptId, product_id: r.productId, label: f ? filLabel(f) : null, kind: r.kind, qty: r.qty };
+        return { receipt_id: receiptId, product_id: r.productId, label: f ? filLabel(f) : null, kind: r.kind, qty: r.qty,
+          unit_cost: (r.unitCost != null && r.unitCost !== '') ? round2(r.unitCost) : null };
       });
     };
+    // produits dont le coût moyen doit être recalculé (anciennes + nouvelles lignes)
+    var affected = uniq(
+      editingOldLines.map(function (l) { return l.product_id; })
+        .concat(valid.map(function (r) { return r.productId; }))
+    );
 
     confirmBtn.disabled = true;
     statusEl.textContent = 'Enregistrement…';
@@ -442,9 +529,9 @@
         });
     }
 
-    chain.then(function () {
+    chain.then(function () { return recomputeAvgCosts(affected); }).then(function () {
       confirmBtn.disabled = false;
-      statusEl.textContent = editingReceiptId ? '✓ Réception modifiée, stock ajusté.' : '✓ Réception enregistrée, stock mis à jour.';
+      statusEl.textContent = editingReceiptId ? '✓ Réception modifiée, stock et coût moyen ajustés.' : '✓ Réception enregistrée, stock et coût moyen mis à jour.';
       resetForm();
       loadFilaments().then(function () { renderReorder(); });
       loadHistory();
@@ -452,6 +539,39 @@
       confirmBtn.disabled = false;
       statusEl.textContent = 'Erreur : ' + (err && err.message ? err.message : err);
     });
+  }
+
+  /* ---- Coût moyen pondéré : recalcul par rejeu des réceptions ----
+     Pour chaque produit touché, on relit TOUTES ses lignes de réception
+     et on recalcule attrs.avg_cost { spool, refill }. Une ligne sans prix
+     saisi retombe sur le coût catalogue du matériau. Le rejeu rend le tout
+     rétroactif et cohérent même après modification/suppression. */
+  function recomputeAvgCosts(productIds) {
+    productIds = uniq(productIds || []).filter(Boolean);
+    if (!productIds.length) return Promise.resolve();
+    return sb.from('receipt_lines').select('product_id,kind,qty,unit_cost').in('product_id', productIds)
+      .then(function (res) {
+        if (res.error) throw res.error;
+        var byProd = {};
+        (res.data || []).forEach(function (l) {
+          var g = byProd[l.product_id] || (byProd[l.product_id] = { spool: [], refill: [] });
+          (l.kind === 'refill' ? g.refill : g.spool).push(l);
+        });
+        return Promise.all(productIds.map(function (pid) {
+          var f = filProd(pid);
+          if (!f) return null;
+          var g = byProd[pid] || { spool: [], refill: [] };
+          var avgS = CA.costing.avg(g.spool, refCostOf(f, 'spool'));
+          var avgR = CA.costing.avg(g.refill, refCostOf(f, 'refill'));
+          var attrs = Object.assign({}, f.attrs || {});
+          var ac = {};
+          if (avgS != null) ac.spool = avgS;
+          if (avgR != null) ac.refill = avgR;
+          if (Object.keys(ac).length) attrs.avg_cost = ac; else delete attrs.avg_cost;
+          return sb.from('products').update({ attrs: attrs, updated_at: new Date().toISOString() }).eq('id', pid).select()
+            .then(function (r) { if (r.data && r.data[0]) f.attrs = r.data[0].attrs || attrs; });
+        }));
+      });
   }
 
   /* =========================================================
@@ -477,15 +597,24 @@
     historyEl.innerHTML = receipts.map(function (rc) {
       var lines = byReceipt[rc.id] || [];
       var totalRolls = lines.reduce(function (s, l) { return s + (l.qty | 0); }, 0);
+      var totalCost = 0, hasAnyCost = false;
       var linesHtml = lines.map(function (l) {
-        return '<li>' + esc(l.label || '(filament supprimé)') + ' — ' + (l.kind === 'refill' ? 'recharge' : 'bobine') + ' × ' + (l.qty | 0) + '</li>';
+        var q = l.qty | 0;
+        var priced = (l.unit_cost != null && l.unit_cost !== '');
+        var eff = priced ? +l.unit_cost : refCostOf(filProd(l.product_id), l.kind === 'refill' ? 'refill' : 'spool');
+        if (eff != null) { totalCost += eff * q; hasAnyCost = true; }
+        var priceTxt = priced
+          ? '<span class="rcp-hist-price">' + money(l.unit_cost) + '/u</span>'
+          : '<span class="rcp-hist-price muted">catalogue' + (eff != null ? ' ' + money(eff) + '/u' : '') + '</span>';
+        return '<li>' + esc(l.label || '(filament supprimé)') + ' — ' + (l.kind === 'refill' ? 'recharge' : 'bobine') + ' × ' + q + ' · ' + priceTxt + '</li>';
       }).join('');
+      var costTxt = hasAnyCost ? ' · ' + money(totalCost) : '';
       return '<div class="mat-row rcp-hist" data-id="' + esc(rc.id) + '">' +
         '<div class="mat-main">' +
           '<div class="rcp-hist-head">' +
             '<span class="rcp-hist-order">' + (rc.order_number ? esc(rc.order_number) : 'Commande sans n°') + '</span>' +
             '<span class="grow"></span>' +
-            '<span class="rcp-hist-meta">' + esc(rc.received_at) + ' · ' + lines.length + ' ligne(s) · ' + totalRolls + ' article(s)</span>' +
+            '<span class="rcp-hist-meta">' + esc(rc.received_at) + ' · ' + lines.length + ' ligne(s) · ' + totalRolls + ' article(s)' + costTxt + '</span>' +
           '</div>' +
           '<ul class="rcp-hist-lines">' + (linesHtml || '<li>(aucune ligne)</li>') + '</ul>' +
         '</div>' +
@@ -510,7 +639,8 @@
     dateI.value = rc.received_at || todayISO();
     pasteI.value = ''; parseHint.textContent = '';
     rows = lines.map(function (l) {
-      return { productId: l.product_id ? String(l.product_id) : '', kind: l.kind === 'refill' ? 'refill' : 'spool', qty: l.qty | 0, label: l.label || '' };
+      return { productId: l.product_id ? String(l.product_id) : '', kind: l.kind === 'refill' ? 'refill' : 'spool', qty: l.qty | 0, label: l.label || '',
+        unitCost: (l.unit_cost != null && l.unit_cost !== '') ? +l.unit_cost : null };
     });
     setMode(rc, lines);
     renderRows();
@@ -521,11 +651,15 @@
   function delReceipt(rc, lines) {
     if (!window.confirm('Supprimer cette réception' + (rc.order_number ? ' (' + rc.order_number + ')' : '') +
       ' ?\nLe stock qu\'elle a ajouté sera retiré.')) return;
+    var affected = uniq(lines.map(function (l) { return l.product_id; }));
     applyStock(lines, -1)
       .then(function () { return sb.from('receipts').delete().eq('id', rc.id).select(); })
       .then(function (res) {
         if (res.error) throw res.error;
         if (!res.data || !res.data.length) throw new Error('Suppression refusée (permissions).');
+        return recomputeAvgCosts(affected);
+      })
+      .then(function () {
         if (editingReceiptId === rc.id) resetForm();
         loadFilaments().then(function () { renderReorder(); });
         loadHistory();

@@ -262,6 +262,35 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 .rcp-hist-lines { margin-top:10px; font-size:.85rem; color:var(--muted); display:none; }
 .rcp-hist.open .rcp-hist-lines { display:block; }
 .rcp-hist-lines li { margin:2px 0; }
+.rcp-hist-price { font-variant-numeric:tabular-nums; }
+
+/* ---- Prix payé (coût moyen pondéré) ---- */
+.rcp-pricebar { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:14px;
+  padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius);
+  background:color-mix(in srgb, var(--paper) 94%, transparent); }
+.rcp-pricebar-lbl { font-weight:600; font-size:.85rem; }
+.rcp-pricebar #r-disc-val { width:100px; text-align:right; }
+.rcp-pricebar .hint { flex-basis:100%; }
+.rcp-table th.num, .rcp-table td.num { text-align:right; }
+.rcp-table .rcp-price { width:100px; text-align:right; }
+.rcp-price-cell { min-width:120px; }
+.rcp-price-hint { margin-top:3px; font-size:.72rem; color:var(--muted); white-space:nowrap; }
+.rcp-price-hint .pos { color:var(--good); } .rcp-price-hint .neg { color:var(--bad); }
+
+/* ---- Recalcul rétroactif des marges (Statistiques) ---- */
+.stat-retro { margin-top:22px; border:1px solid var(--line); border-radius:var(--radius);
+  padding:12px 16px; background:color-mix(in srgb, var(--paper) 94%, transparent); }
+.stat-retro > summary { cursor:pointer; font-weight:700; font-size:.95rem; }
+.stat-retro > summary:hover { color:var(--ink); }
+.stat-retro-body { margin-top:12px; }
+.stat-retro-out, #stat-retro-out { margin-top:10px; }
+.stat-retro-preview { border:1px solid var(--line); border-radius:10px; padding:12px 14px; max-width:520px; }
+.stat-retro-line { display:flex; justify-content:space-between; gap:16px; padding:5px 0;
+  border-bottom:1px solid var(--line); font-size:.9rem; }
+.stat-retro-line:last-of-type { border-bottom:none; }
+.stat-retro-line strong { font-variant-numeric:tabular-nums; }
+.stat-retro-line strong.pos { color:var(--good); } .stat-retro-line strong.neg { color:var(--bad); }
+.stat-retro-none { color:var(--good); font-weight:600; font-size:.9rem; margin:6px 0 0; }
 
 /* ---- Liste latérale « Aller au matériau » (grand écran uniquement) ---- */
 .mat-nav { position:fixed; left:16px; top:118px; width:158px; max-height:74vh; overflow:auto;

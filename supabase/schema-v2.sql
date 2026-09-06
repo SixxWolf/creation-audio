@@ -223,8 +223,12 @@ create table if not exists public.receipt_lines (
   product_id uuid references public.products(id) on delete set null,
   label      text,                            -- « PLA Basic · Gray » (texte, conservé même si non rattaché)
   kind       text not null default 'spool',   -- 'spool' (bobine) | 'refill' (recharge)
-  qty        integer not null default 0
+  qty        integer not null default 0,
+  unit_cost  numeric(10,2)                    -- [PRIVÉ] prix réellement payé /unité (null = pas encore saisi -> coût catalogue)
 );
+
+-- migration douce si receipt_lines préexistait (marge adaptative / coût moyen pondéré) :
+alter table public.receipt_lines add column if not exists unit_cost numeric(10,2);
 
 create index if not exists receipts_received_idx     on public.receipts (received_at desc);
 create index if not exists receipt_lines_receipt_idx on public.receipt_lines (receipt_id);
