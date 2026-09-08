@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=15">
+<link rel="stylesheet" href="assets/admin.css?v=20">
 <link rel="stylesheet" href="assets/facture.css?v=8">
 <link rel="stylesheet" href="assets/autoloop.css?v=1">
 <script src="assets/theme.js?v=1" defer></script>
@@ -452,6 +452,7 @@
       <div class="inv-subtabs" role="tablist" aria-label="Sections inventaire">
         <button type="button" class="inv-subtab is-active" role="tab" data-sub="reception">Réception (scan)</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="commander">À commander</button>
+        <button type="button" class="inv-subtab" role="tab" data-sub="codes">Codes-barres</button>
       </div>
 
       <!-- ============ SOUS-ONGLET : RÉCEPTION SCANNABLE ============ -->
@@ -585,6 +586,33 @@
         </div>
 
         <div id="reorder-body"></div>
+      </div>
+
+      <!-- ============ SOUS-ONGLET : CODES-BARRES ASSOCIÉS ============ -->
+      <div class="inv-subpanel" id="inv-sub-codes" role="tabpanel" hidden>
+        <div class="panel-head" style="margin-top:4px">
+          <div>
+            <h1 style="font-size:1.1rem">Codes-barres associés</h1>
+            <p class="muted">Chaque code scanné et le filament (+ format) auquel il est rattaché. Corrige ou supprime au besoin.</p>
+          </div>
+          <span class="grow"></span>
+          <button class="btn btn-ghost btn-sm" id="bc-add" type="button">+ Associer un code</button>
+          <button class="btn btn-ghost btn-sm" id="bc-refresh" type="button">Actualiser</button>
+        </div>
+
+        <!-- Poste de scan : vérifier au fur et à mesure quel filament correspond -->
+        <div class="bc-scan" id="bc-scan">
+          <button type="button" class="btn btn-accent bc-scan-toggle" id="bc-scan-toggle" aria-pressed="false">▶ Scanner pour vérifier</button>
+          <input type="text" id="bc-scan-input" class="bc-scan-input" autocomplete="off" autocorrect="off"
+                 autocapitalize="off" spellcheck="false" placeholder="Clique « Scanner » puis scanne un code pour le vérifier…" disabled>
+          <span class="bc-scan-feedback" id="bc-scan-feedback" aria-live="polite"></span>
+        </div>
+
+        <div class="bc-bar">
+          <input type="search" id="bc-search" placeholder="Rechercher (code, filament, matériau…)" autocomplete="off">
+          <span class="bc-count" id="bc-count"></span>
+        </div>
+        <div id="bc-body"></div>
       </div>
     </section>
 
@@ -975,13 +1003,12 @@
         </details>
       </div>
 
-      <!-- Caisse : scanner de commande + écran client en direct -->
+      <!-- Caisse : scanner de commande + mode caisse plein écran -->
       <div class="fx-pos no-print" id="fx-pos">
         <button type="button" class="btn btn-accent fx-scan-toggle" id="fx-scan-toggle" aria-pressed="false">▶ Scanner la commande</button>
         <input type="text" id="fx-scan-input" class="fx-scan-input" autocomplete="off" autocorrect="off"
                autocapitalize="off" spellcheck="false" placeholder="Clique « Scanner » puis scanne les articles…" disabled>
-        <label class="fx-check fx-pos-live"><input type="checkbox" id="fx-pos-live"> Caisse en direct</label>
-        <a class="btn btn-ghost btn-sm" id="fx-pos-open" href="caisse.html" target="_blank" rel="noopener">Ouvrir l'écran client ↗</a>
+        <button type="button" class="btn btn-ghost btn-sm" id="fx-caisse-mode">⛶ Mode caisse</button>
         <span class="fx-scan-feedback" id="fx-scan-feedback" aria-live="polite"></span>
 
         <!-- apprentissage d'un code inconnu -->
@@ -1054,6 +1081,25 @@
             <button class="btn btn-ghost" id="fx-copy" type="button">Copier</button>
             <span class="status" id="fx-status"></span>
           </div>
+        </div>
+      </div>
+
+      <!-- Barre de contrôle du mode caisse (visible seulement en plein écran) -->
+      <div class="fx-caisse-bar no-print" id="fx-caisse-bar" hidden>
+        <button class="btn btn-accent" id="fx-caisse-finish" type="button">Terminer la vente</button>
+        <button class="btn btn-ghost" id="fx-caisse-clear" type="button">Vider</button>
+        <span class="status" id="fx-caisse-status" aria-live="polite"></span>
+        <span class="grow"></span>
+        <button class="btn btn-ghost" id="fx-caisse-exit" type="button">✕ Quitter le mode caisse</button>
+      </div>
+
+      <!-- Écran « Merci » après une vente (mode caisse) -->
+      <div class="fx-caisse-thanks" id="fx-caisse-thanks" hidden>
+        <div class="fx-caisse-thanks-in">
+          <div class="fx-caisse-check">✓</div>
+          <h1>Merci&nbsp;!</h1>
+          <p class="fx-caisse-thanks-total" id="fx-caisse-thanks-total"></p>
+          <button class="btn btn-accent" id="fx-caisse-new" type="button">Nouvelle vente</button>
         </div>
       </div>
     </section>
@@ -1390,10 +1436,10 @@
 <script src="assets/cms-linkbuilder.js?v=2"></script>
 <script src="assets/cms-spacers.js?v=5"></script>
 <script src="assets/cms-accessories.js?v=1"></script>
-<script src="assets/cms-inventory.js?v=9"></script>
+<script src="assets/cms-inventory.js?v=15"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
-<script src="assets/cms-facturation.js?v=13"></script>
+<script src="assets/cms-facturation.js?v=15"></script>
 <script src="assets/cms-historique.js?v=3"></script>
 <script src="assets/cms-statistiques.js?v=4"></script>
 <script src="assets/cms-autoloop.js?v=2"></script>

@@ -72,7 +72,7 @@
     if (!loaded) { ensureLoad(); return; }
     // déjà chargé : une vente (facturation) ou une réception a pu changer le stock
     // depuis la dernière visite -> on relit le stock et on rafraîchit « À commander ».
-    loadFilaments().then(function () { renderReorder(); });
+    loadFilaments().then(function () { renderReorder(); renderCodes(); });
   };
   function ensureLoad() {
     if (loaded) return;
@@ -81,7 +81,7 @@
     Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : Promise.resolve(),
       loadFilaments()
-    ]).then(function () { renderRows(); loadHistory(); renderReorder(); }, function () { loadHistory(); });
+    ]).then(function () { renderRows(); loadHistory(); renderReorder(); renderCodes(); }, function () { loadHistory(); });
   }
 
   // toutes marques confondues (une réception peut mélanger, on rattache par code-barres appris)
@@ -107,17 +107,19 @@
   /* =========================================================
      SOUS-ONGLETS
      ========================================================= */
-  var subReception = $('#inv-sub-reception'), subCommander = $('#inv-sub-commander');
+  var subReception = $('#inv-sub-reception'), subCommander = $('#inv-sub-commander'), subCodes = $('#inv-sub-codes');
   // bascule DOM du sous-onglet (l'URL est gérée par le routing de admin-core)
   function showSub(sub) {
-    sub = (sub === 'commander') ? 'commander' : 'reception';
+    if (sub !== 'commander' && sub !== 'codes') sub = 'reception';
     $$('.inv-subtab').forEach(function (b) {
       var on = b.getAttribute('data-sub') === sub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on));
     });
     if (subReception) subReception.hidden = (sub !== 'reception');
     if (subCommander) subCommander.hidden = (sub !== 'commander');
+    if (subCodes) subCodes.hidden = (sub !== 'codes');
     if (sub === 'commander') renderReorder();
+    if (sub === 'codes') renderCodes();
     if (sub === 'reception' && scanActive) focusScan();
   }
   $$('.inv-subtab').forEach(function (btn) {
@@ -700,6 +702,8 @@
       if ((f.brand || '—') !== brand) return;
       var m = f.material || '(sans matériau)'; if (!seen[m]) { seen[m] = 1; out.push(m); }
     });
+    // ordre des matériaux = celui réglé dans l'admin (page Filaments), pas l'alphabet
+    out.sort(function (a, z) { return matOrderIndex(brand, a) - matOrderIndex(brand, z); });
     return out;
   }
   function populateReorderFilters() {
@@ -790,6 +794,11 @@
       if (!gmap[key]) { gmap[key] = { key: key, brand: f.brand, material: f.material, rows: [] }; groups.push(gmap[key]); }
       gmap[key].rows.push(f);
     });
+    // ordre des groupes = ordre des matériaux réglé dans l'admin (page Filaments)
+    groups.sort(function (a, z) {
+      var ba = brandOrderIndex(a.brand), bz = brandOrderIndex(z.brand); if (ba !== bz) return ba - bz;
+      return matOrderIndex(a.brand, a.material) - matOrderIndex(z.brand, z.material);
+    });
 
     if (!groups.length) {
       reorderBody.innerHTML = onlyMiss
@@ -862,6 +871,13 @@
         if (m > 0) items.push({ f: f, kind: kind, qty: m });
       });
     });
+    // ordre = marque puis matériau (ordre admin) puis filament (sort_order) puis format
+    items.sort(function (a, z) {
+      var ba = brandOrderIndex(a.f.brand), bz = brandOrderIndex(z.f.brand); if (ba !== bz) return ba - bz;
+      var ma = matOrderIndex(a.f.brand, a.f.material), mz = matOrderIndex(z.f.brand, z.f.material); if (ma !== mz) return ma - mz;
+      var ia = filaments.indexOf(a.f), iz = filaments.indexOf(z.f); if (ia !== iz) return ia - iz;
+      return (a.kind === 'refill' ? 1 : 0) - (z.kind === 'refill' ? 1 : 0);
+    });
     var totalUnits = items.reduce(function (s, it) { return s + it.qty; }, 0);
 
     if (!items.length) {
@@ -925,6 +941,254 @@
     document.body.removeChild(ta);
   }
 
-  // si les matériaux changent ailleurs (formats offerts), rafraîchir la vue réappro
-  if (window.CA.onMaterialsChange) window.CA.onMaterialsChange(function () { if (loaded) renderReorder(); });
+  /* =========================================================
+     CODES-BARRES — voir / corriger / supprimer les associations
+     (stockées dans products.attrs.barcodes.{spool,refill})
+     ========================================================= */
+  var bcBody = $('#bc-body'), bcSearch = $('#bc-search'), bcCount = $('#bc-count'),
+      bcAddBtn = $('#bc-add'), bcRefreshBtn = $('#bc-refresh');
+  var bcScan = $('#bc-scan'), bcScanToggle = $('#bc-scan-toggle'), bcScanInput = $('#bc-scan-input'), bcScanFeedback = $('#bc-scan-feedback');
+  var bcEditing = null;      // clé "productId:kind" en édition, ou '__new__', ou null
+  var pendingScanCode = '';  // code scanné inconnu, pré-rempli dans le formulaire d'association
+
+  if (bcSearch) bcSearch.addEventListener('input', function () { renderCodes(); });
+  if (bcAddBtn) bcAddBtn.addEventListener('click', function () { pendingScanCode = ''; bcEditing = '__new__'; renderCodes(); });
+  if (bcRefreshBtn) bcRefreshBtn.addEventListener('click', function () {
+    loadFilaments().then(function () { renderCodes(); renderReorder(); });
+  });
+
+  /* ---- poste de scan (vérification) ---- */
+  var bcScanActive = false;
+  function bcFocusScan() { if (bcScanInput) try { bcScanInput.focus(); } catch (e) {} }
+  function bcScanFb(msg, cls) { if (bcScanFeedback) { bcScanFeedback.textContent = msg || ''; bcScanFeedback.className = 'bc-scan-feedback' + (cls ? ' ' + cls : ''); } }
+  function setBcScanActive(on) {
+    bcScanActive = !!on;
+    if (bcScanInput) { bcScanInput.disabled = !bcScanActive; bcScanInput.value = ''; }
+    if (bcScan) bcScan.classList.toggle('is-armed', bcScanActive);
+    if (bcScanToggle) {
+      bcScanToggle.setAttribute('aria-pressed', String(bcScanActive));
+      bcScanToggle.textContent = bcScanActive ? '⏸ Scan en cours…' : '▶ Scanner pour vérifier';
+    }
+    if (bcScanActive) { bcScanFb('En attente d\'un scan…', ''); bcFocusScan(); } else { bcScanFb('', ''); }
+  }
+  if (bcScanToggle) bcScanToggle.addEventListener('click', function () { setBcScanActive(!bcScanActive); });
+  if (bcScanInput) bcScanInput.addEventListener('blur', function () {
+    setTimeout(function () {
+      if (!bcScanActive || bcEditing) return;
+      if (document.activeElement && document.activeElement !== document.body) return;
+      bcFocusScan();
+    }, 40);
+  });
+  if (bcScanInput) bcScanInput.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== 'Tab') return;
+    e.preventDefault();
+    var code = (bcScanInput.value || '').trim();
+    bcScanInput.value = '';
+    if (code) bcProcessScan(code);
+  });
+  function bcProcessScan(code) {
+    var hit = allBarcodeEntries().filter(function (e) { return e.code === code; })[0];
+    if (hit) {
+      // connu -> confirme le filament + met la ligne en évidence
+      bcScanFb('✓ ' + code + ' → ' + filLabel(hit.f) + ' · ' + kindLabel(hit.kind), 'ok');
+      if (bcSearch && bcSearch.value) { bcSearch.value = ''; }   // s'assure que la ligne est visible
+      renderCodes();
+      var tr = bcBody && bcBody.querySelector('tr[data-key="' + hit.key.replace(/"/g, '\\"') + '"]');
+      if (tr) { tr.classList.remove('bc-flash'); void tr.offsetWidth; tr.classList.add('bc-flash'); tr.scrollIntoView({ block: 'nearest' }); }
+      bcFocusScan();
+    } else {
+      // inconnu -> ouvre le formulaire d'association pré-rempli avec le code
+      bcScanFb('⚠ ' + code + ' — code inconnu, associe-le ci-dessous.', 'warn');
+      pendingScanCode = code; bcEditing = '__new__'; renderCodes();
+      var sel = bcBody && bcBody.querySelector('.bc-e-fil'); if (sel) try { sel.focus(); } catch (e) {}
+    }
+  }
+
+  // ordre exactement comme la page Filaments de l'admin : marque (sort_order),
+  // puis matériau (ordre de CA.materials.list = ordre réglé dans l'admin),
+  // puis filament (son sort_order), puis format (bobine avant recharge).
+  function brandOrderIndex(name) {
+    var list = (window.CA.brands && window.CA.brands.list) || [];
+    for (var i = 0; i < list.length; i++) { if (list[i].name === name) return i; }
+    return 9999;
+  }
+  function matOrderIndex(brand, mat) {
+    var list = (window.CA.materials && window.CA.materials.list) || [];
+    for (var i = 0; i < list.length; i++) { if (list[i].brand === brand && list[i].name === mat) return i; }
+    return 9999;
+  }
+  // toutes les associations (une entrée par code : un filament peut en avoir 2, bobine + recharge)
+  function allBarcodeEntries() {
+    var out = [];
+    // idx = position dans `filaments` (déjà trié par sort_order) -> ordre du filament dans son matériau
+    filaments.forEach(function (f, idx) {
+      var b = f.attrs && f.attrs.barcodes; if (!b) return;
+      ['spool', 'refill'].forEach(function (k) {
+        if (b[k]) out.push({ key: String(f.id) + ':' + k, productId: String(f.id), kind: k, code: String(b[k]), f: f, idx: idx });
+      });
+    });
+    out.sort(function (a, z) {
+      var ba = brandOrderIndex(a.f.brand), bz = brandOrderIndex(z.f.brand); if (ba !== bz) return ba - bz;
+      var ma = matOrderIndex(a.f.brand, a.f.material), mz = matOrderIndex(z.f.brand, z.f.material); if (ma !== mz) return ma - mz;
+      if (a.idx !== z.idx) return a.idx - z.idx;                                   // ordre du filament (sort_order)
+      return (a.kind === 'refill' ? 1 : 0) - (z.kind === 'refill' ? 1 : 0);        // bobine avant recharge
+    });
+    return out;
+  }
+  // qui possède déjà ce code ? (pour éviter les doublons)
+  function findCodeOwner(code) {
+    code = String(code).trim();
+    var hit = null;
+    allBarcodeEntries().some(function (e) { if (e.code === code) { hit = e; return true; } return false; });
+    return hit;
+  }
+  function filCodeOptions(selected) {
+    return '<option value="">— choisir le filament —</option>' + filaments.slice().sort(function (a, b) {
+      return filLabel(a).localeCompare(filLabel(b));
+    }).map(function (f) {
+      return '<option value="' + esc(f.id) + '"' + (String(f.id) === String(selected) ? ' selected' : '') + '>' + esc(filLabel(f)) + '</option>';
+    }).join('');
+  }
+  function kindOptions(sel) {
+    return '<option value="spool"' + (sel !== 'refill' ? ' selected' : '') + '>Avec bobine</option>' +
+           '<option value="refill"' + (sel === 'refill' ? ' selected' : '') + '>Recharge</option>';
+  }
+
+  function renderCodes() {
+    if (!bcBody) return;
+    if (!loaded) { ensureLoad(); return; }
+    var entries = allBarcodeEntries();
+    var q = (bcSearch && bcSearch.value || '').trim().toLowerCase();
+    var shown = entries.filter(function (e) {
+      if (!q) return true;
+      return (e.code + ' ' + filLabel(e.f) + ' ' + kindLabel(e.kind)).toLowerCase().indexOf(q) !== -1;
+    });
+    if (bcCount) bcCount.textContent = entries.length + ' code' + (entries.length > 1 ? 's' : '') + ' associé' + (entries.length > 1 ? 's' : '');
+
+    var newRow = (bcEditing === '__new__') ? editRowHtml({ code: pendingScanCode || '', productId: '', kind: 'spool' }, '__new__', true) : '';
+
+    if (!entries.length && bcEditing !== '__new__') {
+      bcBody.innerHTML = '<p class="empty">Aucun code-barres associé pour l\'instant.<br>' +
+        'Ils se créent en scannant à la réception (ou clique «&nbsp;+ Associer un code&nbsp;»).</p>';
+      return;
+    }
+
+    var rowsHtml = shown.map(function (e) {
+      return (bcEditing === e.key) ? editRowHtml(e, e.key, false) : viewRowHtml(e);
+    }).join('');
+    if (!rowsHtml && !newRow) {
+      bcBody.innerHTML = '<div class="bc-table-wrap"><p class="hint" style="padding:12px">Aucun résultat pour «&nbsp;' + esc(q) + '&nbsp;».</p></div>';
+      return;
+    }
+
+    bcBody.innerHTML = '<div class="bc-table-wrap"><table class="bc-table">' +
+      '<thead><tr><th>Code-barres</th><th>Filament</th><th>Format</th><th></th></tr></thead>' +
+      '<tbody>' + newRow + rowsHtml + '</tbody></table></div>';
+    wireCodes();
+  }
+
+  function viewRowHtml(e) {
+    var sw = swatchBg(e.f.hex, colorsOf(e.f));
+    return '<tr data-key="' + esc(e.key) + '">' +
+      '<td class="bc-code"><code>' + esc(e.code) + '</code></td>' +
+      '<td class="bc-fil"><span class="bc-fil-in"><span class="ro-sw" style="background:' + esc(sw) + '"></span>' + esc(filLabel(e.f)) + '</span></td>' +
+      '<td class="bc-format">' + kindLabel(e.kind) + '</td>' +
+      '<td class="bc-act">' +
+        '<button type="button" class="btn btn-ghost btn-sm bc-edit">Modifier</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm bc-del">Suppr.</button>' +
+      '</td>' +
+    '</tr>';
+  }
+  function editRowHtml(e, key, isNew) {
+    return '<tr class="bc-editing" data-key="' + esc(key) + '">' +
+      '<td><input type="text" class="bc-e-code" value="' + esc(e.code) + '" placeholder="Code-barres" autocomplete="off"></td>' +
+      '<td><select class="bc-e-fil">' + filCodeOptions(e.productId) + '</select></td>' +
+      '<td><select class="bc-e-kind">' + kindOptions(e.kind) + '</select></td>' +
+      '<td class="bc-act">' +
+        '<button type="button" class="btn btn-accent btn-sm bc-save">' + (isNew ? 'Associer' : 'Enregistrer') + '</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm bc-cancel">Annuler</button>' +
+      '</td>' +
+    '</tr>';
+  }
+
+  function wireCodes() {
+    $$('.bc-edit', bcBody).forEach(function (b) {
+      b.addEventListener('click', function () { bcEditing = b.closest('tr').getAttribute('data-key'); renderCodes(); });
+    });
+    $$('.bc-del', bcBody).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var e = entryByKey(b.closest('tr').getAttribute('data-key')); if (!e) return;
+        if (!window.confirm('Supprimer l\'association du code « ' + e.code +' » ?\n(' + filLabel(e.f) + ' · ' + kindLabel(e.kind) + ')')) return;
+        applyBarcodeChange(e, null, function (err) {
+          if (err) { window.alert('Erreur : ' + (err.message || err)); return; }
+          renderCodes();
+        });
+      });
+    });
+    $$('.bc-cancel', bcBody).forEach(function (b) {
+      b.addEventListener('click', function () { bcEditing = null; pendingScanCode = ''; renderCodes(); if (bcScanActive) bcFocusScan(); });
+    });
+    $$('.bc-save', bcBody).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var tr = b.closest('tr'), key = tr.getAttribute('data-key');
+        var code = $('.bc-e-code', tr).value.trim();
+        var pid = $('.bc-e-fil', tr).value;
+        var kind = $('.bc-e-kind', tr).value === 'refill' ? 'refill' : 'spool';
+        if (!code) { $('.bc-e-code', tr).focus(); return; }
+        if (!pid) { $('.bc-e-fil', tr).focus(); return; }
+        var oldEntry = (key === '__new__') ? null : entryByKey(key);
+        // doublon : ce code appartient-il déjà à une AUTRE association ?
+        var owner = findCodeOwner(code);
+        if (owner && (!oldEntry || owner.key !== oldEntry.key)) {
+          window.alert('Ce code est déjà associé à :\n' + filLabel(owner.f) + ' · ' + kindLabel(owner.kind) +
+            '.\nModifie ou supprime cette association-là d\'abord.');
+          return;
+        }
+        applyBarcodeChange(oldEntry, { productId: pid, kind: kind, code: code }, function (err) {
+          if (err) { window.alert('Erreur : ' + (err.message || err)); return; }
+          bcEditing = null; pendingScanCode = ''; renderCodes();
+          if (bcScanActive) { bcScanFb('✓ Associé & vérifié : ' + code, 'ok'); bcFocusScan(); }
+        });
+      });
+    });
+  }
+  function entryByKey(key) { return allBarcodeEntries().filter(function (e) { return e.key === key; })[0] || null; }
+
+  // applique un changement : retire l'ancien emplacement (si fourni), pose le nouveau,
+  // en écrivant products.attrs.barcodes pour chaque produit touché.
+  function applyBarcodeChange(oldEntry, newEntry, done) {
+    var work = {};
+    function ensure(f) {
+      if (!work[f.id]) {
+        var a = Object.assign({}, f.attrs || {});
+        a.barcodes = Object.assign({}, a.barcodes || {});
+        work[f.id] = { f: f, attrs: a };
+      }
+      return work[f.id];
+    }
+    if (oldEntry) {
+      var op = filProd(oldEntry.productId);
+      if (op) { var wo = ensure(op); delete wo.attrs.barcodes[oldEntry.kind]; if (!Object.keys(wo.attrs.barcodes).length) delete wo.attrs.barcodes; }
+    }
+    if (newEntry) {
+      var np = filProd(newEntry.productId);
+      if (!np) { done(new Error('Filament introuvable.')); return; }
+      var wn = ensure(np);
+      wn.attrs.barcodes = wn.attrs.barcodes || {};
+      wn.attrs.barcodes[newEntry.kind] = newEntry.code;
+    }
+    var ids = Object.keys(work);
+    if (!ids.length) { done(null); return; }
+    Promise.all(ids.map(function (id) {
+      var w = work[id];
+      return sb.from('products').update({ attrs: w.attrs, updated_at: new Date().toISOString() }).eq('id', id).select()
+        .then(function (res) {
+          if (res.error || !res.data || !res.data.length) throw (res.error || new Error('refusé (permissions ?)'));
+          w.f.attrs = res.data[0].attrs || w.attrs;   // maj mémoire -> scan reconnaît tout de suite
+        });
+    })).then(function () { done(null); }, function (e) { done(e); });
+  }
+
+  // si les matériaux changent ailleurs (formats offerts, ORDRE réarrangé), rafraîchir
+  if (window.CA.onMaterialsChange) window.CA.onMaterialsChange(function () { if (loaded) { renderReorder(); renderCodes(); } });
 })();

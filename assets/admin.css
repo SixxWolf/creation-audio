@@ -455,3 +455,89 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 .fx-scan-learn-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
 .fx-scan-learn-fil { flex:1; min-width:220px; }
 .fx-scan-learn-fil, .fx-scan-learn-kind { padding:9px 10px; }
+
+/* =========================================================
+   Inventaire — sous-onglet Codes-barres
+   ========================================================= */
+.bc-bar { display:flex; align-items:center; gap:12px; margin:2px 0 14px; }
+.bc-bar input[type=search] { flex:0 1 360px; max-width:360px; font:inherit; color:var(--ink);
+  background:var(--paper); border:1.5px solid var(--line); border-radius:var(--radius-sm); padding:9px 11px; }
+.bc-bar input[type=search]:focus { outline:none; border-color:var(--ember); }
+.bc-count { color:var(--muted); font-size:.85rem; white-space:nowrap; }
+.bc-table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); }
+.bc-table { width:100%; border-collapse:collapse; font-size:.9rem; }
+.bc-table th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); padding:9px 14px; border-bottom:1px solid var(--line); }
+.bc-table td { padding:8px 14px; border-bottom:1px solid var(--line); vertical-align:middle; }
+/* colonnes serrées : chaque colonne colle à son contenu, la colonne Actions absorbe le reste */
+.bc-table th, .bc-table td { white-space:nowrap; }
+.bc-table th:last-child, .bc-table td.bc-act { width:100%; }
+.bc-table tr:last-child td { border-bottom:none; }
+.bc-table tr.bc-editing { background:var(--wash); }
+.bc-code code { font-family:var(--mono); font-weight:600; background:var(--wash); border:1px solid var(--line);
+  border-radius:6px; padding:3px 8px; }
+/* le flex va sur un wrapper INTERNE, jamais sur le <td> (sinon la cellule
+   perd son display:table-cell et la colonne se désaligne des autres) */
+.bc-fil { font-weight:600; }
+.bc-fil-in { display:flex; align-items:center; gap:9px; }
+.bc-fil .ro-sw { width:20px; height:20px; border-radius:6px; border:1px solid rgba(0,0,0,.15); flex:none; }
+.bc-format { text-transform:capitalize; }
+.bc-act { text-align:right; }
+.bc-act .btn { margin-left:4px; }
+.bc-table .bc-e-code { min-width:150px; }
+
+/* poste de scan (vérification) dans Codes-barres */
+.bc-scan { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 16px;
+  padding:12px 14px; border:1px solid var(--line); border-radius:var(--radius-lg);
+  background:var(--paper); box-shadow:var(--shadow-sm); transition:border-color .2s, box-shadow .2s; }
+.bc-scan.is-armed { border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.14); }
+.bc-scan-toggle { min-width:200px; }
+.bc-scan.is-armed .bc-scan-toggle { background:var(--charcoal); border-color:var(--charcoal); }
+.bc-scan-input { flex:1; min-width:220px; font-size:1.05rem; font-weight:600; letter-spacing:.02em;
+  text-align:center; padding:11px 14px; border:2px dashed var(--line); border-radius:var(--radius);
+  background:var(--wash); color:var(--ink); }
+.bc-scan-input:focus { outline:none; border-style:solid; border-color:var(--ember); background:var(--paper); }
+.bc-scan-input:disabled { opacity:.5; }
+.bc-scan-feedback { flex-basis:100%; min-height:20px; font-weight:600; font-size:.92rem; text-align:center; }
+.bc-scan-feedback.ok { color:var(--good); }
+.bc-scan-feedback.warn { color:var(--ember-dim); }
+.bc-scan-feedback.bad { color:var(--bad); }
+.bc-table tr.bc-flash { animation:bcFlash 1.3s ease; }
+@keyframes bcFlash { 0%,100% { background:transparent; } 18% { background:var(--good-wash); } }
+
+/* =========================================================
+   Facturation — MODE CAISSE plein écran
+   ========================================================= */
+.fx-caisse-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+body.fx-caisse-on { overflow-x:hidden; }
+body.fx-caisse-on .topbar,
+body.fx-caisse-on .tabs,
+body.fx-caisse-on .nav-drawer,
+body.fx-caisse-on .nav-backdrop,
+body.fx-caisse-on .mat-nav { display:none !important; }
+body.fx-caisse-on main { max-width:none; margin:0; padding:18px; }
+body.fx-caisse-on .tabpanel:not([data-panel="facturation"]) { display:none !important; }
+/* cache tout le côté « admin » : n'affiche que scan + facture + total */
+body.fx-caisse-on [data-panel="facturation"] > .panel-head,
+body.fx-caisse-on .fx-bar,
+body.fx-caisse-on .fx-meta,
+body.fx-caisse-on .fx-side,
+body.fx-caisse-on .fx-margin,
+body.fx-caisse-on .fx-actions,
+body.fx-caisse-on #fx-caisse-mode { display:none !important; }
+body.fx-caisse-on .fx-layout { display:block; }
+body.fx-caisse-on .fx-main,
+body.fx-caisse-on .fx-pos,
+body.fx-caisse-on .fx-caisse-bar { max-width:900px; margin-left:auto; margin-right:auto; }
+body.fx-caisse-on .fx-pos { margin-bottom:16px; }
+body.fx-caisse-on .fx-caisse-bar { margin-top:16px; }
+body.fx-caisse-on .fx-invoice { font-size:1.05rem; }
+
+/* écran « Merci » */
+.fx-caisse-thanks { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;
+  background:color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter:blur(4px); }
+.fx-caisse-thanks-in { text-align:center; }
+.fx-caisse-check { width:120px; height:120px; margin:0 auto 14px; border-radius:50%; background:var(--good); color:#fff;
+  display:flex; align-items:center; justify-content:center; font-size:4rem; box-shadow:0 12px 40px rgba(31,157,87,.35); }
+.fx-caisse-thanks-in h1 { font-size:2.6rem; }
+.fx-caisse-thanks-total { font-size:2rem; font-weight:800; color:var(--ember-dim); margin:8px 0 20px; }
