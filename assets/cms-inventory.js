@@ -1112,6 +1112,22 @@
   }
 
   function wireCodes() {
+    // le format se restreint aux formats réellement vendus par le filament choisi
+    // (comme la page Filaments) : si le filament ne se vend qu'en recharge, on force « Recharge ».
+    $$('.bc-e-fil', bcBody).forEach(function (sel) {
+      var applyKinds = function () {
+        var tr = sel.closest('tr'), kindSel = tr && tr.querySelector('.bc-e-kind'); if (!kindSel) return;
+        var f = filProd(sel.value);
+        var os = kindSel.querySelector('option[value="spool"]'), orf = kindSel.querySelector('option[value="refill"]');
+        if (!f) { if (os) os.disabled = false; if (orf) orf.disabled = false; return; }
+        var hasS = offersSpool(f), hasR = offersRefill(f);
+        if (os) os.disabled = !hasS; if (orf) orf.disabled = !hasR;
+        if (!hasS && hasR) kindSel.value = 'refill';
+        else if (!hasR && hasS) kindSel.value = 'spool';
+      };
+      sel.addEventListener('change', applyKinds);
+      applyKinds();   // applique aussi immédiatement (édition d'une ligne existante)
+    });
     $$('.bc-edit', bcBody).forEach(function (b) {
       b.addEventListener('click', function () { bcEditing = b.closest('tr').getAttribute('data-key'); renderCodes(); });
     });

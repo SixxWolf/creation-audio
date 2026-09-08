@@ -484,7 +484,11 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 .bc-format { text-transform:capitalize; }
 .bc-act { text-align:right; }
 .bc-act .btn { margin-left:4px; }
+/* selects/inputs du formulaire : min-width explicite (sinon width:100% les écrase
+   dans une colonne serrée -> texte « Avec bobine » coupé) */
 .bc-table .bc-e-code { min-width:150px; }
+.bc-table .bc-e-fil { min-width:220px; }
+.bc-table .bc-e-kind { min-width:134px; }
 
 /* poste de scan (vérification) dans Codes-barres */
 .bc-scan { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 16px;
