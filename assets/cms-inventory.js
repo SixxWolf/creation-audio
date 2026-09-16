@@ -81,7 +81,7 @@
     Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : Promise.resolve(),
       loadFilaments()
-    ]).then(function () { renderRows(); loadHistory(); renderReorder(); renderCodes(); }, function () { loadHistory(); });
+    ]).then(function () { renderRows(); loadHistory(); renderReorder(); renderCatalog(); renderCodes(); }, function () { loadHistory(); });
   }
 
   // toutes marques confondues (une réception peut mélanger, on rattache par code-barres appris)
@@ -107,18 +107,21 @@
   /* =========================================================
      SOUS-ONGLETS
      ========================================================= */
-  var subReception = $('#inv-sub-reception'), subCommander = $('#inv-sub-commander'), subCodes = $('#inv-sub-codes');
+  var subReception = $('#inv-sub-reception'), subCommander = $('#inv-sub-commander'),
+      subCatalogue = $('#inv-sub-catalogue'), subCodes = $('#inv-sub-codes');
   // bascule DOM du sous-onglet (l'URL est gérée par le routing de admin-core)
   function showSub(sub) {
-    if (sub !== 'commander' && sub !== 'codes') sub = 'reception';
+    if (['commander', 'catalogue', 'codes'].indexOf(sub) < 0) sub = 'reception';
     $$('.inv-subtab').forEach(function (b) {
       var on = b.getAttribute('data-sub') === sub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on));
     });
     if (subReception) subReception.hidden = (sub !== 'reception');
     if (subCommander) subCommander.hidden = (sub !== 'commander');
+    if (subCatalogue) subCatalogue.hidden = (sub !== 'catalogue');
     if (subCodes) subCodes.hidden = (sub !== 'codes');
     if (sub === 'commander') renderReorder();
+    if (sub === 'catalogue') renderCatalog();
     if (sub === 'codes') renderCodes();
     if (sub === 'reception' && scanActive) focusScan();
   }
@@ -861,6 +864,24 @@
     renderReorderSummary();
   }
 
+  // enregistre le coût catalogue d'un matériau (cost_spool / cost_refill) dans la table materials.
+  // `cols` = { cost_spool?, cost_refill? } (valeur nombre ou null). Met à jour le cache CA.materials
+  // en place -> réception (refCostOf) et facturation en profitent aussitôt. Renvoie une promesse.
+  function updateMaterialCost(brand, name, cols) {
+    var m = window.CA.materialOf ? window.CA.materialOf(brand, name) : null;
+    if (!m) return Promise.resolve({ error: 'introuvable' });
+    var patch = { updated_at: new Date().toISOString() };
+    if ('cost_spool' in cols) patch.cost_spool = cols.cost_spool;
+    if ('cost_refill' in cols) patch.cost_refill = cols.cost_refill;
+    return sb.from('materials').update(patch).eq('brand', brand).eq('name', name).select()
+      .then(function (res) {
+        if (res.error || !res.data || !res.data.length) return { error: res.error || 'refusé' };
+        if ('cost_spool' in cols) m.cost_spool = res.data[0].cost_spool;
+        if ('cost_refill' in cols) m.cost_refill = res.data[0].cost_refill;
+        return { data: res.data[0] };
+      }, function (err) { return { error: err }; });
+  }
+
   // la « liste à commander » : agrège tous les manques, groupés par marque
   function renderReorderSummary() {
     if (!reorderSummary) return;
@@ -939,6 +960,159 @@
     document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); } catch (e) {}
     document.body.removeChild(ta);
+  }
+
+  /* =========================================================
+     PRIX CATALOGUE — coût de base par matériau (cost_spool / cost_refill).
+     Édition ligne par ligne + application groupée d'un prix (bobine / recharge)
+     à plusieurs matériaux cochés d'un coup. C'est ce coût qui sert de base au
+     rabais % de la réception (refCostOf), avant que le CMP prenne le relais.
+     ========================================================= */
+  var catalogBody = $('#catalog-body'), catalogBrand = $('#catalog-brand'),
+      catalogBulkSpool = $('#catalog-bulk-spool'), catalogBulkRefill = $('#catalog-bulk-refill'),
+      catalogApply = $('#catalog-apply'), catalogStatus = $('#catalog-status'), catalogRefresh = $('#catalog-refresh');
+  var catBrand = '';   // '' = toutes les marques
+
+  if (catalogBrand) catalogBrand.addEventListener('change', function () { catBrand = this.value; renderCatalog(); });
+  if (catalogRefresh) catalogRefresh.addEventListener('click', function () {
+    (window.CA.loadMaterials ? window.CA.loadMaterials() : Promise.resolve()).then(renderCatalog, renderCatalog);
+  });
+  if (catalogApply) catalogApply.addEventListener('click', applyBulkCost);
+
+  function catalogBrands() {
+    var list = (window.CA.materials && window.CA.materials.list) || [];
+    var seen = {}, out = [];
+    list.forEach(function (m) { if (!seen[m.brand]) { seen[m.brand] = 1; out.push(m.brand); } });
+    out.sort(function (a, z) { return brandOrderIndex(a) - brandOrderIndex(z); });
+    return out;
+  }
+  function catalogMaterials() {
+    var list = ((window.CA.materials && window.CA.materials.list) || []).slice();
+    list = list.filter(function (m) { return !catBrand || m.brand === catBrand; });
+    list.sort(function (a, z) {
+      var ba = brandOrderIndex(a.brand), bz = brandOrderIndex(z.brand); if (ba !== bz) return ba - bz;
+      return matOrderIndex(a.brand, a.name) - matOrderIndex(z.brand, z.name);
+    });
+    return list;
+  }
+  function populateCatalogBrand() {
+    if (!catalogBrand) return;
+    var brands = catalogBrands();
+    if (catBrand && brands.indexOf(catBrand) < 0) catBrand = '';
+    catalogBrand.innerHTML = '<option value="">Toutes les marques</option>' + brands.map(function (b) {
+      return '<option value="' + esc(b) + '"' + (b === catBrand ? ' selected' : '') + '>' + esc(b) + '</option>';
+    }).join('');
+    catalogBrand.value = catBrand || '';
+  }
+
+  function renderCatalog() {
+    if (!catalogBody) return;
+    if (!loaded) { ensureLoad(); return; }
+    populateCatalogBrand();
+    var mats = catalogMaterials();
+    if (!mats.length) {
+      catalogBody.innerHTML = '<p class="empty">Aucun matériau. Ajoute des matériaux dans l\'onglet <b>Filaments</b>.</p>';
+      return;
+    }
+    var multiBrand = !catBrand && catalogBrands().length > 1;
+    function costCell(kind, has, val) {
+      if (!has) return '<td class="cat-na">—</td>';
+      return '<td><input type="number" class="catcost num" data-kind="' + kind + '" min="0" step="0.01" value="' +
+        (val != null ? val : '') + '" placeholder="0.00"></td>';
+    }
+    var rows = mats.map(function (m) {
+      var hasS = m.sell_spool != null, hasR = m.sell_refill != null;
+      return '<tr data-brand="' + esc(m.brand || '') + '" data-mat="' + esc(m.name || '') + '">' +
+        '<td class="cat-check-td"><input type="checkbox" class="cat-check"></td>' +
+        '<td class="l"><span class="cat-mat">' + esc(m.name || '(sans nom)') + '</span>' +
+          (multiBrand ? ' <span class="cat-brand">' + esc(m.brand || '') + '</span>' : '') + '</td>' +
+        costCell('spool', hasS, m.cost_spool) +
+        costCell('refill', hasR, m.cost_refill) +
+      '</tr>';
+    }).join('');
+    catalogBody.innerHTML =
+      '<div class="reorder-table-wrap"><table class="reorder-table catalog-table">' +
+        '<thead><tr>' +
+          '<th class="cat-check-td"><input type="checkbox" class="cat-check-all" title="Tout cocher / décocher"></th>' +
+          '<th class="l">Matériau</th><th>Bobine</th><th>Recharge</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody>' +
+      '</table></div>';
+    wireCatalog();
+  }
+
+  function wireCatalog() {
+    $$('.catcost', catalogBody).forEach(function (inp) {
+      var tr = inp.closest('tr');
+      var brand = tr.getAttribute('data-brand'), mat = tr.getAttribute('data-mat');
+      var col = inp.getAttribute('data-kind') === 'refill' ? 'cost_refill' : 'cost_spool';
+      var commit = function () {
+        var v = (inp.value === '') ? null : Math.max(0, round2(inp.value));
+        var cols = {}; cols[col] = v;
+        tr.classList.add('saving');
+        updateMaterialCost(brand, mat, cols).then(function (r) {
+          tr.classList.remove('saving');
+          if (!r.error && v != null) inp.value = v;
+          flashRow(tr, !r.error);
+        });
+      };
+      inp.addEventListener('change', commit);
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
+    });
+    var all = $('.cat-check-all', catalogBody);
+    if (all) all.addEventListener('change', function () {
+      $$('.cat-check', catalogBody).forEach(function (c) { c.checked = all.checked; });
+    });
+  }
+
+  function flashRow(tr, ok) {
+    var cls = ok ? 'saved' : 'save-err';
+    tr.classList.add(cls);
+    setTimeout(function () { tr.classList.remove(cls); }, ok ? 900 : 2500);
+  }
+
+  // applique le(s) prix saisi(s) dans la barre à tous les matériaux cochés.
+  // Un champ vide = ce format n'est pas touché ; un matériau qui n'offre pas le format est ignoré pour ce format.
+  function applyBulkCost() {
+    if (!catalogStatus) return;
+    var setS = catalogBulkSpool && catalogBulkSpool.value !== '';
+    var setR = catalogBulkRefill && catalogBulkRefill.value !== '';
+    if (!setS && !setR) { catalogStatus.textContent = 'Entre un prix bobine et/ou recharge à appliquer.'; return; }
+    var sNum = setS ? Math.max(0, round2(catalogBulkSpool.value)) : null;
+    var rNum = setR ? Math.max(0, round2(catalogBulkRefill.value)) : null;
+    var checked = $$('.cat-check', catalogBody).filter(function (c) { return c.checked; });
+    if (!checked.length) { catalogStatus.textContent = 'Coche au moins un matériau.'; return; }
+
+    var jobs = [];
+    checked.forEach(function (c) {
+      var tr = c.closest('tr');
+      var brand = tr.getAttribute('data-brand'), mat = tr.getAttribute('data-mat');
+      var m = window.CA.materialOf ? window.CA.materialOf(brand, mat) : null;
+      if (!m) return;
+      var cols = {};
+      if (setS && m.sell_spool != null) cols.cost_spool = sNum;
+      if (setR && m.sell_refill != null) cols.cost_refill = rNum;
+      if (!('cost_spool' in cols) && !('cost_refill' in cols)) return;   // n'offre pas le(s) format(s) saisi(s)
+      tr.classList.add('saving');
+      jobs.push(updateMaterialCost(brand, mat, cols).then(function (r) {
+        tr.classList.remove('saving');
+        if (!r.error) {
+          if ('cost_spool' in cols) { var i1 = tr.querySelector('.catcost[data-kind="spool"]'); if (i1) i1.value = cols.cost_spool != null ? cols.cost_spool : ''; }
+          if ('cost_refill' in cols) { var i2 = tr.querySelector('.catcost[data-kind="refill"]'); if (i2) i2.value = cols.cost_refill != null ? cols.cost_refill : ''; }
+        }
+        flashRow(tr, !r.error);
+        return r;
+      }));
+    });
+    if (!jobs.length) { catalogStatus.textContent = 'Les matériaux cochés n\'offrent pas ce(s) format(s).'; return; }
+
+    catalogApply.disabled = true;
+    catalogStatus.textContent = 'Application…';
+    Promise.all(jobs).then(function (rs) {
+      catalogApply.disabled = false;
+      var okN = rs.filter(function (r) { return !r.error; }).length, errN = rs.length - okN;
+      catalogStatus.textContent = '✓ Prix appliqué à ' + okN + ' matériau' + (okN > 1 ? 'x' : '') +
+        (errN ? ' · ' + errN + ' refusé' + (errN > 1 ? 's' : '') : '') + '.';
+    });
   }
 
   /* =========================================================
@@ -1206,5 +1380,5 @@
   }
 
   // si les matériaux changent ailleurs (formats offerts, ORDRE réarrangé), rafraîchir
-  if (window.CA.onMaterialsChange) window.CA.onMaterialsChange(function () { if (loaded) { renderReorder(); renderCodes(); } });
+  if (window.CA.onMaterialsChange) window.CA.onMaterialsChange(function () { if (loaded) { renderReorder(); renderCatalog(); renderCodes(); } });
 })();

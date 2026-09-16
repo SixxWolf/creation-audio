@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=23">
+<link rel="stylesheet" href="assets/admin.css?v=25">
 <link rel="stylesheet" href="assets/facture.css?v=8">
 <link rel="stylesheet" href="assets/autoloop.css?v=1">
 <script src="assets/theme.js?v=1" defer></script>
@@ -148,7 +148,7 @@
       <div class="panel-head">
         <div>
           <h1>Matériaux &amp; prix</h1>
-          <p class="muted">Le prix, le coût et les rabais valent pour <b>toutes les couleurs</b> du matériau.</p>
+          <p class="muted">Le prix et les rabais valent pour <b>toutes les couleurs</b> du matériau.</p>
         </div>
         <span class="grow"></span>
         <button class="btn btn-ghost btn-sm" id="m-toggle" type="button" aria-expanded="true">Masquer</button>
@@ -192,25 +192,8 @@
                 </div>
               </div>
             </div>
-            <div class="field">
-              <label class="lbl">Coût payé <span class="hint">(privé)</span></label>
-              <div class="row-2">
-                <div class="spool-only">
-                  <span class="hint">Avec bobine</span>
-                  <input type="number" id="m-cost-spool" min="0" step="0.01" placeholder="0.00" class="money">
-                </div>
-                <div class="refill-only">
-                  <span class="hint">Recharge</span>
-                  <input type="number" id="m-cost-refill" min="0" step="0.01" placeholder="0.00" class="money">
-                </div>
-              </div>
-            </div>
-
             <div class="field col-2">
-              <div class="margin-box">
-                <div class="mrow spool-only"><span class="k">Marge bobine</span><span class="v" id="m-margin-spool">—</span></div>
-                <div class="mrow refill-only"><span class="k">Marge recharge</span><span class="v" id="m-margin-refill">—</span></div>
-              </div>
+              <span class="hint">Le coût (prix catalogue) se règle dans l'onglet <b>Inventaire → À commander</b>, puis s'ajuste automatiquement à chaque réception (coût moyen pondéré).</span>
             </div>
 
             <div class="field col-2">
@@ -452,6 +435,7 @@
       <div class="inv-subtabs" role="tablist" aria-label="Sections inventaire">
         <button type="button" class="inv-subtab is-active" role="tab" data-sub="reception">Réception (scan)</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="commander">À commander</button>
+        <button type="button" class="inv-subtab" role="tab" data-sub="catalogue">Prix catalogue</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="codes">Codes-barres</button>
       </div>
 
@@ -586,6 +570,33 @@
         </div>
 
         <div id="reorder-body"></div>
+      </div>
+
+      <!-- ============ SOUS-ONGLET : PRIX CATALOGUE ============ -->
+      <div class="inv-subpanel" id="inv-sub-catalogue" role="tabpanel" hidden>
+        <div class="panel-head" style="margin-top:4px">
+          <div>
+            <h1 style="font-size:1.1rem">Prix catalogue</h1>
+            <p class="muted">Le <b>coût de base</b> de chaque matériau (bobine / recharge). C'est la référence du rabais&nbsp;% à la réception, avant que le coût moyen pondéré prenne le relais.</p>
+          </div>
+          <span class="grow"></span>
+          <label class="reorder-flabel">Marque
+            <select id="catalog-brand"></select>
+          </label>
+          <button class="btn btn-ghost btn-sm" id="catalog-refresh" type="button">Actualiser</button>
+        </div>
+
+        <!-- Application groupée : un prix -> plusieurs matériaux cochés -->
+        <div class="catalog-bulk">
+          <span class="cb-title">Appliquer aux matériaux cochés :</span>
+          <label class="cb-f">Bobine <input type="number" id="catalog-bulk-spool" min="0" step="0.01" placeholder="0.00" class="money"></label>
+          <label class="cb-f">Recharge <input type="number" id="catalog-bulk-refill" min="0" step="0.01" placeholder="0.00" class="money"></label>
+          <button class="btn btn-accent btn-sm" id="catalog-apply" type="button">Appliquer</button>
+          <span class="cb-status" id="catalog-status" aria-live="polite"></span>
+        </div>
+        <p class="hint" style="margin:2px 0 10px">Laisse un champ vide pour ne pas toucher ce format. Chaque prix se modifie aussi directement dans le tableau.</p>
+
+        <div id="catalog-body"></div>
       </div>
 
       <!-- ============ SOUS-ONGLET : CODES-BARRES ASSOCIÉS ============ -->
@@ -1432,11 +1443,11 @@
 <script src="assets/cms-costing.js?v=1"></script>
 <script src="assets/cms-brands.js?v=4"></script>
 <script src="assets/cms-materials.js?v=11"></script>
-<script src="assets/cms-filaments.js?v=11"></script>
+<script src="assets/cms-filaments.js?v=12"></script>
 <script src="assets/cms-linkbuilder.js?v=2"></script>
 <script src="assets/cms-spacers.js?v=5"></script>
 <script src="assets/cms-accessories.js?v=1"></script>
-<script src="assets/cms-inventory.js?v=16"></script>
+<script src="assets/cms-inventory.js?v=18"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
 <script src="assets/cms-facturation.js?v=15"></script>

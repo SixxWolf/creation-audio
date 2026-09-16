@@ -141,8 +141,6 @@ window.CA = window.CA || {};
   var editor = $('#m-editor'), editorTitle = $('#m-editor-title'),
       nameI = $('#m-name'), hasSpoolI = $('#m-has-spool'), hasRefillI = $('#m-has-refill'),
       sellSpoolI = $('#m-sell-spool'), sellRefillI = $('#m-sell-refill'),
-      costSpoolI = $('#m-cost-spool'), costRefillI = $('#m-cost-refill'),
-      marginSpoolEl = $('#m-margin-spool'), marginRefillEl = $('#m-margin-refill'),
       tiersSpoolEl = $('#m-tiers-spool'), tierAddSpool = $('#m-tier-add-spool'),
       tiersRefillEl = $('#m-tiers-refill'), tierAddRefill = $('#m-tier-add-refill'),
       descI = $('#m-desc'),
@@ -195,27 +193,9 @@ window.CA = window.CA || {};
   if (hasSpoolI) hasSpoolI.addEventListener('change', syncFormatUI);
   if (nameI && slugI) nameI.addEventListener('input', function () { slugI.placeholder = 'auto : ' + (CA.slugify(nameI.value) || 'pla-basic'); });
 
-  [sellSpoolI, sellRefillI, costSpoolI, costRefillI].forEach(function (el) {
-    if (el) el.addEventListener('input', updateMargins);
-  });
-
   function syncFormatUI() {
     $$('.spool-only', editor).forEach(function (el) { el.style.display = hasSpoolI.checked ? '' : 'none'; });
     $$('.refill-only', editor).forEach(function (el) { el.style.display = hasRefillI.checked ? '' : 'none'; });
-    updateMargins();
-  }
-  function marginText(sell, cost) {
-    var s = num(sell), c = num(cost);
-    if (s == null && c == null) return { txt: '—', cls: '' };
-    s = s || 0; c = c || 0;
-    var m = s - c, pct = s > 0 ? Math.round(m / s * 100) : 0;
-    return { txt: money(m) + (s > 0 ? '  (' + pct + '%)' : ''), cls: m >= 0 ? 'pos' : 'neg' };
-  }
-  function updateMargins() {
-    if (hasSpoolI.checked) { var a = marginText(sellSpoolI.value, costSpoolI.value); marginSpoolEl.textContent = a.txt; marginSpoolEl.className = 'v ' + a.cls; }
-    else { marginSpoolEl.textContent = '—'; marginSpoolEl.className = 'v'; }
-    if (hasRefillI.checked) { var b = marginText(sellRefillI.value, costRefillI.value); marginRefillEl.textContent = b.txt; marginRefillEl.className = 'v ' + b.cls; }
-    else { marginRefillEl.textContent = '—'; marginRefillEl.className = 'v'; }
   }
 
   /* ---- paliers ---- */
@@ -291,8 +271,6 @@ window.CA = window.CA || {};
     renderGallery();
     sellSpoolI.value = row && row.sell_spool != null ? row.sell_spool : '';
     sellRefillI.value = row && row.sell_refill != null ? row.sell_refill : '';
-    costSpoolI.value = row && row.cost_spool != null ? row.cost_spool : '';
-    costRefillI.value = row && row.cost_refill != null ? row.cost_refill : '';
     tiersSpoolEl.innerHTML = '';
     normalizeTiers(row ? row.tiers_spool : []).forEach(function (t) { addTierRow(tiersSpoolEl, 'bobines', t.min, t.price); });
     tiersRefillEl.innerHTML = '';
@@ -330,8 +308,9 @@ window.CA = window.CA || {};
       name: name,
       sell_spool: hasS ? Math.max(0, num(sellSpoolI.value) || 0) : null,
       sell_refill: hasR ? Math.max(0, num(sellRefillI.value) || 0) : null,
-      cost_spool: hasS ? Math.max(0, num(costSpoolI.value) || 0) : null,
-      cost_refill: hasR ? Math.max(0, num(costRefillI.value) || 0) : null,
+      // le coût (cost_spool/cost_refill) n'est plus édité ici : il se règle dans l'Inventaire
+      // (prix catalogue) et s'ajuste à la réception (CMP). On l'omet du patch pour NE PAS
+      // l'écraser à l'upsert (ON CONFLICT DO UPDATE ne touche que les colonnes fournies).
       tiers_spool: hasS ? collectTiers(tiersSpoolEl) : [],
       tiers_refill: hasR ? collectTiers(tiersRefillEl) : [],
       description: descI.value.trim() || null,
@@ -401,12 +380,6 @@ window.CA = window.CA || {};
     listEl.innerHTML = '<p class="empty">Impossible de charger les matériaux.<br>Si c\'est la première fois, exécute ' +
       '<strong>V2/supabase/schema-v2.sql</strong> dans Supabase.</p>';
   }
-  function marginPill(label, sell, cost) {
-    var s = +sell || 0, c = +cost || 0, m = s - c;
-    if (!s && !c) return '';
-    var pct = s > 0 ? Math.round(m / s * 100) : 0;
-    return '<span class="card-margin ' + (m >= 0 ? 'pos' : 'neg') + '">' + label + ' ' + money(m) + (s > 0 ? ' · ' + pct + '%' : '') + '</span>';
-  }
   function render() {
     moveEditorHome();   // sort le formulaire de la liste avant de la reconstruire (sinon il serait effacé)
     var list = brandMaterials();
@@ -427,10 +400,6 @@ window.CA = window.CA || {};
           '<div class="mat-prices money">' +
             (hasS ? '<span>Bobine : <b>' + money(m.sell_spool) + '</b></span>' : '') +
             (hasR ? '<span>Recharge : <b>' + money(m.sell_refill) + '</b></span>' : '') +
-          '</div>' +
-          '<div class="card-margins">' +
-            (hasS ? marginPill('Bobine', m.sell_spool, m.cost_spool) : '') +
-            (hasR ? marginPill('Recharge', m.sell_refill, m.cost_refill) : '') +
           '</div>' +
           (ts ? '<div class="card-tierline">Bobine · ' + esc(ts) + '</div>' : '') +
           (tr ? '<div class="card-tierline">Recharge · ' + esc(tr) + '</div>' : '') +

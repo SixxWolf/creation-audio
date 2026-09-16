@@ -410,6 +410,21 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 .reorder-group { margin-top:20px; }
 .reorder-group h3 { font-size:.95rem; margin-bottom:8px; }
 .reorder-group h3 .fil-count { color:var(--muted); font-weight:600; font-size:.8rem; margin-left:6px; }
+/* ===== Prix catalogue (coût de base par matériau) ===== */
+.catalog-bulk { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; margin:2px 0 4px;
+  padding:10px 14px; background:var(--wash); border:1px solid var(--line); border-radius:var(--radius-sm); }
+.catalog-bulk .cb-title { font-size:.85rem; font-weight:600; color:var(--ink); }
+.catalog-bulk .cb-f { display:inline-flex; align-items:center; gap:6px; font-size:.82rem; color:var(--muted); }
+.catalog-bulk .cb-f input { width:82px; text-align:right; padding:6px 7px; }
+.catalog-bulk .cb-status { font-size:.82rem; color:var(--good); font-weight:600; }
+.catalog-table td.cat-check-td, .catalog-table th.cat-check-td { text-align:center; padding-right:6px; padding-left:4px; }
+.catalog-table input.catcost { width:82px; text-align:right; padding:5px 6px; }
+.catalog-table .cat-mat { font-weight:600; }
+.catalog-table .cat-brand { color:var(--muted); font-size:.78rem; margin-left:6px; }
+.catalog-table .cat-na { color:var(--line); }
+.catalog-table tr.saving { opacity:.55; }
+.catalog-table tr.saved { background:var(--good-wash); }
+.catalog-table tr.save-err { background:var(--bad-wash); }
 .reorder-table-wrap { overflow-x:auto; }
 /* compact : le tableau colle à son contenu (colonnes serrées, pas d'étalement) */
 .reorder-table { width:auto; max-width:100%; border-collapse:collapse; font-size:.9rem; }

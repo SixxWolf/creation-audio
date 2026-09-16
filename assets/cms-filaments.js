@@ -427,15 +427,8 @@
     var outB = hasS && qb <= 0, outR = hasR && qr <= 0;
     var outAll = (hasS || hasR) && !((hasS && qb > 0) || (hasR && qr > 0));
 
-    var priceHtml;
-    if (mat) {
-      var pp = [];
-      if (hasS) pp.push(money(mat.sell_spool));
-      if (hasR) pp.push(money(mat.sell_refill));
-      priceHtml = '<span class="card-price money">' + pp.join(' / ') + '</span>';
-    } else {
-      priceHtml = '<span class="card-price is-warn">Matériau non défini</span>';
-    }
+    // Prix retiré des cartes (Théo le connaît) — on ne garde que l'alerte « matériau non défini ».
+    var priceHtml = mat ? '' : '<span class="card-price is-warn">Matériau non défini</span>';
     var ts = hasS && mat ? tiersSummary(mat.tiers_spool) : '', tr = hasR && mat ? tiersSummary(mat.tiers_refill) : '';
 
     return '<article class="card' + (r.active ? '' : ' is-hidden') + '" data-id="' + esc(r.id) + '" draggable="true">' +
@@ -449,7 +442,7 @@
       '<div class="card-body">' +
         '<div class="card-name">' + esc(r.name) + '</div>' +
         (r.code ? '<div class="card-material">code ' + esc(r.code) + '</div>' : '') +
-        '<div class="card-meta">' + priceHtml + '</div>' +
+        (priceHtml ? '<div class="card-meta">' + priceHtml + '</div>' : '') +
         '<div class="card-stock">' +
           (hasS ? '<span class="stk' + (outB ? ' out' : '') + '">Bobine&nbsp;: ' + qb + '</span>' : '') +
           (hasR ? '<span class="stk' + (outR ? ' out' : '') + '">Recharge&nbsp;: ' + qr + '</span>' : '') +
