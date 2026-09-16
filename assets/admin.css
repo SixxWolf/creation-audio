@@ -319,6 +319,10 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 @media (max-width:720px) {
   .hamburger { display:flex; }
   .tabs { display:none; }
+  /* header compact : évite le débordement horizontal sur mobile */
+  .topbar { padding:10px 12px; gap:8px; }
+  .topbar .who { display:none; }          /* « Connecté : … » masqué (place) */
+  .topbar .brand small { display:none; }  /* badge « Admin V2 » masqué (place) */
 }
 @media (max-width:640px) {
   .grid { grid-template-columns:1fr; }
