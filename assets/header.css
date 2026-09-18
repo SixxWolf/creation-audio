@@ -50,3 +50,15 @@
   .home-nav, .home-dealer { display:none; }
   .nav-burger { display:flex; }
 }
+
+/* =========================================================
+   BANDEAU PROMO — barre haute partagée par TOUTES les pages publiques
+   (au-dessus de .home-top). Présente partout = pas de décalage quand on
+   change de page. Texte encre sur ember = contraste AA (≥4.5).
+   ========================================================= */
+.promo-bar {
+  background:linear-gradient(90deg, var(--ember-dim), var(--ember));
+  color:var(--ink); text-align:center; font-size:.86rem; font-weight:700; letter-spacing:.01em;
+  padding:9px 16px; display:flex; align-items:center; justify-content:center; gap:10px;
+}
+.promo-bar svg { width:16px; height:16px; flex:none; }

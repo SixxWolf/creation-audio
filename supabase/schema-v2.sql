@@ -409,6 +409,26 @@ create policy invoice_lines_admin_all
   using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
   with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
+-- ------------------------------------------------------------
+-- POPULARITÉ PUBLIQUE (agrégat marketing, SANS donnée sensible)
+-- Unités vendues par produit, calculées sur les factures FINALES
+-- (annulées exclues). N'expose QUE product_id + qty_sold — aucun prix,
+-- aucun client, aucun revenu. security_invoker=off pour lire invoice_lines
+-- (RLS admin) et publier l'agrégat en lecture anon. Sert à classer les
+-- produits « populaires » (ex. top 5 filaments vendus) sur l'accueil.
+-- ------------------------------------------------------------
+drop view if exists public.product_popularity;
+create view public.product_popularity
+with (security_invoker = off) as
+  select l.product_id,
+         sum(l.qty)::numeric as qty_sold
+  from public.invoice_lines l
+  join public.invoices i on i.id = l.invoice_id
+  where i.status = 'final' and l.product_id is not null
+  group by l.product_id;
+
+grant select on public.product_popularity to anon, authenticated;
+
 -- Déduction de stock : on réutilise receive_stock() avec une quantité NÉGATIVE
 -- (bornée à 0). kind='refill' -> qty_2 ; sinon -> qty (bobine, unité spacer).
 

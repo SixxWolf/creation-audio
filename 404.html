@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page introuvable (404) — Création Audio</title>
+<meta name="robots" content="noindex">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="description" content="Cette page n'existe pas ou a été déplacée. Retour à l'accueil de Création Audio.">
+<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/assets/img/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/tokens.css?v=3">
+<link rel="stylesheet" href="/assets/header.css?v=4">
+<link rel="stylesheet" href="/assets/accueil.css?v=10">
+<style>
+  /* Écran 404 — reprend la direction « atelier / fiche technique » de l'accueil */
+  .err {
+    position:relative; min-height:calc(100vh - 65px); display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:64px 24px; overflow:hidden;
+  }
+  .err-inner { position:relative; max-width:560px; }
+  .err-code {
+    font-size:clamp(5rem, 20vw, 10rem); font-weight:800; line-height:1; letter-spacing:-.04em;
+    color:var(--accent-tx, var(--ember-dim));
+  }
+  .err h1 { font-size:clamp(1.5rem, 4vw, 2.1rem); letter-spacing:-.03em; color:var(--ink); margin-top:8px; }
+  .err p { color:var(--ink-soft, var(--muted)); margin:16px auto 32px; max-width:34em; line-height:1.6; font-size:1.05rem; }
+  .err-actions { display:flex; gap:13px; flex-wrap:wrap; justify-content:center; }
+  .err-links { margin-top:34px; display:flex; gap:8px 20px; flex-wrap:wrap; justify-content:center; font-size:.92rem; }
+  .err-links a { color:var(--ink-soft, var(--muted)); text-decoration:none; }
+  .err-links a:hover { color:var(--ember-dim); }
+</style>
+</head>
+<body class="home-page">
+
+<!-- ======================= EN-TÊTE ======================= -->
+<header class="home-top">
+  <a class="brand" href="/index.html"><span class="d"></span> Création Audio</a>
+  <nav class="home-nav" aria-label="Navigation principale">
+    <a href="/index.html">Accueil</a>
+    <a href="/boutique.html">Filaments</a>
+    <a href="/spacers.html">Spacers</a>
+    <a href="/index.html#caissons">Caissons</a>
+    <a href="/index.html#contact">Contact</a>
+  </nav>
+  <span class="spacer"></span>
+  <a class="home-dealer" href="/dealer.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    Dealer
+  </a>
+  <a class="home-cta" href="/boutique.html">Voir les filaments</a>
+  <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+
+<!-- ======================= 404 ======================= -->
+<main class="err">
+  <div class="err-inner">
+    <div class="err-code">404</div>
+    <h1>Cette page s'est perdue en route.</h1>
+    <p>La page que tu cherches n'existe pas, a été déplacée ou l'adresse contient une erreur.
+      Pas de panique — voici par où continuer.</p>
+    <div class="err-actions">
+      <a class="btn btn-primary" href="/index.html">Retour à l'accueil
+        <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="btn btn-ghost" href="/boutique.html">Voir les filaments</a>
+    </div>
+    <nav class="err-links" aria-label="Liens utiles">
+      <a href="/spacers.html">Spacers &amp; adaptateurs</a>
+      <a href="/index.html#caissons">Caissons de sub</a>
+      <a href="mailto:contact@creationaudio.ca">Nous écrire</a>
+    </nav>
+  </div>
+</main>
+
+<!-- Menu mobile -->
+<div class="nav-backdrop" id="nav-backdrop" hidden></div>
+<aside class="nav-drawer" id="nav-drawer" aria-label="Menu">
+  <button class="close" id="nav-close" type="button" aria-label="Fermer">&times;</button>
+  <a href="/index.html">Accueil</a>
+  <a href="/boutique.html">Filaments</a>
+  <a href="/spacers.html">Spacers</a>
+  <a href="/index.html#caissons">Caissons</a>
+  <a href="/index.html#contact">Contact</a>
+  <a href="/dealer.html">Espace dealer</a>
+</aside>
+
+<script src="/assets/nav.js?v=1"></script>
+</body>
+</html>
