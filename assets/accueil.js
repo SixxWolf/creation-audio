@@ -54,7 +54,10 @@
 
   function filCard(p) {
     var url = publicUrl(p.image_path);
-    var base = (p.sell_price != null) ? p.sell_price : p.sell_price_2;
+    // « dès » = le prix le plus bas réellement disponible (bobine OU recharge),
+    // pas seulement le prix bobine — tout étant offert en recharge, c'est souvent 20 $.
+    var prices = [p.sell_price, p.sell_price_2].filter(function (v) { return v != null; });
+    var base = prices.length ? Math.min.apply(null, prices) : null;
     var media = url
       ? '<img src="' + esc(url) + '" alt="' + esc(p.name) + '" loading="lazy">'
       : '<span class="feat-swatch" style="background:' + esc(p.hex || '#ccc') + '"></span>';
@@ -80,7 +83,7 @@
      factures finales). Repli sur l'ordre boutique (sort_order) s'il n'y a pas
      encore de ventes ou si la vue n'existe pas (schéma pas encore relancé). */
   if (grid) {
-    sb.from('products_public').select('*').eq('type', 'filament').limit(120).then(function (res) {
+    sb.from('products_public').select('*').eq('type', 'filament').limit(500).then(function (res) {
       var fils = (res && res.data) || [];
       if (!fils.length) { hideEl('.feat-wrap'); return; }
       var render = function (pop) {
