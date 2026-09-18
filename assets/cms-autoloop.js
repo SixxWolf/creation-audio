@@ -139,7 +139,7 @@
     // Push + balayages centraux (éjection)
     L.push('');
     L.push(';============================= PUSH SECTION =============================');
-    L.push('G1 Z' + z(pushZ) + ' F' + pushSpeed + ' ; hauteur de push = ' + opts.pushPct + '% de la hauteur pièce');
+    L.push('G1 Z' + z(pushZ) + ' F' + pushSpeed + ' ; hauteur de push = hauteur max − ' + opts.pushOffset + ' mm');
     L.push('M400');
     L.push('G1 X125 F3000 ; balayage central');
     L.push('G1 Y250 F3000 ; bord arrière');
@@ -196,7 +196,7 @@
     if (!RE_START_ANCHOR.test(raw)) { report.error = 'Ancrage du start gcode P2S introuvable.'; return { text: '', report: report }; }
 
     var maxZ = parseFloat(mz[1]);
-    var pushZ = Math.max(maxZ * opts.pushPct / 100, 0);
+    var pushZ = Math.max(maxZ - opts.pushOffset, 0);
     report.maxZ = maxZ; report.pushZ = pushZ;
     report.bendsPerLoop = (opts.bendEnable && opts.bendCycles > 0) ? opts.bendCycles * 2 : 0;
 
@@ -207,7 +207,7 @@
     var parts = [];
     parts.push('; ===================================================' + eol +
                '; Batch généré par AutoLoop — Création Audio' + eol +
-               '; ' + N + ' loops · pièce ' + z(maxZ) + ' mm · push ' + z(pushZ) + ' mm (' + opts.pushPct + '%)' + eol +
+               '; ' + N + ' loops · pièce ' + z(maxZ) + ' mm · push ' + z(pushZ) + ' mm (max − ' + opts.pushOffset + ' mm)' + eol +
                '; Aucune dépendance FarmLoop.' + eol +
                '; ===================================================' + eol + eol);
 
@@ -236,7 +236,7 @@
       bendLow: num($('#al-bend-low').value, 205),
       bendSpeed: num($('#al-bend-speed').value, 12000),
       bendCycles: Math.max(0, intOr($('#al-bend-cycles').value, 6)),
-      pushPct: num($('#al-push-pct').value, 50),
+      pushOffset: num($('#al-push-offset').value, 10),
       pushSpeed: num($('#al-push-speed').value, 10000),
       clearZ: num($('#al-clearz').value, 105),
       coolMode: $('#al-cool-mode').value,
@@ -271,6 +271,58 @@
     return '<div class="al-stat"><span class="al-stat-v">' + v + '</span><span class="al-stat-l">' + label + '</span></div>';
   }
 
+  /* --- Extraction des données du gcode → calculateur de prix ----------
+     Le header Bambu Studio (bloc « ; HEADER_BLOCK_START ») contient le poids
+     de filament et le temps d'impression PAR PIÈCE. On les lit ici pour
+     alimenter automatiquement le calculateur. Patterns tolérants (Bambu /
+     Orca / Prusa) car l'étiquette exacte varie selon le slicer/version. */
+  var RE_WEIGHT = [
+    /;\s*total\s+filament\s+weight\s*\[g\]\s*[:=]\s*([\d.]+)/i,
+    /;\s*total\s+filament\s+used\s*\[g\]\s*[:=]\s*([\d.]+)/i,
+    /;\s*filament\s+used\s*\[g\]\s*[:=]\s*([\d.]+)/i,
+    /;\s*total\s+filament\s+weight\s*[:=]\s*([\d.]+)/i
+  ];
+  var RE_TIME = [
+    /;\s*model\s+printing\s+time:\s*([0-9hms .\t]+)/i,
+    /;\s*total\s+estimated\s+time:\s*([0-9hms .\t]+)/i,
+    /;\s*estimated\s+printing\s+time\s*\(normal\s+mode\)\s*=\s*([0-9hms .\t]+)/i
+  ];
+  function firstCapture(text, res) {
+    for (var i = 0; i < res.length; i++) { var m = res[i].exec(text); if (m) return m[1]; }
+    return null;
+  }
+  // « 1h 21m 5s » → minutes totales (fractionnaires).
+  function parseGcodeTime(str) {
+    var h = /([\d.]+)\s*h/i.exec(str), m = /([\d.]+)\s*m/i.exec(str), s = /([\d.]+)\s*s/i.exec(str);
+    return (h ? parseFloat(h[1]) : 0) * 60 + (m ? parseFloat(m[1]) : 0) + (s ? parseFloat(s[1]) : 0) / 60;
+  }
+  // Alimente le calculateur (poids, temps par pièce, loops) depuis le gcode chargé.
+  function applyGcodeToPricing(text, name) {
+    var applied = [];
+    var wStr = firstCapture(text, RE_WEIGHT);
+    if (wStr != null) {
+      var w = parseFloat(wStr);
+      if (isFinite(w)) { var we = $('#ap-weight'); if (we) { we.value = w; applied.push(w.toFixed(2) + ' g'); } }
+    }
+    var tStr = firstCapture(text, RE_TIME);
+    if (tStr != null) {
+      var tot = parseGcodeTime(tStr);
+      if (tot > 0) {
+        var hh = Math.floor(tot / 60), mm = Math.round(tot % 60);
+        if (mm === 60) { hh++; mm = 0; }
+        var eh = $('#ap-time-h'), em = $('#ap-time-m');
+        if (eh) eh.value = hh; if (em) em.value = mm;
+        applied.push(hh + 'h' + (mm < 10 ? '0' : '') + mm);
+      }
+    }
+    // Loops (pièces) : reprend le nombre du générateur de batch.
+    var lel = $('#ap-loops'), batchLoops = $('#al-loops');
+    if (lel && batchLoops) lel.value = Math.max(1, intOr(batchLoops.value, 1));
+    var src = $('#ap-gcode-src');
+    if (src) src.textContent = applied.length ? ('↺ ' + name + ' · ' + applied.join(' · ')) : '';
+    recompute();  // rafraîchit le résumé (les .value posés en JS ne déclenchent pas « input »)
+  }
+
   function loadFile(file) {
     if (!file) return;
     rawName = file.name;
@@ -284,6 +336,7 @@
       $('#al-download').disabled = true;
       $('#al-report').innerHTML = '';
       outText = '';
+      applyGcodeToPricing(rawText, rawName);
     };
     reader.readAsText(file);
   }
@@ -368,7 +421,7 @@
     'ap-consumables': 'consumables', 'ap-rate': 'rate',
     'ap-prep-model': 'prepModel', 'ap-prep-slice': 'prepSlice', 'ap-prep-transfer': 'prepTransfer',
     'ap-post-removal': 'postRemoval', 'ap-post-support': 'postSupport', 'ap-post-additional': 'postAdditional',
-    'ap-margin': 'margin'
+    'ap-price': 'salePrice'
   };
 
   function priceFields() {
@@ -396,13 +449,16 @@
     var subtotal = filamentCost + deprecCost + elecCost + consumables + laborPrep + laborPost;
     var failure = subtotal * f.failure / 100;
     var cost = subtotal + failure;
-    var price = (f.margin > 0 && f.margin < 100) ? cost / (1 - f.margin / 100) : cost;
+    // On fixe le prix de vente ; la marge (% du prix de vente) est déduite.
+    var price = f.salePrice > 0 ? f.salePrice : cost;
+    var marginAmt = price - cost;
+    var marginPct = price > 0 ? marginAmt / price * 100 : 0;
     return {
       filamentCost: filamentCost, deprecCost: deprecCost, elecCost: elecCost,
       consumables: consumables, laborPrep: laborPrep, laborPost: laborPost,
       prepMin: prepMin, postMin: postMin,
       subtotal: subtotal, failure: failure, failurePct: f.failure,
-      cost: cost, price: price, marginAmt: price - cost, marginPct: f.margin
+      cost: cost, price: price, marginAmt: marginAmt, marginPct: marginPct
     };
   }
 
@@ -418,8 +474,10 @@
     set('ap-out-failure', '+' + money(r.failure));
     set('ap-out-failure-pct', '(' + (Math.round(r.failurePct * 10) / 10) + ' %)');
     set('ap-out-cost', money(r.cost));
-    set('ap-out-price', money(r.price));
+    set('ap-out-margin-pct', (Math.round(r.marginPct * 10) / 10).toString().replace('.', ',') + ' %');
     set('ap-out-margin-amt', money(r.marginAmt));
+    var profit = $('#ap-out-margin-amt');
+    if (profit) profit.style.color = r.marginAmt < 0 ? 'var(--bad)' : '';
     set('ap-prep-permin', (Math.round(r.prepMin * 100) / 100) + ' min/pièce');
     set('ap-post-permin', (Math.round(r.postMin * 100) / 100) + ' min/pièce');
     drawBreakdown(r);
@@ -479,6 +537,13 @@
     var wrap = $('.al-view[data-view="prix"]');
     if (!wrap) return;
     $$('input', wrap).forEach(function (i) { i.addEventListener('input', recompute); });
+
+    // Prix de vente de départ = ~33 % de marge sur le coût, arrondi à 0,05 $.
+    var pe = $('#ap-price');
+    if (pe) {
+      var c = compute(priceFields()).cost;
+      if (c > 0) pe.value = (Math.round(c / (1 - 0.33) * 20) / 20).toFixed(2);
+    }
 
     refreshProfileSelect();
     $('#ap-profile-save').addEventListener('click', function () {

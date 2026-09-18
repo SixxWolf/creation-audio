@@ -90,6 +90,10 @@
 .al-cost span { font-size:.72rem; letter-spacing:.06em; color:var(--ember-dim); }
 .al-cost b { font-size:1.5rem; color:var(--ember-dim); font-variant-numeric:tabular-nums; }
 .al-margin-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:6px 0 10px; }
+.al-price-set { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0 10px; }
+.al-price-set .al-inline input { width:100px; font-size:1.15rem; font-weight:800; text-align:right;
+  border-color:color-mix(in srgb, var(--ember) 45%, var(--line)); }
+.al-price-set .al-u { font-size:1rem; font-weight:700; color:var(--ember-dim); }
 .al-price b { font-size:1.05rem; }
 .al-profit { border-bottom:0; }
 .al-profit b { color:var(--good); }

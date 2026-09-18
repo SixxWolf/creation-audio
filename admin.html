@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/admin.css?v=25">
 <link rel="stylesheet" href="assets/facture.css?v=8">
-<link rel="stylesheet" href="assets/autoloop.css?v=1">
+<link rel="stylesheet" href="assets/autoloop.css?v=2">
 <script src="assets/theme.js?v=1" defer></script>
 </head>
 <body>
@@ -1259,12 +1259,12 @@
             </div>
 
             <div class="al-card">
-              <div class="al-card-head"><span class="al-ic">⤓</span> Push (éjection) <span class="al-note">auto : moitié de la hauteur de l'objet</span></div>
+              <div class="al-card-head"><span class="al-ic">⤓</span> Push (éjection) <span class="al-note">auto : hauteur max − 10 mm</span></div>
               <div class="grid">
                 <div class="field">
-                  <label class="lbl" for="al-push-pct">Hauteur de push (% de la hauteur de l'objet)</label>
-                  <input type="number" id="al-push-pct" min="0" max="100" step="1" value="50" class="num">
-                  <span class="hint">50 % = max_z_height ÷ 2. Calculé automatiquement selon la pièce.</span>
+                  <label class="lbl" for="al-push-offset">Retrait sous la hauteur max (mm)</label>
+                  <input type="number" id="al-push-offset" min="0" step="1" value="10" class="num">
+                  <span class="hint">Push = max_z_height − ce retrait. Défaut 10 mm (valeur FarmLoop). Calculé par pièce.</span>
                 </div>
                 <div class="field">
                   <label class="lbl" for="al-push-speed">Vitesse de push (F)</label>
@@ -1322,7 +1322,7 @@
           <!-- Entrées -->
           <div class="al-main">
             <div class="al-card">
-              <div class="al-card-head"><span class="al-ic">🖨</span> Impression &amp; matériau</div>
+              <div class="al-card-head"><span class="al-ic">🖨</span> Impression &amp; matériau<span class="al-note" id="ap-gcode-src"></span></div>
               <div class="grid">
                 <div class="field">
                   <label class="lbl">Temps d'impression</label>
@@ -1413,11 +1413,11 @@
               <div class="al-srow"><span>Ajustement échec <em id="ap-out-failure-pct"></em></span><span id="ap-out-failure">—</span></div>
               <div class="al-cost"><span>COÛT DE PRODUCTION</span><b id="ap-out-cost">—</b></div>
 
-              <div class="al-margin-row">
-                <label class="lbl" for="ap-margin">Marge <span class="hint">(% du prix de vente)</span></label>
-                <div class="al-inline"><input type="number" id="ap-margin" min="0" max="99" step="1" value="33" class="num"><span class="al-u">%</span></div>
+              <div class="al-price-set">
+                <label class="lbl" for="ap-price">Prix de vente <span class="hint">(tu fixes le prix, la marge s'ajuste)</span></label>
+                <div class="al-inline"><span class="al-u">$</span><input type="number" id="ap-price" min="0" step="0.05" value="6.94" class="money"></div>
               </div>
-              <div class="al-srow al-price"><span>Prix de vente</span><b id="ap-out-price">—</b></div>
+              <div class="al-srow"><span>Marge <em>(% du prix de vente)</em></span><b id="ap-out-margin-pct">—</b></div>
               <div class="al-srow al-profit"><span>Profit</span><b id="ap-out-margin-amt">—</b></div>
             </div>
 
@@ -1453,6 +1453,6 @@
 <script src="assets/cms-facturation.js?v=15"></script>
 <script src="assets/cms-historique.js?v=3"></script>
 <script src="assets/cms-statistiques.js?v=4"></script>
-<script src="assets/cms-autoloop.js?v=2"></script>
+<script src="assets/cms-autoloop.js?v=4"></script>
 </body>
 </html>
