@@ -52,6 +52,22 @@
 
   if (!sb) { hideEl('.feat-wrap'); hideEl('#spacer-section'); return; }
 
+  // Même slugify que boutique.js (minuscules, accents retirés, tirets).
+  function slugify(s) {
+    return String(s == null ? '' : s)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  // Lien direct vers le filament : boutique.html#/m/marque/matériau/couleur.
+  // Les resolveBrand/Material/Color de boutique.js acceptent le slug auto, donc
+  // slugify(brand) résout même si la marque a un slug personnalisé (non exposé ici).
+  function filUrl(p) {
+    var b = slugify(p.brand || 'Autres');
+    var m = p.material_slug || slugify(p.material || 'Autres');
+    var c = p.slug || slugify(p.name);
+    return 'boutique.html#/m/' + b + '/' + m + '/' + c;
+  }
+
   function filCard(p) {
     var url = publicUrl(p.image_path);
     // « dès » = le prix le plus bas réellement disponible (bobine OU recharge),
@@ -61,7 +77,7 @@
     var media = url
       ? '<img src="' + esc(url) + '" alt="' + esc(p.name) + '" loading="lazy">'
       : '<span class="feat-swatch" style="background:' + esc(p.hex || '#ccc') + '"></span>';
-    return '<a class="feat-card" href="boutique.html">' +
+    return '<a class="feat-card" href="' + filUrl(p) + '">' +
       '<div class="feat-media">' + media + '</div>' +
       '<div class="feat-body"><span class="feat-kind">' + esc(p.material || 'Filament') + '</span>' +
         '<span class="feat-name">' + esc(p.name) + '</span>' +
