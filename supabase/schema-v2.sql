@@ -34,8 +34,6 @@ create table if not exists public.products (
 
   sell_price    numeric(10,2) not null default 0,        -- (hérité V1 / repli si pas de matériau)
   sell_price_2  numeric(10,2),                           -- (hérité V1 / repli si pas de matériau)
-  sell_override    numeric(10,2),                        -- prix BOBINE personnalisé pour CETTE couleur (override matériau ; null = hérite)
-  sell_override_2  numeric(10,2),                        -- prix RECHARGE personnalisé pour CETTE couleur (override matériau ; null = hérite)
   cost_price    numeric(10,2) not null default 0,        -- COÛT payé (dimension principale) -> marge  [PRIVÉ]
   cost_price_2  numeric(10,2),                           -- coût 2e dimension (recharge)               [PRIVÉ]
 
@@ -502,46 +500,12 @@ alter table public.dealers add column if not exists city    text;
 -- (dont la catégorie est choisie à la main dans l'éditeur de facture).
 alter table public.invoice_lines add column if not exists ptype text;
 
--- ============================================================
--- CAISSE EN DIRECT (écran client)
--- ------------------------------------------------------------
--- Une ligne par « caisse » (id, ex. 'main'). L'admin y pousse le
--- panier en cours (payload jsonb : articles + totaux + branding,
--- AUCUN coût/marge ni coordonnées client). L'écran client (caisse.html,
--- clé anonyme) le lit en direct (Realtime + repli par sondage).
--- ============================================================
-create table if not exists public.pos_display (
-  id         text primary key,
-  payload    jsonb not null default '{}'::jsonb,
-  updated_at timestamptz not null default now()
-);
-
-alter table public.pos_display enable row level security;
-
--- Lecture publique (l'écran client tourne sur un autre poste, sans login).
-drop policy if exists pos_display_public_read on public.pos_display;
-create policy pos_display_public_read
-  on public.pos_display for select
-  to anon, authenticated
-  using ( true );
-
--- Écriture réservée à l'admin (même garde e-mail que le reste).
-drop policy if exists pos_display_admin_write on public.pos_display;
-create policy pos_display_admin_write
-  on public.pos_display for all
-  to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
-
--- Mises à jour instantanées via Supabase Realtime (repli : sondage côté client).
-do $$ begin
-  if not exists (
-    select 1 from pg_publication_tables
-    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'pos_display'
-  ) then
-    alter publication supabase_realtime add table public.pos_display;
-  end if;
-end $$;
+-- NOTE : l'ancienne « caisse en direct » (table public.pos_display + écran
+-- client caisse.html) a été retirée. Elle est remplacée par le mode caisse
+-- plein écran (déduction directe du stock à la fin de la vente). La table
+-- pos_display n'est plus utilisée par aucun code et doit être supprimée
+-- (drop table if exists public.pos_display;) — voir aussi les tables V1
+-- orphelines inventory / sales / spacers, également supprimées.
 
 -- ------------------------------------------------------------
 -- Vérification
