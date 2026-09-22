@@ -314,18 +314,33 @@
      Le header Bambu Studio (bloc « ; HEADER_BLOCK_START ») contient le poids
      de filament et le temps d'impression PAR PIÈCE. On les lit ici pour
      alimenter automatiquement le calculateur. Patterns tolérants (Bambu /
-     Orca / Prusa) car l'étiquette exacte varie selon le slicer/version. */
+     Orca / Prusa) car l'étiquette exacte varie selon le slicer/version.
+     Poids : Bambu liste UNE valeur PAR FILAMENT (« 110.47,0.70 » = pièce + purge
+     de l'AMS) → on capture la liste complète et on l'additionne, sinon le total
+     du slicer n'est jamais atteint.
+     Temps : on prend « total estimated time » et PAS « model printing time ».
+     Le premier inclut la phase de préparation (start gcode : chauffe, homing,
+     bed leveling, purge ≈ 7 min) — et dans un batch AutoLoop cette phase est
+     rejouée à CHAQUE loop, contrairement à un plateau multi-copies du slicer
+     où elle n'est payée qu'une fois.                                          */
   var RE_WEIGHT = [
-    /;\s*total\s+filament\s+weight\s*\[g\]\s*[:=]\s*([\d.]+)/i,
-    /;\s*total\s+filament\s+used\s*\[g\]\s*[:=]\s*([\d.]+)/i,
-    /;\s*filament\s+used\s*\[g\]\s*[:=]\s*([\d.]+)/i,
-    /;\s*total\s+filament\s+weight\s*[:=]\s*([\d.]+)/i
+    /;\s*total\s+filament\s+weight\s*\[g\]\s*[:=]\s*([\d.,\s]+)/i,
+    /;\s*total\s+filament\s+used\s*\[g\]\s*[:=]\s*([\d.,\s]+)/i,
+    /;\s*filament\s+used\s*\[g\]\s*[:=]\s*([\d.,\s]+)/i,
+    /;\s*total\s+filament\s+weight\s*[:=]\s*([\d.,\s]+)/i
   ];
   var RE_TIME = [
-    /;\s*model\s+printing\s+time:\s*([0-9hms .\t]+)/i,
     /;\s*total\s+estimated\s+time:\s*([0-9hms .\t]+)/i,
+    /;\s*model\s+printing\s+time:\s*([0-9hms .\t]+)/i,
     /;\s*estimated\s+printing\s+time\s*\(normal\s+mode\)\s*=\s*([0-9hms .\t]+)/i
   ];
+  // « 110.47,0.70 » → 111.17 (somme de tous les filaments du job).
+  function sumWeights(str) {
+    return String(str).split(',').reduce(function (acc, p) {
+      var n = parseFloat(p);
+      return acc + (isFinite(n) ? n : 0);
+    }, 0);
+  }
   function firstCapture(text, res) {
     for (var i = 0; i < res.length; i++) { var m = res[i].exec(text); if (m) return m[1]; }
     return null;
@@ -340,8 +355,8 @@
     var applied = [];
     var wStr = firstCapture(text, RE_WEIGHT);
     if (wStr != null) {
-      var w = parseFloat(wStr);
-      if (isFinite(w)) { var we = $('#ap-weight'); if (we) { we.value = w; applied.push(w.toFixed(2) + ' g'); } }
+      var w = Math.round(sumWeights(wStr) * 100) / 100;
+      if (isFinite(w) && w > 0) { var we = $('#ap-weight'); if (we) { we.value = w; applied.push(w.toFixed(2) + ' g'); } }
     }
     var tStr = firstCapture(text, RE_TIME);
     if (tStr != null) {
@@ -514,7 +529,8 @@
     var n = f.loops;
     var nLabel = '(' + n + ' pièce' + (n > 1 ? 's' : '') + ')';
     set('ap-batch', 'Batch de ' + n + ' pièce' + (n > 1 ? 's' : '') + ' : ' + fmtHm((f.timeH * 60 + f.timeM) * n) +
-        ' · ' + (Math.round(f.weight * n * 100) / 100).toString().replace('.', ',') + ' g de filament');
+        ' · ' + (Math.round(f.weight * n * 100) / 100).toString().replace('.', ',') + ' g de filament' +
+        (n > 1 ? ' (hors refroidissement entre loops)' : ''));
     set('ap-out-batch-n', nLabel);
     set('ap-out-batch-n2', nLabel);
     set('ap-out-batch-cost', money(r.cost * n));
