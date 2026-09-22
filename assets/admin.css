@@ -452,20 +452,10 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 /* =========================================================
    Facturation — barre scanner de commande
    ========================================================= */
-.fx-pos { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 18px;
-  padding:14px 16px; border:1px solid var(--line); border-radius:var(--radius-lg);
-  background:var(--paper); box-shadow:var(--shadow-sm); transition:border-color .2s, box-shadow .2s; }
-.fx-pos.is-armed { border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.14); }
-.fx-scan-toggle { min-width:190px; }
-.fx-pos.is-armed .fx-scan-toggle { background:var(--charcoal); border-color:var(--charcoal); }
-.fx-scan-input { flex:1; min-width:200px; font-size:1.05rem; font-weight:600; letter-spacing:.02em;
-  text-align:center; padding:11px 14px; border:2px dashed var(--line); border-radius:var(--radius);
-  background:var(--wash); color:var(--ink); transition:border-color .15s, background .15s; }
-.fx-scan-input:focus { outline:none; border-style:solid; border-color:var(--ember); background:var(--paper); }
-.fx-scan-input:disabled { opacity:.5; }
-.fx-pos-live { white-space:nowrap; }
-#fx-pos-open { text-decoration:none; }
-.fx-scan-feedback { flex-basis:100%; min-height:20px; font-weight:600; font-size:.9rem; text-align:center; }
+.fx-pos { margin:0 0 18px; }
+/* indicateur discret dans la barre du haut (scanner toujours à l'écoute) */
+.fx-scan-feedback { font-size:.82rem; font-weight:600; color:var(--muted); white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; max-width:420px; cursor:default; }
 .fx-scan-feedback.ok { color:var(--good); }
 .fx-scan-feedback.warn { color:var(--ember-dim); }
 .fx-scan-feedback.bad { color:var(--bad); }

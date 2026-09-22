@@ -910,56 +910,72 @@
   if ($('#co-logo-remove')) $('#co-logo-remove').addEventListener('click', function () { logoData = ''; $('#co-logo-file').value = ''; showLogoPreview(); writeCompany(); render(); });
 
   /* =========================================================
-     CAISSE — scanner de commande
-     - « Scanner la commande » arme une case en attente ; chaque
-       code-barres ajoute le bon filament (bon format). Codes inconnus :
-       panneau d'apprentissage (products.attrs.barcodes).
+     SCANNER — toujours à l'écoute dans l'onglet Facturation
+     - Pas de bouton ni de case : un scanner code-barres (clavier HID)
+       tape très vite puis Entrée. On détecte cette rafale au niveau du
+       document, même si le curseur est dans un champ (les caractères
+       scannés en sont alors retirés). Chaque code ajoute le bon filament
+       (bon format). Code inconnu : panneau d'apprentissage
+       (products.attrs.barcodes).
      ========================================================= */
 
   /* ----- éléments ----- */
-  var elScanToggle = $('#fx-scan-toggle'), elScanInput = $('#fx-scan-input'), elScanFeedback = $('#fx-scan-feedback'),
+  var elScanFeedback = $('#fx-scan-feedback'),
       elScanLearn = $('#fx-scan-learn'), elScanLearnCode = $('#fx-scan-learn-code'),
       elScanLearnFil = $('#fx-scan-learn-fil'), elScanLearnKind = $('#fx-scan-learn-kind'),
       elScanLearnSave = $('#fx-scan-learn-save'), elScanLearnCancel = $('#fx-scan-learn-cancel'),
       elPosStation = $('#fx-pos');
 
-  var scanActive = false, learnOpen = false, pendingCode = '';
+  var learnOpen = false, pendingCode = '';
+  var SCAN_IDLE = '⌁ Scanner prêt';
+  var feedbackTimer = null;
 
-  function focusScan() { if (elScanInput) try { elScanInput.focus(); } catch (e) {} }
-  function scanFeedback(msg, cls) { if (elScanFeedback) { elScanFeedback.textContent = msg || ''; elScanFeedback.className = 'fx-scan-feedback' + (cls ? ' ' + cls : ''); } }
-
-  function setScanActive(on) {
-    scanActive = !!on;
-    if (elScanInput) { elScanInput.disabled = !scanActive; elScanInput.value = ''; }
-    if (elScanToggle) {
-      elScanToggle.setAttribute('aria-pressed', String(scanActive));
-      elScanToggle.textContent = scanActive ? '⏸ Scan en cours…' : '▶ Scanner la commande';
-    }
-    if (elPosStation) elPosStation.classList.toggle('is-armed', scanActive);
-    if (scanActive) {
-      // le scan a besoin du catalogue filament (attrs.barcodes) même si le gabarit courant est autre
-      if (!catalogLoaded.filament) loadCatalog('filament');
-      scanFeedback('En attente d\'un scan…', '');
-      focusScan();
-    } else { closeLearn(); scanFeedback('', ''); }
+  function scanFeedback(msg, cls) {
+    if (!elScanFeedback) return;
+    clearTimeout(feedbackTimer);
+    elScanFeedback.textContent = msg || SCAN_IDLE;
+    elScanFeedback.className = 'fx-scan-feedback no-print' + (cls ? ' ' + cls : '');
+    // retour à l'indicateur discret après quelques secondes (sauf pendant une association)
+    if (msg && !learnOpen) feedbackTimer = setTimeout(function () { scanFeedback('', ''); }, 6000);
   }
-  if (elScanToggle) elScanToggle.addEventListener('click', function () { setScanActive(!scanActive); });
+  scanFeedback('', '');
 
-  // garde la case active pendant une session de scan (sans voler le focus d'un champ édité)
-  if (elScanInput) elScanInput.addEventListener('blur', function () {
-    setTimeout(function () {
-      if (!scanActive || learnOpen) return;
-      if (document.activeElement && document.activeElement !== document.body) return;
-      focusScan();
-    }, 40);
-  });
-  if (elScanInput) elScanInput.addEventListener('keydown', function (e) {
-    if (e.key !== 'Enter' && e.key !== 'Tab') return;
-    e.preventDefault();
-    var code = (elScanInput.value || '').trim();
-    elScanInput.value = '';
-    if (code) processScan(code);
-  });
+  function facturationVisible() {
+    var app = $('#app'), panel = $('[data-panel="facturation"]');
+    return !!(app && !app.hidden && panel && !panel.hidden);
+  }
+  function isEditable(el) {
+    if (!el || !el.tagName) return false;
+    var t = el.tagName;
+    return (t === 'INPUT' && !/^(checkbox|radio|button|submit)$/i.test(el.type || '')) || t === 'TEXTAREA';
+  }
+
+  // Détection d'une rafale scanner : >= 6 caractères à moins de ~50 ms d'écart, puis Entrée/Tab.
+  var SCAN_GAP = 50, SCAN_MIN = 6;
+  var buf = '', lastT = 0, bufTarget = null;
+  document.addEventListener('keydown', function (e) {
+    if (!facturationVisible() || e.ctrlKey || e.metaKey || e.altKey) return;
+    var now = Date.now();
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      var code = buf, target = bufTarget, fresh = (now - lastT) <= SCAN_GAP * 2;
+      buf = ''; bufTarget = null;
+      if (code.length < SCAN_MIN || !fresh) return;
+      e.preventDefault(); e.stopPropagation();
+      // les caractères sont déjà tombés dans le champ actif : on les retire
+      if (isEditable(target)) {
+        var v = target.value || '', i = v.lastIndexOf(code);
+        if (i !== -1) {
+          target.value = v.slice(0, i) + v.slice(i + code.length);
+          target.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+      processScan(code.trim());
+      return;
+    }
+    if (e.key.length !== 1) return;              // Maj, flèches, etc.
+    if (now - lastT > SCAN_GAP) { buf = ''; bufTarget = e.target; }
+    buf += e.key; lastT = now;
+  }, true);
 
   function findByBarcode(code) {
     var fils = catalog.filament || [];
@@ -973,11 +989,12 @@
   }
 
   function processScan(code) {
+    if (!code) return;
+    if (!catalogLoaded.filament) { scanFeedback('Chargement du catalogue… rescanne dans un instant.', 'warn'); loadCatalog('filament'); return; }
     var hit = findByBarcode(code);
     if (!hit) { openLearn(code); return; }
     var qty = scanAddFilament(hit.p, hit.kind);
     scanFeedback('✓ ' + hit.p.name + ' · ' + (hit.kind === 'refill' ? 'recharge' : 'bobine') + '  (×' + qty + ')', 'ok');
-    focusScan();
   }
 
   // ajoute (ou incrémente) une ligne filament pour un format donné — indépendant du gabarit courant
@@ -1012,11 +1029,11 @@
     elScanLearnCode.textContent = code;
     elScanLearnFil.innerHTML = learnOptions(); elScanLearnFil.value = '';
     elScanLearnKind.value = 'spool';
-    elScanLearn.hidden = false;
+    elScanLearn.hidden = false; if (elPosStation) elPosStation.hidden = false;
     scanFeedback('⚠ Code inconnu — associe-le une fois.', 'warn');
     try { elScanLearnFil.focus(); } catch (e) {}
   }
-  function closeLearn() { learnOpen = false; pendingCode = ''; if (elScanLearn) elScanLearn.hidden = true; }
+  function closeLearn() { learnOpen = false; pendingCode = ''; if (elScanLearn) elScanLearn.hidden = true; if (elPosStation) elPosStation.hidden = true; }
   if (elScanLearnFil) elScanLearnFil.addEventListener('change', function () {
     var p = prodInCatalog('filament', this.value); if (!p) return;
     var hasS = filOffers(p, 'spool'), hasR = filOffers(p, 'refill');
@@ -1025,7 +1042,7 @@
     if (!hasS && hasR) elScanLearnKind.value = 'refill';
     if (!hasR && hasS) elScanLearnKind.value = 'spool';
   });
-  if (elScanLearnCancel) elScanLearnCancel.addEventListener('click', function () { scanFeedback('Code ignoré.', 'warn'); closeLearn(); focusScan(); });
+  if (elScanLearnCancel) elScanLearnCancel.addEventListener('click', function () { closeLearn(); scanFeedback('Code ignoré.', 'warn'); });
   if (elScanLearnSave) elScanLearnSave.addEventListener('click', function () {
     var p = prodInCatalog('filament', elScanLearnFil.value);
     if (!p) { elScanLearnFil.focus(); return; }
@@ -1043,8 +1060,7 @@
         closeLearn();
         var qty = scanAddFilament(p, kind);
         scanFeedback('✓ Associé & ajouté : ' + p.name + ' · ' + (kind === 'refill' ? 'recharge' : 'bobine') + '  (×' + qty + ')', 'ok');
-        focusScan();
-      }, function (err) { elScanLearnSave.disabled = false; scanFeedback('Erreur : ' + (err && err.message ? err.message : err), 'bad'); });
+          }, function (err) { elScanLearnSave.disabled = false; scanFeedback('Erreur : ' + (err && err.message ? err.message : err), 'bad'); });
   });
   function prodInCatalog(which, id) { return (catalog[which] || []).filter(function (p) { return String(p.id) === String(id); })[0] || null; }
 

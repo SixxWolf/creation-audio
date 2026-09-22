@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=26">
+<link rel="stylesheet" href="assets/admin.css?v=27">
 <link rel="stylesheet" href="assets/facture.css?v=10">
 <link rel="stylesheet" href="assets/autoloop.css?v=6">
 <script src="assets/theme.js?v=1" defer></script>
@@ -909,6 +909,8 @@
           <button type="button" class="fx-seg-btn" data-cat="caisson">Caisson</button>
         </div>
         <label class="fx-check"><input type="checkbox" id="fx-tax"> Taxes (TPS/TVQ)</label>
+        <span class="fx-scan-feedback no-print" id="fx-scan-feedback" aria-live="polite"
+              title="Dans cet onglet, le scanner est toujours à l'écoute : scanne un article, il s'ajoute à la facture."></span>
         <div class="fx-seg fx-cli-seg" role="group" aria-label="Type de client">
           <button type="button" class="fx-cli-btn is-active" data-cli="client">Client</button>
           <button type="button" class="fx-cli-btn" data-cli="dealer">Dealer</button>
@@ -1012,14 +1014,8 @@
         </details>
       </div>
 
-      <!-- Caisse : scanner de commande -->
-      <div class="fx-pos no-print" id="fx-pos">
-        <button type="button" class="btn btn-accent fx-scan-toggle" id="fx-scan-toggle" aria-pressed="false">▶ Scanner la commande</button>
-        <input type="text" id="fx-scan-input" class="fx-scan-input" autocomplete="off" autocorrect="off"
-               autocapitalize="off" spellcheck="false" placeholder="Clique « Scanner » puis scanne les articles…" disabled>
-        <span class="fx-scan-feedback" id="fx-scan-feedback" aria-live="polite"></span>
-
-        <!-- apprentissage d'un code inconnu -->
+      <!-- Scanner toujours à l'écoute : ce panneau n'apparaît que pour associer un code inconnu -->
+      <div class="fx-pos no-print" id="fx-pos" hidden>
         <div class="fx-scan-learn" id="fx-scan-learn" hidden>
           <div class="fx-scan-learn-head">Code-barres inconnu&nbsp;: <code id="fx-scan-learn-code"></code>
             <span class="hint">— associe-le une fois, il sera mémorisé.</span></div>
@@ -1424,7 +1420,7 @@
 <script src="assets/cms-inventory.js?v=18"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
-<script src="assets/cms-facturation.js?v=19"></script>
+<script src="assets/cms-facturation.js?v=20"></script>
 <script src="assets/cms-historique.js?v=5"></script>
 <script src="assets/cms-statistiques.js?v=4"></script>
 <script src="assets/cms-autoloop.js?v=10"></script>
