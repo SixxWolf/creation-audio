@@ -54,6 +54,7 @@
     if (name === 'historique') { if (!loaded) { loaded = true; load(); } }
   };
   window.CA.reloadHistorique = function () { if (loaded) load(); };   // appelé après un enregistrement de facture
+  window.CA.printInvoice = function (inv, lines) { reprint(inv, lines || []); };   // impression de la facture tout juste enregistrée
 
   if (refreshBtn) refreshBtn.addEventListener('click', load);
   if (searchEl) searchEl.addEventListener('input', function () { query = this.value.trim().toLowerCase(); render(); });

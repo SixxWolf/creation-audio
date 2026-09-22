@@ -706,7 +706,6 @@
     var keys = Object.keys(set);
     return keys.length === 1 ? keys[0] : (keys.length ? 'mixte' : cat);
   }
-  function lock() { saved = true; elSave.disabled = true; elSave.textContent = '✓ Enregistrée'; }
   function unlock() { saved = false; elSave.disabled = false; elSave.textContent = 'Enregistrer la facture'; }
 
   function onSave() {
@@ -714,6 +713,7 @@
     var valid = lines.filter(function (l) { return l.qty > 0; });
     if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
 
+    saved = true;   // verrou pendant l'envoi (anti double-clic, y compris « Terminer » en caisse)
     elSave.disabled = true; elStatus.textContent = 'Attribution du numéro…';
     var t = totals();
     var specs = specsText();
@@ -730,6 +730,7 @@
           return res.data;
         });
 
+    var savedRows = [];
     numberP.then(function (number) {
       elNumber.value = number;
       var doDeduct = !!elDeduct.checked;
@@ -757,6 +758,7 @@
             kind: l.kind, ptype: l.ptype || null, qty: l.qty, unit_price: round2(l.price), unit_cost: round2(l.cost),
             line_total: round2(l.qty * l.price), sort_order: i };
         });
+        savedRows = lineRows;
         return sb.from('invoice_lines').insert(lineRows).then(function (r3) {
           if (r3.error) throw r3.error;
           if (!doDeduct) return inv;
@@ -766,15 +768,23 @@
         });
       });
     }).then(function (inv) {
-      lock();
-      if (caisseMode) showCaisseThanks();   // mode caisse : écran « Merci » + total
-      render();
+      if (caisseMode) showCaisseThanks();   // mode caisse : écran « Merci » + total (calculé avant la remise à zéro)
       // auto-mémorisation du client (mode client seulement ; les dealers = onglet Dealers)
       if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value)) {
         window.CA.rememberClient(clientFields());
       }
-      elStatus.textContent = '✓ Facture ' + inv.number + ' enregistrée' + (elDeduct.checked ? ', stock déduit.' : '.');
-      loadNextNumberHint();
+      var deducted = !!elDeduct.checked;
+      // la vente est enregistrée : on repart d'une facture vierge (réimpression possible ci-dessous ou dans l'Historique)
+      resetInvoice();
+      if (caisseMode && elCaisseStatus) elCaisseStatus.textContent = '';
+      elStatus.textContent = '✓ Facture ' + inv.number + ' enregistrée' + (deducted ? ', stock déduit' : '') + '. Nouvelle facture prête. ';
+      if (window.CA.printInvoice) {
+        var pb = document.createElement('button');
+        pb.type = 'button'; pb.className = 'btn btn-ghost btn-sm';
+        pb.textContent = 'Imprimer ' + inv.number;
+        pb.addEventListener('click', function () { window.CA.printInvoice(inv, savedRows); });
+        elStatus.appendChild(pb);
+      }
       // recharge les stocks du catalogue (badges/plafonds à jour)
       catalogLoaded.filament = false; catalogLoaded.spacer = false;
       if (cat !== 'caisson') loadCatalog(cat);
@@ -1041,6 +1051,15 @@
     if (!fxCaisseThanks) return;
     if (elCaisseThanksTotal) elCaisseThanksTotal.textContent = money(totals().total);
     fxCaisseThanks.hidden = false;
+    // la facture est déjà remise à zéro derrière : l'écran « Merci » se ferme seul après quelques secondes
+    clearTimeout(thanksTimer);
+    thanksTimer = setTimeout(closeCaisseThanks, 4000);
+  }
+  var thanksTimer = null;
+  function closeCaisseThanks() {
+    clearTimeout(thanksTimer);
+    if (fxCaisseThanks) fxCaisseThanks.hidden = true;
+    if (caisseMode) { if (!scanActive) setScanActive(true); else focusScan(); }
   }
   if (elCaisseMode) elCaisseMode.addEventListener('click', enterCaisse);
   if (elCaisseExit) elCaisseExit.addEventListener('click', exitCaisse);
@@ -1054,10 +1073,6 @@
     if (elCaisseStatus) elCaisseStatus.textContent = 'Enregistrement…';
     onSave();   // succès -> showCaisseThanks() ; erreur -> message dans #fx-caisse-status
   });
-  if (elCaisseNew) elCaisseNew.addEventListener('click', function () {
-    if (fxCaisseThanks) fxCaisseThanks.hidden = true;
-    resetInvoice();
-    if (!scanActive) setScanActive(true); focusScan();
-  });
+  if (elCaisseNew) elCaisseNew.addEventListener('click', closeCaisseThanks);   // la facture est déjà vierge
 
 })();
