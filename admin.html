@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/admin.css?v=26">
-<link rel="stylesheet" href="assets/facture.css?v=9">
+<link rel="stylesheet" href="assets/facture.css?v=10">
 <link rel="stylesheet" href="assets/autoloop.css?v=6">
 <script src="assets/theme.js?v=1" defer></script>
 </head>
@@ -900,7 +900,7 @@
         <button class="btn btn-ghost btn-sm" id="fx-reset" type="button">Nouvelle facture</button>
       </div>
 
-      <!-- Barre de gabarit + client -->
+      <!-- Barre de gabarit + taxes + type de client -->
       <div class="fx-bar">
         <div class="fx-seg" role="tablist" aria-label="Type de facture">
           <button type="button" class="fx-seg-btn is-active" data-cat="filament">Filament</button>
@@ -908,21 +908,16 @@
           <button type="button" class="fx-seg-btn" data-cat="accessory">Accessoire</button>
           <button type="button" class="fx-seg-btn" data-cat="caisson">Caisson</button>
         </div>
-        <span class="grow"></span>
         <label class="fx-check"><input type="checkbox" id="fx-tax"> Taxes (TPS/TVQ)</label>
+        <div class="fx-seg fx-cli-seg" role="group" aria-label="Type de client">
+          <button type="button" class="fx-cli-btn is-active" data-cli="client">Client</button>
+          <button type="button" class="fx-cli-btn" data-cli="dealer">Dealer</button>
+        </div>
       </div>
 
       <!-- Infos client + facture -->
       <div class="editor fx-meta">
         <div class="grid">
-          <div class="field">
-            <label class="lbl">Type de client</label>
-            <div class="fx-seg fx-seg-sm" role="group" aria-label="Type de client">
-              <button type="button" class="fx-cli-btn is-active" data-cli="client">Client</button>
-              <button type="button" class="fx-cli-btn" data-cli="dealer">Dealer</button>
-            </div>
-            <span class="hint" id="fx-cli-hint"></span>
-          </div>
           <div class="field" id="fx-dealer-field" hidden>
             <label class="lbl" for="fx-dealer-select">Dealer</label>
             <select id="fx-dealer-select"><option value="">— choisir un dealer —</option></select>
@@ -934,45 +929,48 @@
               <input type="search" id="fx-client-search" placeholder="Rechercher (nom, courriel, téléphone)…" autocomplete="off">
               <div class="fx-combo-list" id="fx-client-results" hidden></div>
             </div>
-            <span class="hint">Choisis un client existant, ou remplis les champs ci-dessous pour en créer un nouveau.</span>
+            <span class="hint">Choisis un client existant, ou tape un nom à droite pour en créer un nouveau.</span>
           </div>
           <div class="field">
             <label class="lbl" for="fx-cli-name">Client / entreprise</label>
             <input type="text" id="fx-cli-name" placeholder="Nom ou raison sociale" autocomplete="off">
           </div>
-          <div class="field">
-            <label class="lbl" for="fx-cli-email">Courriel <span class="hint">(optionnel)</span></label>
-            <input type="text" id="fx-cli-email" placeholder="client@example.com" autocomplete="off" inputmode="email">
-          </div>
-          <div class="field">
-            <label class="lbl" for="fx-cli-phone">Téléphone <span class="hint">(optionnel)</span></label>
-            <input type="text" id="fx-cli-phone" placeholder="418 555-1234" autocomplete="off">
-          </div>
-          <div class="field">
-            <label class="lbl" for="fx-cli-address">Adresse <span class="hint">(optionnel)</span></label>
-            <input type="text" id="fx-cli-address" placeholder="123 rue Exemple" autocomplete="off">
-          </div>
-          <div class="field">
-            <label class="lbl" for="fx-cli-city">Ville, code postal <span class="hint">(optionnel)</span></label>
-            <input type="text" id="fx-cli-city" placeholder="Québec, QC  G1A 1A1" autocomplete="off">
-          </div>
-          <div class="field">
-            <div class="row-2">
-              <div>
-                <label class="lbl" for="fx-number">N° de facture <span class="hint">(auto — modifiable)</span></label>
-                <input type="text" id="fx-number" placeholder="F-2026-001" autocomplete="off">
-              </div>
-              <div>
-                <label class="lbl" for="fx-date">Date</label>
-                <input type="text" id="fx-date" placeholder="AAAA-MM-JJ" autocomplete="off">
-              </div>
+        </div>
+
+        <!-- Détails client + facture (repliable, rarement utilisés) -->
+        <details class="fx-company fx-details" id="fx-details">
+          <summary>Coordonnées du client, n° de facture &amp; note <span class="hint">(courriel, téléphone, adresse, date…)</span></summary>
+          <div class="grid" style="margin-top:14px">
+            <div class="field">
+              <label class="lbl" for="fx-cli-email">Courriel <span class="hint">(optionnel)</span></label>
+              <input type="text" id="fx-cli-email" placeholder="client@example.com" autocomplete="off" inputmode="email">
+            </div>
+            <div class="field">
+              <label class="lbl" for="fx-cli-phone">Téléphone <span class="hint">(optionnel)</span></label>
+              <input type="text" id="fx-cli-phone" placeholder="418 555-1234" autocomplete="off">
+            </div>
+            <div class="field">
+              <label class="lbl" for="fx-cli-address">Adresse <span class="hint">(optionnel)</span></label>
+              <input type="text" id="fx-cli-address" placeholder="123 rue Exemple" autocomplete="off">
+            </div>
+            <div class="field">
+              <label class="lbl" for="fx-cli-city">Ville, code postal <span class="hint">(optionnel)</span></label>
+              <input type="text" id="fx-cli-city" placeholder="Québec, QC  G1A 1A1" autocomplete="off">
+            </div>
+            <div class="field">
+              <label class="lbl" for="fx-number">N° de facture <span class="hint">(auto — modifiable)</span></label>
+              <input type="text" id="fx-number" placeholder="F-2026-001" autocomplete="off">
+            </div>
+            <div class="field">
+              <label class="lbl" for="fx-date">Date</label>
+              <input type="text" id="fx-date" placeholder="AAAA-MM-JJ" autocomplete="off">
+            </div>
+            <div class="field col-2">
+              <label class="lbl" for="fx-note">Note / paiement <span class="hint">(optionnel, affichée sur la facture)</span></label>
+              <input type="text" id="fx-note" placeholder="Ex. Paiement à la livraison · Interac · ramassage Québec" autocomplete="off">
             </div>
           </div>
-          <div class="field col-2">
-            <label class="lbl" for="fx-note">Note / paiement <span class="hint">(optionnel, affichée sur la facture)</span></label>
-            <input type="text" id="fx-note" placeholder="Ex. Paiement à la livraison · Interac · ramassage Québec" autocomplete="off">
-          </div>
-        </div>
+        </details>
 
         <!-- Entreprise (repliable) -->
         <details class="fx-company" id="fx-company">
@@ -1426,7 +1424,7 @@
 <script src="assets/cms-inventory.js?v=18"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
-<script src="assets/cms-facturation.js?v=18"></script>
+<script src="assets/cms-facturation.js?v=19"></script>
 <script src="assets/cms-historique.js?v=5"></script>
 <script src="assets/cms-statistiques.js?v=4"></script>
 <script src="assets/cms-autoloop.js?v=10"></script>

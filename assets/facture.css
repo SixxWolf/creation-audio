@@ -19,6 +19,7 @@
 .fx-seg-btn:hover, .fx-cli-btn:hover { color:var(--ink); }
 .fx-seg-btn.is-active, .fx-cli-btn.is-active { background:var(--fill-strong); color:#fff; }
 .fx-seg-sm .fx-cli-btn { padding:6px 13px; font-size:.85rem; }
+.fx-cli-seg { margin-left:auto; }   /* type de client calé à droite de la barre */
 .fx-check { display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--ink);
   font-weight:500; cursor:pointer; white-space:nowrap; }
 .fx-check input { width:auto; }
@@ -30,6 +31,8 @@
 .fx-company > summary::-webkit-details-marker { display:none; }
 .fx-company > summary::before { content:"▸ "; color:var(--ember); }
 .fx-company[open] > summary::before { content:"▾ "; }
+.fx-details { margin-top:14px; }
+.fx-details .grid { align-items:end; }   /* champs alignés même si un libellé porte un indice */
 .fx-logo-prev img { max-height:44px; max-width:150px; border:1px solid var(--line); border-radius:8px;
   padding:4px; background:var(--thumb-bg); object-fit:contain; }
 

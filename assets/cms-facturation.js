@@ -347,7 +347,7 @@
     if (!keepFields) {
       setClientFields({});
       if (elDealerSelect) elDealerSelect.value = '';
-      elCliHint.textContent = isDlr ? 'Choisis un dealer — ses coordonnées et les prix dealer s\'appliquent.' : '';
+      if (elCliHint) elCliHint.textContent = isDlr ? 'Choisis un dealer — ses coordonnées et les prix dealer s\'appliquent.' : '';
     }
     repriceSpacers();                       // bascule prix client <-> dealer sur les lignes spacer
     if (cat === 'spacer') buildPicker();    // rafraîchit les prix affichés dans le catalogue
