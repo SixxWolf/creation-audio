@@ -80,7 +80,7 @@
     if (!dateI.value) dateI.value = todayISO();
     Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : Promise.resolve(),
-      loadFilaments()
+      loadFilaments(), loadAccessories()
     ]).then(function () { renderRows(); loadHistory(); renderReorder(); renderCatalog(); renderCodes(); }, function () { loadHistory(); });
   }
 
@@ -94,6 +94,14 @@
       .then(function (res) { filaments = (res.data || []); });
   }
 
+  // accessoires (bobines vides, etc.) : seulement pour l'onglet Codes-barres (attrs.barcodes.item)
+  var accessories = [];
+  function loadAccessories() {
+    return sb.from('products').select('id,name,attrs').eq('type', 'accessory')
+      .order('sort_order', { ascending: true }).order('name', { ascending: true })
+      .then(function (res) { accessories = (res.data || []); });
+  }
+
   function filProd(id) { return filaments.filter(function (x) { return String(x.id) === String(id); })[0] || null; }
   function matOf(f) { return f && window.CA.materialOf ? window.CA.materialOf(f.brand, f.material) : null; }
   function matHasSpool(f) { var m = matOf(f); return !!(m && m.sell_spool != null); }
@@ -102,7 +110,13 @@
   function offersSpool(f) { return matHasSpool(f) && f.offer_spool !== false; }
   function offersRefill(f) { return matHasRefill(f) && f.offer_refill !== false; }
   function filLabel(f) { return (f.brand ? f.brand + ' · ' : '') + (f.material ? f.material + ' · ' : '') + (f.name || '(sans nom)'); }
-  function kindLabel(k) { return k === 'refill' ? 'recharge' : 'bobine'; }
+  function kindLabel(k) { return k === 'item' ? 'article' : (k === 'refill' ? 'recharge' : 'bobine'); }
+  function accProd(id) { return accessories.filter(function (x) { return String(x.id) === String(id); })[0] || null; }
+  function isAcc(p) { return !!p && accessories.indexOf(p) !== -1; }
+  // deux accessoires peuvent porter le même nom : la description les distingue
+  function accLabel(a) { var d = a.attrs && a.attrs.description; return (a.name || '(sans nom)') + (d ? ' — ' + d : ''); }
+  function bcProd(id) { return filProd(id) || accProd(id); }
+  function bcLabel(p) { return isAcc(p) ? accLabel(p) : filLabel(p); }
 
   /* =========================================================
      SOUS-ONGLETS
@@ -1117,7 +1131,7 @@
 
   /* =========================================================
      CODES-BARRES — voir / corriger / supprimer les associations
-     (stockées dans products.attrs.barcodes.{spool,refill})
+     (products.attrs.barcodes.{spool,refill} ; accessoires : .item)
      ========================================================= */
   var bcBody = $('#bc-body'), bcSearch = $('#bc-search'), bcCount = $('#bc-count'),
       bcAddBtn = $('#bc-add'), bcRefreshBtn = $('#bc-refresh');
@@ -1128,7 +1142,7 @@
   if (bcSearch) bcSearch.addEventListener('input', function () { renderCodes(); });
   if (bcAddBtn) bcAddBtn.addEventListener('click', function () { pendingScanCode = ''; bcEditing = '__new__'; renderCodes(); });
   if (bcRefreshBtn) bcRefreshBtn.addEventListener('click', function () {
-    loadFilaments().then(function () { renderCodes(); renderReorder(); });
+    Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderCodes(); renderReorder(); });
   });
 
   /* ---- poste de scan (vérification) ---- */
@@ -1164,7 +1178,7 @@
     var hit = allBarcodeEntries().filter(function (e) { return e.code === code; })[0];
     if (hit) {
       // connu -> confirme le filament + met la ligne en évidence
-      bcScanFb('✓ ' + code + ' → ' + filLabel(hit.f) + ' · ' + kindLabel(hit.kind), 'ok');
+      bcScanFb('✓ ' + code + ' → ' + bcLabel(hit.f) + (hit.acc ? '' : ' · ' + kindLabel(hit.kind)), 'ok');
       if (bcSearch && bcSearch.value) { bcSearch.value = ''; }   // s'assure que la ligne est visible
       renderCodes();
       var tr = bcBody && bcBody.querySelector('tr[data-key="' + hit.key.replace(/"/g, '\\"') + '"]');
@@ -1207,6 +1221,11 @@
       if (a.idx !== z.idx) return a.idx - z.idx;                                   // ordre du filament (sort_order)
       return (a.kind === 'refill' ? 1 : 0) - (z.kind === 'refill' ? 1 : 0);        // bobine avant recharge
     });
+    // accessoires ensuite (un seul code par article), dans leur ordre du catalogue
+    accessories.forEach(function (a, idx) {
+      var b = a.attrs && a.attrs.barcodes;
+      if (b && b.item) out.push({ key: String(a.id) + ':item', productId: String(a.id), kind: 'item', code: String(b.item), f: a, idx: idx, acc: true });
+    });
     return out;
   }
   // qui possède déjà ce code ? (pour éviter les doublons)
@@ -1216,12 +1235,18 @@
     allBarcodeEntries().some(function (e) { if (e.code === code) { hit = e; return true; } return false; });
     return hit;
   }
-  function filCodeOptions(selected) {
-    return '<option value="">— choisir le filament —</option>' + filaments.slice().sort(function (a, b) {
-      return filLabel(a).localeCompare(filLabel(b));
-    }).map(function (f) {
-      return '<option value="' + esc(f.id) + '"' + (String(f.id) === String(selected) ? ' selected' : '') + '>' + esc(filLabel(f)) + '</option>';
-    }).join('');
+  // scope : 'fil' | 'acc' | 'all' (nouvelle association : filament OU accessoire)
+  function filCodeOptions(selected, scope) {
+    function opts(list, label) {
+      return list.slice().sort(function (a, b) { return label(a).localeCompare(label(b)); }).map(function (p) {
+        return '<option value="' + esc(p.id) + '"' + (String(p.id) === String(selected) ? ' selected' : '') + '>' + esc(label(p)) + '</option>';
+      }).join('');
+    }
+    if (scope === 'acc') return '<option value="">— choisir l\'accessoire —</option>' + opts(accessories, accLabel);
+    if (scope === 'fil' || !accessories.length) return '<option value="">— choisir le filament —</option>' + opts(filaments, filLabel);
+    return '<option value="">— choisir l\'article —</option>' +
+      '<optgroup label="Filaments">' + opts(filaments, filLabel) + '</optgroup>' +
+      '<optgroup label="Accessoires">' + opts(accessories, accLabel) + '</optgroup>';
   }
   function kindOptions(sel) {
     return '<option value="spool"' + (sel !== 'refill' ? ' selected' : '') + '>Avec bobine</option>' +
@@ -1235,11 +1260,11 @@
     var q = (bcSearch && bcSearch.value || '').trim().toLowerCase();
     var shown = entries.filter(function (e) {
       if (!q) return true;
-      return (e.code + ' ' + filLabel(e.f) + ' ' + kindLabel(e.kind)).toLowerCase().indexOf(q) !== -1;
+      return (e.code + ' ' + bcLabel(e.f) + ' ' + kindLabel(e.kind)).toLowerCase().indexOf(q) !== -1;
     });
     if (bcCount) bcCount.textContent = entries.length + ' code' + (entries.length > 1 ? 's' : '') + ' associé' + (entries.length > 1 ? 's' : '');
 
-    var newRow = (bcEditing === '__new__') ? editRowHtml({ code: pendingScanCode || '', productId: '', kind: 'spool' }, '__new__', true) : '';
+    var newRow = (bcEditing === '__new__') ? editRowHtml({ code: pendingScanCode || '', productId: '', kind: 'spool', scope: 'all' }, '__new__', true) : '';
 
     if (!entries.length && bcEditing !== '__new__') {
       bcBody.innerHTML = '<p class="empty">Aucun code-barres associé pour l\'instant.<br>' +
@@ -1247,25 +1272,32 @@
       return;
     }
 
-    var rowsHtml = shown.map(function (e) {
-      return (bcEditing === e.key) ? editRowHtml(e, e.key, false) : viewRowHtml(e);
-    }).join('');
-    if (!rowsHtml && !newRow) {
+    function rows(list) {
+      return list.map(function (e) { return (bcEditing === e.key) ? editRowHtml(e, e.key, false) : viewRowHtml(e); }).join('');
+    }
+    var filRows = rows(shown.filter(function (e) { return !e.acc; })),
+        accRows = rows(shown.filter(function (e) { return e.acc; }));
+    if (!filRows && !accRows && !newRow) {
       bcBody.innerHTML = '<div class="bc-table-wrap"><p class="hint" style="padding:12px">Aucun résultat pour «&nbsp;' + esc(q) + '&nbsp;».</p></div>';
       return;
     }
 
+    // un seul tableau (colonnes alignées) ; les accessoires ont leur propre section
     bcBody.innerHTML = '<div class="bc-table-wrap"><table class="bc-table">' +
       '<thead><tr><th>Code-barres</th><th>Filament</th><th>Format</th><th></th></tr></thead>' +
-      '<tbody>' + newRow + rowsHtml + '</tbody></table></div>';
+      '<tbody>' + newRow + filRows +
+      (accRows ? '<tr class="bc-group"><th colspan="4">Accessoires</th></tr>' + accRows : '') +
+      '</tbody></table></div>';
     wireCodes();
   }
 
   function viewRowHtml(e) {
-    var sw = swatchBg(e.f.hex, colorsOf(e.f));
+    var sw = e.acc ? '' : '<span class="ro-sw" style="background:' + esc(swatchBg(e.f.hex, colorsOf(e.f))) + '"></span>';
     return '<tr data-key="' + esc(e.key) + '">' +
       '<td class="bc-code"><code>' + esc(e.code) + '</code></td>' +
-      '<td class="bc-fil"><span class="bc-fil-in"><span class="ro-sw" style="background:' + esc(sw) + '"></span>' + esc(filLabel(e.f)) + '</span></td>' +
+      '<td class="bc-fil"><span class="bc-fil-in">' + sw + (e.acc
+        ? '<span>' + esc(e.f.name || '(sans nom)') + ((e.f.attrs && e.f.attrs.description) ? '<small class="bc-acc-desc">' + esc(e.f.attrs.description) + '</small>' : '') + '</span>'
+        : esc(filLabel(e.f))) + '</span></td>' +
       '<td class="bc-format">' + kindLabel(e.kind) + '</td>' +
       '<td class="bc-act">' +
         '<button type="button" class="btn btn-ghost btn-sm bc-edit">Modifier</button>' +
@@ -1276,8 +1308,9 @@
   function editRowHtml(e, key, isNew) {
     return '<tr class="bc-editing" data-key="' + esc(key) + '">' +
       '<td><input type="text" class="bc-e-code" value="' + esc(e.code) + '" placeholder="Code-barres" autocomplete="off"></td>' +
-      '<td><select class="bc-e-fil">' + filCodeOptions(e.productId) + '</select></td>' +
-      '<td><select class="bc-e-kind">' + kindOptions(e.kind) + '</select></td>' +
+      '<td><select class="bc-e-fil">' + filCodeOptions(e.productId, e.scope || (e.acc ? 'acc' : 'fil')) + '</select></td>' +
+      '<td><select class="bc-e-kind"' + (e.acc ? ' hidden' : '') + '>' + kindOptions(e.kind) + '</select>' +
+        '<span class="bc-format bc-e-item"' + (e.acc ? '' : ' hidden') + '>article</span></td>' +
       '<td class="bc-act">' +
         '<button type="button" class="btn btn-accent btn-sm bc-save">' + (isNew ? 'Associer' : 'Enregistrer') + '</button>' +
         '<button type="button" class="btn btn-ghost btn-sm bc-cancel">Annuler</button>' +
@@ -1291,6 +1324,10 @@
     $$('.bc-e-fil', bcBody).forEach(function (sel) {
       var applyKinds = function () {
         var tr = sel.closest('tr'), kindSel = tr && tr.querySelector('.bc-e-kind'); if (!kindSel) return;
+        // accessoire : pas de format bobine/recharge
+        var acc = !!accProd(sel.value), itemLbl = tr.querySelector('.bc-e-item');
+        kindSel.hidden = acc; if (itemLbl) itemLbl.hidden = !acc;
+        if (acc) return;
         var f = filProd(sel.value);
         var os = kindSel.querySelector('option[value="spool"]'), orf = kindSel.querySelector('option[value="refill"]');
         if (!f) { if (os) os.disabled = false; if (orf) orf.disabled = false; return; }
@@ -1308,7 +1345,7 @@
     $$('.bc-del', bcBody).forEach(function (b) {
       b.addEventListener('click', function () {
         var e = entryByKey(b.closest('tr').getAttribute('data-key')); if (!e) return;
-        if (!window.confirm('Supprimer l\'association du code « ' + e.code +' » ?\n(' + filLabel(e.f) + ' · ' + kindLabel(e.kind) + ')')) return;
+        if (!window.confirm('Supprimer l\'association du code « ' + e.code +' » ?\n(' + bcLabel(e.f) + ' · ' + kindLabel(e.kind) + ')')) return;
         applyBarcodeChange(e, null, function (err) {
           if (err) { window.alert('Erreur : ' + (err.message || err)); return; }
           renderCodes();
@@ -1323,14 +1360,14 @@
         var tr = b.closest('tr'), key = tr.getAttribute('data-key');
         var code = $('.bc-e-code', tr).value.trim();
         var pid = $('.bc-e-fil', tr).value;
-        var kind = $('.bc-e-kind', tr).value === 'refill' ? 'refill' : 'spool';
         if (!code) { $('.bc-e-code', tr).focus(); return; }
         if (!pid) { $('.bc-e-fil', tr).focus(); return; }
+        var kind = accProd(pid) ? 'item' : ($('.bc-e-kind', tr).value === 'refill' ? 'refill' : 'spool');
         var oldEntry = (key === '__new__') ? null : entryByKey(key);
         // doublon : ce code appartient-il déjà à une AUTRE association ?
         var owner = findCodeOwner(code);
         if (owner && (!oldEntry || owner.key !== oldEntry.key)) {
-          window.alert('Ce code est déjà associé à :\n' + filLabel(owner.f) + ' · ' + kindLabel(owner.kind) +
+          window.alert('Ce code est déjà associé à :\n' + bcLabel(owner.f) + ' · ' + kindLabel(owner.kind) +
             '.\nModifie ou supprime cette association-là d\'abord.');
           return;
         }
@@ -1357,12 +1394,12 @@
       return work[f.id];
     }
     if (oldEntry) {
-      var op = filProd(oldEntry.productId);
+      var op = bcProd(oldEntry.productId);
       if (op) { var wo = ensure(op); delete wo.attrs.barcodes[oldEntry.kind]; if (!Object.keys(wo.attrs.barcodes).length) delete wo.attrs.barcodes; }
     }
     if (newEntry) {
-      var np = filProd(newEntry.productId);
-      if (!np) { done(new Error('Filament introuvable.')); return; }
+      var np = bcProd(newEntry.productId);
+      if (!np) { done(new Error('Article introuvable.')); return; }
       var wn = ensure(np);
       wn.attrs.barcodes = wn.attrs.barcodes || {};
       wn.attrs.barcodes[newEntry.kind] = newEntry.code;
