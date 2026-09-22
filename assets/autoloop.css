@@ -13,7 +13,7 @@
 .al-seg:hover { color:var(--ink); }
 
 /* --- Disposition 2 colonnes ----------------------------- */
-.al-cols { display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:18px; align-items:start; }
+.al-cols { display:grid; grid-template-columns:minmax(0,1fr) 420px; gap:18px; align-items:start; }
 .al-main { display:flex; flex-direction:column; gap:16px; min-width:0; }
 .al-side { display:flex; flex-direction:column; gap:16px; position:sticky; top:14px; }
 
@@ -85,10 +85,12 @@
 .al-cost { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
   background:color-mix(in srgb, var(--ember) 8%, transparent); border-radius:var(--radius-sm);
   padding:12px 14px; margin:12px 0; font-weight:800; }
-.al-cost span { font-size:.72rem; letter-spacing:.06em; color:var(--ember-dim); }
-.al-cost b { font-size:1.5rem; color:var(--ember-dim); font-variant-numeric:tabular-nums; }
+.al-cost span { font-size:.72rem; letter-spacing:.06em; color:var(--ember-dim); white-space:nowrap; }
+.al-cost b { font-size:1.5rem; color:var(--ember-dim); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .al-margin-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:6px 0 10px; }
 .al-price-set { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0 10px; }
+.al-price-set .lbl { margin:0; }
+.al-price-set .hint { display:block; font-weight:500; letter-spacing:0; text-transform:none; }
 .al-price-set .al-inline input { width:100px; font-size:1.15rem; font-weight:800; text-align:right;
   border-color:color-mix(in srgb, var(--ember) 45%, var(--line)); }
 .al-price-set .al-u { font-size:1rem; font-weight:700; color:var(--ember-dim); }
