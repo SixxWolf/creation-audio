@@ -39,7 +39,16 @@ window.CA = window.CA || {};
     isReady = false;
   }
 
+  // La session peut revenir AVANT que tous les modules cms-*.js soient chargés
+  // (getSession résout pendant que le navigateur télécharge encore les scripts
+  // suivants). On attend la fin du parsing (tous les <script> exécutés) : sinon
+  // l'onglet ouvert par rechargement/lien direct (ex. #facturation) n'est jamais
+  // initialisé -> « Chargement… » infini.
   function fireReady() {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', fireReady, { once: true });
+      return;
+    }
     isReady = true;
     readyCbs.splice(0).forEach(function (cb) { try { cb(); } catch (e) {} });
     // Lien direct vers un onglet autre que le défaut (ex. #historique) : on déclenche
