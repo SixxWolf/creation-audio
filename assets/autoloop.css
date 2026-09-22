@@ -109,6 +109,10 @@
 .ap-dot { width:11px; height:11px; border-radius:3px; flex:0 0 auto; }
 .ap-leg-v { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
 
+/* Les libellés du calculateur ont des longueurs inégales (certains passent sur
+   deux lignes à cause de leur précision entre parenthèses) : on pousse le champ
+   en bas de sa cellule pour que tous les inputs d'une même rangée s'alignent. */
+.al-view .grid > .field { justify-content:flex-end; }
 .field-wide { grid-column:1 / -1; }
 .field-wide .al-fine { margin:0; }
 
