@@ -354,9 +354,9 @@
         applied.push(hh + 'h' + (mm < 10 ? '0' : '') + mm);
       }
     }
-    // Loops (pièces) : reprend le nombre du générateur de batch.
-    var lel = $('#ap-loops'), batchLoops = $('#al-loops');
-    if (lel && batchLoops) lel.value = Math.max(1, intOr(batchLoops.value, 1));
+    // Le gcode importé décrit UNE pièce : temps et poids sont par pièce, on ne
+    // touche pas au nombre de loops du calculateur (défaut 1 ; le batch se
+    // déduit en multipliant, cf. recompute).
     var src = $('#ap-gcode-src');
     if (src) src.textContent = applied.length ? ('↺ ' + name + ' · ' + applied.join(' · ')) : '';
     recompute();  // rafraîchit le résumé (les .value posés en JS ne déclenchent pas « input »)
@@ -501,9 +501,26 @@
     };
   }
 
+  // « 1h05 » à partir de minutes.
+  function fmtHm(min) {
+    var h = Math.floor(min / 60), m = Math.round(min % 60);
+    if (m === 60) { h++; m = 0; }
+    return h + 'h' + (m < 10 ? '0' : '') + m;
+  }
+
   function recompute() {
-    var r = compute(priceFields());
+    var f = priceFields();
+    var r = compute(f);
     var set = function (id, v) { var el = $('#' + id); if (el) el.textContent = v; };
+    // Batch = valeurs par pièce × loops (temps, filament, coût, profit).
+    var n = f.loops;
+    var nLabel = '(' + n + ' pièce' + (n > 1 ? 's' : '') + ')';
+    set('ap-batch', 'Batch de ' + n + ' pièce' + (n > 1 ? 's' : '') + ' : ' + fmtHm((f.timeH * 60 + f.timeM) * n) +
+        ' · ' + (Math.round(f.weight * n * 100) / 100).toString().replace('.', ',') + ' g de filament');
+    set('ap-out-batch-n', nLabel);
+    set('ap-out-batch-n2', nLabel);
+    set('ap-out-batch-cost', money(r.cost * n));
+    set('ap-out-batch-profit', money(r.marginAmt * n));
     set('ap-out-filament', money(r.filamentCost));
     set('ap-out-deprec', money(r.deprecCost));
     set('ap-out-elec', money(r.elecCost));
