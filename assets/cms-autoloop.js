@@ -352,7 +352,7 @@
         outText = res.text;
         renderReport(res.report);
         if (res.report.ok) {
-          outName = rawName.replace(/\.[^.]*$/, '') + '_' + res.report.loops + 'loops.gcode';
+          outName = 'plate_1.gcode';
           $('#al-download').disabled = false;
         } else {
           $('#al-download').disabled = true;
