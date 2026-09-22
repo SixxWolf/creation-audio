@@ -177,10 +177,15 @@
   }
 
   /* ---------- remise en stock (inverse de la déduction) ---------- */
+  // ne remet que ce qui a RÉELLEMENT été retiré (qty_deducted) : un article vendu à stock 0
+  // n'a rien retiré -> rien à remettre. qty_deducted NULL = ancienne facture -> on remet qty.
   function restoreStock(lines) {
-    var calls = (lines || []).filter(function (l) { return l.product_id && l.qty > 0; }).map(function (l) {
-      return sb.rpc('receive_stock', { p_product: l.product_id, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: Math.abs(+l.qty) });
-    });
+    var calls = (lines || []).map(function (l) {
+      var back = (l.qty_deducted != null) ? +l.qty_deducted : Math.abs(+l.qty);
+      if (!l.product_id || !(back > 0)) return null;
+      return sb.rpc('receive_stock', { p_product: l.product_id, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: back })
+        .then(function (res) { if (res && res.error) throw res.error; });
+    }).filter(Boolean);
     return Promise.all(calls);
   }
 

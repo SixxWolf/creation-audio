@@ -520,6 +520,34 @@ alter table public.dealers add column if not exists city    text;
 -- (dont la catégorie est choisie à la main dans l'éditeur de facture).
 alter table public.invoice_lines add column if not exists ptype text;
 
+-- Quantité RÉELLEMENT retirée du stock par une ligne de facture. Le stock est
+-- borné à 0 : vendre 1 article à stock 0 n'en retire aucun. À l'annulation /
+-- suppression, on ne remet que ce qui a été retiré (sinon on crée du stock
+-- fantôme). NULL = ancienne facture (avant ce suivi) -> on remet qty.
+alter table public.invoice_lines add column if not exists qty_deducted integer;
+
+-- Déduction de stock bornée à 0 qui RENVOIE la quantité effectivement retirée.
+create or replace function public.deduct_stock(p_product uuid, p_kind text, p_qty integer)
+returns integer language plpgsql security definer set search_path = public as $$
+declare v_before integer; v_taken integer;
+begin
+  if coalesce((select auth.jwt() ->> 'email'), '') <> 'creationaudio.ca@gmail.com' then
+    raise exception 'Réservé à l''administrateur.';
+  end if;
+  select case when p_kind = 'refill' then coalesce(qty_2,0) else coalesce(qty,0) end
+    into v_before from public.products where id = p_product for update;
+  if not found then return 0; end if;
+  v_taken := least(v_before, abs(p_qty));
+  update public.products
+     set qty   = case when p_kind <> 'refill' then coalesce(qty,0)   - v_taken else qty   end,
+         qty_2 = case when p_kind =  'refill' then coalesce(qty_2,0) - v_taken else qty_2 end,
+         updated_at = now()
+   where id = p_product;
+  return v_taken;
+end $$;
+revoke all on function public.deduct_stock(uuid, text, integer) from public, anon;
+grant execute on function public.deduct_stock(uuid, text, integer) to authenticated;
+
 -- NOTE : l'ancienne « caisse en direct » (table public.pos_display + écran
 -- client caisse.html) a été retirée. Elle est remplacée par le mode caisse
 -- plein écran (déduction directe du stock à la fin de la vente). La table
