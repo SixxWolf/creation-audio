@@ -53,12 +53,14 @@
   function uniq(a) { var s = {}, o = []; a.forEach(function (x) { if (x != null && !s[x]) { s[x] = 1; o.push(x); } }); return o; }
   // coût catalogue (référence matériau) pour CE filament + format — sert de défaut
   function refCostOf(f, kind) {
+    if (f && isAcc(f)) return num(f.cost_price);   // accessoire : prix à l'unité du produit
     var m = matOf(f);
     if (m) return num(kind === 'refill' ? m.cost_refill : m.cost_spool);
     return num(kind === 'refill' ? f.cost_price_2 : f.cost_price);
   }
   // prix de vente (référence matériau) pour l'aperçu de marge à la réception
   function sellOf(f, kind) {
+    if (f && isAcc(f)) return num(f.sell_price);
     var m = matOf(f);
     if (m) return num(kind === 'refill' ? m.sell_refill : m.sell_spool);
     return num(kind === 'refill' ? f.sell_price_2 : f.sell_price);
@@ -94,10 +96,10 @@
       .then(function (res) { filaments = (res.data || []); });
   }
 
-  // accessoires (bobines vides, etc.) : seulement pour l'onglet Codes-barres (attrs.barcodes.item)
+  // accessoires (bobines vides, etc.) : Codes-barres + Réception (attrs.barcodes.item, kind 'item' -> qty)
   var accessories = [];
   function loadAccessories() {
-    return sb.from('products').select('id,name,attrs').eq('type', 'accessory')
+    return sb.from('products').select('id,name,attrs,qty,cost_price,sell_price').eq('type', 'accessory')
       .order('sort_order', { ascending: true }).order('name', { ascending: true })
       .then(function (res) { accessories = (res.data || []); });
   }
@@ -114,7 +116,11 @@
   function accProd(id) { return accessories.filter(function (x) { return String(x.id) === String(id); })[0] || null; }
   function isAcc(p) { return !!p && accessories.indexOf(p) !== -1; }
   // deux accessoires peuvent porter le même nom : la description les distingue
-  function accLabel(a) { var d = a.attrs && a.attrs.description; return (a.name || '(sans nom)') + (d ? ' — ' + d : ''); }
+  function accLabel(a) {
+    var d = a.attrs && a.attrs.description;
+    var dup = accessories.some(function (x) { return x !== a && x.name === a.name; });
+    return (a.name || '(sans nom)') + (dup && d ? ' — ' + d : '');
+  }
   function bcProd(id) { return filProd(id) || accProd(id); }
   function bcLabel(p) { return isAcc(p) ? accLabel(p) : filLabel(p); }
 
@@ -167,11 +173,20 @@
   }
 
   function filamentOptions(selected) {
-    var opts = ['<option value="">— choisir —</option>'];
-    filaments.forEach(function (f) {
-      opts.push('<option value="' + esc(f.id) + '"' + (String(f.id) === String(selected) ? ' selected' : '') + '>' + esc(filLabel(f)) + '</option>');
-    });
-    return opts.join('');
+    function opt(p, label) { return '<option value="' + esc(p.id) + '"' + (String(p.id) === String(selected) ? ' selected' : '') + '>' + esc(label(p)) + '</option>'; }
+    var fils = filaments.map(function (f) { return opt(f, filLabel); }).join('');
+    if (!accessories.length) return '<option value="">— choisir —</option>' + fils;
+    return '<option value="">— choisir —</option>' +
+      '<optgroup label="Filaments">' + fils + '</optgroup>' +
+      '<optgroup label="Accessoires">' + accessories.map(function (a) { return opt(a, accLabel); }).join('') + '</optgroup>';
+  }
+  // format d'une ligne selon le produit : accessoire -> 'item', filament -> bobine/recharge offert
+  function fitKind(p, kind) {
+    if (isAcc(p)) return 'item';
+    if (kind === 'item') kind = 'spool';
+    if (p && kind === 'refill' && !offersRefill(p) && offersSpool(p)) return 'spool';
+    if (p && kind === 'spool' && !offersSpool(p) && offersRefill(p)) return 'refill';
+    return kind;
   }
 
   // cellule « prix payé » : champ + repère de marge réelle (vente − prix payé)
@@ -205,16 +220,18 @@
     if (!rows.length) { rowsEl.innerHTML = ''; emptyHint.style.display = ''; updateScanCount(); return; }
     emptyHint.style.display = 'none';
     rowsEl.innerHTML = rows.map(function (r, i) {
-      var f = filProd(r.productId);
-      var hasS = !r.productId || offersSpool(f);
-      var hasR = !r.productId || offersRefill(f);
+      var f = bcProd(r.productId), acc = isAcc(f);
+      var hasS = !r.productId || acc || offersSpool(f);
+      var hasR = !r.productId || acc || offersRefill(f);
       return '<tr class="rcp-row' + (r.productId ? '' : ' unmatched') + '" data-i="' + i + '">' +
         '<td class="rcp-fil"><select class="rcp-fil-sel">' + filamentOptions(r.productId) + '</select>' +
           (!r.productId && r.label ? '<div class="hint">détecté : ' + esc(r.label) + '</div>' : '') + '</td>' +
-        '<td><select class="rcp-kind">' +
+        '<td>' + (acc
+          ? '<span class="rcp-kind-item">Article</span>'
+          : '<select class="rcp-kind">' +
             '<option value="spool"' + (r.kind !== 'refill' ? ' selected' : '') + (hasS ? '' : ' disabled') + '>Avec bobine</option>' +
             '<option value="refill"' + (r.kind === 'refill' ? ' selected' : '') + (hasR ? '' : ' disabled') + '>Recharge</option>' +
-          '</select></td>' +
+          '</select>') + '</td>' +
         '<td class="num"><input type="number" class="rcp-qty num" min="0" step="1" value="' + (r.qty != null ? r.qty : '') + '"></td>' +
         '<td class="num rcp-price-cell">' + priceCell(r, f) + '</td>' +
         '<td><button type="button" class="rcp-row-del" aria-label="Retirer">✕</button></td>' +
@@ -225,18 +242,17 @@
       var i = +tr.getAttribute('data-i');
       $('.rcp-fil-sel', tr).addEventListener('change', function () {
         rows[i].productId = this.value;
-        var f = filProd(this.value);
-        if (rows[i].kind === 'refill' && !offersRefill(f) && offersSpool(f)) rows[i].kind = 'spool';
-        if (rows[i].kind === 'spool' && !offersSpool(f) && offersRefill(f)) rows[i].kind = 'refill';
+        rows[i].kind = fitKind(bcProd(this.value), rows[i].kind);
         renderRows();
       });
-      $('.rcp-kind', tr).addEventListener('change', function () { rows[i].kind = this.value; renderRows(); });
+      var kindSel = $('.rcp-kind', tr);
+      if (kindSel) kindSel.addEventListener('change', function () { rows[i].kind = this.value; renderRows(); });
       $('.rcp-qty', tr).addEventListener('input', function () { rows[i].qty = Math.max(0, parseInt(this.value, 10) || 0); updateScanCount(); });
       var priceInp = $('.rcp-price', tr);
       if (priceInp) priceInp.addEventListener('input', function () {
         rows[i].unitCost = this.value === '' ? null : Math.max(0, parseFloat(this.value) || 0);
         var hint = $('.rcp-price-hint', tr);
-        if (hint) hint.innerHTML = priceHint(rows[i], filProd(rows[i].productId));
+        if (hint) hint.innerHTML = priceHint(rows[i], bcProd(rows[i].productId));
       });
       $('.rcp-row-del', tr).addEventListener('click', function () { rows.splice(i, 1); renderRows(); });
     });
@@ -252,7 +268,7 @@
     var v = num(discVal && discVal.value);
     if (v == null) { statusEl.textContent = 'Entre une valeur à appliquer.'; return; }
     rows.forEach(function (r) {
-      var f = filProd(r.productId); if (!f) return;
+      var f = bcProd(r.productId); if (!f) return;
       if (mode === 'fixed') { r.unitCost = round2(Math.max(0, v)); return; }
       var ref = refCostOf(f, r.kind);
       if (ref != null) r.unitCost = round2(Math.max(0, ref * (1 - v / 100)));
@@ -331,8 +347,13 @@
       if (b.spool && String(b.spool) === code) return { f: filaments[i], kind: 'spool' };
       if (b.refill && String(b.refill) === code) return { f: filaments[i], kind: 'refill' };
     }
+    for (var j = 0; j < accessories.length; j++) {
+      var a = accessories[j].attrs && accessories[j].attrs.barcodes;
+      if (a && a.item && String(a.item) === code) return { f: accessories[j], kind: 'item' };
+    }
     return null;
   }
+  function scanLabel(f, kind) { return bcLabel(f) + (kind === 'item' ? '' : ' · ' + kindLabel(kind)); }
 
   function feedback(msg, cls) {
     scanFeedback.textContent = msg;
@@ -343,7 +364,7 @@
     var hit = findByBarcode(code);
     if (!hit) { openLearn(code); return; }
     var qty = addScanUnit(hit.f, hit.kind);
-    feedback('✓ ' + filLabel(hit.f) + ' · ' + kindLabel(hit.kind) + '  (×' + qty + ')', 'ok');
+    feedback('✓ ' + scanLabel(hit.f, hit.kind) + '  (×' + qty + ')', 'ok');
     bumpCount();
     focusScan();
   }
@@ -352,7 +373,7 @@
   function addScanUnit(f, kind) {
     var line = rows.filter(function (r) { return String(r.productId) === String(f.id) && r.kind === kind; })[0];
     if (line) { line.qty = (line.qty | 0) + 1; }
-    else { line = { productId: String(f.id), kind: kind, qty: 1, label: filLabel(f), unitCost: null }; rows.push(line); }
+    else { line = { productId: String(f.id), kind: kind, qty: 1, label: bcLabel(f), unitCost: null }; rows.push(line); }
     renderRows();
     return line.qty;
   }
@@ -372,20 +393,14 @@
   }
 
   /* ---- apprentissage d'un code inconnu ---- */
-  function learnOptions() {
-    var opts = ['<option value="">— choisir le filament —</option>'];
-    filaments.forEach(function (f) {
-      opts.push('<option value="' + esc(f.id) + '">' + esc(filLabel(f)) + '</option>');
-    });
-    return opts.join('');
-  }
+  function learnOptions() { return filamentOptions('').replace('— choisir —', '— choisir l\'article —'); }
   function openLearn(code) {
     pendingCode = code;
     learnOpen = true;
     scanLearnCode.textContent = code;
     scanLearnFil.innerHTML = learnOptions();
     scanLearnFil.value = '';
-    scanLearnKind.value = 'spool';
+    scanLearnKind.value = 'spool'; scanLearnKind.hidden = false;
     scanLearn.hidden = false;
     feedback('⚠ Code-barres inconnu — associe-le ci-dessous.', 'warn');
     try { scanLearnFil.focus(); } catch (e) {}
@@ -396,6 +411,7 @@
   }
   // ajuste le format proposé selon les formats offerts par la couleur choisie
   if (scanLearnFil) scanLearnFil.addEventListener('change', function () {
+    scanLearnKind.hidden = !!accProd(this.value);   // accessoire : pas de format
     var f = filProd(this.value); if (!f) return;
     var hasS = offersSpool(f), hasR = offersRefill(f);
     scanLearnKind.querySelector('option[value="spool"]').disabled = !hasS;
@@ -407,9 +423,9 @@
     feedback('Code ignoré.', 'warn'); closeLearn(); focusScan();
   });
   if (scanLearnSave) scanLearnSave.addEventListener('click', function () {
-    var f = filProd(scanLearnFil.value);
+    var f = bcProd(scanLearnFil.value);
     if (!f) { scanLearnFil.focus(); return; }
-    var kind = scanLearnKind.value === 'refill' ? 'refill' : 'spool';
+    var kind = isAcc(f) ? 'item' : (scanLearnKind.value === 'refill' ? 'refill' : 'spool');
     var code = pendingCode;
     scanLearnSave.disabled = true;
     feedback('Association…', 'warn');
@@ -423,7 +439,7 @@
         f.attrs = res.data[0].attrs || attrs;   // maj en mémoire -> reconnu immédiatement ensuite
         closeLearn();
         var qty = addScanUnit(f, kind);
-        feedback('✓ Associé & compté : ' + filLabel(f) + ' · ' + kindLabel(kind) + '  (×' + qty + ')', 'ok');
+        feedback('✓ Associé & compté : ' + scanLabel(f, kind) + '  (×' + qty + ')', 'ok');
         bumpCount();
         focusScan();
       }, function (err) {
@@ -508,8 +524,8 @@
     var order = orderI.value.trim() || null;
     var newLinesFor = function (receiptId) {
       return valid.map(function (r) {
-        var f = filaments.filter(function (x) { return String(x.id) === String(r.productId); })[0];
-        return { receipt_id: receiptId, product_id: r.productId, label: f ? filLabel(f) : null, kind: r.kind, qty: r.qty,
+        var f = bcProd(r.productId);
+        return { receipt_id: receiptId, product_id: r.productId, label: f ? bcLabel(f) : null, kind: fitKind(f, r.kind), qty: r.qty,
           unit_cost: (r.unitCost != null && r.unitCost !== '') ? round2(r.unitCost) : null };
       });
     };
@@ -552,7 +568,7 @@
       confirmBtn.disabled = false;
       statusEl.textContent = editingReceiptId ? '✓ Réception modifiée, stock et coût moyen ajustés.' : '✓ Réception enregistrée, stock et coût moyen mis à jour.';
       resetForm();
-      loadFilaments().then(function () { renderReorder(); });
+      Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
       loadHistory();
     }, function (err) {
       confirmBtn.disabled = false;
@@ -577,15 +593,21 @@
           (l.kind === 'refill' ? g.refill : g.spool).push(l);
         });
         return Promise.all(productIds.map(function (pid) {
-          var f = filProd(pid);
+          var f = bcProd(pid);
           if (!f) return null;
           var g = byProd[pid] || { spool: [], refill: [] };
-          var avgS = CA.costing.avg(g.spool, refCostOf(f, 'spool'));
-          var avgR = CA.costing.avg(g.refill, refCostOf(f, 'refill'));
           var attrs = Object.assign({}, f.attrs || {});
           var ac = {};
-          if (avgS != null) ac.spool = avgS;
-          if (avgR != null) ac.refill = avgR;
+          if (isAcc(f)) {
+            // accessoire : un seul coût moyen (lignes 'item' rangées avec 'spool' ci-dessus)
+            var avgI = CA.costing.avg(g.spool, refCostOf(f, 'item'));
+            if (avgI != null) ac.item = avgI;
+          } else {
+            var avgS = CA.costing.avg(g.spool, refCostOf(f, 'spool'));
+            var avgR = CA.costing.avg(g.refill, refCostOf(f, 'refill'));
+            if (avgS != null) ac.spool = avgS;
+            if (avgR != null) ac.refill = avgR;
+          }
           if (Object.keys(ac).length) attrs.avg_cost = ac; else delete attrs.avg_cost;
           return sb.from('products').update({ attrs: attrs, updated_at: new Date().toISOString() }).eq('id', pid).select()
             .then(function (r) { if (r.data && r.data[0]) f.attrs = r.data[0].attrs || attrs; });
@@ -620,12 +642,12 @@
       var linesHtml = lines.map(function (l) {
         var q = l.qty | 0;
         var priced = (l.unit_cost != null && l.unit_cost !== '');
-        var eff = priced ? +l.unit_cost : refCostOf(filProd(l.product_id), l.kind === 'refill' ? 'refill' : 'spool');
+        var eff = priced ? +l.unit_cost : refCostOf(bcProd(l.product_id), l.kind === 'refill' ? 'refill' : 'spool');
         if (eff != null) { totalCost += eff * q; hasAnyCost = true; }
         var priceTxt = priced
           ? '<span class="rcp-hist-price">' + money(l.unit_cost) + '/u</span>'
           : '<span class="rcp-hist-price muted">catalogue' + (eff != null ? ' ' + money(eff) + '/u' : '') + '</span>';
-        return '<li>' + esc(l.label || '(filament supprimé)') + ' — ' + (l.kind === 'refill' ? 'recharge' : 'bobine') + ' × ' + q + ' · ' + priceTxt + '</li>';
+        return '<li>' + esc(l.label || '(produit supprimé)') + ' — ' + kindLabel(l.kind) + ' × ' + q + ' · ' + priceTxt + '</li>';
       }).join('');
       var costTxt = hasAnyCost ? ' · ' + money(totalCost) : '';
       return '<div class="mat-row rcp-hist" data-id="' + esc(rc.id) + '">' +
@@ -658,7 +680,7 @@
     dateI.value = rc.received_at || todayISO();
     pasteI.value = ''; parseHint.textContent = '';
     rows = lines.map(function (l) {
-      return { productId: l.product_id ? String(l.product_id) : '', kind: l.kind === 'refill' ? 'refill' : 'spool', qty: l.qty | 0, label: l.label || '',
+      return { productId: l.product_id ? String(l.product_id) : '', kind: l.kind === 'refill' ? 'refill' : (l.kind === 'item' ? 'item' : 'spool'), qty: l.qty | 0, label: l.label || '',
         unitCost: (l.unit_cost != null && l.unit_cost !== '') ? +l.unit_cost : null };
     });
     setMode(rc, lines);
@@ -680,7 +702,7 @@
       })
       .then(function () {
         if (editingReceiptId === rc.id) resetForm();
-        loadFilaments().then(function () { renderReorder(); });
+        Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
         loadHistory();
       }, function (err) { window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
   }

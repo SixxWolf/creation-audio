@@ -500,7 +500,10 @@
       meta = [p.brand, p.material, (kind === 'refill' ? 'Recharge' : 'Avec bobine')].filter(Boolean).join(' · ');
     } else if (c === 'accessory') {
       kind = 'unit';
-      base = p.sell_price; cost = p.cost_price; tiers = [];
+      base = p.sell_price; tiers = [];
+      // coût moyen réel (réceptions) prioritaire sur le coût catalogue
+      var acI = p.attrs && p.attrs.avg_cost && p.attrs.avg_cost.item;
+      cost = (acI != null && acI !== '') ? +acI : p.cost_price;
       label = p.name; meta = 'Accessoire';
     } else { // spacer : deux tarifs (client / dealer)
       kind = 'unit';
@@ -1047,7 +1050,8 @@
     function accLabel(p) {
       // deux accessoires peuvent porter le même nom : on ajoute la description pour les distinguer
       var d = p.attrs && p.attrs.description;
-      return p.name + (d ? ' — ' + d : '');
+      var dup = accs.some(function (x) { return x !== p && x.name === p.name; });
+      return p.name + (dup && d ? ' — ' + d : '');
     }
     return '<option value="">— choisir l\'article —</option>' +
       (accs.length ? '<optgroup label="Accessoires">' + accs.map(function (p) {
