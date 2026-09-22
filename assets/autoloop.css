@@ -73,8 +73,6 @@
 .al-lfoot { font-size:.8rem; color:var(--muted); border-top:1px dashed var(--line); padding-top:6px; margin-top:4px; }
 
 /* --- Profils -------------------------------------------- */
-.al-profiles { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-.al-profiles input[type="text"], .al-profiles select { flex:1 1 180px; min-width:150px; }
 
 /* --- Résumé des coûts ----------------------------------- */
 .al-summary { position:relative; }

@@ -5,7 +5,7 @@
       (calibration par intervalle, hauteur de push auto, bending
       motion régénéré, cooldown configurable, strip AMS optionnel).
    2) Calculateur de prix : coût de production / prix de vente,
-      profils sauvegardés en localStorage.
+      lecture auto du gcode (poids, temps), totaux du batch.
 
    Réf. ancrages gcode : « Auto Loop.md ». Ne PAS modifier les
    regex sans re-tester contre un vrai fichier gcode multi-loop.
@@ -447,8 +447,6 @@
   /*  2) CALCULATEUR DE PRIX                                              */
   /* ================================================================== */
 
-  var PROFILE_KEY = 'creationaudio_farmloop_pricing_profiles';
-
   function money(n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; }
 
   // Modèle fidèle à FarmLoop : main d'œuvre = taux horaire × minutes,
@@ -567,28 +565,6 @@
       '<div class="ap-legend">' + legend + '</div>';
   }
 
-  /* --- Profils (localStorage) ---------------------------------------- */
-  function loadProfiles() {
-    try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}') || {}; }
-    catch (e) { return {}; }
-  }
-  function saveProfiles(obj) {
-    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(obj)); } catch (e) {}
-  }
-  function refreshProfileSelect() {
-    var sel = $('#ap-profile-select'), profiles = loadProfiles();
-    var names = Object.keys(profiles).sort();
-    sel.innerHTML = '<option value="">— profils sauvegardés —</option>' +
-      names.map(function (n) { return '<option value="' + n.replace(/"/g, '&quot;') + '">' + n + '</option>'; }).join('');
-  }
-  function applyProfile(data) {
-    if (!data) return;
-    Object.keys(PRICE_MAP).forEach(function (id) {
-      if (data[PRICE_MAP[id]] != null) { var el = $('#' + id); if (el) el.value = data[PRICE_MAP[id]]; }
-    });
-    recompute();
-  }
-
   function initPricing() {
     var wrap = $('.al-view[data-view="prix"]');
     if (!wrap) return;
@@ -600,64 +576,6 @@
       var c = compute(priceFields()).cost;
       if (c > 0) pe.value = (Math.round(c / (1 - 0.33) * 20) / 20).toFixed(2);
     }
-
-    refreshProfileSelect();
-    $('#ap-profile-save').addEventListener('click', function () {
-      var name = ($('#ap-profile-name').value || '').trim();
-      if (!name) { $('#ap-profile-status').textContent = 'Donne un nom au profil.'; return; }
-      var profiles = loadProfiles();
-      profiles[name] = priceFields();
-      saveProfiles(profiles);
-      refreshProfileSelect();
-      $('#ap-profile-select').value = name;
-      $('#ap-profile-status').textContent = 'Profil « ' + name + ' » enregistré.';
-    });
-    $('#ap-profile-select').addEventListener('change', function () {
-      var name = $('#ap-profile-select').value;
-      if (!name) return;
-      applyProfile(loadProfiles()[name]);
-      $('#ap-profile-name').value = name;
-      $('#ap-profile-status').textContent = 'Profil « ' + name + ' » chargé.';
-    });
-    $('#ap-profile-delete').addEventListener('click', function () {
-      var name = $('#ap-profile-select').value;
-      if (!name) return;
-      var profiles = loadProfiles();
-      delete profiles[name];
-      saveProfiles(profiles);
-      refreshProfileSelect();
-      $('#ap-profile-status').textContent = 'Profil supprimé.';
-    });
-    // Export / import JSON (portabilité entre appareils)
-    $('#ap-export').addEventListener('click', function () {
-      var blob = new Blob([JSON.stringify(loadProfiles(), null, 2)], { type: 'application/json' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url; a.download = 'autoloop-profils-prix.json';
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-    });
-    var importInput = $('#ap-import');
-    $('#ap-import-btn').addEventListener('click', function () { importInput.click(); });
-    importInput.addEventListener('change', function () {
-      var file = importInput.files[0];
-      if (!file) return;
-      var reader = new FileReader();
-      reader.onload = function (e) {
-        try {
-          var incoming = JSON.parse(String(e.target.result));
-          var profiles = loadProfiles();
-          Object.keys(incoming).forEach(function (k) { profiles[k] = incoming[k]; });
-          saveProfiles(profiles);
-          refreshProfileSelect();
-          $('#ap-profile-status').textContent = Object.keys(incoming).length + ' profil(s) importé(s).';
-        } catch (err) {
-          $('#ap-profile-status').textContent = 'Fichier JSON invalide.';
-        }
-        importInput.value = '';
-      };
-      reader.readAsText(file);
-    });
 
     recompute();
   }
