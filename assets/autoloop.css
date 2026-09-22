@@ -109,6 +109,9 @@
 .ap-dot { width:11px; height:11px; border-radius:3px; flex:0 0 auto; }
 .ap-leg-v { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
 
+.field-wide { grid-column:1 / -1; }
+.field-wide .al-fine { margin:0; }
+
 /* --- Responsive ----------------------------------------- */
 @media (max-width:900px) {
   .al-cols { grid-template-columns:1fr; }

@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/admin.css?v=25">
 <link rel="stylesheet" href="assets/facture.css?v=8">
-<link rel="stylesheet" href="assets/autoloop.css?v=4">
+<link rel="stylesheet" href="assets/autoloop.css?v=5">
 <script src="assets/theme.js?v=1" defer></script>
 </head>
 <body>
@@ -1338,6 +1338,12 @@
                 <div class="field">
                   <label class="lbl" for="ap-loops">Loops (pièces)</label>
                   <input type="number" id="ap-loops" min="1" step="1" value="1" class="num">
+                </div>
+                <div class="field">
+                  <label class="lbl" for="ap-cooldown">Refroidissement <span class="hint">(min/loop, éjection incluse)</span></label>
+                  <input type="number" id="ap-cooldown" min="0" step="1" value="0" class="num">
+                </div>
+                <div class="field field-wide">
                   <p class="al-fine" id="ap-batch"></p>
                 </div>
                 <div class="field">
@@ -1442,6 +1448,6 @@
 <script src="assets/cms-facturation.js?v=15"></script>
 <script src="assets/cms-historique.js?v=3"></script>
 <script src="assets/cms-statistiques.js?v=4"></script>
-<script src="assets/cms-autoloop.js?v=9"></script>
+<script src="assets/cms-autoloop.js?v=10"></script>
 </body>
 </html>

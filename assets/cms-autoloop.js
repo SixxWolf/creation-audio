@@ -468,7 +468,7 @@
   // prep amortie sur le nombre de loops, post par pièce.
   var PRICE_MAP = {
     'ap-time-h': 'timeH', 'ap-time-m': 'timeM', 'ap-weight': 'weight',
-    'ap-loops': 'loops', 'ap-failure': 'failure',
+    'ap-loops': 'loops', 'ap-cooldown': 'cooldown', 'ap-failure': 'failure',
     'ap-filament-kg': 'filamentKg', 'ap-deprec': 'deprec', 'ap-elec': 'elec',
     'ap-consumables': 'consumables', 'ap-rate': 'rate',
     'ap-prep-model': 'prepModel', 'ap-prep-slice': 'prepSlice', 'ap-prep-transfer': 'prepTransfer',
@@ -487,7 +487,10 @@
   }
 
   function compute(f) {
-    var hours = (f.timeH * 60 + f.timeM) / 60;
+    // Temps machine par pièce = impression + refroidissement/éjection entre loops.
+    // La P2S est occupée pendant le cooldown → il compte dans la dépréciation et
+    // l'électricité, mais évidemment pas dans le filament.
+    var hours = (f.timeH * 60 + f.timeM + f.cooldown) / 60;
     var filamentCost = f.weight * f.filamentKg / 1000;
     var deprecCost = hours * f.deprec;
     var elecCost = hours * f.elec;
@@ -528,9 +531,10 @@
     // Batch = valeurs par pièce × loops (temps, filament, coût, profit).
     var n = f.loops;
     var nLabel = '(' + n + ' pièce' + (n > 1 ? 's' : '') + ')';
-    set('ap-batch', 'Batch de ' + n + ' pièce' + (n > 1 ? 's' : '') + ' : ' + fmtHm((f.timeH * 60 + f.timeM) * n) +
-        ' · ' + (Math.round(f.weight * n * 100) / 100).toString().replace('.', ',') + ' g de filament' +
-        (n > 1 ? ' (hors refroidissement entre loops)' : ''));
+    var printMin = (f.timeH * 60 + f.timeM) * n, coolMin = f.cooldown * n;
+    set('ap-batch', 'Batch de ' + n + ' pièce' + (n > 1 ? 's' : '') + ' : ' + fmtHm(printMin + coolMin) +
+        (coolMin > 0 ? ' (dont ' + fmtHm(coolMin) + ' de refroidissement)' : '') +
+        ' · ' + (Math.round(f.weight * n * 100) / 100).toString().replace('.', ',') + ' g de filament');
     set('ap-out-batch-n', nLabel);
     set('ap-out-batch-n2', nLabel);
     set('ap-out-batch-cost', money(r.cost * n));
