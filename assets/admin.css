@@ -450,7 +450,7 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 }
 
 /* =========================================================
-   Facturation — barre caisse (scanner + écran client)
+   Facturation — barre scanner de commande
    ========================================================= */
 .fx-pos { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 18px;
   padding:14px 16px; border:1px solid var(--line); border-radius:var(--radius-lg);
@@ -532,39 +532,3 @@ input[type=color] { -webkit-appearance:none; appearance:none; width:38px; height
 .bc-table tr.bc-flash { animation:bcFlash 1.3s ease; }
 @keyframes bcFlash { 0%,100% { background:transparent; } 18% { background:var(--good-wash); } }
 
-/* =========================================================
-   Facturation — MODE CAISSE plein écran
-   ========================================================= */
-.fx-caisse-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-body.fx-caisse-on { overflow-x:hidden; }
-body.fx-caisse-on .topbar,
-body.fx-caisse-on .tabs,
-body.fx-caisse-on .nav-drawer,
-body.fx-caisse-on .nav-backdrop,
-body.fx-caisse-on .mat-nav { display:none !important; }
-body.fx-caisse-on main { max-width:none; margin:0; padding:18px; }
-body.fx-caisse-on .tabpanel:not([data-panel="facturation"]) { display:none !important; }
-/* cache tout le côté « admin » : n'affiche que scan + facture + total */
-body.fx-caisse-on [data-panel="facturation"] > .panel-head,
-body.fx-caisse-on .fx-bar,
-body.fx-caisse-on .fx-meta,
-body.fx-caisse-on .fx-side,
-body.fx-caisse-on .fx-margin,
-body.fx-caisse-on .fx-actions,
-body.fx-caisse-on #fx-caisse-mode { display:none !important; }
-body.fx-caisse-on .fx-layout { display:block; }
-body.fx-caisse-on .fx-main,
-body.fx-caisse-on .fx-pos,
-body.fx-caisse-on .fx-caisse-bar { max-width:900px; margin-left:auto; margin-right:auto; }
-body.fx-caisse-on .fx-pos { margin-bottom:16px; }
-body.fx-caisse-on .fx-caisse-bar { margin-top:16px; }
-body.fx-caisse-on .fx-invoice { font-size:1.05rem; }
-
-/* écran « Merci » */
-.fx-caisse-thanks { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;
-  background:color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter:blur(4px); }
-.fx-caisse-thanks-in { text-align:center; }
-.fx-caisse-check { width:120px; height:120px; margin:0 auto 14px; border-radius:50%; background:var(--good); color:#fff;
-  display:flex; align-items:center; justify-content:center; font-size:4rem; box-shadow:0 12px 40px rgba(31,157,87,.35); }
-.fx-caisse-thanks-in h1 { font-size:2.6rem; }
-.fx-caisse-thanks-total { font-size:2rem; font-weight:800; color:var(--ember-dim); margin:8px 0 20px; }

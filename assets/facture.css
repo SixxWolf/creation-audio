@@ -167,6 +167,8 @@
 .fx-margin-v { font-weight:700; font-size:1.1rem; font-variant-numeric:tabular-nums; }
 .fx-margin-v.pos { color:var(--good); } .fx-margin-v.neg { color:var(--bad); }
 .fx-margin-sub { color:var(--muted); font-size:.82rem; font-variant-numeric:tabular-nums; }
+.fx-margin-v.fx-margin-hidden { color:var(--muted); letter-spacing:.15em; }
+.fx-margin-toggle { margin-left:auto; align-self:center; }
 
 .fx-actions { display:flex; align-items:center; gap:10px; margin-top:16px; flex-wrap:wrap; }
 

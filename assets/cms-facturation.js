@@ -66,6 +66,7 @@
   var matFilter = 'all';         // filtre matériau (catalogue filament)
   var lines = [];                // lignes de la facture
   var saved = false;             // verrou anti-double-enregistrement
+  var marginShown = false;       // marge/coût masqués par défaut (non mémorisé : re-masqués au rechargement)
   var catalog = { filament: [], spacer: [], accessory: [] };
   var catalogLoaded = { filament: false, spacer: false, accessory: false };
   var lastAutoNumber = '';   // dernier n° auto proposé (E2 : détecte une saisie manuelle)
@@ -678,13 +679,18 @@
       b.addEventListener('click', function () { lines.splice(+this.getAttribute('data-i'), 1); afterChange(); });
     });
 
-    // marge (privé)
+    // marge (privé) : masquée par défaut (client devant l'écran), un clic l'affiche / la masque
     var mcls = t.margin >= 0 ? 'pos' : 'neg';
     var pct = t.sub > 0 ? Math.round(t.margin / t.sub * 100) : 0;
     elMargin.hidden = false;
+    elMargin.classList.toggle('is-masked', !marginShown);
     elMargin.innerHTML = '<span class="fx-margin-k">Marge (privé)</span>' +
-      '<span class="fx-margin-v ' + mcls + '">' + money(t.margin) + (t.sub > 0 ? ' · ' + pct + '%' : '') + '</span>' +
-      '<span class="fx-margin-sub">coût ' + money(t.cost) + '</span>';
+      (marginShown
+        ? '<span class="fx-margin-v ' + mcls + '">' + money(t.margin) + (t.sub > 0 ? ' · ' + pct + '%' : '') + '</span>' +
+          '<span class="fx-margin-sub">coût ' + money(t.cost) + '</span>'
+        : '<span class="fx-margin-v fx-margin-hidden" aria-label="masquée">•••••</span>') +
+      '<button type="button" class="btn btn-ghost btn-sm fx-margin-toggle" aria-pressed="' + marginShown + '">' +
+        (marginShown ? 'Masquer' : 'Afficher') + '</button>';
 
     refreshPickerBadges();
   }
@@ -699,6 +705,10 @@
   });
   if (elCliName) elCliName.addEventListener('change', autofillClientByName);
   if (elTax) elTax.addEventListener('change', function () { taxEnabled = this.checked; render(); });
+  if (elMargin) elMargin.addEventListener('click', function (e) {
+    if (!e.target.closest('.fx-margin-toggle')) return;
+    marginShown = !marginShown; render();
+  });
 
   /* ---------- enregistrement ---------- */
   function currentCategory() {
@@ -713,7 +723,7 @@
     var valid = lines.filter(function (l) { return l.qty > 0; });
     if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
 
-    saved = true;   // verrou pendant l'envoi (anti double-clic, y compris « Terminer » en caisse)
+    saved = true;   // verrou pendant l'envoi (anti double-clic)
     elSave.disabled = true; elStatus.textContent = 'Attribution du numéro…';
     var t = totals();
     var specs = specsText();
@@ -768,7 +778,6 @@
         });
       });
     }).then(function (inv) {
-      if (caisseMode) showCaisseThanks();   // mode caisse : écran « Merci » + total (calculé avant la remise à zéro)
       // auto-mémorisation du client (mode client seulement ; les dealers = onglet Dealers)
       if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value)) {
         window.CA.rememberClient(clientFields());
@@ -776,7 +785,6 @@
       var deducted = !!elDeduct.checked;
       // la vente est enregistrée : on repart d'une facture vierge (réimpression possible ci-dessous ou dans l'Historique)
       resetInvoice();
-      if (caisseMode && elCaisseStatus) elCaisseStatus.textContent = '';
       elStatus.textContent = '✓ Facture ' + inv.number + ' enregistrée' + (deducted ? ', stock déduit' : '') + '. Nouvelle facture prête. ';
       if (window.CA.printInvoice) {
         var pb = document.createElement('button');
@@ -795,7 +803,6 @@
       var msg = (err && err.message) ? err.message : String(err);
       if (/duplicate|unique|23505/i.test(msg)) msg = 'Ce numéro de facture existe déjà. Choisis-en un autre.';
       elStatus.textContent = 'Erreur : ' + msg;
-      if (caisseMode && elCaisseStatus) elCaisseStatus.textContent = 'Erreur : ' + msg;
     });
   }
   function round2(n) { return Math.round((+n || 0) * 100) / 100; }
@@ -903,12 +910,10 @@
   if ($('#co-logo-remove')) $('#co-logo-remove').addEventListener('click', function () { logoData = ''; $('#co-logo-file').value = ''; showLogoPreview(); writeCompany(); render(); });
 
   /* =========================================================
-     CAISSE — scanner de commande + mode caisse plein écran
+     CAISSE — scanner de commande
      - « Scanner la commande » arme une case en attente ; chaque
        code-barres ajoute le bon filament (bon format). Codes inconnus :
        panneau d'apprentissage (products.attrs.barcodes).
-     - « Mode caisse » : plein écran épuré (scan + facture + total) ;
-       « Terminer la vente » enregistre la vente ET déduit le stock.
      ========================================================= */
 
   /* ----- éléments ----- */
@@ -1043,53 +1048,5 @@
   });
   function prodInCatalog(which, id) { return (catalog[which] || []).filter(function (p) { return String(p.id) === String(id); })[0] || null; }
 
-  /* ----- MODE CAISSE plein écran (portable, un seul écran) ----- */
-  var caisseMode = false;
-  var elCaisseMode = $('#fx-caisse-mode'), fxCaisseBar = $('#fx-caisse-bar'),
-      elCaisseFinish = $('#fx-caisse-finish'), elCaisseClear = $('#fx-caisse-clear'), elCaisseExit = $('#fx-caisse-exit'),
-      elCaisseStatus = $('#fx-caisse-status'), fxCaisseThanks = $('#fx-caisse-thanks'),
-      elCaisseThanksTotal = $('#fx-caisse-thanks-total'), elCaisseNew = $('#fx-caisse-new');
-
-  function enterCaisse() {
-    caisseMode = true;
-    document.body.classList.add('fx-caisse-on');
-    if (fxCaisseBar) fxCaisseBar.hidden = false;
-    if (elDeduct) elDeduct.checked = true;              // la caisse déduit toujours le stock
-    if (elCaisseStatus) elCaisseStatus.textContent = '';
-    if (!scanActive) setScanActive(true); else focusScan();
-  }
-  function exitCaisse() {
-    caisseMode = false;
-    document.body.classList.remove('fx-caisse-on');
-    if (fxCaisseBar) fxCaisseBar.hidden = true;
-    if (fxCaisseThanks) fxCaisseThanks.hidden = true;
-  }
-  function showCaisseThanks() {
-    if (!fxCaisseThanks) return;
-    if (elCaisseThanksTotal) elCaisseThanksTotal.textContent = money(totals().total);
-    fxCaisseThanks.hidden = false;
-    // la facture est déjà remise à zéro derrière : l'écran « Merci » se ferme seul après quelques secondes
-    clearTimeout(thanksTimer);
-    thanksTimer = setTimeout(closeCaisseThanks, 4000);
-  }
-  var thanksTimer = null;
-  function closeCaisseThanks() {
-    clearTimeout(thanksTimer);
-    if (fxCaisseThanks) fxCaisseThanks.hidden = true;
-    if (caisseMode) { if (!scanActive) setScanActive(true); else focusScan(); }
-  }
-  if (elCaisseMode) elCaisseMode.addEventListener('click', enterCaisse);
-  if (elCaisseExit) elCaisseExit.addEventListener('click', exitCaisse);
-  if (elCaisseClear) elCaisseClear.addEventListener('click', function () {
-    resetInvoice(); if (elCaisseStatus) elCaisseStatus.textContent = '';
-    if (!scanActive) setScanActive(true); focusScan();
-  });
-  if (elCaisseFinish) elCaisseFinish.addEventListener('click', function () {
-    var valid = lines.filter(function (l) { return l.qty > 0; });
-    if (!valid.length) { if (elCaisseStatus) elCaisseStatus.textContent = 'Scanne au moins un article.'; return; }
-    if (elCaisseStatus) elCaisseStatus.textContent = 'Enregistrement…';
-    onSave();   // succès -> showCaisseThanks() ; erreur -> message dans #fx-caisse-status
-  });
-  if (elCaisseNew) elCaisseNew.addEventListener('click', closeCaisseThanks);   // la facture est déjà vierge
 
 })();

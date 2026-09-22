@@ -15,8 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=25">
-<link rel="stylesheet" href="assets/facture.css?v=8">
+<link rel="stylesheet" href="assets/admin.css?v=26">
+<link rel="stylesheet" href="assets/facture.css?v=9">
 <link rel="stylesheet" href="assets/autoloop.css?v=6">
 <script src="assets/theme.js?v=1" defer></script>
 </head>
@@ -1014,12 +1014,11 @@
         </details>
       </div>
 
-      <!-- Caisse : scanner de commande + mode caisse plein écran -->
+      <!-- Caisse : scanner de commande -->
       <div class="fx-pos no-print" id="fx-pos">
         <button type="button" class="btn btn-accent fx-scan-toggle" id="fx-scan-toggle" aria-pressed="false">▶ Scanner la commande</button>
         <input type="text" id="fx-scan-input" class="fx-scan-input" autocomplete="off" autocorrect="off"
                autocapitalize="off" spellcheck="false" placeholder="Clique « Scanner » puis scanne les articles…" disabled>
-        <button type="button" class="btn btn-ghost btn-sm" id="fx-caisse-mode">⛶ Mode caisse</button>
         <span class="fx-scan-feedback" id="fx-scan-feedback" aria-live="polite"></span>
 
         <!-- apprentissage d'un code inconnu -->
@@ -1081,7 +1080,7 @@
         <div class="fx-main">
           <div class="fx-invoice" id="fx-invoice"></div>
 
-          <!-- Résumé marge (privé, non imprimé) -->
+          <!-- Résumé marge (privé, non imprimé) — masqué par défaut, bouton pour afficher -->
           <div class="fx-margin no-print" id="fx-margin" hidden></div>
 
           <div class="fx-actions no-print">
@@ -1095,24 +1094,6 @@
         </div>
       </div>
 
-      <!-- Barre de contrôle du mode caisse (visible seulement en plein écran) -->
-      <div class="fx-caisse-bar no-print" id="fx-caisse-bar" hidden>
-        <button class="btn btn-accent" id="fx-caisse-finish" type="button">Terminer la vente</button>
-        <button class="btn btn-ghost" id="fx-caisse-clear" type="button">Vider</button>
-        <span class="status" id="fx-caisse-status" aria-live="polite"></span>
-        <span class="grow"></span>
-        <button class="btn btn-ghost" id="fx-caisse-exit" type="button">✕ Quitter le mode caisse</button>
-      </div>
-
-      <!-- Écran « Merci » après une vente (mode caisse) -->
-      <div class="fx-caisse-thanks" id="fx-caisse-thanks" hidden>
-        <div class="fx-caisse-thanks-in">
-          <div class="fx-caisse-check">✓</div>
-          <h1>Merci&nbsp;!</h1>
-          <p class="fx-caisse-thanks-total" id="fx-caisse-thanks-total"></p>
-          <button class="btn btn-accent" id="fx-caisse-new" type="button">Nouvelle vente</button>
-        </div>
-      </div>
     </section>
     <!-- ---------------- HISTORIQUE ---------------- -->
     <section class="tabpanel" data-panel="historique" role="tabpanel" hidden>
@@ -1445,7 +1426,7 @@
 <script src="assets/cms-inventory.js?v=18"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
-<script src="assets/cms-facturation.js?v=17"></script>
+<script src="assets/cms-facturation.js?v=18"></script>
 <script src="assets/cms-historique.js?v=5"></script>
 <script src="assets/cms-statistiques.js?v=4"></script>
 <script src="assets/cms-autoloop.js?v=10"></script>
