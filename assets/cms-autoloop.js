@@ -62,6 +62,39 @@
   var END_ANCHOR = '; MACHINE_END_GCODE_START';
   var RE_START_ANCHOR = /(;======== P2S start gcode==========\r?\n;=====[^\r\n]*\r?\n)/;
   var RE_MAXZ = /;\s*max_z_height:\s*([\d.]+)/;
+  /* - RE_LOAD_LINE : bloc « nozzle load line » du start gcode P2S (la petite
+       ligne de purge tracée devant le plateau via G130). En boucle, ce fil peut
+       rester accroché au bord et être ramassé au push suivant ; on le remplace
+       donc, comme FarmLoop le faisait, par une purge dans la goulotte à déchets
+       (la buse y est déjà parquée par le G150.3 précédent). Bambu écrit
+       « noozle » dans la balise de fin → orthographe tolérante.                */
+  var RE_LOAD_LINE = /^;=+ no+z+le load line =+[^\r\n]*\r?\n([\s\S]*?)^;=+ no+z+le load line end =+[^\r\n]*\r?\n/m;
+
+  // Remplace la ligne de purge native par une purge en goulotte. Séquence reprise
+  // du fichier FarmLoop qui imprimait déjà ; la température M109 est celle du bloc
+  // d'origine (temp. buse du profil). Bloc absent → gcode inchangé (signalé au rapport).
+  function replaceLoadLine(head, eol) {
+    var m = RE_LOAD_LINE.exec(head);
+    if (!m) return { text: head, replaced: false };
+    var t = /M109 S(\d+)/.exec(m[1]);
+    var L = [
+      ';===== nozzle load line (AutoLoop : purge en goulotte, pas de ligne sur le plateau) =====',
+      'M1002 gcode_claim_action : 51',
+      '  G29.2 S1 ; ensure z comp turn on',
+      t ? '  M109 S' + t[1] : '  ; (température buse introuvable dans le bloc natif — déjà chauffée par M104 A)',
+      '  M975 S1',
+      '  G90',
+      '  M83',
+      '  T1000',
+      '  G92 E0',
+      '  G1 E50 F200 ; purge dans la goulotte à déchets',
+      '  M400',
+      '  G1 X100 F21000',
+      '  M400',
+      ';===== nozzle load line end ====='
+    ];
+    return { text: head.slice(0, m.index) + L.join(eol) + eol + head.slice(m.index + m[0].length), replaced: true };
+  }
 
   // Loop calibré ? Loop 1 toujours ; puis tous les `interval` loops si interval>0.
   function calibrateLoop(i, interval) {
@@ -187,7 +220,8 @@
     var eol = detectEol(raw);
     var report = {
       ok: false, loops: opts.loops, eol: eol === '\r\n' ? 'CRLF' : 'LF',
-      maxZ: null, pushZ: null, calibrated: [], bendsPerLoop: 0, size: 0, error: null
+      maxZ: null, pushZ: null, calibrated: [], bendsPerLoop: 0, size: 0, error: null,
+      loadLineReplaced: false
     };
     var idx = raw.indexOf(END_ANCHOR);
     var mz = raw.match(RE_MAXZ);
@@ -201,6 +235,8 @@
     report.bendsPerLoop = (opts.bendEnable && opts.bendCycles > 0) ? opts.bendCycles * 2 : 0;
 
     var head = raw.slice(0, idx);   // pièce complète (header + config + start + corps), sans le end gcode natif
+    var ll = replaceLoadLine(head, eol);   // purge en goulotte à la place de la ligne G130, sur tous les loops
+    head = ll.text; report.loadLineReplaced = ll.replaced;
     var N = opts.loops;
     var trans = buildTransition(opts, pushZ, maxZ, eol);   // identique pour chaque loop
 
@@ -264,6 +300,9 @@
         ' · fichier ~' + fmtSize(rep.size) +
         '<br>Calibration sur loop(s) : ' + (rep.calibrated.join(', ') || '—') +
         ' · les autres loops sautent extrusion + bed leveling.' +
+        '<br>Ligne de purge : ' + (rep.loadLineReplaced
+          ? 'remplacée par une purge en goulotte (aucune ligne sur le plateau).'
+          : '<span class="al-warn">bloc « nozzle load line » introuvable — purge native conservée.</span>') +
       '</p>' +
       '<p class="al-fine al-tip">Vérifie toujours le premier loop sur la P2S avant de lancer le batch complet.</p>';
   }
