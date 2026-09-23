@@ -102,11 +102,16 @@
       return;
     }
     listEl.innerHTML = cache.map(function (d) {
-      var contact = [d.email, d.phone].filter(Boolean).join(' · ');
-      return '<div class="mat-row" data-email="' + esc(d.email) + '">' +
+      var loc = [d.address, d.city].filter(Boolean).join(', ');
+      return '<div class="mat-row person" data-email="' + esc(d.email) + '">' +
+        CA.avatar(d.name || d.email) +
         '<div class="mat-main">' +
-          '<div class="mat-name">' + esc(d.name || d.email) + '</div>' +
-          '<div class="mat-prices"><span>' + esc(contact) + '</span></div>' +
+          '<div class="mat-name">' + esc(d.name || d.email) + ' <span class="person-tag">Portail dealer</span></div>' +
+          '<div class="person-meta">' +
+            '<span class="pm pm-mail">' + esc(d.email) + '</span>' +
+            (d.phone ? '<span class="pm pm-tel">' + esc(d.phone) + '</span>' : '') +
+            (loc ? '<span class="pm pm-loc">' + esc(loc) + '</span>' : '') +
+          '</div>' +
         '</div>' +
         '<div class="mat-actions">' +
           '<button class="btn btn-ghost btn-sm dl-edit" type="button">Modifier</button>' +

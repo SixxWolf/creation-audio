@@ -21,6 +21,16 @@ window.CA = window.CA || {};
       .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   };
 
+  // Pastille à initiales (listes Clients / Dealers) : teinte stable dérivée du nom.
+  window.CA.avatar = function (name) {
+    var s = String(name == null ? '' : name).trim();
+    var words = s.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(Boolean);
+    var ini = words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2);
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+    return '<span class="person-av" style="--h:' + h + '" aria-hidden="true">' + ini.toUpperCase().replace(/[<>&"']/g, '') + '</span>';
+  };
+
   var loginWrap = $('#login'), app = $('#app'),
       loginForm = $('#login-form'), emailI = $('#login-email'), passI = $('#login-pass'),
       loginBtn = $('#login-btn'), loginStatus = $('#login-status'),

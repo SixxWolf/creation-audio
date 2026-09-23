@@ -340,6 +340,41 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .sp-tierrow .card-margin { white-space:nowrap; }
 
 /* =========================================================
+   ONGLETS DEALERS & CLIENTS (lignes contact avec avatar)
+   ========================================================= */
+.mat-row.person { gap:14px; }
+.person-av { display:grid; place-items:center; width:42px; height:42px; flex:none; border-radius:50%;
+  font-family:var(--display); font-weight:700; font-size:.92rem; letter-spacing:.02em;
+  color:hsl(var(--h, 20) 45% 30%); background:hsl(var(--h, 20) 70% 91%); }
+:root[data-theme="dark"] .person-av { color:hsl(var(--h, 20) 75% 80%); background:hsl(var(--h, 20) 30% 22%); }
+.person-tag { margin-left:6px; padding:2px 8px; font-family:var(--font); font-size:.66rem; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; vertical-align:2px; color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 13%, transparent); border-radius:100px; }
+.person-meta { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:.84rem; color:var(--muted); }
+.pm { display:inline-flex; align-items:center; gap:6px; min-width:0; overflow-wrap:anywhere; }
+.pm::before { content:''; width:15px; height:15px; flex:none; opacity:.75; background:center / contain no-repeat; }
+.pm-mail::before { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Cpath d='m3.5 6.5 8.5 6.5 8.5-6.5'/%3E%3C/svg%3E"); }
+.pm-tel::before { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2'/%3E%3C/svg%3E"); }
+.pm-loc::before { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z'/%3E%3Ccircle cx='12' cy='10' r='2.5'/%3E%3C/svg%3E"); }
+.pm-none { font-style:italic; }
+.pm-none::before { display:none; }
+/* carnet de clients : 2 colonnes sur grand écran (l'éditeur ouvert prend toute la largeur) */
+#cl-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap:10px; }
+#cl-list > .empty, #cl-list > .muted { grid-column:1 / -1; }
+@media (max-width:640px) {
+  .mat-row.person { flex-direction:row; flex-wrap:wrap; align-items:flex-start; gap:10px 12px; }
+  .mat-row.person .mat-main { flex:1 1 calc(100% - 60px); }
+  .mat-row.person .mat-actions { flex-basis:100%; justify-content:flex-end; }
+}
+
+/* Encadré d'information (ex. rappel du portail dealer) */
+.callout { display:flex; align-items:flex-start; gap:12px; margin-bottom:16px; padding:14px 16px; font-size:.9rem; line-height:1.55;
+  color:var(--ink-2); background:color-mix(in srgb, var(--ember) 6%, var(--paper)); border:1px solid color-mix(in srgb, var(--ember) 28%, var(--line));
+  border-radius:14px; }
+.callout svg { width:20px; height:20px; flex:none; margin-top:1px; fill:none; stroke:var(--ember-ink); stroke-width:2; stroke-linecap:round; }
+.callout p { margin:0; }
+.callout b { color:var(--ink); }
+
+/* =========================================================
    CONNEXION
    ========================================================= */
 .login-wrap { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px;

@@ -180,13 +180,15 @@ window.CA = window.CA || {};
       return;
     }
     listEl.innerHTML = list.map(function (c) {
-      var contact = [c.email, c.phone].filter(Boolean).join(' · ');
       var loc = [c.address, c.city].filter(Boolean).join(', ');
-      return '<article class="mat-row" data-id="' + esc(c.id) + '">' +
+      var meta = (c.email ? '<span class="pm pm-mail">' + esc(c.email) + '</span>' : '') +
+        (c.phone ? '<span class="pm pm-tel">' + esc(c.phone) + '</span>' : '') +
+        (loc ? '<span class="pm pm-loc">' + esc(loc) + '</span>' : '');
+      return '<article class="mat-row person" data-id="' + esc(c.id) + '">' +
+        CA.avatar(c.name) +
         '<div class="mat-main">' +
           '<div class="mat-name">' + esc(c.name) + '</div>' +
-          (contact ? '<div class="mat-prices"><span>' + esc(contact) + '</span></div>' : '') +
-          (loc ? '<div class="mat-prices"><span>' + esc(loc) + '</span></div>' : '') +
+          '<div class="person-meta">' + (meta || '<span class="pm pm-none">Aucune coordonnée</span>') + '</div>' +
         '</div>' +
         '<div class="mat-actions">' +
           '<button class="btn btn-ghost btn-sm cl-edit" type="button">Modifier</button>' +
