@@ -58,7 +58,7 @@ function emailContent(p: Product, kind: string | null, url: string) {
     "Voir le produit : " + url + "\n\n" +
     "Les quantités sont limitées. Pour le réserver, ajoute-le à ton panier sur le site (la commande se confirme par Messenger) " +
     "ou réponds simplement à ce courriel.\n\n" +
-    "Merci et à bientôt !\nThéo — Création Audio\n\n" +
+    "Merci et à bientôt !\nCréation Audio\n\n" +
     "—\nTu reçois ce courriel une seule fois parce que tu as demandé à être avisé(e) du retour de ce produit sur creationaudio.ca. " +
     "Ton adresse a maintenant été supprimée de notre liste d'attente.";
   const html =
@@ -69,7 +69,7 @@ function emailContent(p: Product, kind: string | null, url: string) {
     "<p>Bonne nouvelle&nbsp;: le <strong>" + esc(what) + "</strong> que tu attendais est de nouveau en stock.</p>" +
     '<p style="margin:22px 0"><a href="' + esc(url) + '" style="background:#FF6A2B;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">Voir le produit</a></p>' +
     "<p>Les quantités sont limitées. Pour le réserver, ajoute-le à ton panier sur le site (la commande se confirme par Messenger) ou réponds simplement à ce courriel.</p>" +
-    "<p>Merci et à bientôt&nbsp;!<br>Théo — Création Audio</p>" +
+    "<p>Merci et à bientôt&nbsp;!<br>Création Audio</p>" +
     '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
     '<p style="font-size:12px;color:#6C727C">Tu reçois ce courriel une seule fois parce que tu as demandé à être avisé(e) du retour de ce produit sur ' +
     '<a href="' + SITE + '" style="color:#6C727C">creationaudio.ca</a>. Ton adresse a maintenant été supprimée de notre liste d\'attente.</p>' +

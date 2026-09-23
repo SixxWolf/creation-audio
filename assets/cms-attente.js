@@ -276,7 +276,7 @@
     var what = prodLabel(p).replace(' · ', ' ') + (w.kind === 'refill' ? ' (recharge)' : w.kind === 'spool' ? ' (avec bobine)' : '');
     return 'Salut' + (w.name ? ' ' + w.name : '') + ' ! Bonne nouvelle : le ' + what +
       ' que tu attendais vient d\'arriver. Je peux te le garder — dis-moi quand tu veux passer le chercher. ' +
-      'Théo — Création Audio';
+      '— Création Audio';
   }
   function copyText(txt) {
     if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt);

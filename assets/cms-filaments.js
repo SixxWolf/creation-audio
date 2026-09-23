@@ -427,7 +427,7 @@
     var outB = hasS && qb <= 0, outR = hasR && qr <= 0;
     var outAll = (hasS || hasR) && !((hasS && qb > 0) || (hasR && qr > 0));
 
-    // Prix retiré des cartes (Théo le connaît) — on ne garde que l'alerte « matériau non défini ».
+    // Prix retiré des cartes (l'admin le connaît) — on ne garde que l'alerte « matériau non défini ».
     var priceHtml = mat ? '' : '<span class="card-price is-warn">Matériau non défini</span>';
     var ts = hasS && mat ? tiersSummary(mat.tiers_spool) : '', tr = hasR && mat ? tiersSummary(mat.tiers_refill) : '';
 
