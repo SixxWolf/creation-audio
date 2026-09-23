@@ -312,6 +312,52 @@
 .stat-topmargin { font-size:.74rem; font-weight:600; padding:1px 7px; border-radius:100px; }
 .stat-topmargin.pos { background:var(--good-wash); color:var(--good); } .stat-topmargin.neg { background:var(--bad-wash); color:var(--bad); }
 
+/* top produits : un classement par catégorie */
+.stat-h-note { font-size:.74rem; font-weight:500; color:var(--muted); margin-left:6px; }
+.stat-toppanel { margin-top:18px; }
+.stat-topgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px,1fr)); gap:14px 24px; align-items:start; }
+.stat-topgroup .stat-topmain { flex-wrap:wrap; row-gap:6px; }
+.stat-topgroup .stat-topname { flex-basis:100%; line-height:1.35; }
+.stat-topgroup .stat-topmain .stat-bar { max-width:none; flex-basis:100%; height:6px; }
+.stat-topgroup h3 { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--muted); margin:0 0 2px; }
+.stat-none { font-size:.84rem; margin:4px 0 0; }
+.stat-chip { display:inline-block; width:14px; height:14px; border-radius:50%; flex:none; vertical-align:-2px;
+  margin-right:8px; box-shadow:0 0 0 1.5px var(--line); }
+
+/* sous-onglets Vue d'ensemble / Produits vendus (même look que l'inventaire) */
+.stat-subtabs { display:flex; gap:6px; margin:4px 0 16px; padding:4px; background:var(--wash);
+  border:1px solid var(--line); border-radius:var(--radius); width:fit-content; }
+.stat-subtab { appearance:none; border:none; background:none; cursor:pointer; font:inherit; font-weight:600;
+  color:var(--muted); padding:9px 18px; border-radius:10px; transition:background .15s, color .15s; }
+.stat-subtab:hover { color:var(--ink); }
+.stat-subtab.is-active { background:var(--paper); color:var(--ember-dim); box-shadow:var(--shadow-sm); }
+
+/* onglet Produits vendus */
+.stat-soldpanel + .stat-soldpanel { margin-top:18px; }
+.stat-soldhead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+.stat-soldhead h2 { margin:0; }
+.stat-soldsum { font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.stat-soldcols, .stat-soldrow { display:grid; grid-template-columns:32px minmax(0,1fr) 64px 110px 130px;
+  align-items:center; gap:10px; }
+.stat-soldcols { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+  padding:4px 0 6px; border-bottom:1px solid var(--line); }
+.stat-soldcols span:nth-child(n+3) { text-align:right; }
+.stat-soldrow { padding:8px 0; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+.stat-soldrow:last-child { border-bottom:none; }
+.stat-soldrank { font-size:.8rem; color:var(--muted); font-weight:600; }
+.stat-soldname { display:flex; align-items:center; min-width:0; font-size:.88rem; font-weight:600; }
+.stat-soldlabel { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stat-soldqty, .stat-soldrev, .stat-soldmargin { text-align:right; font-size:.86rem; }
+.stat-soldrev { font-weight:700; }
+
 @media (max-width:720px) {
   .stat-cols { grid-template-columns:1fr; }
+  .stat-soldcols { display:none; }
+  .stat-soldrow { grid-template-columns:24px minmax(0,1fr) auto; row-gap:2px; }
+  .stat-soldrev { grid-column:2; text-align:left; }
+  .stat-soldmargin { grid-column:3; }
+  .stat-soldname { align-items:flex-start; }
+  .stat-soldlabel { white-space:normal; line-height:1.35; }
+  .stat-soldname .stat-chip { margin-top:2px; }
 }

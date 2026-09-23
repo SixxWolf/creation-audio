@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/admin.css?v=29">
-<link rel="stylesheet" href="assets/facture.css?v=10">
+<link rel="stylesheet" href="assets/facture.css?v=11">
 <link rel="stylesheet" href="assets/autoloop.css?v=6">
 <script src="assets/theme.js?v=1" defer></script>
 </head>
@@ -1133,6 +1133,11 @@
         <button class="btn btn-ghost btn-sm" id="stat-refresh" type="button">Actualiser</button>
       </div>
 
+      <div class="stat-subtabs" role="tablist" aria-label="Sections statistiques">
+        <button type="button" class="stat-subtab is-active" role="tab" data-sub="apercu">Vue d'ensemble</button>
+        <button type="button" class="stat-subtab" role="tab" data-sub="produits">Produits vendus</button>
+      </div>
+
       <div class="stat-periods" id="stat-periods" role="group" aria-label="Période">
         <button type="button" class="stat-pbtn" data-days="7">1 semaine</button>
         <button type="button" class="stat-pbtn is-active" data-days="30">1 mois</button>
@@ -1143,6 +1148,7 @@
       </div>
 
       <div id="stat-body"><p class="muted">Chargement…</p></div>
+      <div id="stat-sold" hidden></div>
 
       <details class="stat-retro" id="stat-retro">
         <summary>Recalculer les marges historiques (coût moyen pondéré)</summary>
@@ -1422,7 +1428,7 @@
 <script src="assets/cms-clients.js?v=1"></script>
 <script src="assets/cms-facturation.js?v=22"></script>
 <script src="assets/cms-historique.js?v=5"></script>
-<script src="assets/cms-statistiques.js?v=4"></script>
+<script src="assets/cms-statistiques.js?v=5"></script>
 <script src="assets/cms-autoloop.js?v=10"></script>
 </body>
 </html>
