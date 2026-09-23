@@ -4,7 +4,7 @@
    products_public (aucun coût exposé).
    ========================================================= */
 
-/* ---- Barre supérieure : voir header.css (en-tête partagée) ---- */
+/* ---- Barre supérieure : voir site.css (chrome public partagé) ---- */
 .cart-btn { position:relative; display:inline-flex; align-items:center; gap:8px; font:inherit; font-weight:600;
   cursor:pointer; border:1.5px solid var(--line); background:var(--paper); color:var(--ink);
   border-radius:100px; padding:8px 15px; transition:border-color .18s, box-shadow .18s; }

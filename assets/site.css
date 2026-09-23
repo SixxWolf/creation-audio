@@ -1,0 +1,239 @@
+/* =========================================================
+   Création Audio — CHROME PUBLIC PARTAGÉ (v3 · sept. 2026)
+   Bandeau promo + en-tête + menu mobile + pied de page, identiques
+   sur toutes les pages publiques (accueil, boutique, spacers, dealer,
+   pages légales, 404). Remplace l'ancien header.css.
+   Direction : CLAIR, atelier/technique. Titres en Space Grotesk
+   (police « display »), texte en Inter. Ember = accent de marque.
+   À charger APRÈS tokens.css, AVANT la CSS propre à la page.
+   ========================================================= */
+
+:root {
+  --display: 'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --ink-2: #3A3D45;          /* sous-titres, liens de nav */
+  --ember-ink: #B23F12;      /* ember foncé : texte AA sur clair (prix, liens) */
+  --line-2: #DAD7CF;
+  --wash-2: #EFEDE8;
+  --maxw: 1240px;
+  --gutter: clamp(16px, 4vw, 32px);
+  --top-h: 68px;             /* hauteur de l'en-tête (ancre, menu latéral boutique) */
+}
+
+/* Pages « vitrine » (accueil, légal, 404) : fond blanc. */
+.home-page { background:#fff; color:var(--ink); }
+.home-page ::selection { background:rgba(255,106,43,.22); color:var(--ink); }
+
+/* Focus clavier visible partout dans le chrome (WCAG 2.4.7) */
+.promo-bar a:focus-visible, .home-top a:focus-visible, .home-top button:focus-visible,
+.nav-drawer a:focus-visible, .nav-drawer button:focus-visible, .site-foot a:focus-visible,
+.home-page a:focus-visible, .home-page button:focus-visible {
+  outline:3px solid var(--ember-dim); outline-offset:2px; border-radius:10px;
+}
+
+/* Titres display + petits éléments communs des pages « vitrine » */
+.home-page h1, .home-page h2, .home-page h3 { font-family:var(--display); letter-spacing:-.02em; }
+.home-page .eyebrow { margin:0 0 10px; font-size:.72rem; font-weight:700; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ember-ink); }
+
+/* Boutons (portée .home-page : n'affecte pas les boutons de la boutique) */
+.home-page .btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:9px; height:46px; padding:0 20px;
+  font:inherit; font-weight:700; font-size:.95rem; white-space:nowrap; text-decoration:none; cursor:pointer;
+  border:1px solid transparent; border-radius:12px;
+  transition:background .16s, border-color .16s, transform .12s, box-shadow .16s;
+}
+.home-page .btn-lg { height:52px; padding:0 24px; font-size:1rem; }
+.home-page .btn svg { width:18px; height:18px; }
+.home-page .btn .arr { transition:transform .18s; }
+.home-page .btn:hover .arr { transform:translateX(3px); }
+.home-page .btn:active { transform:translateY(1px); }
+.home-page .btn-ember { background:var(--ember); color:var(--ink); border-color:var(--ember);   /* encre sur ember = AA */
+  box-shadow:0 12px 26px -14px rgba(226,78,21,.75); }
+.home-page .btn-ember:hover { background:var(--ember-dim); border-color:var(--ember-dim); }
+.home-page .btn-ghost { background:#fff; color:var(--ink); border-color:var(--line-2); }
+.home-page .btn-ghost:hover { border-color:var(--ink); }
+.home-page .btn-primary { background:var(--ink); color:#fff; border-color:var(--ink); }
+.home-page .btn-primary:hover { background:#000; }
+
+/* Lien d'évitement (clavier) */
+.skip { position:absolute; left:12px; top:-60px; z-index:100; background:var(--ink); color:#fff;
+  padding:10px 14px; border-radius:10px; font-weight:700; text-decoration:none; transition:top .15s; }
+.skip:focus { top:12px; }
+
+/* =========================================================
+   BANDEAU PROMO — mince, teinté ember, texte ember foncé (AA)
+   ========================================================= */
+.promo-bar {
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  padding:8px var(--gutter); background:#FFF3EC; color:var(--ember-ink);
+  border-bottom:1px solid #F7DDCF; font-size:.82rem; font-weight:600; line-height:1.35; text-align:center;
+}
+.promo-bar svg { width:15px; height:15px; flex:none; }
+
+/* =========================================================
+   EN-TÊTE
+   Pas de wrapper interne : le padding horizontal aligne le contenu
+   sur la colonne de la page (max --maxw) quelle que soit la largeur.
+   ========================================================= */
+.home-top {
+  position:sticky; top:0; z-index:30; height:var(--top-h);
+  display:flex; align-items:center; gap:clamp(12px, 2vw, 26px);
+  padding:0 max(var(--gutter), calc((100% - var(--maxw)) / 2 + var(--gutter)));
+  background:rgba(255,255,255,.9);
+  -webkit-backdrop-filter:saturate(1.5) blur(12px); backdrop-filter:saturate(1.5) blur(12px);
+  border-bottom:1px solid var(--line); transition:box-shadow .2s, background .2s;
+}
+.home-top.is-scrolled { background:rgba(255,255,255,.96); box-shadow:0 10px 30px -18px rgba(20,22,26,.28); }
+
+/* Logo : loup + mot-symbole (échos du logo officiel) */
+.brand { display:inline-flex; align-items:center; gap:10px; flex:none; text-decoration:none; color:var(--ink); }
+.brand-mark { width:42px; height:42px; object-fit:contain; flex:none; }
+.brand-tx { display:flex; flex-direction:column; line-height:1; }
+.brand-tx b { font-family:var(--display); font-weight:700; font-size:1.06rem; letter-spacing:.01em; text-transform:uppercase; }
+.brand-tx small { margin-top:5px; font-size:.6rem; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+
+/* Navigation principale : onglets, trait ember posé sur la bordure basse */
+.home-nav { display:flex; align-items:center; gap:2px; }
+.home-nav a {
+  position:relative; height:40px; display:inline-flex; align-items:center; padding:0 12px;
+  text-decoration:none; color:var(--ink-2); font-weight:600; font-size:.92rem; border-radius:10px;
+  transition:color .15s, background .15s;
+}
+.home-nav a:hover { color:var(--ink); background:var(--wash); }
+.home-nav a.is-active { color:var(--ink); }
+.home-nav a.is-active::after {
+  content:''; position:absolute; left:12px; right:12px; bottom:calc((40px - var(--top-h)) / 2);
+  height:2px; border-radius:2px 2px 0 0; background:var(--ember);
+}
+.home-top .spacer { flex:1; }
+
+/* Actions de droite : même hauteur partout (40 px) */
+.home-dealer, .home-cta, .home-top .cart-btn { height:40px; border-radius:12px; }
+.home-dealer {
+  display:inline-flex; align-items:center; gap:7px; padding:0 14px; white-space:nowrap;
+  text-decoration:none; color:var(--ink-2); font-weight:600; font-size:.88rem;
+  background:#fff; border:1px solid var(--line); transition:color .15s, border-color .15s, background .15s;
+}
+.home-dealer:hover { color:var(--ink); border-color:var(--line-2); background:var(--wash); }
+.home-dealer svg { width:15px; height:15px; flex:none; }
+.home-cta {
+  display:inline-flex; align-items:center; gap:8px; padding:0 18px; white-space:nowrap;
+  text-decoration:none; font-weight:700; font-size:.9rem; color:#fff;
+  background:var(--ink); border:1px solid var(--ink); transition:background .15s, transform .1s;
+}
+.home-cta svg { width:16px; height:16px; transition:transform .18s; }
+.home-cta:hover { background:#000; }
+.home-cta:hover svg { transform:translateX(2px); }
+.home-cta:active { transform:translateY(1px); }
+.home-top .cart-btn { padding-top:0; padding-bottom:0; border-width:1px; }
+
+/* Burger (≤ 960 px) */
+.nav-burger {
+  display:none; width:42px; height:42px; flex:none; cursor:pointer; padding:0;
+  flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  background:#fff; border:1px solid var(--line); border-radius:12px;
+}
+.nav-burger span { display:block; width:18px; height:2px; border-radius:2px; background:var(--ink); }
+
+/* =========================================================
+   MENU MOBILE (tiroir) — piloté par nav.js (classe .open)
+   ========================================================= */
+.nav-backdrop { position:fixed; inset:0; z-index:40; background:rgba(20,22,26,.42);
+  -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px); }
+.nav-drawer {
+  position:fixed; top:0; right:0; bottom:0; z-index:50; width:330px; max-width:88vw;
+  display:flex; flex-direction:column; padding:14px 20px 22px; overflow-y:auto;
+  background:#fff; box-shadow:-24px 0 60px -24px rgba(0,0,0,.35);
+  transform:translateX(100%); visibility:hidden;
+  transition:transform .26s cubic-bezier(.2,.8,.2,1), visibility 0s linear .26s;
+}
+.nav-drawer.open { transform:none; visibility:visible; transition:transform .26s cubic-bezier(.2,.8,.2,1), visibility 0s; }
+.drawer-head { display:flex; align-items:center; justify-content:space-between; padding-bottom:12px;
+  margin-bottom:6px; border-bottom:1px solid var(--line); }
+.drawer-head .brand-mark { width:36px; height:36px; }
+.nav-drawer .close {
+  width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center;
+  font-size:1.6rem; line-height:1; color:var(--ink-2); cursor:pointer;
+  background:var(--wash); border:none; border-radius:12px;
+}
+.drawer-links { display:flex; flex-direction:column; }
+.drawer-links a {
+  display:flex; align-items:center; justify-content:space-between; padding:14px 4px;
+  text-decoration:none; color:var(--ink); font-family:var(--display); font-weight:600; font-size:1.3rem;
+  letter-spacing:-.01em; border-bottom:1px solid var(--line);
+}
+.drawer-links a::after { content:'→'; font-family:var(--font); font-size:1rem; color:var(--muted); transition:transform .15s, color .15s; }
+.drawer-links a:hover::after { transform:translateX(3px); color:var(--ember-ink); }
+.drawer-links a.is-active { color:var(--ember-ink); }
+.drawer-cta { margin-top:18px; display:flex; flex-direction:column; gap:10px; }
+.drawer-cta a {
+  display:flex; align-items:center; justify-content:center; gap:8px; height:48px; border-radius:12px;
+  text-decoration:none; font-weight:700; font-size:.95rem;
+}
+.drawer-cta .primary { background:var(--ember); color:var(--ink); }
+.drawer-cta .secondary { background:#fff; color:var(--ink); border:1px solid var(--line-2); }
+.drawer-cta svg { width:16px; height:16px; }
+.drawer-foot { margin-top:auto; padding-top:22px; font-size:.84rem; color:var(--muted); line-height:1.6; }
+.drawer-foot a { color:var(--ink-2); font-weight:600; }
+
+@media (max-width:960px) {
+  .home-nav, .home-dealer { display:none; }
+  .nav-burger { display:flex; }
+}
+@media (max-width:560px) {
+  .home-top .home-cta { display:none; }       /* le héros et le tiroir portent l'appel à l'action */
+}
+@media (max-width:400px) {
+  .brand-tx small { display:none; }
+  .brand-mark { width:38px; height:38px; }
+}
+
+/* =========================================================
+   PIED DE PAGE (clair) — commun à toutes les pages publiques
+   ========================================================= */
+.site-foot { background:var(--wash); border-top:1px solid var(--line); color:var(--ink-2); overflow:hidden; }
+.foot-inner {
+  max-width:var(--maxw); margin:0 auto; padding:clamp(40px, 6vw, 64px) var(--gutter) 28px;
+  display:grid; grid-template-columns:1.5fr repeat(3, 1fr); gap:32px 40px;
+}
+.foot-brand p { margin:14px 0 0; max-width:30em; font-size:.92rem; line-height:1.6; color:var(--muted); }
+.foot-contact { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+.foot-pill {
+  display:inline-flex; align-items:center; gap:7px; height:36px; padding:0 13px; border-radius:10px;
+  text-decoration:none; font-size:.85rem; font-weight:600; color:var(--ink);
+  background:#fff; border:1px solid var(--line); transition:border-color .15s, color .15s;
+}
+.foot-pill:hover { border-color:var(--ember); color:var(--ember-ink); }
+.foot-pill svg { width:15px; height:15px; }
+.foot-col h4 { margin:4px 0 12px; font-size:.7rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+.foot-col a { display:block; padding:5px 0; text-decoration:none; font-size:.92rem; color:var(--ink-2); transition:color .15s; }
+.foot-col a:hover { color:var(--ember-ink); }
+
+/* Signature : grand mot-symbole en filigrane */
+.foot-sign {
+  max-width:var(--maxw); margin:0 auto; padding:0 var(--gutter);
+  font-family:var(--display); font-weight:700; text-transform:uppercase; white-space:nowrap;
+  font-size:min(10.2vw, 128px); line-height:.8; letter-spacing:-.02em; text-align:center;
+  color:transparent; -webkit-text-stroke:1.2px var(--line-2); user-select:none;
+  transform:translateY(.05em);
+}
+.foot-bottom { position:relative; background:#fff; border-top:1px solid var(--line); }
+.foot-bottom-inner {
+  max-width:var(--maxw); margin:0 auto; padding:16px var(--gutter);
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 20px;
+  font-size:.8rem; color:var(--muted);
+}
+.foot-made { display:inline-flex; align-items:center; gap:8px; font-weight:600; color:var(--ink-2); }
+.foot-made .dot { width:8px; height:8px; border-radius:50%; background:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.18); }
+
+@media (max-width:860px) {
+  .foot-inner { grid-template-columns:1fr 1fr; }
+  .foot-brand { grid-column:1 / -1; }
+}
+@media (max-width:420px) {
+  .foot-inner { grid-template-columns:1fr; gap:24px; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .nav-drawer, .home-top, .home-cta svg, .drawer-links a::after { transition:none; }
+}

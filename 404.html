@@ -13,10 +13,9 @@
 <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/tokens.css?v=3">
-<link rel="stylesheet" href="/assets/header.css?v=4">
-<link rel="stylesheet" href="/assets/accueil.css?v=10">
+<link rel="stylesheet" href="/assets/site.css?v=1">
 <style>
   /* Écran 404 — reprend la direction « atelier / fiche technique » de l'accueil */
   .err {
@@ -40,9 +39,11 @@
 
 <!-- ======================= EN-TÊTE ======================= -->
 <header class="home-top">
-  <a class="brand" href="/index.html"><span class="d"></span> Création Audio</a>
+  <a class="brand" href="/index.html" aria-label="Création Audio — accueil">
+    <img class="brand-mark" src="/assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="42" height="42">
+    <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
+  </a>
   <nav class="home-nav" aria-label="Navigation principale">
-    <a href="/index.html">Accueil</a>
     <a href="/boutique.html">Filaments</a>
     <a href="/spacers.html">Spacers</a>
     <a href="/index.html#caissons">Caissons</a>
@@ -54,7 +55,7 @@
     Dealer
   </a>
   <a class="home-cta" href="/boutique.html">Voir les filaments</a>
-  <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false">
+  <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-drawer">
     <span></span><span></span><span></span>
   </button>
 </header>
@@ -83,15 +84,28 @@
 <!-- Menu mobile -->
 <div class="nav-backdrop" id="nav-backdrop" hidden></div>
 <aside class="nav-drawer" id="nav-drawer" aria-label="Menu">
-  <button class="close" id="nav-close" type="button" aria-label="Fermer">&times;</button>
-  <a href="/index.html">Accueil</a>
-  <a href="/boutique.html">Filaments</a>
-  <a href="/spacers.html">Spacers</a>
-  <a href="/index.html#caissons">Caissons</a>
-  <a href="/index.html#contact">Contact</a>
-  <a href="/dealer.html">Espace dealer</a>
+  <div class="drawer-head">
+    <img class="brand-mark" src="/assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="36" height="36">
+    <button class="close" id="nav-close" type="button" aria-label="Fermer le menu">&times;</button>
+  </div>
+  <nav class="drawer-links" aria-label="Menu mobile">
+    <a href="/index.html">Accueil</a>
+    <a href="/boutique.html">Filaments</a>
+    <a href="/spacers.html">Spacers</a>
+    <a href="/index.html#caissons">Caissons</a>
+    <a href="/index.html#contact">Contact</a>
+  </nav>
+  <div class="drawer-cta">
+    <a class="primary" href="/boutique.html">Magasiner les filaments</a>
+    <a class="secondary" href="/dealer.html">Espace dealer</a>
+  </div>
+  <div class="drawer-foot">
+    <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> ·
+    <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a><br>
+    Ramassage local à Québec · Aucun paiement en ligne
+  </div>
 </aside>
 
-<script src="/assets/nav.js?v=1"></script>
+<script src="/assets/nav.js?v=2"></script>
 </body>
 </html>

@@ -13,10 +13,9 @@
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/header.css?v=4">
-<link rel="stylesheet" href="assets/accueil.css?v=10">
+<link rel="stylesheet" href="assets/site.css?v=1">
 <link rel="stylesheet" href="assets/legal.css?v=1">
 </head>
 <body class="home-page">
@@ -27,9 +26,11 @@
 </div>
 
 <header class="home-top">
-  <a class="brand" href="index.html"><span class="d"></span> Création Audio</a>
+  <a class="brand" href="index.html" aria-label="Création Audio — accueil">
+    <img class="brand-mark" src="assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="42" height="42">
+    <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
+  </a>
   <nav class="home-nav" aria-label="Navigation principale">
-    <a href="index.html">Accueil</a>
     <a href="boutique.html">Filaments</a>
     <a href="spacers.html">Spacers</a>
     <a href="index.html#caissons">Caissons</a>
@@ -41,7 +42,7 @@
     Dealer
   </a>
   <a class="home-cta" href="boutique.html">Magasiner</a>
-  <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false">
+  <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-drawer">
     <span></span><span></span><span></span>
   </button>
 </header>
@@ -130,49 +131,72 @@
   <p>Une question ? <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>.</p>
 </main>
 
-<footer class="home-foot">
+<footer class="site-foot">
   <div class="foot-inner">
     <div class="foot-brand">
-      <a class="brand" href="index.html"><span class="d"></span> Création Audio</a>
-      <p>Impression 3D &amp; audio automobile dans la région de Québec. Filaments, spacers et caissons
-        de sub sur-mesure, faits localement.</p>
+      <a class="brand" href="index.html" aria-label="Création Audio — accueil">
+        <img class="brand-mark" src="assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="42" height="42">
+        <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
+      </a>
+      <p>Filaments d'impression 3D, spacers et caissons de sub sur-mesure, dans la région de Québec.</p>
+      <div class="foot-contact">
+        <a class="foot-pill" href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
+        <a class="foot-pill" href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
+      </div>
     </div>
-    <div class="foot-col">
+    <nav class="foot-col" aria-label="Boutique">
       <h4>Boutique</h4>
       <a href="boutique.html">Filaments</a>
       <a href="spacers.html">Spacers &amp; adaptateurs</a>
       <a href="index.html#caissons">Caissons de sub</a>
-    </div>
-    <div class="foot-col">
-      <h4>Aide &amp; contact</h4>
-      <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
-      <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
+      <a href="boutique.html">Accessoires</a>
+    </nav>
+    <nav class="foot-col" aria-label="Aide">
+      <h4>Aide</h4>
+      <a href="index.html#etapes">Comment commander</a>
+      <a href="index.html#contact">Nous joindre</a>
       <a href="dealer.html">Espace dealer</a>
-    </div>
-    <div class="foot-col">
+    </nav>
+    <nav class="foot-col" aria-label="Légal">
       <h4>Légal</h4>
       <a href="confidentialite.html">Confidentialité</a>
       <a href="conditions.html">Conditions d'utilisation</a>
       <a href="retours.html">Retours &amp; remboursements</a>
-    </div>
+    </nav>
   </div>
+  <div class="foot-sign" aria-hidden="true">Création Audio</div>
   <div class="foot-bottom">
-    <span>© <span id="year"></span> Création Audio — Théo Faget · NEQ 2282510769 · Québec (QC)</span>
+    <div class="foot-bottom-inner">
+      <span>© <span id="year">2026</span> Création Audio — Théo Faget · NEQ 2282510769 · Québec (QC)</span>
+      <span class="foot-made"><span class="dot" aria-hidden="true"></span>Entreprise locale · Québec</span>
+    </div>
   </div>
 </footer>
 
 <div class="nav-backdrop" id="nav-backdrop" hidden></div>
 <aside class="nav-drawer" id="nav-drawer" aria-label="Menu">
-  <button class="close" id="nav-close" type="button" aria-label="Fermer">&times;</button>
-  <a href="index.html">Accueil</a>
-  <a href="boutique.html">Filaments</a>
-  <a href="spacers.html">Spacers</a>
-  <a href="index.html#caissons">Caissons</a>
-  <a href="index.html#contact">Contact</a>
-  <a href="dealer.html">Espace dealer</a>
+  <div class="drawer-head">
+    <img class="brand-mark" src="assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="36" height="36">
+    <button class="close" id="nav-close" type="button" aria-label="Fermer le menu">&times;</button>
+  </div>
+  <nav class="drawer-links" aria-label="Menu mobile">
+    <a href="index.html">Accueil</a>
+    <a href="boutique.html">Filaments</a>
+    <a href="spacers.html">Spacers</a>
+    <a href="index.html#caissons">Caissons</a>
+    <a href="index.html#contact">Contact</a>
+  </nav>
+  <div class="drawer-cta">
+    <a class="primary" href="boutique.html">Magasiner les filaments</a>
+    <a class="secondary" href="dealer.html">Espace dealer</a>
+  </div>
+  <div class="drawer-foot">
+    <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> ·
+    <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a><br>
+    Ramassage local à Québec · Aucun paiement en ligne
+  </div>
 </aside>
 
-<script src="assets/nav.js?v=1"></script>
-<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="assets/nav.js?v=2"></script>
 </body>
 </html>
