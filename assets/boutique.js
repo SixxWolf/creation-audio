@@ -774,5 +774,58 @@
     clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove('show'); }, 2400);
   }
 
+  /* ---------- stock toujours à jour ----------
+     L'onglet peut rester ouvert pendant que des ventes sont facturées ailleurs :
+     on relit SEULEMENT les quantités (requête légère) quand l'onglet redevient
+     visible, puis toutes les 60 s tant qu'il l'est. Aucun re-rendu si rien n'a
+     bougé ; sinon on rafraîchit l'écran couleur et le panier (quantités
+     ramenées au stock réel, avec un message) sans toucher au défilement. */
+  var REFRESH_MS = 60000, lastRefresh = Date.now(), refreshing = false;
+  function focusedIn(el) { var a = document.activeElement; return !!(el && a && a !== document.body && el.contains(a)); }
+  function refreshStock() {
+    if (!sb || !dataReady || refreshing) return;
+    refreshing = true; lastRefresh = Date.now();
+    sb.from('products_public').select('id,type,qty,qty_2').in('type', ['filament', 'accessory']).then(function (res) {
+      refreshing = false;
+      if (!res || res.error || !res.data) return;
+      var changed = false;
+      res.data.forEach(function (r) {
+        if (r.type === 'accessory') {
+          var a = accById[r.id], q = (r.qty == null ? null : (r.qty | 0));
+          if (a && a.qty !== q) { a.qty = q; changed = true; }
+          return;
+        }
+        var p = byId[r.id]; if (!p) return;
+        if ((p.qty | 0) !== (r.qty | 0) || (p.qty_2 | 0) !== (r.qty_2 | 0)) { p.qty = r.qty; p.qty_2 = r.qty_2; changed = true; }
+      });
+      if (!changed) return;
+      // panier : ramène chaque ligne au stock réellement disponible
+      var trimmed = [];
+      Object.keys(cart).forEach(function (k) {
+        var it = cart[k], max = maxOf(it);
+        if (it.qty > max) {
+          var m = metaOf(it); trimmed.push(m ? m.name : '');
+          if (max <= 0) delete cart[k]; else it.qty = max;
+        }
+      });
+      if (trimmed.length) {
+        saveCart();
+        toast('Stock mis à jour : ' + trimmed.filter(Boolean).join(', ') + ' — quantité ajustée dans ton panier.');
+      }
+      if (trimmed.length || !focusedIn(cartItems)) renderCart();
+      // écran couleur : rafraîchit stock / ruptures, sans interrompre une saisie
+      if (curColor && !screenCol.hidden && !focusedIn(configEl)) {
+        var st = stockOf(curColor, curType);
+        if (st > 0 && curQty > st) curQty = st;
+        renderConfig();
+      }
+    }, function () { refreshing = false; });
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 5000) refreshStock();
+  });
+  window.addEventListener('focus', function () { if (Date.now() - lastRefresh > 5000) refreshStock(); });
+  setInterval(function () { if (document.visibilityState === 'visible') refreshStock(); }, REFRESH_MS);
+
   load();
 })();

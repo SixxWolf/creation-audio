@@ -216,5 +216,37 @@
   var toastEl = $('#toast'), toastT;
   function toast(msg) { toastEl.textContent = msg; toastEl.hidden = false; requestAnimationFrame(function () { toastEl.classList.add('show'); }); clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove('show'); }, 2400); }
 
+  /* ---- stock toujours à jour (même logique que la page filaments) :
+     relecture légère des quantités au retour sur l'onglet + toutes les 60 s ---- */
+  var lastRefresh = Date.now(), refreshing = false;
+  function focusedIn(el) { var a = document.activeElement; return !!(el && a && a !== document.body && el.contains(a)); }
+  function refreshStock() {
+    if (!sb || refreshing || !spacers.length) return;
+    refreshing = true; lastRefresh = Date.now();
+    sb.from('products_public').select('id,qty').eq('type', 'spacer').then(function (res) {
+      refreshing = false;
+      if (!res || res.error || !res.data) return;
+      var changed = false;
+      res.data.forEach(function (r) {
+        var p = byId[r.id];
+        if (p && (p.qty | 0) !== (r.qty | 0)) { p.qty = r.qty; changed = true; }
+      });
+      if (!changed) return;
+      var trimmed = [];
+      Object.keys(cart).forEach(function (id) {
+        var p = byId[id], max = p ? (p.qty | 0) : 0;
+        if (p && cart[id].qty > max) { trimmed.push(p.name); if (max <= 0) delete cart[id]; else cart[id].qty = max; }
+      });
+      if (trimmed.length) { saveCart(); toast('Stock mis à jour : ' + trimmed.join(', ') + ' — quantité ajustée dans ton panier.'); }
+      render();
+      if (trimmed.length || !focusedIn(cartItems)) renderCart();
+    }, function () { refreshing = false; });
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 5000) refreshStock();
+  });
+  window.addEventListener('focus', function () { if (Date.now() - lastRefresh > 5000) refreshStock(); });
+  setInterval(function () { if (document.visibilityState === 'visible') refreshStock(); }, 60000);
+
   load();
 })();
