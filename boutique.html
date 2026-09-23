@@ -24,9 +24,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/site.css?v=1">
-<link rel="stylesheet" href="assets/boutique.css?v=20">
+<link rel="stylesheet" href="assets/boutique.css?v=21">
 </head>
-<body>
+<body class="home-page shop-page">
+<a class="skip" href="#main">Aller au contenu</a>
 
 <div class="promo-bar">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
@@ -58,43 +59,49 @@
   </button>
 </header>
 
-<!-- Accès rapide aux matériaux (grand écran) -->
-<nav class="shop-nav" id="shop-nav" aria-label="Accès rapide aux matériaux"></nav>
+<main class="shop" id="main">
+  <!-- Catalogue : matériaux regroupés par marque, filtrables (#/ ou #/m/<marque>) -->
+  <section id="screen-catalog" aria-labelledby="cat-title">
+    <header class="cat-hero">
+      <div class="cat-hero-tx">
+        <p class="eyebrow">Boutique</p>
+        <h1 id="cat-title">Filaments d'impression 3D</h1>
+        <p class="cat-sub">Choisis ton matériau, puis ta couleur. Tout est en main à Québec&nbsp;: ramassage local, aucun paiement en ligne.</p>
+      </div>
+      <dl class="cat-stats" id="cat-stats" aria-label="La boutique en chiffres">
+        <div><dt>Couleurs</dt><dd id="st-colors">—</dd></div>
+        <div><dt>En stock</dt><dd id="st-stock">—</dd></div>
+        <div><dt>Marques</dt><dd id="st-brands">—</dd></div>
+      </dl>
+    </header>
 
-<main class="shop">
-  <!-- Écran 0 : marques -->
-  <section id="screen-brands">
-    <div class="shop-head">
-      <div class="shop-eyebrow">Filaments d'impression 3D</div>
-      <h1>Choisis ta marque</h1>
-      <p class="muted">Sélectionne une marque, puis un matériau, puis ta couleur. Ramassage région de Québec.</p>
+    <div class="cat-bar" id="cat-bar">
+      <nav class="cat-chips" id="cat-chips" aria-label="Filtrer par marque"></nav>
+      <label class="switch">
+        <input type="checkbox" class="js-only-stock">
+        <span class="switch-ui" aria-hidden="true"></span>
+        En stock seulement
+      </label>
     </div>
-    <div class="shop-grid" id="brands-grid"><p class="muted">Chargement…</p></div>
+
+    <div class="cat-groups" id="cat-groups" aria-busy="true">
+      <div class="cat-grid"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+    </div>
   </section>
 
-  <!-- Écran 1 : matériaux -->
-  <section id="screen-materials" hidden>
-    <button class="back-link" id="back-brands" type="button">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-      Toutes les marques
-    </button>
-    <div class="shop-head">
-      <div class="shop-eyebrow" id="materials-eyebrow">Marque</div>
-      <h1 id="materials-title">Matériaux</h1>
-      <p class="muted">Choisis un matériau, puis ta couleur.</p>
-    </div>
-    <div class="shop-grid" id="materials-grid"></div>
-  </section>
-
-  <!-- Écran 2 : configurateur d'un matériau (image + couleurs) -->
-  <section id="screen-colors" hidden>
-    <button class="back-link" id="back-materials" type="button">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-      Tous les matériaux
-    </button>
+  <!-- Fiche d'une couleur (#/m/<marque>/<matériau>/<couleur>) -->
+  <section id="screen-product" hidden>
+    <nav class="crumbs" id="crumbs" aria-label="Fil d'Ariane"></nav>
     <div id="config"></div>
   </section>
 </main>
+
+<!-- Barre d'achat collante (mobile, fiche couleur) -->
+<div class="buybar" id="buybar" hidden>
+  <span class="buybar-sw" id="buybar-sw" aria-hidden="true"></span>
+  <span class="buybar-tx"><b id="buybar-name"></b><small id="buybar-meta"></small></span>
+  <button type="button" class="buybar-btn" id="buybar-btn">Ajouter</button>
+</div>
 
 <!-- Panier -->
 <div class="cart-backdrop" id="cart-backdrop" hidden></div>
@@ -109,8 +116,8 @@
     <button type="button" class="cart-order" id="cart-order">Copier ma liste &amp; écrire sur Messenger</button>
     <button type="button" class="cart-order cart-email" id="cart-email">Écrire par courriel</button>
     <p class="cart-msg" id="cart-msg" role="status"></p>
-    <button type="button" class="btn btn-ghost cart-clear" id="cart-clear">Vider le panier</button>
-    <p class="cart-note">Aucun paiement en ligne — je confirme la dispo et un ramassage à Québec.</p>
+    <button type="button" class="cart-clear" id="cart-clear">Vider le panier</button>
+    <p class="cart-note">Aucun paiement en ligne — on confirme la dispo et un ramassage à Québec.</p>
   </div>
 </aside>
 
@@ -187,6 +194,6 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=2"></script>
-<script src="assets/boutique.js?v=24"></script>
+<script src="assets/boutique.js?v=25"></script>
 </body>
 </html>
