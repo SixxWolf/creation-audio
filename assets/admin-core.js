@@ -101,12 +101,29 @@ window.CA = window.CA || {};
     if (session) showApp(session); else showLogin('');
   });
 
-  // --- Menu latéral mobile (tiroir) ---
-  var navToggle = $('#nav-toggle'), navDrawer = $('#nav-drawer'), navBackdrop = $('#nav-backdrop');
-  function openDrawer() { if (!navDrawer) return; navDrawer.classList.add('open'); if (navBackdrop) navBackdrop.hidden = false; if (navToggle) navToggle.setAttribute('aria-expanded', 'true'); }
-  function closeDrawer() { if (!navDrawer) return; navDrawer.classList.remove('open'); if (navBackdrop) navBackdrop.hidden = true; if (navToggle) navToggle.setAttribute('aria-expanded', 'false'); }
+  // --- Barre latérale : tiroir sur mobile (hamburger, ✕, Échap, fond) ---
+  var navToggle = $('#nav-toggle'), navDrawer = $('#nav-drawer'), navBackdrop = $('#nav-backdrop'), navClose = $('#nav-close');
+  function openDrawer() {
+    if (!navDrawer) return;
+    navDrawer.classList.add('open'); if (navBackdrop) navBackdrop.hidden = false;
+    if (navToggle) navToggle.setAttribute('aria-expanded', 'true');
+    var cur = $('.tab[aria-current="page"]', navDrawer); if (cur) cur.focus();
+  }
+  function closeDrawer() {
+    if (!navDrawer || !navDrawer.classList.contains('open')) return;
+    navDrawer.classList.remove('open'); if (navBackdrop) navBackdrop.hidden = true;
+    if (navToggle) navToggle.setAttribute('aria-expanded', 'false');
+  }
   if (navToggle) navToggle.addEventListener('click', function () { navDrawer.classList.contains('open') ? closeDrawer() : openDrawer(); });
   if (navBackdrop) navBackdrop.addEventListener('click', closeDrawer);
+  if (navClose) navClose.addEventListener('click', function () { closeDrawer(); if (navToggle) navToggle.focus(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && navDrawer && navDrawer.classList.contains('open')) { closeDrawer(); if (navToggle) navToggle.focus(); }
+  });
+  // « Aller au matériau » (sous-liste de Filaments) : referme le tiroir après le saut
+  if (navDrawer) navDrawer.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('.mat-nav-link')) closeDrawer();
+  });
 
   // --- Onglets + routing par hash (#onglet ou #onglet/sous-onglet) --------------
   // Chaque onglet (et sous-onglet) porte son URL : le bouton « retour » du
@@ -124,8 +141,17 @@ window.CA = window.CA || {};
   }
   function hashFor(tab, sub) { return '#' + tab + (sub ? '/' + sub : ''); }
 
+  var topGroup = $('#topbar-group'), topTab = $('#topbar-tab');
   function activate(name) {                 // bascule le DOM uniquement (pas l'URL)
-    tabs.forEach(function (t) { t.setAttribute('aria-selected', String(t.dataset.tab === name)); });
+    tabs.forEach(function (t) {
+      var on = t.dataset.tab === name;
+      if (on) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current');
+      if (on) {                             // titre de la barre du haut : « Groupe › Onglet »
+        var lbl = $('span', t);
+        if (topTab) topTab.textContent = lbl ? lbl.textContent : t.textContent;
+        if (topGroup) topGroup.textContent = t.dataset.group || '';
+      }
+    });
     panels.forEach(function (p) { p.hidden = (p.dataset.panel !== name); });
     document.body.setAttribute('data-tab', name);
     closeDrawer();
