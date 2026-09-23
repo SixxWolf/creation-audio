@@ -289,12 +289,13 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
   background:var(--thumb-bg); border-bottom:1px solid var(--line); }
 .card-thumb img { width:100%; height:100%; object-fit:contain; }
 .card-noimg { font-size:.8rem; color:var(--muted); }
-.card-pastille { position:absolute; left:9px; top:9px; width:20px; height:20px; border-radius:50%;
+/* pastille en bas à gauche : le coin haut-gauche des photos Bambu porte le logo « RFID » */
+.card-pastille { position:absolute; left:9px; bottom:9px; width:22px; height:22px; border-radius:50%;
   border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.28); }
 .badge { position:absolute; top:9px; right:9px; padding:3px 8px; font-size:.64rem; font-weight:700; letter-spacing:.04em;
   text-transform:uppercase; color:#fff; border-radius:7px; }
 .badge-out { background:var(--bad); }
-.badge-hidden { top:auto; right:auto; left:9px; bottom:9px; background:var(--charcoal); }
+.badge-hidden { right:auto; left:9px; background:var(--charcoal); }
 .drag-handle { position:absolute; right:9px; bottom:9px; }
 .card-body { display:flex; flex-direction:column; gap:7px; flex:1; padding:12px; }
 .card-name { font-size:.96rem; font-weight:700; line-height:1.25; }
