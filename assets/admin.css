@@ -723,21 +723,24 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
    Facturation — barre scanner de commande
    ========================================================= */
 .fx-pos { margin:0 0 18px; }
-/* indicateur discret dans la barre du haut (scanner toujours à l'écoute) */
-.fx-scan-feedback { font-size:.82rem; font-weight:600; color:var(--muted); white-space:nowrap; overflow:hidden;
-  text-overflow:ellipsis; max-width:420px; cursor:default; }
-.fx-scan-feedback.ok { color:var(--good); }
-.fx-scan-feedback.warn { color:var(--ember-dim); }
-.fx-scan-feedback.bad { color:var(--bad); }
+/* indicateur du scanner (toujours à l'écoute dans cet onglet) : pastille discrète dans la barre de gabarit */
+.fx-scan-feedback { display:inline-flex; align-items:center; gap:7px; max-width:420px; min-height:30px; padding:0 12px;
+  font-size:.82rem; font-weight:600; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default;
+  background:var(--wash); border-radius:100px; }
+.fx-scan-feedback:empty { display:none; }
+.fx-scan-feedback.ok { color:var(--good); background:var(--good-wash); }
+.fx-scan-feedback.warn { color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 12%, transparent); }
+.fx-scan-feedback.bad { color:var(--bad); background:var(--bad-wash); }
 
-.fx-scan-learn { flex-basis:100%; padding:12px 14px; border:1px solid var(--ember);
-  border-radius:var(--radius); background:var(--bad-wash); }
-.fx-scan-learn-head { font-weight:700; margin-bottom:8px; }
-.fx-scan-learn-head code { background:var(--paper); border:1px solid var(--line); border-radius:6px;
-  padding:2px 7px; font-family:var(--mono); }
-.fx-scan-learn-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+/* code-barres inconnu : l'associer une fois (même présentation que la réception) */
+.fx-scan-learn { flex-basis:100%; padding:14px 16px; background:color-mix(in srgb, var(--ember) 7%, var(--paper));
+  border:1px solid color-mix(in srgb, var(--ember) 45%, transparent); border-radius:12px; }
+.fx-scan-learn-head { margin-bottom:10px; font-weight:700; }
+.fx-scan-learn-head code { padding:3px 8px; font-family:ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace; font-size:.86rem;
+  background:var(--paper); border:1px solid var(--line); border-radius:7px; }
+.fx-scan-learn-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
 .fx-scan-learn-fil { flex:1; min-width:220px; }
-.fx-scan-learn-fil, .fx-scan-learn-kind { padding:9px 10px; }
+.fx-scan-learn-kind { width:auto; min-width:150px; }
 
 /* =========================================================
    Statistiques — recalcul rétroactif des marges (style d'origine,

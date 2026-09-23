@@ -15,8 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=34">
-<link rel="stylesheet" href="assets/facture.css?v=11">
+<link rel="stylesheet" href="assets/admin.css?v=35">
+<link rel="stylesheet" href="assets/facture.css?v=12">
 <link rel="stylesheet" href="assets/autoloop.css?v=6">
 <script src="assets/theme.js?v=1" defer></script>
 </head>
@@ -1138,9 +1138,11 @@
           <div class="fx-actions no-print">
             <button class="btn btn-accent" id="fx-save" type="button">Enregistrer la facture</button>
             <label class="fx-check" id="fx-deduct-wrap"><input type="checkbox" id="fx-deduct" checked> Déduire le stock</label>
-            <button class="btn btn-ghost" id="fx-print" type="button">Imprimer / PDF</button>
-            <button class="btn btn-ghost" id="fx-email" type="button">Envoyer par courriel</button>
-            <button class="btn btn-ghost" id="fx-copy" type="button">Copier</button>
+            <div class="fx-actions-2">
+              <button class="btn btn-ghost" id="fx-print" type="button">Imprimer / PDF</button>
+              <button class="btn btn-ghost" id="fx-email" type="button">Envoyer par courriel</button>
+              <button class="btn btn-ghost" id="fx-copy" type="button">Copier</button>
+            </div>
             <span class="status" id="fx-status"></span>
           </div>
         </div>
