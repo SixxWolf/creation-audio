@@ -171,12 +171,23 @@ create policy materials_admin_all
 -- éventuel porté par le produit si le matériau n'existe pas encore.
 -- security_invoker = off  =>  la vue contourne la RLS et n'expose
 -- que les lignes actives + colonnes non sensibles.
+-- attrs : LISTE BLANCHE des clés lues par la boutique (colors, img_spool,
+-- img_refill, description). Les clés privées (avg_cost, barcodes,
+-- par_spool, par_refill…) ne sortent jamais — une nouvelle clé attrs
+-- reste privée tant qu'on ne l'ajoute pas ici (et dans products_dealer).
 -- ------------------------------------------------------------
 drop view if exists public.products_public;
 create view public.products_public
 with (security_invoker = off) as
   select
-    p.id, p.type, p.name, p.material, p.brand, p.code, p.hex, p.attrs, p.image_path,
+    p.id, p.type, p.name, p.material, p.brand, p.code, p.hex,
+    jsonb_strip_nulls(jsonb_build_object(
+      'colors',      p.attrs -> 'colors',
+      'img_spool',   p.attrs -> 'img_spool',
+      'img_refill',  p.attrs -> 'img_refill',
+      'description', p.attrs -> 'description'
+    )) as attrs,
+    p.image_path,
     p.slug,                            -- slug perso de la couleur (null = auto côté boutique)
     m.slug        as material_slug,    -- slug perso du matériau (null = auto côté boutique)
     -- prix null = format non vendu (bobine ou recharge) quand le matériau existe ;
@@ -475,9 +486,17 @@ grant execute on function public.is_dealer() to authenticated;
 -- security_invoker = off + filtre par e-mail dealer => invisible aux anonymes
 -- et aux comptes non-dealer (0 ligne). L'alias sell_price permet de réutiliser
 -- exactement le même rendu que la boutique publique.
+-- attrs : même liste blanche que products_public (jamais avg_cost/barcodes/par_*).
 drop view if exists public.products_dealer;
 create view public.products_dealer with (security_invoker = off) as
-  select p.id, p.type, p.name, p.attrs, p.image_path,
+  select p.id, p.type, p.name,
+         jsonb_strip_nulls(jsonb_build_object(
+           'colors',      p.attrs -> 'colors',
+           'img_spool',   p.attrs -> 'img_spool',
+           'img_refill',  p.attrs -> 'img_refill',
+           'description', p.attrs -> 'description'
+         )) as attrs,
+         p.image_path,
          coalesce(p.dealer_price, p.sell_price) as sell_price,
          p.tiers, p.qty, p.sort_order
   from public.products p
