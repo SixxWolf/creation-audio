@@ -108,6 +108,8 @@ main { width:100%; max-width:1280px; margin:0 auto; padding:26px clamp(16px, 2.4
 .panel-head h1 { font-family:var(--display); font-size:1.55rem; line-height:1.1; letter-spacing:-.02em; }
 .panel-head .muted { margin:4px 0 0; font-size:.9rem; }
 .panel-head .grow { flex:1; }
+/* le bloc titre + description prend la place : les boutons restent à droite sur la même ligne */
+.panel-head > div:first-child { flex:1 1 380px; min-width:0; }
 
 /* Boutons */
 .btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:40px; padding:0 16px;
@@ -316,14 +318,26 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
   background:var(--wash); border:1px solid var(--line); border-radius:100px; }
 .stk.out { color:var(--bad); background:var(--bad-wash); border-color:transparent; }
 .card-tierline { font-size:.74rem; color:var(--muted); }
-.sp-tiers-break { display:flex; flex-direction:column; gap:5px; margin-top:2px; }
-.sp-tierrow { display:flex; align-items:center; flex-wrap:nowrap; gap:8px; font-size:.72rem; }
-.sp-tierrow .tp { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
-.sp-tierrow .card-margin { white-space:nowrap; }
-/* cartes spacers un peu plus larges : chaque ligne de palier tient sur une seule ligne */
-#sp-list { grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); }
 .card-actions { display:flex; gap:6px; margin-top:auto; padding-top:4px; }
 .card-actions .btn-ghost { flex:1; min-height:32px; padding:0 8px; font-size:.8rem; }
+
+/* =========================================================
+   ONGLETS SPACERS & ACCESSOIRES (cartes produit + prix/marges)
+   ========================================================= */
+/* cartes spacers un peu plus larges : chaque ligne de prix tient sur une seule ligne */
+#sp-list { grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); }
+#ac-list { grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); }
+.card-desc { margin:-2px 0 0; font-size:.8rem; line-height:1.45; color:var(--muted);
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+/* tableau prix : libellé + prix à gauche, marge à droite (client, dealer, paliers dealer) */
+.sp-tiers-break { display:flex; flex-direction:column; margin-top:2px; padding:2px 10px; background:var(--wash);
+  border:1px solid var(--line); border-radius:10px; }
+.sp-tierrow { display:flex; align-items:center; justify-content:space-between; flex-wrap:nowrap; gap:8px; padding:6px 0;
+  font-size:.76rem; border-bottom:1px dashed var(--line-2); }
+.sp-tierrow:last-child { border-bottom:none; }
+.sp-tierrow .tp { color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.sp-tierrow .tp b { font-weight:700; color:var(--ink); }
+.sp-tierrow .card-margin { white-space:nowrap; }
 
 /* =========================================================
    CONNEXION

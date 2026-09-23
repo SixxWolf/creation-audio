@@ -180,7 +180,7 @@
         '</div>' +
         '<div class="card-body">' +
           '<div class="card-name">' + esc(r.name) + '</div>' +
-          (desc ? '<div class="card-stock"><span class="stk">' + esc(desc) + '</span></div>' : '') +
+          (desc ? '<p class="card-desc">' + esc(desc) + '</p>' : '') +
           '<div class="card-stock"><span class="stk' + (out ? ' out' : '') + '">' + (r.qty | 0) + ' en stock</span></div>' +
           '<div class="sp-tiers-break">' +
             '<div class="sp-tierrow"><span class="tp"><b>Prix</b> : ' + money(r.sell_price) + '</span>' + marginPill(r.sell_price, r.cost_price) + '</div>' +
