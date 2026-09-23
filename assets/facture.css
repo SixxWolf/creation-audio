@@ -243,131 +243,153 @@
 }
 
 /* =========================================================
-   Historique
+   Historique (admin v3)
    ========================================================= */
-.hist-bar { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
-.hist-bar input[type=search] { flex:1; min-width:200px; padding:9px 12px; border:1.5px solid var(--line);
-  border-radius:var(--radius-sm); font:inherit; }
-.hist-fbtn { font:inherit; font-weight:600; font-size:.85rem; cursor:pointer; border:none; background:none;
-  color:var(--muted); border-radius:100px; padding:6px 14px; }
-.hist-fbtn.is-active { background:var(--fill-strong); color:#fff; }
+.hist-bar { display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin-bottom:14px; }
+.hist-bar input[type=search] { flex:1; min-width:220px; padding-left:38px;
+  background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='m20 20-4.2-4.2'/%3E%3C/svg%3E") 12px center / 17px no-repeat; }
+/* statut : contrôle segmenté (même look que la facturation) */
+.hist-fbtn { min-height:32px; padding:0 13px; font:inherit; font-weight:600; font-size:.85rem; color:var(--muted); cursor:pointer;
+  background:none; border:none; border-radius:8px; transition:background .15s, color .15s; }
+.hist-fbtn:hover { color:var(--ink); }
+.hist-fbtn.is-active { color:var(--ink); background:var(--paper); box-shadow:0 1px 3px rgba(20,22,26,.14), inset 0 0 0 1px var(--line); }
+.hist-fbtn:focus-visible, .hist-cbtn:focus-visible, .stat-pbtn:focus-visible, .stat-subtab:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
 
-/* Séparation par type de facture */
-.hist-cats { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
-.hist-cbtn { display:inline-flex; align-items:center; gap:7px; font:inherit; font-weight:600; font-size:.86rem;
-  cursor:pointer; border:1.5px solid var(--line); background:var(--paper); color:var(--ink);
-  border-radius:100px; padding:7px 14px; transition:border-color .15s, background .15s, color .15s; }
-.hist-cbtn:hover { border-color:var(--ember); }
-.hist-cbtn.is-active { background:var(--fill-strong); color:#fff; border-color:var(--fill-strong); }
-.hist-cnt { min-width:20px; height:19px; padding:0 6px; border-radius:100px; background:var(--wash); color:var(--muted);
-  font-size:.72rem; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
-.hist-cbtn.is-active .hist-cnt { background:rgba(255,255,255,.22); color:#fff; }
+/* Séparation par type de facture : puces avec compteur */
+.hist-cats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+.hist-cbtn { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:0 8px 0 14px; font:inherit; font-weight:600; font-size:.88rem;
+  color:var(--ink-2); cursor:pointer; background:var(--paper); border:1px solid var(--line-2); border-radius:100px;
+  transition:border-color .15s, background .15s, color .15s; }
+.hist-cbtn:hover { color:var(--ink); border-color:var(--ink-2); }
+.hist-cbtn.is-active { color:#fff; background:var(--fill-strong); border-color:var(--fill-strong); }
+.hist-cnt { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; padding:0 7px; font-size:.72rem; font-weight:700;
+  color:var(--muted); font-variant-numeric:tabular-nums; background:var(--wash); border-radius:100px; }
+.hist-cbtn.is-active .hist-cnt { color:#fff; background:rgba(255,255,255,.2); }
 
+/* Liste des factures (lignes dépliables) */
 .hist-list { display:flex; flex-direction:column; gap:8px; }
-.hist-row { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-sm); overflow:hidden; }
+.hist-row { overflow:hidden; background:var(--paper); border:1px solid var(--line); border-radius:14px; transition:border-color .15s, box-shadow .15s; }
+.hist-row:hover { border-color:var(--line-2); }
+.hist-row.open { border-color:var(--line-2); box-shadow:0 18px 38px -28px rgba(20,22,26,.45); }
 .hist-row.is-cancelled { opacity:.62; }
-.hist-head { display:flex; align-items:center; gap:12px; padding:12px 14px; cursor:pointer; flex-wrap:wrap; }
-.hist-head:hover { background:var(--wash); }
-.hist-num { font-weight:700; font-variant-numeric:tabular-nums; }
-.hist-cat { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
-  background:var(--wash); border:1px solid var(--line); border-radius:100px; padding:2px 8px; }
-.hist-dealer { font-size:.6rem; font-weight:700; text-transform:uppercase; color:#fff; background:var(--ember);
-  border-radius:100px; padding:1px 7px; }
-.hist-annul { font-size:.62rem; font-weight:700; text-transform:uppercase; color:#fff; background:var(--bad);
-  border-radius:100px; padding:2px 8px; }
-.hist-client { color:var(--muted); font-size:.9rem; }
+.hist-row.is-cancelled .hist-total { text-decoration:line-through; }
+.hist-head { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; padding:12px 14px 12px 16px; cursor:pointer; }
+.hist-head:hover { background:color-mix(in srgb, var(--wash) 60%, transparent); }
+.hist-head::after { content:''; width:16px; height:16px; flex:none; background:var(--chev) center / 14px no-repeat; transition:transform .2s; }
+.hist-row.open .hist-head::after { transform:rotate(180deg); }
+.hist-num { font-family:var(--display); font-weight:700; font-size:1rem; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+.hist-cat { padding:2px 9px; font-size:.66rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-2);
+  background:var(--wash); border:1px solid var(--line); border-radius:100px; }
+.hist-dealer { padding:2px 9px; font-size:.64rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--on-ember);
+  background:var(--ember); border-radius:100px; }
+.hist-annul { padding:2px 9px; font-size:.64rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#fff;
+  background:var(--bad); border-radius:100px; }
+.hist-client { font-size:.9rem; color:var(--ink-2); }
 .hist-head .grow { flex:1; }
-.hist-date { color:var(--muted); font-size:.84rem; }
-.hist-total { font-weight:700; font-variant-numeric:tabular-nums; min-width:90px; text-align:right; }
-.hist-detail { display:none; padding:0 14px; }
-.hist-row.open .hist-detail { display:block; padding:6px 14px 14px; border-top:1px solid var(--line); }
+.hist-date { font-size:.84rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.hist-total { min-width:96px; text-align:right; font-family:var(--display); font-weight:700; font-size:1.05rem; font-variant-numeric:tabular-nums; }
+.hist-detail { display:none; padding:0 16px; }
+.hist-row.open .hist-detail { display:block; padding:8px 16px 16px; border-top:1px solid var(--line); }
 
-.hist-lines { width:100%; border-collapse:collapse; margin:8px 0; font-size:.88rem; }
-.hist-lines th { text-align:left; font-size:.66rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:700; padding:5px 6px; }
+.hist-lines { width:100%; margin:8px 0 10px; font-size:.88rem; border-collapse:separate; border-spacing:0;
+  border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+.hist-lines th { padding:8px 12px; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-align:left; text-transform:uppercase;
+  color:var(--muted); background:var(--wash); border-bottom:1px solid var(--line); }
 .hist-lines th.num, .hist-lines td.num { text-align:right; font-variant-numeric:tabular-nums; }
-.hist-lines td { padding:6px 6px; border-top:1px solid var(--line); }
-.hd-meta { color:var(--muted); font-size:.8rem; }
-.hd-note { color:var(--muted); font-size:.84rem; white-space:pre-line; margin:6px 0; }
-.hist-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:8px; }
+.hist-lines td { padding:8px 12px; border-top:1px solid var(--line); }
+.hist-lines tbody tr:first-child td { border-top:none; }
+.hd-meta { font-size:.8rem; color:var(--muted); }
+.hd-note { margin:6px 0; font-size:.84rem; white-space:pre-line; color:var(--ink-2); }
+.hist-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; margin-top:10px; }
 .hist-actions .grow { flex:1; }
 .hd-sum { font-size:.86rem; color:var(--muted); font-variant-numeric:tabular-nums; }
 .hd-sum b { color:var(--ink); }
-.hd-stock { font-size:.7rem; font-weight:600; color:var(--muted); background:var(--wash); border:1px solid var(--line); border-radius:100px; padding:2px 8px; }
-.hd-stock.ok { color:var(--good); background:var(--good-wash); border-color:var(--good-wash); }
+.hd-stock { padding:3px 9px; font-size:.72rem; font-weight:600; color:var(--muted); background:var(--wash); border:1px solid var(--line); border-radius:100px; }
+.hd-stock.ok { color:var(--good); background:var(--good-wash); border-color:transparent; }
 
 /* =========================================================
-   Statistiques
+   Statistiques (admin v3)
    ========================================================= */
-.stat-periods { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px; }
-.stat-pbtn { font:inherit; font-weight:600; font-size:.85rem; cursor:pointer; border:1.5px solid var(--line);
-  background:var(--paper); color:var(--ink); border-radius:100px; padding:7px 14px; }
-.stat-pbtn:hover { border-color:var(--ember); }
-.stat-pbtn.is-active { background:var(--fill-strong); color:#fff; border-color:var(--fill-strong); }
+/* sous-onglets soulignés (comme l'inventaire) */
+.stat-subtabs { display:flex; gap:2px; margin:0 0 16px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line); }
+.stat-subtabs::-webkit-scrollbar { display:none; }
+.stat-subtab { position:relative; flex:none; padding:10px 14px 13px; font:inherit; font-weight:600; font-size:.92rem; color:var(--muted);
+  white-space:nowrap; cursor:pointer; background:none; border:none; border-radius:9px 9px 0 0; transition:color .15s; }
+.stat-subtab:hover { color:var(--ink); }
+.stat-subtab.is-active { color:var(--ink); }
+.stat-subtab.is-active::after { content:''; position:absolute; left:10px; right:10px; bottom:-1px; height:2px; border-radius:2px 2px 0 0; background:var(--ember); }
 
-.stat-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-bottom:22px; }
-.stat-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow-sm); }
-.stat-card-label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
-.stat-card-value { font-size:1.5rem; font-weight:700; font-variant-numeric:tabular-nums; margin-top:4px; }
-.stat-card-sub { font-size:.78rem; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
-.stat-pct { font-size:.8rem; font-weight:700; padding:1px 7px; border-radius:100px; vertical-align:middle; }
-.stat-pct.pos { background:var(--good-wash); color:var(--good); } .stat-pct.neg { background:var(--bad-wash); color:var(--bad); }
+/* périodes : contrôle segmenté défilable */
+.stat-periods { display:inline-flex; gap:2px; max-width:100%; margin-bottom:20px; padding:3px; overflow-x:auto; scrollbar-width:none;
+  background:var(--wash); border:1px solid var(--line); border-radius:11px; }
+.stat-periods::-webkit-scrollbar { display:none; }
+.stat-pbtn { flex:none; min-height:34px; padding:0 14px; font:inherit; font-weight:600; font-size:.86rem; color:var(--muted); white-space:nowrap;
+  cursor:pointer; background:none; border:none; border-radius:8px; transition:background .15s, color .15s; }
+.stat-pbtn:hover { color:var(--ink); }
+.stat-pbtn.is-active { color:var(--ink); background:var(--paper); box-shadow:0 1px 3px rgba(20,22,26,.14), inset 0 0 0 1px var(--line); }
 
-.stat-cols { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
-.stat-panel { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow-sm); }
-.stat-panel h2 { font-size:1rem; margin-bottom:12px; }
+/* cartes chiffres clés */
+.stat-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; margin-bottom:20px; }
+.stat-card { position:relative; padding:16px 18px; overflow:hidden; background:var(--paper); border:1px solid var(--line); border-radius:16px; }
+.stat-card:first-child::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--ember); }
+.stat-card-label { font-size:.68rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.stat-card-value { margin-top:6px; font-family:var(--display); font-size:1.75rem; font-weight:700; line-height:1.1; letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums; }
+.stat-card-sub { margin-top:4px; font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.stat-pct { padding:2px 8px; font-family:var(--font); font-size:.78rem; font-weight:700; letter-spacing:0; vertical-align:middle; border-radius:100px; }
+.stat-pct.pos { color:var(--good); background:var(--good-wash); } .stat-pct.neg { color:var(--bad); background:var(--bad-wash); }
 
-.stat-catrow { display:flex; align-items:center; gap:10px; margin:8px 0; }
-.stat-catname { width:78px; font-size:.85rem; font-weight:600; flex:none; }
-.stat-catval { width:88px; text-align:right; font-size:.85rem; font-variant-numeric:tabular-nums; flex:none; }
-.stat-bar { flex:1; height:8px; background:var(--wash); border-radius:100px; overflow:hidden; }
-.stat-bar-fill { display:block; height:100%; background:var(--ember); border-radius:100px; }
+.stat-cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.stat-panel { padding:18px 20px; background:var(--paper); border:1px solid var(--line); border-radius:16px; }
+.stat-panel h2 { margin-bottom:14px; font-family:var(--display); font-size:1.1rem; letter-spacing:-.01em; }
 
-.stat-toprow { padding:9px 0; border-top:1px solid var(--line); }
+/* barres de répartition */
+.stat-catrow { display:flex; align-items:center; gap:12px; margin:10px 0; }
+.stat-catname { flex:none; width:88px; font-size:.86rem; font-weight:600; }
+.stat-catval { flex:none; width:92px; text-align:right; font-size:.86rem; font-weight:600; font-variant-numeric:tabular-nums; }
+.stat-bar { flex:1; height:10px; overflow:hidden; background:var(--wash); border-radius:100px; }
+.stat-bar-fill { display:block; height:100%; background:linear-gradient(90deg, var(--ember-dim), var(--ember)); border-radius:100px; }
+
+/* classements */
+.stat-toprow { padding:10px 0; border-top:1px solid var(--line); }
 .stat-toprow:first-child { border-top:none; }
 .stat-topmain { display:flex; align-items:center; gap:10px; }
-.stat-topname { flex:1; font-size:.88rem; font-weight:600; min-width:0; }
-.stat-topmeta { color:var(--muted); font-weight:400; font-size:.78rem; }
+.stat-topname { flex:1; min-width:0; font-size:.88rem; font-weight:600; }
+.stat-topmeta { font-size:.78rem; font-weight:400; color:var(--muted); }
 .stat-topmain .stat-bar { max-width:120px; }
 .stat-topnums { display:flex; align-items:center; gap:10px; margin-top:4px; font-variant-numeric:tabular-nums; }
 .stat-topqty { font-size:.8rem; color:var(--muted); }
 .stat-toprev { font-size:.86rem; font-weight:700; }
-.stat-topmargin { font-size:.74rem; font-weight:600; padding:1px 7px; border-radius:100px; }
-.stat-topmargin.pos { background:var(--good-wash); color:var(--good); } .stat-topmargin.neg { background:var(--bad-wash); color:var(--bad); }
+.stat-topmargin { padding:1px 8px; font-size:.74rem; font-weight:600; border-radius:100px; }
+.stat-topmargin.pos { color:var(--good); background:var(--good-wash); } .stat-topmargin.neg { color:var(--bad); background:var(--bad-wash); }
 
 /* top produits : un classement par catégorie */
-.stat-h-note { font-size:.74rem; font-weight:500; color:var(--muted); margin-left:6px; }
-.stat-toppanel { margin-top:18px; }
-.stat-topgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px,1fr)); gap:14px 24px; align-items:start; }
+.stat-h-note { margin-left:6px; font-family:var(--font); font-size:.74rem; font-weight:500; letter-spacing:0; color:var(--muted); }
+.stat-toppanel { margin-top:16px; }
+.stat-topgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px 26px; align-items:start; }
 .stat-topgroup .stat-topmain { flex-wrap:wrap; row-gap:6px; }
 .stat-topgroup .stat-topname { flex-basis:100%; line-height:1.35; }
-.stat-topgroup .stat-topmain .stat-bar { max-width:none; flex-basis:100%; height:6px; }
-.stat-topgroup h3 { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
-  color:var(--muted); margin:0 0 2px; }
-.stat-none { font-size:.84rem; margin:4px 0 0; }
-.stat-chip { display:inline-block; width:14px; height:14px; border-radius:50%; flex:none; vertical-align:-2px;
-  margin-right:8px; box-shadow:0 0 0 1.5px var(--line); }
-
-/* sous-onglets Vue d'ensemble / Produits vendus (même look que l'inventaire) */
-.stat-subtabs { display:flex; gap:6px; margin:4px 0 16px; padding:4px; background:var(--wash);
-  border:1px solid var(--line); border-radius:var(--radius); width:fit-content; }
-.stat-subtab { appearance:none; border:none; background:none; cursor:pointer; font:inherit; font-weight:600;
-  color:var(--muted); padding:9px 18px; border-radius:10px; transition:background .15s, color .15s; }
-.stat-subtab:hover { color:var(--ink); }
-.stat-subtab.is-active { background:var(--paper); color:var(--ember-dim); box-shadow:var(--shadow-sm); }
+.stat-topgroup .stat-topmain .stat-bar { flex-basis:100%; max-width:none; height:6px; }
+.stat-topgroup h3 { display:flex; align-items:center; gap:8px; margin:0 0 4px; font-size:.68rem; font-weight:700; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted); }
+.stat-topgroup h3::after { content:''; flex:1; height:1px; background:var(--line); }
+.stat-none { margin:4px 0 0; font-size:.84rem; }
+.stat-chip { display:inline-block; flex:none; width:14px; height:14px; margin-right:8px; vertical-align:-2px; border-radius:50%;
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.16); }
 
 /* onglet Produits vendus */
-.stat-soldpanel + .stat-soldpanel { margin-top:18px; }
-.stat-soldhead { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+.stat-soldpanel + .stat-soldpanel { margin-top:16px; }
+.stat-soldhead { display:flex; align-items:baseline; flex-wrap:wrap; gap:12px; margin-bottom:8px; }
 .stat-soldhead h2 { margin:0; }
 .stat-soldsum { font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums; }
-.stat-soldcols, .stat-soldrow { display:grid; grid-template-columns:32px minmax(0,1fr) 64px 110px 130px;
-  align-items:center; gap:10px; }
-.stat-soldcols { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
-  padding:4px 0 6px; border-bottom:1px solid var(--line); }
+.stat-soldcols, .stat-soldrow { display:grid; grid-template-columns:32px minmax(0, 1fr) 64px 110px 130px; align-items:center; gap:10px; }
+.stat-soldcols { padding:8px 10px; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+  background:var(--wash); border-radius:10px; }
 .stat-soldcols span:nth-child(n+3) { text-align:right; }
-.stat-soldrow { padding:8px 0; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+.stat-soldrow { padding:9px 10px; font-variant-numeric:tabular-nums; border-bottom:1px solid var(--line); }
 .stat-soldrow:last-child { border-bottom:none; }
-.stat-soldrank { font-size:.8rem; color:var(--muted); font-weight:600; }
+.stat-soldrow:hover { background:color-mix(in srgb, var(--wash) 55%, transparent); }
+.stat-soldrank { font-size:.8rem; font-weight:600; color:var(--muted); }
 .stat-soldname { display:flex; align-items:center; min-width:0; font-size:.88rem; font-weight:600; }
 .stat-soldlabel { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .stat-soldqty, .stat-soldrev, .stat-soldmargin { text-align:right; font-size:.86rem; }
@@ -376,10 +398,14 @@
 @media (max-width:720px) {
   .stat-cols { grid-template-columns:1fr; }
   .stat-soldcols { display:none; }
-  .stat-soldrow { grid-template-columns:24px minmax(0,1fr) auto; row-gap:2px; }
+  .stat-soldrow { grid-template-columns:24px minmax(0, 1fr) auto; row-gap:2px; padding:9px 4px; }
   .stat-soldrev { grid-column:2; text-align:left; }
   .stat-soldmargin { grid-column:3; }
   .stat-soldname { align-items:flex-start; }
   .stat-soldlabel { white-space:normal; line-height:1.35; }
   .stat-soldname .stat-chip { margin-top:2px; }
+  .hist-head { padding:12px; }
+  .hist-total { min-width:0; }
+  .hist-client { flex-basis:100%; order:3; }
+  .stat-card-value { font-size:1.45rem; }
 }
