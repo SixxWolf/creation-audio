@@ -1,8 +1,7 @@
 /* =========================================================
    Création Audio V2 — Coût moyen pondéré (CMP)
-   Math pure, partagée par l'Inventaire (coût moyen stocké sur
-   products.attrs.avg_cost) et les Statistiques (recalcul
-   rétroactif des marges à la date de la vente).
+   Math pure utilisée par l'Inventaire (coût moyen stocké sur
+   products.attrs.avg_cost).
 
    Modèle : « moyenne pondérée périodique ». Le coût moyen d'un
    produit = Σ(qté × prix payé) / Σ(qté) sur ses réceptions.
@@ -11,9 +10,8 @@
    vrai prix. Aucune dépendance à Supabase ici — que du calcul.
 
    Expose window.CA.costing :
-     - avg(lines, fallback)         -> moyenne pondérée (ou null)
-     - avgUpTo(lines, dateISO, fb)  -> idem, réceptions <= date
-   « lines » = [{ qty, unit_cost, received_at? }].
+     - avg(lines, fallback)  -> moyenne pondérée (ou null)
+   « lines » = [{ qty, unit_cost }].
    ========================================================= */
 window.CA = window.CA || {};
 (function () {
@@ -44,15 +42,5 @@ window.CA = window.CA || {};
     return round2(totC / totQ);
   }
 
-  // Moyenne pondérée en ne gardant que les réceptions à la date <= dateISO
-  // (voyage dans le temps : « coût moyen tel qu'il était ce jour-là »).
-  function avgUpTo(lines, dateISO, fallback) {
-    var d = dateISO || '9999-12-31';
-    var kept = (lines || []).filter(function (l) {
-      return String(l.received_at || '') <= d;
-    });
-    return avg(kept, fallback);
-  }
-
-  window.CA.costing = { avg: avg, avgUpTo: avgUpTo, round2: round2 };
+  window.CA.costing = { avg: avg, round2: round2 };
 })();
