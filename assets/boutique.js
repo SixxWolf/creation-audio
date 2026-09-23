@@ -4,7 +4,7 @@
    aucun coût exposé).
    Catalogue (matériaux groupés par marque, filtre marque +
    « en stock seulement ») → fiche couleur (photo, format,
-   pastilles par teinte, onglets) → panier → commande par
+   pastilles dans l'ordre de l'admin, onglets) → panier → commande par
    Messenger ou courriel (aucun paiement en ligne).
    Adresses : #/ · #/m/<marque> · #/m/<marque>/<matériau>[/<couleur>]
    ========================================================= */
@@ -548,8 +548,8 @@
     var tierHtml = tiers.length ? '<div class="pdp-tiers"><span>Rabais quantité</span>' +
       tiers.map(function (t) { return '<span class="pdp-tier"><b>' + t.min + '+</b> à ' + money(t.price) + '</span>'; }).join('') + '</div>' : '';
 
-    // pastilles rangées par teinte ; « en stock seulement » garde toujours la couleur affichée
-    var items = m.items.slice().sort(hueSort);
+    // pastilles dans l'ordre de l'admin (sort_order) ; « en stock seulement » garde toujours la couleur affichée
+    var items = m.items.slice();
     var hiddenN = 0;
     if (onlyStock) items = items.filter(function (it) {
       var keep = it === p || inStockAs(it, curType);
