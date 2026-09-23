@@ -59,7 +59,7 @@
   /* ---------- état ---------- */
   var loaded = false;
   var cat = 'filament';          // gabarit courant (pilote la colonne gauche)
-  var clientType = 'client';     // 'client' | 'dealer'  (legacy 'olivier' => dealer)
+  var clientType = 'client';     // 'client' | 'dealer'
   var taxEnabled = false;
   var pickerKind = 'spool';      // filament : bobine | recharge
   var brandFilter = 'all';       // filtre marque (catalogue filament)
@@ -338,10 +338,10 @@
   });
 
   function setClientType(type, keepFields) {
-    clientType = (type === 'dealer' || type === 'olivier') ? 'dealer' : 'client';
+    clientType = type === 'dealer' ? 'dealer' : 'client';
     $$('.fx-cli-btn').forEach(function (x) {
       var v = x.getAttribute('data-cli');
-      x.classList.toggle('is-active', v === clientType || (clientType === 'dealer' && v === 'olivier'));
+      x.classList.toggle('is-active', v === clientType);
     });
     var isDlr = clientType === 'dealer';
     if (elDealerField) elDealerField.hidden = !isDlr;
@@ -848,7 +848,7 @@
     elNote.value = '';
     cxVehicle.value = ''; cxLitrage.value = ''; cxEvent.value = ''; cxFinition.value = '';
     elDate.value = todayISO(); elStatus.textContent = '';
-    setClientType('client');   // vide les champs client (le profil Olivier reste mémorisé)
+    setClientType('client');   // vide les champs client (le profil dealer reste mémorisé)
     loadNextNumberHint();
     render();
   }

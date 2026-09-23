@@ -362,7 +362,7 @@ create table if not exists public.invoices (
   client_contact text,                                       -- courriel / téléphone / Messenger
   client_address text,                                       -- adresse (facture pro)
   client_city    text,                                       -- ville, code postal
-  client_type    text    not null default 'client',          -- 'client' | 'olivier' (dealer)
+  client_type    text    not null default 'client',          -- 'client' | 'dealer'
   category       text    not null default 'filament',         -- 'filament' | 'spacer' | 'caisson' | 'mixte'
   invoice_date   date    not null default current_date,
   note           text,                                        -- conditions de paiement / mot libre
@@ -449,7 +449,7 @@ grant select on public.product_popularity to anon, authenticated;
 -- Deux tarifs pour les spacers :
 --   - PUBLIC (client lambda) : products.sell_price, à plat, SANS rabais
 --     quantité (les rabais spacer sont retirés de products_public ci-dessus).
---   - DEALER (Olivier & co) : products.dealer_price + products.tiers
+--   - DEALER (portail dealer) : products.dealer_price + products.tiers
 --     (rabais quantité), visibles UNIQUEMENT via la vue products_dealer,
 --     réservée aux comptes listés dans public.dealers. Le coût reste privé.
 -- ------------------------------------------------------------
