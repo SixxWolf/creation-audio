@@ -555,6 +555,93 @@ grant execute on function public.deduct_stock(uuid, text, integer) to authentica
 -- (drop table if exists public.pos_display;) — voir aussi les tables V1
 -- orphelines inventory / sales / spacers, également supprimées.
 
+-- ============================================================
+-- LISTE D'ATTENTE « M'aviser quand disponible »
+-- Une demande = une personne qui attend un produit (et un format).
+--  - source 'site'        : formulaire public de la boutique (courriel) ;
+--  - source 'marketplace' / 'autre' : saisie à la main dans l'admin.
+-- Loi 25 : le courriel ne sert QU'À l'avis. Après l'avis ou l'expiration
+-- (60 jours), nom + contact sont EFFACÉS ; il ne reste qu'une trace
+-- anonyme (produit, format, dates) pour les statistiques.
+-- Lecture / gestion : admin seulement. Le public n'insère QUE via la
+-- RPC waitlist_subscribe (validation, anti-doublon, anti-pourriel).
+-- L'envoi du courriel se fait par l'Edge Function « waitlist-notify ».
+-- ------------------------------------------------------------
+create table if not exists public.waitlist (
+  id          uuid primary key default gen_random_uuid(),
+  product_id  uuid not null references public.products(id) on delete cascade,
+  kind        text,                         -- 'spool' | 'refill' | 'item' ; null = n'importe quel format
+  name        text,                         -- optionnel (saisie admin)
+  contact     text,                         -- courriel (site) ou « Messenger » ; null après avis/expiration
+  source      text not null default 'site' check (source in ('site','marketplace','autre')),
+  status      text not null default 'open' check (status in ('open','notified','expired')),
+  note        text,
+  created_at  timestamptz not null default now(),
+  notified_at timestamptz,
+  expires_at  timestamptz not null default (now() + interval '60 days')
+);
+create index if not exists waitlist_open_idx on public.waitlist (product_id) where status = 'open';
+-- anti-doublon : même courriel + même produit + même format, tant que la demande est ouverte
+create unique index if not exists waitlist_open_uidx
+  on public.waitlist (lower(contact), product_id, coalesce(kind, ''))
+  where status = 'open' and source = 'site';
+
+alter table public.waitlist enable row level security;
+drop policy if exists waitlist_admin_all on public.waitlist;
+create policy waitlist_admin_all on public.waitlist for all to authenticated
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+
+-- Expiration + effacement des renseignements (Loi 25). Appelée chaque jour
+-- par pg_cron, et au passage par waitlist_subscribe (filet de sécurité).
+create or replace function public.waitlist_cleanup()
+returns integer language plpgsql security definer set search_path = public as $$
+declare n integer;
+begin
+  update public.waitlist
+     set status = 'expired', name = null, contact = null
+   where status = 'open' and expires_at < now();
+  get diagnostics n = row_count;
+  -- filet : aucune donnée personnelle ne doit survivre à une demande close
+  update public.waitlist set name = null, contact = null
+   where status <> 'open' and (name is not null or contact is not null);
+  return n;
+end $$;
+revoke all on function public.waitlist_cleanup() from public, anon, authenticated;
+
+-- Inscription publique (boutique). p_hp = champ piège (honeypot) : doit être vide.
+-- Renvoie : 'ok' | 'exists' | 'invalid' | 'unavailable' | 'busy'
+create or replace function public.waitlist_subscribe(p_product uuid, p_kind text, p_email text, p_hp text default '')
+returns text language plpgsql security definer set search_path = public as $$
+declare v_email text := lower(trim(coalesce(p_email, '')));
+        v_kind  text := nullif(trim(coalesce(p_kind, '')), '');
+begin
+  -- robot : on fait semblant que tout va bien, sans rien enregistrer
+  if coalesce(p_hp, '') <> '' then return 'ok'; end if;
+  if length(v_email) > 254 or v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$' then return 'invalid'; end if;
+  if v_kind is not null and v_kind not in ('spool','refill','item') then return 'invalid'; end if;
+  if not exists (select 1 from public.products where id = p_product and active) then return 'unavailable'; end if;
+  perform public.waitlist_cleanup();
+  -- anti-pourriel : 5 demandes ouvertes max par courriel, 40 inscriptions/heure au total
+  if (select count(*) from public.waitlist where status = 'open' and source = 'site' and lower(contact) = v_email) >= 5
+     or (select count(*) from public.waitlist where source = 'site' and created_at > now() - interval '1 hour') >= 40 then
+    return 'busy';
+  end if;
+  if exists (select 1 from public.waitlist where status = 'open' and source = 'site' and lower(contact) = v_email
+               and product_id = p_product and coalesce(kind, '') = coalesce(v_kind, '')) then
+    return 'exists';
+  end if;
+  insert into public.waitlist (product_id, kind, contact, source) values (p_product, v_kind, v_email, 'site');
+  return 'ok';
+end $$;
+revoke all on function public.waitlist_subscribe(uuid, text, text, text) from public;
+grant execute on function public.waitlist_subscribe(uuid, text, text, text) to anon, authenticated;
+
+-- Nettoyage quotidien (4 h UTC) via pg_cron.
+create extension if not exists pg_cron;
+select cron.unschedule(jobid) from cron.job where jobname = 'waitlist-cleanup';
+select cron.schedule('waitlist-cleanup', '0 4 * * *', 'select public.waitlist_cleanup()');
+
 -- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------

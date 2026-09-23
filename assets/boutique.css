@@ -156,6 +156,27 @@
 .cfg-add:active { transform:translateY(1px); }
 .cfg-add.is-disabled { background:var(--muted); box-shadow:none; cursor:not-allowed; }
 
+/* « M'aviser quand c'est de retour » (format en rupture) */
+.cfg-notify { border:1.5px dashed var(--ember); border-radius:var(--radius); padding:15px 17px; margin:-8px 0 22px;
+  background:rgba(255,106,43,.05); }
+.cfg-notify-title { font-weight:700; margin-bottom:10px; }
+.cfg-notify-form { display:flex; gap:8px; }
+.cfg-notify-email { flex:1; min-width:0; font:inherit; color:var(--ink); background:var(--paper); border:1.5px solid var(--line);
+  border-radius:100px; padding:10px 16px; }
+.cfg-notify-email:focus { outline:none; border-color:var(--ember); }
+.cfg-notify-btn { flex:none; cursor:pointer; font:inherit; font-weight:700; color:#fff; background:var(--fill-strong);
+  border:none; border-radius:100px; padding:0 20px; }
+.cfg-notify-btn:hover { background:var(--fill-strong-hover); }
+.cfg-notify-btn:disabled { opacity:.6; cursor:wait; }
+.cfg-hp { position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
+.cfg-notify-msg { font-size:.86rem; font-weight:600; margin:8px 0 0; }
+.cfg-notify-msg:empty { display:none; }
+.cfg-notify-msg.ok { color:var(--good); margin:0; }
+.cfg-notify-msg.bad { color:var(--bad); }
+.cfg-notify-legal { font-size:.76rem; color:var(--muted); margin:10px 0 0; line-height:1.45; }
+.cfg-notify-legal a { color:inherit; text-decoration:underline; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
 /* Accessoires (bobines vides) */
 .cfg-accs { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
 .cfg-acc { display:flex; align-items:center; gap:13px; border:1px solid var(--line); border-radius:var(--radius); padding:11px 13px; background:var(--paper); }

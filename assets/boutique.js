@@ -538,6 +538,7 @@
             '<button type="button" class="cfg-add' + (out ? ' is-disabled' : '') + '"' + (out ? ' disabled' : '') + '>' +
               (out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
           '</div>' +
+          (out ? notifyHtml(p) : '') +
 
           featHtml +
 
@@ -549,7 +550,60 @@
     wireConfig();
   }
 
+  /* ---------- « M'aviser quand c'est de retour » (format en rupture) ----------
+     Courriel seul, envoyé à la RPC waitlist_subscribe (validation, anti-doublon,
+     anti-pourriel côté serveur). Champ piège « website » caché = honeypot.
+     Loi 25 : usage annoncé au moment de la collecte + lien vers la politique. */
+  var notifyDone = {};   // "id|format" -> message de confirmation (survit aux re-rendus)
+  function fmtName(type) { return type === 'refill' ? 'recharge' : 'avec bobine'; }
+  function notifyHtml(p) {
+    var key = p.id + '|' + curType, done = notifyDone[key];
+    return '<div class="cfg-notify">' +
+      '<div class="cfg-notify-title">🔔 M\'aviser quand c\'est de retour</div>' +
+      (done ? '<p class="cfg-notify-msg ok">' + esc(done) + '</p>' :
+      '<form class="cfg-notify-form" novalidate>' +
+        '<label class="sr-only" for="cfg-notify-email">Ton courriel</label>' +
+        '<input type="email" id="cfg-notify-email" class="cfg-notify-email" required maxlength="254" autocomplete="email" placeholder="ton@courriel.com">' +
+        '<input type="text" name="website" class="cfg-hp" tabindex="-1" autocomplete="off" aria-hidden="true">' +
+        '<button type="submit" class="cfg-notify-btn">M\'aviser</button>' +
+      '</form>' +
+      '<p class="cfg-notify-msg" aria-live="polite"></p>' +
+      '<p class="cfg-notify-legal">On utilise ton courriel <strong>uniquement</strong> pour t\'aviser de l\'arrivée de ce produit (' +
+        esc(p.name) + ', ' + fmtName(curType) + '), puis il est supprimé. ' +
+        '<a href="confidentialite.html#liste-attente">Politique de confidentialité</a></p>') +
+    '</div>';
+  }
+  function wireNotify() {
+    var form = $('.cfg-notify-form', configEl); if (!form) return;
+    var p = curColor, type = curType;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = $('.cfg-notify-email', form), btn = $('.cfg-notify-btn', form), msg = $('.cfg-notify-msg', configEl);
+      var val = (email.value || '').trim();
+      function say(t, cls) { msg.textContent = t; msg.className = 'cfg-notify-msg' + (cls ? ' ' + cls : ''); }
+      if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(val)) { say('Entre un courriel valide.', 'bad'); email.focus(); return; }
+      if (!sb) { say('Service momentanément indisponible.', 'bad'); return; }
+      btn.disabled = true; say('Envoi…');
+      sb.rpc('waitlist_subscribe', { p_product: p.id, p_kind: type, p_email: val, p_hp: $('.cfg-hp', form).value || '' })
+        .then(function (res) {
+          btn.disabled = false;
+          var r = res && !res.error ? res.data : null;
+          if (r === 'ok' || r === 'exists') {
+            notifyDone[p.id + '|' + type] = r === 'ok'
+              ? '✓ C\'est noté ! On t\'écrit dès que le ' + p.name + ' (' + fmtName(type) + ') est de retour.'
+              : 'Tu es déjà sur la liste pour ce produit — on t\'écrit dès son arrivée.';
+            if (curColor === p && curType === type) renderConfig();
+            return;
+          }
+          if (r === 'invalid') say('Ce courriel semble invalide.', 'bad');
+          else if (r === 'busy') say('Trop de demandes pour le moment — réessaie un peu plus tard.', 'bad');
+          else say('Impossible d\'enregistrer ta demande pour le moment. Écris-nous à ' + EMAIL + '.', 'bad');
+        }, function () { btn.disabled = false; say('Erreur réseau — réessaie.', 'bad'); });
+    });
+  }
+
   function wireConfig() {
+    wireNotify();
     $$('.cfg-type', configEl).forEach(function (b) {
       b.addEventListener('click', function () { curType = b.getAttribute('data-type'); curQty = 1; renderConfig(); });
     });

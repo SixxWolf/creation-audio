@@ -128,10 +128,10 @@
      SOUS-ONGLETS
      ========================================================= */
   var subReception = $('#inv-sub-reception'), subCommander = $('#inv-sub-commander'),
-      subCatalogue = $('#inv-sub-catalogue'), subCodes = $('#inv-sub-codes');
+      subCatalogue = $('#inv-sub-catalogue'), subCodes = $('#inv-sub-codes'), subAttente = $('#inv-sub-attente');
   // bascule DOM du sous-onglet (l'URL est gérée par le routing de admin-core)
   function showSub(sub) {
-    if (['commander', 'catalogue', 'codes'].indexOf(sub) < 0) sub = 'reception';
+    if (['commander', 'catalogue', 'codes', 'attente'].indexOf(sub) < 0) sub = 'reception';
     $$('.inv-subtab').forEach(function (b) {
       var on = b.getAttribute('data-sub') === sub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on));
@@ -140,6 +140,7 @@
     if (subCommander) subCommander.hidden = (sub !== 'commander');
     if (subCatalogue) subCatalogue.hidden = (sub !== 'catalogue');
     if (subCodes) subCodes.hidden = (sub !== 'codes');
+    if (subAttente) subAttente.hidden = (sub !== 'attente');
     if (sub === 'commander') renderReorder();
     if (sub === 'catalogue') renderCatalog();
     if (sub === 'codes') renderCodes();
@@ -366,6 +367,7 @@
     var qty = addScanUnit(hit.f, hit.kind);
     feedback('✓ ' + scanLabel(hit.f, hit.kind) + '  (×' + qty + ')', 'ok');
     bumpCount();
+    if (window.CA.waitlist) window.CA.waitlist.onScan(hit.f.id, hit.kind);   // quelqu'un l'attend ?
     focusScan();
   }
 
@@ -441,6 +443,7 @@
         var qty = addScanUnit(f, kind);
         feedback('✓ Associé & compté : ' + scanLabel(f, kind) + '  (×' + qty + ')', 'ok');
         bumpCount();
+        if (window.CA.waitlist) window.CA.waitlist.onScan(f.id, kind);
         focusScan();
       }, function (err) {
         scanLearnSave.disabled = false;
@@ -567,6 +570,8 @@
     chain.then(function () { return recomputeAvgCosts(affected); }).then(function () {
       confirmBtn.disabled = false;
       statusEl.textContent = editingReceiptId ? '✓ Réception modifiée, stock et coût moyen ajustés.' : '✓ Réception enregistrée, stock et coût moyen mis à jour.';
+      // liste d'attente : alerte pour TOUT ce qui vient d'entrer (y compris lignes saisies à la main)
+      if (window.CA.waitlist) window.CA.waitlist.onReceived(valid.map(function (r) { return { productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind) }; }));
       resetForm();
       Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
       loadHistory();
@@ -809,6 +814,14 @@
   }
   function cssId(id) { return String(id).replace(/"/g, '\\"'); }
 
+  // pastille « N en attente » (liste d'attente) — guide les achats
+  function waitBadge(f) {
+    var n = window.CA.waitlist ? window.CA.waitlist.count(f.id) : 0;
+    return n ? ' <span class="ro-wait" title="Personnes en liste d\'attente pour cette couleur">⏳ ' + n + ' en attente</span>' : '';
+  }
+  // la liste d'attente se charge en parallèle -> on rafraîchit les pastilles à son arrivée
+  document.addEventListener('ca:waitlist', function () { if (loaded && reorderBody && subCommander && !subCommander.hidden) renderReorder(); });
+
   function renderReorder() {
     if (!reorderBody) return;
     if (!loaded) { ensureLoad(); return; }
@@ -871,7 +884,7 @@
           '<td class="l"><div class="reorder-fil">' +
             '<span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
             '<span><span class="ro-name">' + esc(f.name || '(sans nom)') + '</span>' +
-            (f.code ? ' <span class="ro-code">' + esc(f.code) + '</span>' : '') + '</span>' +
+            (f.code ? ' <span class="ro-code">' + esc(f.code) + '</span>' : '') + waitBadge(f) + '</span>' +
           '</div></td>' +
           fmtCells('spool', hasS, anyS) +
           fmtCells('refill', hasR, anyR) +

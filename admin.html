@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=29">
+<link rel="stylesheet" href="assets/admin.css?v=30">
 <link rel="stylesheet" href="assets/facture.css?v=11">
 <link rel="stylesheet" href="assets/autoloop.css?v=6">
 <script src="assets/theme.js?v=1" defer></script>
@@ -437,6 +437,7 @@
         <button type="button" class="inv-subtab" role="tab" data-sub="commander">À commander</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="catalogue">Prix catalogue</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="codes">Codes-barres</button>
+        <button type="button" class="inv-subtab" role="tab" data-sub="attente">Liste d'attente <span class="wl-tab-count" id="wl-tab-count" hidden></span></button>
       </div>
 
       <!-- ============ SOUS-ONGLET : RÉCEPTION SCANNABLE ============ -->
@@ -474,6 +475,9 @@
             </div>
           </div>
         </div>
+
+        <!-- Alerte liste d'attente : quelqu'un attend un article qu'on vient de scanner / recevoir -->
+        <div class="wl-alert" id="wl-alert" hidden aria-live="polite"></div>
 
         <!-- Réception (n° + date + tableau) -->
         <form class="editor" id="r-editor">
@@ -624,6 +628,46 @@
           <span class="bc-count" id="bc-count"></span>
         </div>
         <div id="bc-body"></div>
+      </div>
+
+      <!-- ============ SOUS-ONGLET : LISTE D'ATTENTE ============ -->
+      <div class="inv-subpanel" id="inv-sub-attente" role="tabpanel" hidden>
+        <div class="panel-head">
+          <div>
+            <h1 style="font-size:1.1rem">Liste d'attente</h1>
+            <p class="muted">Qui attend quel produit. Demandes du site = courriel envoyé automatiquement ; Marketplace = message prêt à copier. Les coordonnées sont effacées après l'avis ou après 60 jours.</p>
+          </div>
+          <span class="grow"></span>
+          <button class="btn btn-ghost btn-sm" id="wl-refresh" type="button">Actualiser</button>
+        </div>
+
+        <details class="wl-add" id="wl-add">
+          <summary>+ Ajouter une demande (Marketplace, téléphone…)</summary>
+          <form class="wl-add-form" id="wl-add-form">
+            <label class="field wl-f-prod"><span>Produit</span><select id="wl-add-prod" required></select></label>
+            <label class="field wl-f-kind"><span>Format</span>
+              <select id="wl-add-kind">
+                <option value="">Peu importe</option>
+                <option value="refill">Recharge</option>
+                <option value="spool">Avec bobine</option>
+              </select></label>
+            <label class="field"><span>Nom</span><input type="text" id="wl-add-name" maxlength="80" placeholder="Jean"></label>
+            <label class="field"><span>Source</span>
+              <select id="wl-add-source">
+                <option value="marketplace">Marketplace</option>
+                <option value="autre">Autre</option>
+                <option value="site">Courriel (auto)</option>
+              </select></label>
+            <label class="field wl-f-contact"><span>Contact <small class="muted" id="wl-add-contact-hint">(facultatif)</small></span><input type="text" id="wl-add-contact" maxlength="254" placeholder="Messenger, téléphone…"></label>
+            <div class="wl-add-actions">
+              <button type="submit" class="btn btn-accent btn-sm" id="wl-add-save">Ajouter</button>
+              <span class="hint" id="wl-add-status"></span>
+            </div>
+          </form>
+        </details>
+
+        <div id="wl-list"><p class="muted">Chargement…</p></div>
+        <div id="wl-stats"></div>
       </div>
     </section>
 
@@ -1423,7 +1467,8 @@
 <script src="assets/cms-linkbuilder.js?v=2"></script>
 <script src="assets/cms-spacers.js?v=5"></script>
 <script src="assets/cms-accessories.js?v=1"></script>
-<script src="assets/cms-inventory.js?v=20"></script>
+<script src="assets/cms-inventory.js?v=21"></script>
+<script src="assets/cms-attente.js?v=1"></script>
 <script src="assets/cms-dealers.js?v=2"></script>
 <script src="assets/cms-clients.js?v=1"></script>
 <script src="assets/cms-facturation.js?v=22"></script>
