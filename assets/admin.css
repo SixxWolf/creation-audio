@@ -375,119 +375,299 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 }
 
 /* =========================================================
-   Inventaire V2 — sous-onglets, poste de scan, à commander
+   ONGLET INVENTAIRE (v3) — sous-onglets, poste de scan, réception,
+   À commander, prix catalogue, codes-barres, liste d'attente
    ========================================================= */
 
-/* ---- sous-onglets ---- */
-.inv-subtabs { display:flex; gap:6px; margin:4px 0 20px; padding:4px; background:var(--wash);
-  border:1px solid var(--line); border-radius:var(--radius); width:fit-content; }
-.inv-subtab { appearance:none; border:none; background:none; cursor:pointer; font:inherit; font-weight:600;
-  color:var(--muted); padding:9px 18px; border-radius:10px; transition:background .15s, color .15s; }
+/* ---- Sous-onglets (soulignés, défilables sur mobile) ---- */
+.inv-subtabs { display:flex; gap:2px; margin:0 0 22px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line); }
+.inv-subtabs::-webkit-scrollbar { display:none; }
+.inv-subtab { position:relative; flex:none; display:inline-flex; align-items:center; gap:7px; padding:10px 14px 13px;
+  font:inherit; font-weight:600; font-size:.92rem; color:var(--muted); white-space:nowrap; cursor:pointer;
+  background:none; border:none; border-radius:9px 9px 0 0; transition:color .15s; }
 .inv-subtab:hover { color:var(--ink); }
-.inv-subtab.is-active { background:var(--paper); color:var(--ember-dim); box-shadow:var(--shadow-sm); }
+.inv-subtab.is-active { color:var(--ink); }
+.inv-subtab.is-active::after { content:''; position:absolute; left:10px; right:10px; bottom:-1px; height:2px;
+  border-radius:2px 2px 0 0; background:var(--ember); }
+.inv-subtab:focus-visible { outline:2px solid var(--ember); outline-offset:-2px; }
+.wl-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; padding:0 6px;
+  font-size:.72rem; font-weight:700; color:var(--on-ember); background:var(--ember); border-radius:100px; }
+.wl-tab-count[hidden] { display:none; }
 
-/* ---- poste de scan ---- */
-.scan-station { border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--paper);
-  box-shadow:var(--shadow-sm); padding:18px; margin-bottom:22px; transition:border-color .2s, box-shadow .2s; }
-.scan-station.is-armed { border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.14); }
-.scan-head { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
-.scan-toggle { min-width:210px; }
-.scan-station.is-armed .scan-toggle { background:var(--charcoal); }
-.scan-count { margin-left:auto; display:flex; align-items:baseline; gap:8px; }
-.scan-count-num { font-size:2rem; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink); }
-.scan-count-lbl { color:var(--muted); font-size:.85rem; }
-.scan-inputwrap { margin-top:14px; }
-.scan-input { width:100%; font-size:1.25rem; font-weight:600; letter-spacing:.02em; padding:14px 16px;
-  border:2px dashed var(--line); border-radius:var(--radius); background:var(--wash); color:var(--ink);
-  text-align:center; transition:border-color .15s, background .15s; }
-.scan-input:focus { outline:none; border-color:var(--ember); border-style:solid; background:var(--paper); }
-.scan-input:disabled { opacity:.5; }
+/* ---- Tableaux (réception, À commander, prix catalogue, codes-barres) ---- */
+.rcp-table-wrap, .reorder-table-wrap, .bc-table-wrap { overflow-x:auto; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
+.rcp-table, .reorder-table, .bc-table { width:100%; border-collapse:separate; border-spacing:0; font-size:.9rem; }
+.rcp-table th, .reorder-table th, .bc-table th { padding:10px 14px; font-size:.67rem; font-weight:700; letter-spacing:.08em; text-align:left;
+  text-transform:uppercase; white-space:nowrap; color:var(--muted); background:var(--wash); border-bottom:1px solid var(--line); }
+.rcp-table td, .reorder-table td, .bc-table td { padding:8px 14px; vertical-align:middle; border-bottom:1px solid var(--line); }
+.rcp-table tbody tr:last-child td, .reorder-table tbody tr:last-child td, .bc-table tbody tr:last-child td { border-bottom:none; }
+.rcp-table tbody tr:hover td, .reorder-table tbody tr:hover td, .bc-table tbody tr:hover td { background:color-mix(in srgb, var(--wash) 55%, transparent); }
+.rcp-table input, .rcp-table select, .reorder-table input, .bc-table input, .bc-table select { padding:6px 10px; font-size:.9rem; border-radius:8px; }
+.rcp-table select, .bc-table select { padding-right:30px; background-position:right 9px center; }
+.rcp-table th.num, .rcp-table td.num, .reorder-table th, .reorder-table td { text-align:right; }
+.reorder-table th.l, .reorder-table td.l { text-align:left; }
+.num input, input.num { text-align:right; font-variant-numeric:tabular-nums; }
+
+/* ---- Poste de scan ---- */
+.scan-station { position:relative; margin-bottom:22px; padding:20px; background:var(--paper); border:1px solid var(--line);
+  border-radius:16px; transition:border-color .2s, box-shadow .2s; }
+.scan-station.is-armed { border-color:var(--ember); box-shadow:var(--ring), 0 22px 44px -30px rgba(226,78,21,.55); }
+.scan-head { display:flex; align-items:center; flex-wrap:wrap; gap:14px 18px; }
+.scan-toggle { min-width:230px; min-height:46px; font-size:.98rem; }
+.scan-station.is-armed .scan-toggle { color:#fff; background:var(--fill-strong); border-color:var(--fill-strong); }
+.scan-count { display:flex; align-items:baseline; gap:8px; margin-left:auto; padding:8px 16px;
+  background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+.scan-count-num { font-family:var(--display); font-size:2rem; font-weight:700; line-height:1; color:var(--ink); font-variant-numeric:tabular-nums; }
+.scan-count-lbl { font-size:.85rem; color:var(--muted); }
+.scan-inputwrap { position:relative; margin-top:16px; }
+/* icône code-barres à gauche du champ ; point vert « à l'écoute » à droite quand le poste est armé */
+.scan-inputwrap::before { content:''; position:absolute; left:18px; top:50%; width:26px; height:26px; margin-top:-13px; opacity:.55; pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M4 6v12M7 6v12M10.5 6v12M13 6v12M16.5 6v12M20 6v12'/%3E%3C/svg%3E") center / contain no-repeat; }
+.scan-station.is-armed .scan-inputwrap::after { content:''; position:absolute; right:20px; top:50%; width:10px; height:10px; margin-top:-5px;
+  border-radius:50%; background:var(--good); animation:scanPulse 1.6s ease-out infinite; pointer-events:none; }
+@keyframes scanPulse { 0% { box-shadow:0 0 0 0 rgba(31,157,87,.55); } 100% { box-shadow:0 0 0 12px rgba(31,157,87,0); } }
+.scan-input { width:100%; min-height:62px; padding:14px 48px 14px 56px; font-size:1.2rem; font-weight:600; letter-spacing:.04em; text-align:center;
+  color:var(--ink); background:var(--wash); border:2px dashed var(--line-2); border-radius:14px; transition:border-color .15s, background .15s, box-shadow .15s; }
+.scan-input:focus { border-style:solid; border-color:var(--ember); background:var(--paper); box-shadow:var(--ring); }
+.scan-input:disabled { opacity:.65; cursor:not-allowed; }
 .scan-feedback { min-height:22px; margin-top:10px; text-align:center; font-size:.92rem; font-weight:600; }
-.scan-feedback.ok  { color:var(--good); }
-.scan-feedback.warn { color:var(--ember-dim); }
+.scan-feedback.ok { color:var(--good); }
+.scan-feedback.warn { color:var(--ember-ink); }
 .scan-feedback.bad { color:var(--bad); }
 .scan-bump { animation:scanBump .28s ease; }
-@keyframes scanBump { 0%{transform:scale(1)} 40%{transform:scale(1.18)} 100%{transform:scale(1)} }
+@keyframes scanBump { 0% { transform:scale(1); } 40% { transform:scale(1.18); } 100% { transform:scale(1); } }
 
-/* ---- apprentissage code inconnu ---- */
-.scan-learn { margin-top:14px; padding:14px; border:1px solid var(--ember); border-radius:var(--radius);
-  background:var(--bad-wash); }
-.scan-learn-head { font-weight:700; margin-bottom:2px; }
-.scan-learn-head code { background:var(--paper); border:1px solid var(--line); border-radius:6px;
-  padding:2px 7px; font-family:var(--mono); }
-.scan-learn-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+/* apprentissage d'un code inconnu (poste de réception + codes-barres) */
+.scan-learn { margin-top:14px; padding:14px 16px; background:color-mix(in srgb, var(--ember) 7%, var(--paper));
+  border:1px solid color-mix(in srgb, var(--ember) 45%, transparent); border-radius:12px; }
+.scan-learn-head { margin-bottom:2px; font-weight:700; }
+.scan-learn-head code, .bc-code code { padding:3px 8px; font-family:ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace; font-size:.86rem; font-weight:600;
+  background:var(--paper); border:1px solid var(--line); border-radius:7px; }
+.scan-learn-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:10px; }
 .scan-learn-fil { flex:1; min-width:220px; }
-.scan-learn-fil, .scan-learn-kind { padding:9px 10px; }
+.scan-learn-kind { width:auto; min-width:150px; }
 
-.rcp-manual { margin-top:14px; border-top:1px solid var(--line); padding-top:10px; }
-.rcp-manual summary { cursor:pointer; color:var(--muted); font-weight:600; font-size:.9rem; }
+/* ---- Réception : prix payé, lignes, saisie manuelle ---- */
+.rcp-pricebar { display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; margin-top:16px; padding:12px 14px;
+  background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+.rcp-pricebar-lbl { margin-right:4px; font-size:.86rem; font-weight:700; }
+.rcp-pricebar select { width:auto; min-width:150px; }
+.rcp-pricebar #r-disc-val { width:110px; text-align:right; }
+.rcp-pricebar .hint { flex-basis:100%; }
+.rcp-table-wrap { margin-top:16px; }
+.rcp-table-wrap > .hint { margin:0; padding:16px; text-align:center; }
+.rcp-table .rcp-qty { width:90px; text-align:right; }
+.rcp-table .rcp-kind { width:140px; }
+.rcp-table .rcp-kind-item { display:inline-block; width:140px; padding:0 2px; font-size:.9rem; color:var(--muted); }
+.rcp-table .rcp-fil { min-width:200px; }
+.rcp-table .rcp-price { width:110px; text-align:right; }
+.rcp-price-cell { min-width:130px; }
+.rcp-price-hint { margin-top:3px; font-size:.72rem; white-space:nowrap; color:var(--muted); }
+.rcp-price-hint .pos { color:var(--good); } .rcp-price-hint .neg { color:var(--bad); }
+.rcp-row-del { display:grid; place-items:center; width:30px; height:30px; padding:0; font-size:1rem; color:var(--muted); cursor:pointer;
+  background:none; border:none; border-radius:8px; }
+.rcp-row-del:hover { color:var(--bad); background:var(--bad-wash); }
+.rcp-row.unmatched select { border-color:var(--ember); box-shadow:var(--ring); }
+.rcp-manual { margin-top:16px; padding-top:12px; border-top:1px solid var(--line); }
+.rcp-manual summary { display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:.9rem; color:var(--ink-2); cursor:pointer; list-style:none; }
+.rcp-manual summary::-webkit-details-marker { display:none; }
+.rcp-manual summary::before { content:''; width:16px; height:16px; background:var(--chev) center / 14px no-repeat; transform:rotate(-90deg); transition:transform .2s; }
+.rcp-manual[open] summary::before { transform:none; }
 .rcp-manual summary:hover { color:var(--ink); }
 
-/* ---- à commander ---- */
+/* Historique des réceptions (lignes dépliables) */
+.rcp-hist { align-items:flex-start; }
+.rcp-hist-head { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; cursor:pointer; }
+.rcp-hist-head .grow { flex:1; }
+.rcp-hist-order { display:inline-flex; align-items:center; gap:8px; font-family:var(--display); font-weight:700; font-size:1.02rem; }
+.rcp-hist-order::before { content:''; width:14px; height:14px; flex:none; background:var(--chev) center / 13px no-repeat; transform:rotate(-90deg); transition:transform .2s; }
+.rcp-hist.open .rcp-hist-order::before { transform:none; }
+.rcp-hist-meta { font-size:.82rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.rcp-hist-lines { display:none; margin:10px 0 0; padding:10px 0 0 22px; font-size:.86rem; color:var(--ink-2); border-top:1px dashed var(--line-2); }
+.rcp-hist.open .rcp-hist-lines { display:block; }
+.rcp-hist-lines li { margin:3px 0; }
+.rcp-hist-price { font-weight:600; font-variant-numeric:tabular-nums; }
+
+/* ---- À commander ---- */
 .reorder-summary:empty { display:none; }
-.reorder-card { border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--paper);
-  box-shadow:var(--shadow-sm); padding:18px; }
-.reorder-card.has-miss { border-color:var(--ember); }
-.reorder-card-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
-.reorder-card-head h2 { font-size:1.05rem; }
+.reorder-card { padding:18px 20px; background:var(--paper); border:1px solid var(--line); border-radius:16px; }
+.reorder-card.has-miss { border-color:color-mix(in srgb, var(--ember) 55%, var(--line)); box-shadow:0 22px 44px -32px rgba(226,78,21,.5); }
+.reorder-card-head { display:flex; align-items:center; flex-wrap:wrap; gap:10px 12px; margin-bottom:4px; }
+.reorder-card-head h2 { font-family:var(--display); font-size:1.2rem; letter-spacing:-.02em; }
 .reorder-card-head .grow { flex:1; }
-.reorder-total { background:var(--ember); color:#fff; font-weight:700; border-radius:999px; padding:3px 12px; font-size:.85rem; }
-.reorder-total.zero { background:var(--good); }
-.reorder-list { margin:10px 0 0; padding:0; list-style:none; columns:2; column-gap:26px; }
-.reorder-list li { break-inside:avoid; padding:5px 0; border-bottom:1px dashed var(--line); font-size:.92rem;
-  display:flex; align-items:center; gap:8px; }
-.reorder-list .ro-sw { width:14px; height:14px; border-radius:4px; border:1px solid rgba(0,0,0,.15); flex:none; }
+.reorder-total { padding:4px 12px; font-size:.84rem; font-weight:700; color:var(--on-ember); background:var(--ember); border-radius:100px; }
+.reorder-total.zero { color:#fff; background:var(--good); }
+.reorder-empty { margin:6px 0 0; font-weight:600; color:var(--good); }
+.reorder-brandgroup h3 { font-family:var(--display); letter-spacing:-.01em; }
+.reorder-list { margin:8px 0 0; padding:0; list-style:none; columns:2; column-gap:28px; }
+.reorder-list li { display:flex; align-items:center; gap:9px; padding:6px 0; font-size:.92rem; break-inside:avoid; border-bottom:1px dashed var(--line); }
+.reorder-list .ro-sw, .reorder-fil .ro-sw, .bc-fil .ro-sw { flex:none; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.15); border:none; }
+.reorder-list .ro-sw { width:16px; height:16px; }
 .reorder-list .ro-q { margin-left:auto; font-weight:700; font-variant-numeric:tabular-nums; }
-.reorder-empty { color:var(--good); font-weight:600; }
+.ro-code { font-size:.78rem; color:var(--muted); }
+.ro-wait { display:inline-block; margin-left:6px; padding:1px 8px; font-size:.72rem; font-weight:700; white-space:nowrap;
+  color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 13%, transparent); border-radius:100px; }
 
-/* filtre marque → matériau */
-.reorder-filters { display:flex; flex-wrap:wrap; gap:14px; margin:2px 0 6px; }
-.reorder-flabel { display:flex; align-items:center; gap:8px; font-size:.72rem; font-weight:700;
-  text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
-.reorder-flabel select { font:inherit; font-size:.9rem; font-weight:500; text-transform:none; letter-spacing:0;
-  color:var(--ink); padding:8px 10px; border:1px solid var(--line); border-radius:var(--radius-sm);
-  background:var(--paper); min-width:160px; }
-
+/* filtres marque → matériau */
+.reorder-filters { display:flex; flex-wrap:wrap; gap:10px 16px; margin:2px 0 14px; }
+.reorder-flabel { display:flex; align-items:center; gap:8px; font-size:.7rem; font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--muted); }
+.reorder-flabel select { width:auto; min-width:170px; font-size:.9rem; font-weight:500; letter-spacing:0; text-transform:none; }
 .reorder-group { margin-top:20px; }
-.reorder-group h3 { font-size:.95rem; margin-bottom:8px; }
-.reorder-group h3 .fil-count { color:var(--muted); font-weight:600; font-size:.8rem; margin-left:6px; }
-/* ===== Prix catalogue (coût de base par matériau) ===== */
-.catalog-bulk { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; margin:2px 0 4px;
-  padding:10px 14px; background:var(--wash); border:1px solid var(--line); border-radius:var(--radius-sm); }
-.catalog-bulk .cb-title { font-size:.85rem; font-weight:600; color:var(--ink); }
-.catalog-bulk .cb-f { display:inline-flex; align-items:center; gap:6px; font-size:.82rem; color:var(--muted); }
-.catalog-bulk .cb-f input { width:82px; text-align:right; padding:6px 7px; }
-.catalog-bulk .cb-status { font-size:.82rem; color:var(--good); font-weight:600; }
-.catalog-table td.cat-check-td, .catalog-table th.cat-check-td { text-align:center; padding-right:6px; padding-left:4px; }
-.catalog-table input.catcost { width:82px; text-align:right; padding:5px 6px; }
-.catalog-table .cat-mat { font-weight:600; }
-.catalog-table .cat-brand { color:var(--muted); font-size:.78rem; margin-left:6px; }
-.catalog-table .cat-na { color:var(--line); }
-.catalog-table tr.saving { opacity:.55; }
-.catalog-table tr.saved { background:var(--good-wash); }
-.catalog-table tr.save-err { background:var(--bad-wash); }
-.reorder-table-wrap { overflow-x:auto; }
-/* compact : le tableau colle à son contenu (colonnes serrées, pas d'étalement) */
-.reorder-table { width:auto; max-width:100%; border-collapse:collapse; font-size:.9rem; }
-.reorder-table th { text-align:right; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em;
-  color:var(--muted); padding:6px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
-.reorder-table th.l { text-align:left; }
-.reorder-table td { padding:6px 12px; border-bottom:1px solid var(--line); vertical-align:middle;
-  text-align:right; white-space:nowrap; }
-.reorder-table td.l { text-align:left; padding-right:22px; }
-.reorder-table tr.has-miss { background:var(--bad-wash); }
-.reorder-fil { display:flex; align-items:center; gap:9px; }
-.reorder-fil .ro-sw { width:20px; height:20px; border-radius:6px; border:1px solid rgba(0,0,0,.15); flex:none; }
+.reorder-group h3 { display:flex; align-items:center; gap:8px; margin-bottom:10px; font-family:var(--display); font-size:1.05rem; letter-spacing:-.01em; }
+.reorder-group h3 .fil-count { margin-left:0; }
+/* compact : le tableau colle à son contenu (colonnes serrées) */
+.reorder-table-wrap { display:inline-block; max-width:100%; vertical-align:top; }
+.reorder-table { width:auto; }
+.reorder-table td { white-space:nowrap; }
+.reorder-table td.l { padding-right:24px; }
+.reorder-table tr.has-miss td { background:color-mix(in srgb, var(--bad) 7%, var(--paper)); }
+.reorder-fil { display:flex; align-items:center; gap:10px; }
+.reorder-fil .ro-sw { width:20px; height:20px; }
 .reorder-fil .ro-name { font-weight:600; }
-.reorder-fil .ro-code { color:var(--muted); font-size:.78rem; }
-.reorder-table input.reorder-par { width:52px; text-align:right; padding:5px 6px; }
+.reorder-fil .ro-code { font-size:.78rem; }
+.reorder-table input.reorder-par { width:64px; }
 .reorder-miss { font-weight:700; color:var(--bad); font-variant-numeric:tabular-nums; }
-.reorder-miss.ok { color:var(--muted); font-weight:500; }
-.reorder-na { color:var(--line); }
+.reorder-miss.ok { font-weight:500; color:var(--muted); }
+.reorder-na { color:var(--line-2); }
 
+/* ---- Prix catalogue ---- */
+.catalog-bulk { display:flex; align-items:center; flex-wrap:wrap; gap:10px 16px; margin:2px 0 6px; padding:12px 14px;
+  background:var(--paper); border:1px solid var(--line); border-radius:12px; }
+.catalog-bulk .cb-title { font-size:.88rem; font-weight:700; color:var(--ink); }
+.catalog-bulk .cb-f { display:inline-flex; align-items:center; gap:8px; font-size:.84rem; font-weight:600; color:var(--muted); }
+.catalog-bulk .cb-f input { width:96px; padding:7px 10px; text-align:right; }
+.catalog-bulk .cb-status { font-size:.84rem; font-weight:600; color:var(--good); }
+.catalog-table td.cat-check-td, .catalog-table th.cat-check-td { padding-left:12px; padding-right:4px; text-align:center; }
+.catalog-table input.catcost { width:96px; }
+.catalog-table .cat-mat { font-weight:600; }
+.catalog-table .cat-brand { margin-left:6px; font-size:.78rem; color:var(--muted); }
+.catalog-table .cat-na { color:var(--line-2); }
+.catalog-table tr.saving td { opacity:.55; }
+.catalog-table tr.saved td { background:var(--good-wash); }
+.catalog-table tr.save-err td { background:var(--bad-wash); }
+
+/* ---- Codes-barres ---- */
+.bc-scan { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin:0 0 16px; padding:14px 16px;
+  background:var(--paper); border:1px solid var(--line); border-radius:16px; transition:border-color .2s, box-shadow .2s; }
+.bc-scan.is-armed { border-color:var(--ember); box-shadow:var(--ring); }
+.bc-scan-toggle { min-width:210px; }
+.bc-scan.is-armed .bc-scan-toggle { color:#fff; background:var(--fill-strong); border-color:var(--fill-strong); }
+.bc-scan-input { flex:1; min-width:220px; min-height:46px; padding:10px 14px; font-size:1.05rem; font-weight:600; letter-spacing:.03em; text-align:center;
+  color:var(--ink); background:var(--wash); border:2px dashed var(--line-2); border-radius:12px; }
+.bc-scan-input:focus { border-style:solid; border-color:var(--ember); background:var(--paper); box-shadow:var(--ring); }
+.bc-scan-input:disabled { opacity:.65; }
+.bc-scan-feedback { flex-basis:100%; min-height:20px; font-size:.92rem; font-weight:600; text-align:center; }
+.bc-scan-feedback.ok { color:var(--good); }
+.bc-scan-feedback.warn { color:var(--ember-ink); }
+.bc-scan-feedback.bad { color:var(--bad); }
+.bc-bar { display:flex; align-items:center; gap:12px; margin:2px 0 14px; }
+.bc-bar input[type=search] { flex:0 1 380px; max-width:380px; padding-left:38px;
+  background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='m20 20-4.2-4.2'/%3E%3C/svg%3E") 12px center / 17px no-repeat; }
+.bc-count { font-size:.85rem; white-space:nowrap; color:var(--muted); }
+/* colonnes serrées : chaque colonne colle à son contenu, la colonne Actions absorbe le reste */
+.bc-table th, .bc-table td { white-space:nowrap; }
+.bc-table th:last-child, .bc-table td.bc-act { width:100%; }
+.bc-table tr.bc-editing td { background:var(--wash); }
+.bc-table tr.bc-group th { width:auto; padding-top:14px; font-size:.7rem; color:var(--ink); background:color-mix(in srgb, var(--wash) 70%, var(--paper)); }
+/* le flex va sur un wrapper INTERNE, jamais sur le <td> (sinon la cellule perd son display:table-cell) */
+.bc-fil { font-weight:600; }
+.bc-fil-in { display:flex; align-items:center; gap:10px; }
+.bc-fil .ro-sw { width:20px; height:20px; }
+.bc-format { text-transform:capitalize; }
+.bc-acc-desc { display:block; margin-top:2px; font-size:.82rem; font-weight:400; color:var(--muted); }
+.bc-act { text-align:right; }
+.bc-act .btn { margin-left:4px; }
+/* selects/inputs du formulaire : min-width explicite (sinon width:100% les écrase dans une colonne serrée) */
+.bc-table .bc-e-code { min-width:160px; }
+.bc-table .bc-e-fil { min-width:230px; }
+.bc-table .bc-e-kind { min-width:150px; }
+.bc-table tr.bc-flash td { animation:bcFlash 1.3s ease; }
+@keyframes bcFlash { 0%, 100% { background:transparent; } 18% { background:var(--good-wash); } }
+
+/* ---- Liste d'attente ---- */
+/* alerte au poste de scan — volontairement très visible */
+.wl-alert { margin:0 0 22px; padding:16px 18px; background:color-mix(in srgb, var(--ember) 7%, var(--paper));
+  border:2px solid var(--ember); border-radius:16px; box-shadow:var(--ring), var(--shadow); animation:wl-pop .35s ease-out; }
+.wl-alert[hidden] { display:none; }
+@keyframes wl-pop { from { transform:scale(.98); opacity:.4; } to { transform:none; opacity:1; } }
+.wl-alert-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; font-family:var(--display); font-size:1.1rem; font-weight:700; }
+.wl-alert-head .grow { flex:1; }
+.wl-alert-ic { font-size:1.4rem; }
+.wl-alert-close { display:grid; place-items:center; width:32px; height:32px; padding:0; color:var(--muted); cursor:pointer;
+  background:none; border:none; border-radius:8px; }
+.wl-alert-close:hover { color:var(--ink); background:var(--wash); }
+.wl-alert .wl-group { background:var(--paper); }
+
+/* ajout manuel */
+.wl-add { margin-bottom:16px; padding:14px 18px; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
+.wl-add > summary { display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:.92rem; color:var(--ember-ink); cursor:pointer; list-style:none; }
+.wl-add > summary::-webkit-details-marker { display:none; }
+.wl-add-form { display:grid; grid-template-columns:minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap:12px 14px;
+  margin-top:14px; align-items:end; }
+.wl-add-form .field > span { font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.wl-add-form .field > span small { font-weight:500; letter-spacing:0; text-transform:none; }
+.wl-f-contact { grid-column:span 2; }
+.wl-add-actions { grid-column:span 2; display:flex; align-items:center; gap:12px; }
+
+/* groupes par produit */
+.wl-group { margin-bottom:12px; padding:14px 16px; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
+.wl-group-head { display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+.wl-group-head .grow { flex:1; }
+.wl-sw { width:20px; height:20px; flex:none; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.15); }
+.wl-sw-none { background:var(--wash); }
+.wl-group-name { font-family:var(--display); font-weight:700; font-size:1rem; letter-spacing:-.01em; }
+.wl-group-n { padding:2px 10px; font-size:.76rem; font-weight:700; color:var(--ember-ink);
+  background:color-mix(in srgb, var(--ember) 13%, transparent); border-radius:100px; }
+.wl-stock { padding:2px 9px; font-size:.76rem; font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums;
+  background:var(--wash); border:1px solid var(--line); border-radius:100px; }
+.wl-stock.in { color:var(--good); background:var(--good-wash); border-color:transparent; }
+.wl-req { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
+.wl-req:last-child { padding-bottom:0; border-bottom:none; }
+.wl-req-main { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
+.wl-req-who { font-weight:600; overflow-wrap:anywhere; }
+.wl-req-meta { font-size:.8rem; color:var(--muted); overflow-wrap:anywhere; }
+.wl-req-act { display:flex; align-items:center; gap:6px; flex:none; }
+.wl-del { display:grid; place-items:center; width:32px; height:32px; padding:0; color:var(--muted); cursor:pointer;
+  background:none; border:none; border-radius:8px; }
+.wl-del:hover { color:var(--bad); background:var(--bad-wash); }
+
+/* statistiques anonymes */
+.wl-stats { margin-top:22px; padding:16px 18px; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
+.wl-stats h2 { margin:0 0 4px; font-family:var(--display); font-size:1.05rem; letter-spacing:-.01em; }
+.wl-h-note { margin-left:6px; font-family:var(--font); font-size:.74rem; font-weight:500; color:var(--muted); }
+.wl-stats-sum { margin-bottom:8px; font-size:.8rem; color:var(--muted); }
+.wl-stat-row { display:flex; align-items:center; gap:10px; padding:7px 0; font-size:.88rem; border-top:1px solid var(--line); }
+.wl-stat-name { flex:1; min-width:0; }
+.wl-stat-n { font-weight:700; font-variant-numeric:tabular-nums; }
+
+.wl-toast { position:fixed; left:50%; bottom:24px; z-index:80; max-width:calc(100vw - 32px); padding:12px 18px;
+  font-weight:600; font-size:.9rem; color:#fff; background:var(--fill-strong); border-radius:12px; box-shadow:var(--shadow);
+  opacity:0; pointer-events:none; transform:translate(-50%, 20px); transition:opacity .2s, transform .2s; }
+.wl-toast.show { opacity:1; transform:translate(-50%, 0); }
+.wl-toast.bad { background:var(--bad); }
+
+@media (max-width:720px) {
+  .wl-add-form { grid-template-columns:1fr 1fr; }
+  .wl-f-prod { grid-column:1 / -1; }
+  .wl-req { flex-wrap:wrap; }
+  .wl-req-act { width:100%; justify-content:flex-end; }
+}
 @media (max-width:640px) {
   .reorder-list { columns:1; }
-  .scan-count { margin-left:0; }
+  .scan-station { padding:14px; }
+  .scan-head { flex-wrap:nowrap; gap:10px; }
+  .scan-toggle { flex:1; min-width:0; padding:0 12px; font-size:.92rem; }
+  .scan-count { margin-left:0; padding:6px 10px; }
+  .scan-count-num { font-size:1.6rem; }
+  .scan-input { font-size:1.05rem; padding-left:48px; padding-right:36px; }
+  .scan-inputwrap::before { left:14px; width:22px; height:22px; margin-top:-11px; }
+  .bc-bar input[type=search] { flex:1; max-width:none; }
+  .rcp-pricebar-lbl { flex-basis:100%; }
+  .rcp-pricebar select, .rcp-pricebar #r-disc-val { flex:1; min-width:0; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .scan-station.is-armed .scan-inputwrap::after, .wl-alert { animation:none; }
 }
 
 /* =========================================================
@@ -511,137 +691,20 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .fx-scan-learn-fil, .fx-scan-learn-kind { padding:9px 10px; }
 
 /* =========================================================
-   Inventaire — sous-onglet Codes-barres
+   Statistiques — recalcul rétroactif des marges (style d'origine,
+   à refaire avec l'onglet Statistiques)
    ========================================================= */
-.bc-bar { display:flex; align-items:center; gap:12px; margin:2px 0 14px; }
-.bc-bar input[type=search] { flex:0 1 360px; max-width:360px; font:inherit; color:var(--ink);
-  background:var(--paper); border:1.5px solid var(--line); border-radius:var(--radius-sm); padding:9px 11px; }
-.bc-bar input[type=search]:focus { outline:none; border-color:var(--ember); }
-.bc-count { color:var(--muted); font-size:.85rem; white-space:nowrap; }
-.bc-table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); }
-.bc-table { width:100%; border-collapse:collapse; font-size:.9rem; }
-.bc-table th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em;
-  color:var(--muted); padding:9px 14px; border-bottom:1px solid var(--line); }
-.bc-table td { padding:8px 14px; border-bottom:1px solid var(--line); vertical-align:middle; }
-/* colonnes serrées : chaque colonne colle à son contenu, la colonne Actions absorbe le reste */
-.bc-table th, .bc-table td { white-space:nowrap; }
-.bc-table th:last-child, .bc-table td.bc-act { width:100%; }
-.bc-table tr:last-child td { border-bottom:none; }
-.bc-table tr.bc-editing { background:var(--wash); }
-.bc-code code { font-family:var(--mono); font-weight:600; background:var(--wash); border:1px solid var(--line);
-  border-radius:6px; padding:3px 8px; }
-/* le flex va sur un wrapper INTERNE, jamais sur le <td> (sinon la cellule
-   perd son display:table-cell et la colonne se désaligne des autres) */
-.bc-fil { font-weight:600; }
-.bc-fil-in { display:flex; align-items:center; gap:9px; }
-.bc-fil .ro-sw { width:20px; height:20px; border-radius:6px; border:1px solid rgba(0,0,0,.15); flex:none; }
-.bc-format { text-transform:capitalize; }
-.bc-table tr.bc-group th { width:auto; padding-top:18px; background:var(--wash); color:var(--ink); font-size:.72rem; }
-.bc-acc-desc { display:block; color:var(--muted); font-weight:400; font-size:.82rem; margin-top:2px; }
-.bc-act { text-align:right; }
-.bc-act .btn { margin-left:4px; }
-/* selects/inputs du formulaire : min-width explicite (sinon width:100% les écrase
-   dans une colonne serrée -> texte « Avec bobine » coupé) */
-.bc-table .bc-e-code { min-width:150px; }
-.bc-table .bc-e-fil { min-width:220px; }
-.bc-table .bc-e-kind { min-width:134px; }
+.stat-retro { margin-top:22px; border:1px solid var(--line); border-radius:var(--radius);
+  padding:12px 16px; background:color-mix(in srgb, var(--paper) 94%, transparent); }
+.stat-retro > summary { cursor:pointer; font-weight:700; font-size:.95rem; }
+.stat-retro > summary:hover { color:var(--ink); }
+.stat-retro-body { margin-top:12px; }
+.stat-retro-out, #stat-retro-out { margin-top:10px; }
+.stat-retro-preview { border:1px solid var(--line); border-radius:10px; padding:12px 14px; max-width:520px; }
+.stat-retro-line { display:flex; justify-content:space-between; gap:16px; padding:5px 0;
+  border-bottom:1px solid var(--line); font-size:.9rem; }
+.stat-retro-line:last-of-type { border-bottom:none; }
+.stat-retro-line strong { font-variant-numeric:tabular-nums; }
+.stat-retro-line strong.pos { color:var(--good); } .stat-retro-line strong.neg { color:var(--bad); }
+.stat-retro-none { color:var(--good); font-weight:600; font-size:.9rem; margin:6px 0 0; }
 
-/* poste de scan (vérification) dans Codes-barres */
-.bc-scan { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 16px;
-  padding:12px 14px; border:1px solid var(--line); border-radius:var(--radius-lg);
-  background:var(--paper); box-shadow:var(--shadow-sm); transition:border-color .2s, box-shadow .2s; }
-.bc-scan.is-armed { border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.14); }
-.bc-scan-toggle { min-width:200px; }
-.bc-scan.is-armed .bc-scan-toggle { background:var(--charcoal); border-color:var(--charcoal); }
-.bc-scan-input { flex:1; min-width:220px; font-size:1.05rem; font-weight:600; letter-spacing:.02em;
-  text-align:center; padding:11px 14px; border:2px dashed var(--line); border-radius:var(--radius);
-  background:var(--wash); color:var(--ink); }
-.bc-scan-input:focus { outline:none; border-style:solid; border-color:var(--ember); background:var(--paper); }
-.bc-scan-input:disabled { opacity:.5; }
-.bc-scan-feedback { flex-basis:100%; min-height:20px; font-weight:600; font-size:.92rem; text-align:center; }
-.bc-scan-feedback.ok { color:var(--good); }
-.bc-scan-feedback.warn { color:var(--ember-dim); }
-.bc-scan-feedback.bad { color:var(--bad); }
-.bc-table tr.bc-flash { animation:bcFlash 1.3s ease; }
-@keyframes bcFlash { 0%,100% { background:transparent; } 18% { background:var(--good-wash); } }
-
-
-/* =========================================================
-   Liste d'attente (« M'aviser quand disponible »)
-   ========================================================= */
-.wl-tab-count { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px;
-  padding:0 6px; margin-left:4px; border-radius:100px; background:var(--ember); color:#fff; font-size:.72rem; font-weight:700; }
-.wl-tab-count[hidden] { display:none; }
-
-/* alerte au poste de scan — volontairement très visible */
-.wl-alert { margin:0 0 22px; border:2px solid var(--ember); border-radius:var(--radius-lg);
-  background:linear-gradient(0deg, rgba(255,106,43,.07), rgba(255,106,43,.07)), var(--paper);
-  padding:16px 18px; box-shadow:0 0 0 4px rgba(255,106,43,.14), var(--shadow); animation:wl-pop .35s ease-out; }
-.wl-alert[hidden] { display:none; }
-@keyframes wl-pop { from { transform:scale(.98); opacity:.4; } to { transform:none; opacity:1; } }
-.wl-alert-head { display:flex; align-items:center; gap:10px; font-size:1.08rem; margin-bottom:8px; }
-.wl-alert-head .grow { flex:1; }
-.wl-alert-ic { font-size:1.4rem; }
-.wl-alert-close { appearance:none; border:none; background:none; color:var(--muted); cursor:pointer; font-size:1rem; padding:4px 8px; border-radius:8px; }
-.wl-alert-close:hover { color:var(--ink); background:var(--wash); }
-.wl-alert .wl-group { background:var(--paper); }
-
-/* groupes par produit */
-.wl-group { border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); padding:12px 14px;
-  margin-bottom:12px; box-shadow:var(--shadow-sm); }
-.wl-group-head { display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; padding-bottom:8px; border-bottom:1px solid var(--line); }
-.wl-group-head .grow { flex:1; }
-.wl-sw { width:18px; height:18px; border-radius:50%; flex:none; box-shadow:0 0 0 1.5px var(--line); }
-.wl-sw-none { background:var(--wash); }
-.wl-group-name { font-weight:700; }
-.wl-group-n { font-size:.78rem; font-weight:700; color:var(--ember-dim); background:rgba(255,106,43,.12); padding:2px 9px; border-radius:100px; }
-.wl-stock { font-size:.76rem; color:var(--muted); font-variant-numeric:tabular-nums; }
-.wl-stock.in { color:var(--good); font-weight:700; }
-.wl-req { display:flex; align-items:center; gap:12px; padding:9px 0; border-bottom:1px solid var(--line); }
-.wl-req:last-child { border-bottom:none; padding-bottom:0; }
-.wl-req-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
-.wl-req-who { font-weight:600; overflow-wrap:anywhere; }
-.wl-req-meta { font-size:.8rem; color:var(--muted); overflow-wrap:anywhere; }
-.wl-req-act { display:flex; align-items:center; gap:6px; flex:none; }
-.wl-del { appearance:none; border:none; background:none; color:var(--muted); cursor:pointer; padding:6px 8px; border-radius:8px; }
-.wl-del:hover { color:var(--bad); background:var(--bad-wash); }
-
-/* ajout manuel */
-.wl-add { border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); padding:12px 16px;
-  margin-bottom:16px; box-shadow:var(--shadow-sm); }
-.wl-add > summary { cursor:pointer; font-weight:700; font-size:.92rem; color:var(--ember-dim); }
-.wl-add-form { display:grid; grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); gap:12px 14px;
-  margin-top:14px; align-items:end; }
-.wl-add-form .field > span { font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
-.wl-add-form .field > span small { text-transform:none; letter-spacing:0; font-weight:500; }
-.wl-f-contact { grid-column:span 2; }
-.wl-add-form input[type=email] { font:inherit; color:var(--ink); background:var(--paper); border:1.5px solid var(--line);
-  border-radius:var(--radius-sm); padding:9px 11px; width:100%; }
-.wl-add-form input[type=email]:focus { outline:none; border-color:var(--ember); }
-.wl-add-actions { grid-column:span 2; display:flex; align-items:center; gap:12px; }
-
-/* stats anonymes */
-.wl-stats { margin-top:22px; border:1px solid var(--line); border-radius:var(--radius); background:var(--paper); padding:14px 16px; box-shadow:var(--shadow-sm); }
-.wl-stats h2 { font-size:1rem; margin:0 0 4px; }
-.wl-h-note { font-size:.74rem; font-weight:500; color:var(--muted); margin-left:6px; }
-.wl-stats-sum { font-size:.8rem; color:var(--muted); margin-bottom:8px; }
-.wl-stat-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px solid var(--line); font-size:.88rem; }
-.wl-stat-name { flex:1; min-width:0; }
-.wl-stat-n { font-weight:700; font-variant-numeric:tabular-nums; }
-
-/* pastille dans « À commander » */
-.ro-wait { display:inline-block; margin-left:6px; font-size:.72rem; font-weight:700; color:var(--ember-dim);
-  background:rgba(255,106,43,.12); padding:1px 8px; border-radius:100px; white-space:nowrap; }
-
-.wl-toast { position:fixed; left:50%; bottom:24px; transform:translate(-50%, 20px); opacity:0; pointer-events:none; z-index:80;
-  background:var(--fill-strong); color:#fff; padding:11px 18px; border-radius:100px; font-weight:600; font-size:.9rem;
-  box-shadow:var(--shadow); transition:opacity .2s, transform .2s; max-width:calc(100vw - 32px); }
-.wl-toast.show { opacity:1; transform:translate(-50%, 0); }
-.wl-toast.bad { background:var(--bad); }
-
-@media (max-width:720px) {
-  .wl-add-form { grid-template-columns:1fr 1fr; }
-  .wl-f-prod { grid-column:1 / -1; }
-  .wl-req { flex-wrap:wrap; }
-  .wl-req-act { width:100%; justify-content:flex-end; }
-}
