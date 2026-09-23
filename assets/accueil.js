@@ -257,28 +257,49 @@
     });
     if (!mats.length) { emptyNote(matGrid, 'Le stock se renouvelle — <a href="boutique.html">voir toute la boutique</a>.'); return 0; }
 
-    matGrid.innerHTML = mats.map(function (g) {
-      var band = g.stock.slice().sort(hueSort).slice(0, 28).map(function (p, i) {
-        return '<i style="--s:' + esc(swatchBg(p._cs)) + ';--i:' + i + '"></i>';
-      }).join('');
-      var mins = g.stock.map(fromPrice).filter(function (v) { return v != null; });
-      var min = mins.length ? Math.min.apply(null, mins) : null;
-      var tag = String(g.first.material_desc || '').split(/\r?\n/)[0].trim();
-      if (tag.length > 90) tag = tag.slice(0, 88).replace(/\s+\S*$/, '') + '…';
-      var n = g.stock.length;
-      return '<a class="mat-card" href="' + esc(matUrl(g.first)) + '">' +
-        '<span class="mat-band" aria-hidden="true">' + band + '</span>' +
-        '<span class="mat-go" aria-hidden="true">' + ARROW + '</span>' +
-        '<span class="mat-body">' +
-          '<span class="mat-brand">' + esc(g.brand) + '</span>' +
-          '<span class="mat-name">' + esc(g.material) + '</span>' +
-          (tag ? '<span class="mat-tag">' + esc(tag) + '</span>' : '') +
-          '<span class="mat-foot"><span><b>' + n + '</b> couleur' + (n > 1 ? 's' : '') + ' en stock</span>' +
-            (min != null ? '<span class="mat-price">dès <b>' + priceShort(min) + '</b></span>' : '') + '</span>' +
-        '</span></a>';
+    // Un groupe par marque (ordre des marques de l'admin), chacun avec sa grille de matériaux.
+    var brands = [], byBrand = {};
+    mats.forEach(function (g) {
+      if (!byBrand[g.brand]) { byBrand[g.brand] = []; brands.push(g.brand); }
+      byBrand[g.brand].push(g);
+    });
+    matGrid.innerHTML = brands.map(function (b) {
+      var list = byBrand[b], id = 'mb-' + slugify(b);
+      var nCol = list.reduce(function (s, g) { return s + g.stock.length; }, 0);
+      return '<section class="mat-brand-group" aria-labelledby="' + id + '">' +
+        '<header class="mat-brand-head">' +
+          '<h3 class="mat-brand-title" id="' + id + '">' + esc(b) + '</h3>' +
+          '<span class="mat-brand-meta">' + list.length + ' matériau' + (list.length > 1 ? 'x' : '') + ' · ' +
+            nCol + ' couleur' + (nCol > 1 ? 's' : '') + ' en stock</span>' +
+          '<span class="mat-brand-rule" aria-hidden="true"></span>' +
+          '<a class="mat-brand-link" href="boutique.html#/m/' + esc(brandSeg(b)) + '" aria-label="Voir tous les filaments ' + esc(b) + '">' +
+            'Voir la marque ' + ARROW + '</a>' +
+        '</header>' +
+        '<div class="mat-grid">' + list.map(matCard).join('') + '</div>' +
+      '</section>';
     }).join('');
     done(matGrid);
     return mats.length;
+  }
+
+  function matCard(g) {
+    var band = g.stock.slice().sort(hueSort).slice(0, 28).map(function (p, i) {
+      return '<i style="--s:' + esc(swatchBg(p._cs)) + ';--i:' + i + '"></i>';
+    }).join('');
+    var mins = g.stock.map(fromPrice).filter(function (v) { return v != null; });
+    var min = mins.length ? Math.min.apply(null, mins) : null;
+    var tag = String(g.first.material_desc || '').split(/\r?\n/)[0].trim();
+    if (tag.length > 90) tag = tag.slice(0, 88).replace(/\s+\S*$/, '') + '…';
+    var n = g.stock.length;
+    return '<a class="mat-card" href="' + esc(matUrl(g.first)) + '">' +
+      '<span class="mat-band" aria-hidden="true">' + band + '</span>' +
+      '<span class="mat-go" aria-hidden="true">' + ARROW + '</span>' +
+      '<span class="mat-body">' +
+        '<span class="mat-name">' + esc(g.material) + '</span>' +
+        (tag ? '<span class="mat-tag">' + esc(tag) + '</span>' : '') +
+        '<span class="mat-foot"><span><b>' + n + '</b> couleur' + (n > 1 ? 's' : '') + ' en stock</span>' +
+          (min != null ? '<span class="mat-price">dès <b>' + priceShort(min) + '</b></span>' : '') + '</span>' +
+      '</span></a>';
   }
 
   function renderPopular(fils, pop) {
@@ -395,7 +416,7 @@
      Apparition douce des sections au défilement
      ========================================================= */
   if ('IntersectionObserver' in window && !reduceMotion) {
-    var targets = $$('.sec-head, .mat-grid, .pop-grid, .steps, .bento, .box-panel, .contact-card');
+    var targets = $$('.sec-head, .mat-groups, .pop-grid, .steps, .bento, .box-panel, .contact-card');
     var io = new IntersectionObserver(function (en) {
       en.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
     }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });

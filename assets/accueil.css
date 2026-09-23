@@ -181,7 +181,18 @@ main section[id] { scroll-margin-top:calc(var(--top-h) + 8px); }
 .empty-note { grid-column:1 / -1; margin:0; padding:26px; text-align:center; color:var(--muted);
   background:#fff; border:1px dashed var(--line-2); border-radius:18px; }
 
-/* ---- matériaux ---- */
+/* ---- matériaux, regroupés par marque ---- */
+.mat-groups { display:flex; flex-direction:column; gap:clamp(34px, 4.5vw, 52px); }
+.mat-brand-head { display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; margin-bottom:16px; }
+.mat-brand-title { font-size:1.45rem; font-weight:700; line-height:1.1; letter-spacing:-.02em; color:var(--ink); }
+.mat-brand-meta { padding:4px 11px; border-radius:100px; font-size:.82rem; color:var(--ink-2);
+  background:var(--wash); border:1px solid var(--line); white-space:nowrap; }
+.mat-brand-rule { flex:1; min-width:24px; height:1px; background:var(--line); }
+.mat-brand-link { display:inline-flex; align-items:center; gap:6px; padding:6px 0; text-decoration:none;
+  font-weight:700; font-size:.9rem; color:var(--ink); white-space:nowrap; transition:color .15s; }
+.mat-brand-link svg { width:15px; height:15px; transition:transform .18s; }
+.mat-brand-link:hover { color:var(--ember-ink); }
+.mat-brand-link:hover svg { transform:translateX(3px); }
 .mat-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:16px; }
 .mat-card {
   position:relative; display:flex; flex-direction:column; overflow:hidden; text-decoration:none; color:var(--ink);
@@ -197,7 +208,6 @@ a.mat-card:hover { transform:translateY(-3px); border-color:var(--line-2); box-s
 }
 a.mat-card:hover .mat-band i { transform:translateY(-5px); }
 .mat-body { display:flex; flex-direction:column; gap:4px; flex:1; padding:16px 18px 18px; }
-.mat-brand { font-size:.7rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
 .mat-name { font-family:var(--display); font-weight:700; font-size:1.36rem; letter-spacing:-.02em; line-height:1.15; }
 .mat-tag { font-size:.9rem; line-height:1.45; color:var(--ink-2); }
 .mat-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:auto; padding-top:14px;
@@ -375,6 +385,12 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
   .hero-cta { order:5; margin-top:22px; }
   .hero-facts { order:6; margin-top:28px; }
   .mat-grid { grid-template-columns:1fr; }
+  /* en-tête de marque : nom + lien sur la 1re ligne, pastille dessous (même rendu pour toutes les marques) */
+  .mat-brand-head { display:grid; grid-template-columns:minmax(0, 1fr) auto; align-items:center; gap:6px 12px; }
+  .mat-brand-title { grid-column:1; grid-row:1; }
+  .mat-brand-link { grid-column:2; grid-row:1; }
+  .mat-brand-meta { grid-column:1 / -1; grid-row:2; justify-self:start; }
+  .mat-brand-rule { display:none; }
   .sw-card { position:relative; left:auto; bottom:auto; width:100%; margin-top:-6px; }
   .hero-facts { grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
   .hero-facts b { font-size:1.08rem; white-space:normal; }
