@@ -10,6 +10,17 @@
 .cai-intro p { margin:0 0 16px; color:var(--muted); }
 .cai-intro b { color:var(--ink); }
 
+/* ---- Bandeau « modification d'une facture enregistrée » ---- */
+.fx-edit-banner { display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin-bottom:14px; padding:12px 14px;
+  background:color-mix(in srgb, var(--ember) 9%, var(--paper)); border:1px solid color-mix(in srgb, var(--ember) 38%, var(--line));
+  border-radius:14px; }
+.fx-edit-banner[hidden] { display:none; }
+.fx-edit-ic { display:grid; place-items:center; flex:none; width:36px; height:36px; color:var(--on-ember); background:var(--ember); border-radius:10px; }
+.fx-edit-txt { display:flex; flex-direction:column; gap:2px; flex:1 1 260px; min-width:0; font-size:.85rem; color:var(--muted); }
+.fx-edit-txt b { font-family:var(--display); font-size:1rem; font-weight:700; letter-spacing:-.01em; color:var(--ink); }
+#fx-edit-num { white-space:nowrap; }
+.fx-edit-banner .btn { flex:none; margin-left:auto; }
+
 /* ---- Barre gabarit + client (admin v3) ---- */
 .fx-bar { display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin-bottom:16px; padding:8px;
   background:var(--paper); border:1px solid var(--line); border-radius:14px; }
@@ -271,6 +282,7 @@
 .hist-row { overflow:hidden; background:var(--paper); border:1px solid var(--line); border-radius:14px; transition:border-color .15s, box-shadow .15s; }
 .hist-row:hover { border-color:var(--line-2); }
 .hist-row.open { border-color:var(--line-2); box-shadow:0 18px 38px -28px rgba(20,22,26,.45); }
+.hist-row.flash { box-shadow:0 0 0 2px var(--ember); }
 .hist-row.is-cancelled { opacity:.62; }
 .hist-row.is-cancelled .hist-total { text-decoration:line-through; }
 .hist-head { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; padding:12px 14px 12px 16px; cursor:pointer; }

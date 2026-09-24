@@ -661,6 +661,115 @@ create extension if not exists pg_cron;
 select cron.unschedule(jobid) from cron.job where jobname = 'waitlist-cleanup';
 select cron.schedule('waitlist-cleanup', '0 4 * * *', 'select public.waitlist_cleanup()');
 
+-- ============================================================
+-- MODIFIER UNE FACTURE ENREGISTRÉE (Historique -> « Modifier »)
+-- Tout se fait dans UNE transaction (tout ou rien) :
+--   1. le stock retiré par la version d'origine est remis
+--      (qty_deducted, ou qty pour une ancienne facture) ;
+--   2. les lignes sont remplacées ; si p_deduct, le stock de la
+--      nouvelle version est déduit (borné à 0, quantité retirée
+--      mémorisée dans qty_deducted comme à la création) ;
+--   3. l'en-tête est mis à jour (même id ; n° modifiable, unique).
+-- Une facture annulée ne se modifie pas. updated_at = dernière modif.
+-- ------------------------------------------------------------
+alter table public.invoices add column if not exists updated_at timestamptz;
+
+create or replace function public.update_invoice(p_id uuid, p_invoice jsonb, p_lines jsonb, p_deduct boolean)
+returns public.invoices language plpgsql security definer set search_path = public as $$
+declare
+  v_inv    public.invoices;
+  r        record;
+  v_line   jsonb;
+  v_i      integer := 0;
+  v_back   integer;
+  v_prod   uuid;
+  v_kind   text;
+  v_qty    numeric;
+  v_before integer;
+  v_taken  integer;
+begin
+  -- Garde admin (voir receive_stock).
+  if coalesce((select auth.jwt() ->> 'email'), '') <> 'creationaudio.ca@gmail.com' then
+    raise exception 'Réservé à l''administrateur.';
+  end if;
+  select * into v_inv from public.invoices where id = p_id for update;
+  if not found then raise exception 'Facture introuvable.'; end if;
+  if v_inv.status = 'cancelled' then raise exception 'Une facture annulée ne peut pas être modifiée.'; end if;
+  if p_lines is null or jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'La facture doit contenir au moins une ligne.';
+  end if;
+
+  -- 1) remet le stock retiré par la version d'origine
+  if v_inv.stock_deducted then
+    for r in select product_id, kind, qty, qty_deducted from public.invoice_lines
+              where invoice_id = p_id and product_id is not null loop
+      v_back := coalesce(r.qty_deducted, abs(r.qty)::integer);
+      if v_back > 0 then
+        update public.products
+           set qty   = case when r.kind <> 'refill' then coalesce(qty,0)   + v_back else qty   end,
+               qty_2 = case when r.kind =  'refill' then coalesce(qty_2,0) + v_back else qty_2 end,
+               updated_at = now()
+         where id = r.product_id;
+      end if;
+    end loop;
+  end if;
+
+  -- 2) remplace les lignes (+ déduction de la nouvelle version)
+  delete from public.invoice_lines where invoice_id = p_id;
+  for v_line in select value from jsonb_array_elements(p_lines) loop
+    v_prod  := nullif(v_line ->> 'product_id', '')::uuid;
+    v_kind  := coalesce(nullif(v_line ->> 'kind', ''), 'spool');
+    v_qty   := coalesce((v_line ->> 'qty')::numeric, 0);
+    v_taken := null;
+    if p_deduct and v_prod is not null and v_qty > 0 then
+      select case when v_kind = 'refill' then coalesce(qty_2,0) else coalesce(qty,0) end
+        into v_before from public.products where id = v_prod for update;
+      if found then
+        v_taken := least(v_before, abs(v_qty)::integer);
+        update public.products
+           set qty   = case when v_kind <> 'refill' then coalesce(qty,0)   - v_taken else qty   end,
+               qty_2 = case when v_kind =  'refill' then coalesce(qty_2,0) - v_taken else qty_2 end,
+               updated_at = now()
+         where id = v_prod;
+      else
+        v_taken := 0;
+      end if;
+    end if;
+    insert into public.invoice_lines
+      (invoice_id, product_id, label, meta, kind, ptype, qty, unit_price, unit_cost, line_total, sort_order, qty_deducted)
+    values
+      (p_id, v_prod, v_line ->> 'label', v_line ->> 'meta', v_kind, v_line ->> 'ptype', v_qty,
+       coalesce((v_line ->> 'unit_price')::numeric, 0), coalesce((v_line ->> 'unit_cost')::numeric, 0),
+       coalesce((v_line ->> 'line_total')::numeric, 0), v_i, v_taken);
+    v_i := v_i + 1;
+  end loop;
+
+  -- 3) en-tête
+  update public.invoices set
+    number         = coalesce(nullif(trim(p_invoice ->> 'number'), ''), number),
+    client_name    = p_invoice ->> 'client_name',
+    client_contact = p_invoice ->> 'client_contact',
+    client_address = p_invoice ->> 'client_address',
+    client_city    = p_invoice ->> 'client_city',
+    client_type    = case when p_invoice ->> 'client_type' = 'dealer' then 'dealer' else 'client' end,
+    category       = coalesce(nullif(p_invoice ->> 'category', ''), category),
+    invoice_date   = coalesce((p_invoice ->> 'invoice_date')::date, invoice_date),
+    note           = p_invoice ->> 'note',
+    tax_enabled    = coalesce((p_invoice ->> 'tax_enabled')::boolean, false),
+    subtotal       = coalesce((p_invoice ->> 'subtotal')::numeric, 0),
+    tax_gst        = coalesce((p_invoice ->> 'tax_gst')::numeric, 0),
+    tax_qst        = coalesce((p_invoice ->> 'tax_qst')::numeric, 0),
+    total          = coalesce((p_invoice ->> 'total')::numeric, 0),
+    cost_total     = coalesce((p_invoice ->> 'cost_total')::numeric, 0),
+    stock_deducted = coalesce(p_deduct, false),
+    updated_at     = now()
+  where id = p_id
+  returning * into v_inv;
+  return v_inv;
+end $$;
+revoke all on function public.update_invoice(uuid, jsonb, jsonb, boolean) from public, anon;
+grant execute on function public.update_invoice(uuid, jsonb, jsonb, boolean) to authenticated;
+
 -- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------

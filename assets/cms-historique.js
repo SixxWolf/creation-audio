@@ -3,6 +3,8 @@
    - Liste toutes les factures (invoices + invoice_lines).
    - Recherche (n° / client) + filtre Actives / Annulées / Toutes.
    - Détail des lignes, réimpression au format exact.
+   - MODIFIER une facture active : elle est rechargée dans l'éditeur de
+     Facturation (CA.editInvoice) ; l'enregistrement la remplace (même n°).
    - ANNULER une facture à tout moment : le stock déduit est REMIS
      (receive_stock positif), la facture passe en statut « annulée ».
    - Supprimer définitivement (remet aussi le stock si nécessaire).
@@ -31,6 +33,12 @@
     try { return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' }); }
     catch (e) { return iso; }
   }
+  // horodatage (timestamptz) -> date locale (fmtDateFR lirait la date UTC : faux après ~20 h)
+  function fmtStampFR(ts) {
+    var d = new Date(ts);
+    if (isNaN(d)) return fmtDateFR(ts);
+    try { return d.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) { return fmtDateFR(ts); }
+  }
   var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', caisson: 'Caisson', mixte: 'Mixte' };
 
   var DEFAULT_CO = {
@@ -45,6 +53,8 @@
 
   /* ---------- état ---------- */
   var loaded = false, invoices = [], linesByInv = {}, filter = 'active', catFilter = 'all', query = '';
+  var loadSeq = 0;       // seul le DERNIER chargement lancé s'affiche (évite qu'un vieux résultat écrase un plus récent)
+  var focusId = null;    // facture à rouvrir au prochain affichage (retour après une modification)
 
   var listEl = $('#hist-list'), searchEl = $('#hist-search'), refreshBtn = $('#hist-refresh'), printBox = $('#hist-print');
 
@@ -55,6 +65,8 @@
   };
   window.CA.reloadHistorique = function () { if (loaded) load(); };   // appelé après un enregistrement de facture
   window.CA.printInvoice = function (inv, lines) { reprint(inv, lines || []); };   // impression de la facture tout juste enregistrée
+  // rouvre (et fait défiler jusqu'à) une facture — rechargée pour montrer la version à jour
+  window.CA.focusInvoice = function (id) { focusId = id; loaded = true; load(); };
 
   if (refreshBtn) refreshBtn.addEventListener('click', load);
   if (searchEl) searchEl.addEventListener('input', function () { query = this.value.trim().toLowerCase(); render(); });
@@ -75,18 +87,22 @@
 
   /* ---------- chargement ---------- */
   function load() {
+    var my = ++loadSeq;
     listEl.innerHTML = '<p class="muted">Chargement…</p>';
     sb.from('invoices').select('*').order('created_at', { ascending: false }).then(function (res) {
+      if (my !== loadSeq) return;
       if (res.error) { listEl.innerHTML = '<p class="empty">Impossible de charger.<br>As-tu relancé <strong>schema-v2.sql</strong> ?</p>'; return; }
-      invoices = res.data || [];
-      linesByInv = {};
-      if (!invoices.length) { render(); return; }
-      var ids = invoices.map(function (r) { return r.id; });
+      var invs = res.data || [];
+      if (!invs.length) { invoices = invs; linesByInv = {}; render(); return; }
+      var ids = invs.map(function (r) { return r.id; });
       sb.from('invoice_lines').select('*').in('invoice_id', ids).order('sort_order', { ascending: true }).then(function (r2) {
-        (r2.data || []).forEach(function (l) { (linesByInv[l.invoice_id] = linesByInv[l.invoice_id] || []).push(l); });
+        if (my !== loadSeq) return;
+        var byInv = {};
+        (r2.data || []).forEach(function (l) { (byInv[l.invoice_id] = byInv[l.invoice_id] || []).push(l); });
+        invoices = invs; linesByInv = byInv;
         render();
-      }, function () { render(); });
-    }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
+      }, function () { if (my !== loadSeq) return; invoices = invs; linesByInv = {}; render(); });
+    }, function () { if (my === loadSeq) listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
 
   function catOf(inv) { return inv.category || 'mixte'; }
@@ -146,6 +162,21 @@
       var inv = rows.filter(function (x) { return String(x.id) === el.getAttribute('data-id'); })[0];
       $('.hist-head', el).addEventListener('click', function () { toggleDetail(el, inv); });
     });
+    applyFocus(rows);
+  }
+  // rouvre la facture demandée (après une modification) et la ramène à l'écran
+  function applyFocus(rows) {
+    if (!focusId) return;
+    var id = String(focusId); focusId = null;
+    var inv = rows.filter(function (x) { return String(x.id) === id; })[0];
+    var el = $$('.hist-row', listEl).filter(function (r) { return r.getAttribute('data-id') === id; })[0];
+    if (!inv || !el) return;
+    toggleDetail(el, inv);
+    el.classList.add('flash');
+    setTimeout(function () {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(function () { el.classList.remove('flash'); }, 1400);
+    }, 60);
   }
 
   function toggleDetail(el, inv) {
@@ -159,6 +190,7 @@
         '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num">' + money(l.line_total) + '</td></tr>';
     }).join('');
     var stockNote = inv.stock_deducted ? '<span class="hd-stock">stock déduit</span>' : (cancelled ? '<span class="hd-stock ok">stock remis</span>' : '');
+    if (inv.updated_at) stockNote += '<span class="hd-stock">modifiée le ' + esc(fmtStampFR(inv.updated_at)) + '</span>';
     box.innerHTML =
       '<table class="hist-lines"><thead><tr><th>Article</th><th class="num">Qté</th><th class="num">Prix</th><th class="num">Montant</th></tr></thead>' +
         '<tbody>' + (linesHtml || '<tr><td colspan="4" class="muted">(aucune ligne)</td></tr>') + '</tbody></table>' +
@@ -167,13 +199,23 @@
         '<span class="hd-sum">Sous-total ' + money(inv.subtotal) + (inv.tax_enabled ? ' · taxes ' + money((+inv.tax_gst) + (+inv.tax_qst)) : '') + ' · <b>Total ' + money(inv.total) + '</b></span>' +
         stockNote +
         '<span class="grow"></span>' +
+        (cancelled ? '' : '<button class="btn btn-ghost btn-sm hd-edit" type="button">Modifier</button>') +
         '<button class="btn btn-ghost btn-sm hd-print" type="button">Réimprimer</button>' +
         (cancelled ? '' : '<button class="btn btn-ghost btn-sm hd-cancel" type="button">Annuler</button>') +
         '<button class="btn btn-ghost btn-sm hd-del" type="button">Suppr.</button>' +
       '</div>';
+    var eb = $('.hd-edit', box); if (eb) eb.addEventListener('click', function (e) { e.stopPropagation(); editInvoice(inv, lines); });
     $('.hd-print', box).addEventListener('click', function (e) { e.stopPropagation(); reprint(inv, lines); });
     var cb = $('.hd-cancel', box); if (cb) cb.addEventListener('click', function (e) { e.stopPropagation(); cancelInvoice(inv, lines); });
     $('.hd-del', box).addEventListener('click', function (e) { e.stopPropagation(); delInvoice(inv, lines); });
+  }
+
+  /* ---------- modifier : la facture est rechargée dans l'éditeur de Facturation ---------- */
+  function editInvoice(inv, lines) {
+    if (!window.CA.editInvoice) { window.alert('Le module Facturation n\'est pas chargé. Recharge la page.'); return; }
+    if (!window.CA.editInvoice(inv, lines)) return;   // l'admin a gardé sa facture en cours
+    location.hash = '#facturation';
+    window.scrollTo(0, 0);
   }
 
   /* ---------- remise en stock (inverse de la déduction) ---------- */

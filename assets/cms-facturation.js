@@ -8,6 +8,8 @@
    - Marge privée (coût) calculée pour l'admin — jamais imprimée.
    - Enregistrement : numéro atomique (RPC), persistance
      (invoices / invoice_lines), déduction de stock (receive_stock).
+   - Modification d'une facture enregistrée (CA.editInvoice, appelé par
+     l'Historique) : rechargée dans l'éditeur, puis RPC update_invoice.
    - Impression PDF + copie texte.
    ========================================================= */
 (function () {
@@ -70,6 +72,9 @@
   var catalog = { filament: [], spacer: [], accessory: [] };
   var catalogLoaded = { filament: false, spacer: false, accessory: false };
   var lastAutoNumber = '';   // dernier n° auto proposé (E2 : détecte une saisie manuelle)
+  var editing = null;        // { id, number } : facture de l'Historique en cours de modification
+  var editToken = null;      // chargement en cours d'une facture à modifier (annulé par « Nouvelle facture »)
+  var deductBeforeEdit = null;   // état de la case « Déduire le stock » avant la modification
 
   /* ---------- éléments ---------- */
   var elReset = $('#fx-reset'), elNextHint = $('#fx-nexthint'),
@@ -87,6 +92,8 @@
       elPrint = $('#fx-print'), elEmail = $('#fx-email'), elCopy = $('#fx-copy'), elStatus = $('#fx-status');
   // specs caisson
   var cxVehicle = $('#cx-vehicle'), cxLitrage = $('#cx-litrage'), cxEvent = $('#cx-event'), cxFinition = $('#cx-finition');
+  // bandeau « modification d'une facture enregistrée »
+  var elEditBanner = $('#fx-edit-banner'), elEditNum = $('#fx-edit-num'), elEditCancel = $('#fx-edit-cancel');
 
   /* ---------- entreprise (localStorage) ---------- */
   var DEFAULT_CO = {
@@ -195,7 +202,7 @@
         }
         var next = 'F-' + year + '-' + ('000' + seq).slice(-3);
         lastAutoNumber = next;
-        if (!saved) elNumber.value = next;
+        if (!saved && !editing) elNumber.value = next;   // en modification : on garde le n° de la facture
         elNextHint.textContent = 'Prochaine : ' + next;
       }, function () {});
   }
@@ -726,19 +733,59 @@
     var keys = Object.keys(set);
     return keys.length === 1 ? keys[0] : (keys.length ? 'mixte' : cat);
   }
-  function unlock() { saved = false; elSave.disabled = false; elSave.textContent = 'Enregistrer la facture'; }
+  function unlock() {
+    saved = false; elSave.disabled = false;
+    elSave.textContent = editing ? 'Enregistrer les modifications' : 'Enregistrer la facture';
+  }
+
+  // en-tête commun (création ET modification) — le n° et le statut sont gérés à part
+  function invoiceFields(t) {
+    var specs = specsText();
+    var note = elNote.value.trim();
+    var fullNote = (specs ? ('Caisson — ' + specs) : '') + ((specs && note) ? '\n' : '') + note;
+    return {
+      client_name: elCliName.value.trim() || null,
+      client_contact: contactStr() || null,
+      client_address: elCliAddress.value.trim() || null,
+      client_city: elCliCity.value.trim() || null,
+      client_type: clientType,
+      category: currentCategory(),
+      invoice_date: /^\d{4}-\d{2}-\d{2}$/.test(elDate.value) ? elDate.value : todayISO(),
+      note: fullNote || null,
+      tax_enabled: taxEnabled,
+      subtotal: round2(t.sub), tax_gst: round2(t.gst), tax_qst: round2(t.qst),
+      total: round2(t.total), cost_total: round2(t.cost)
+    };
+  }
+  function lineRow(l, i) {
+    return { product_id: l.productId, label: l.label || null, meta: l.meta || null,
+      kind: l.kind, ptype: l.ptype || null, qty: l.qty, unit_price: round2(l.price), unit_cost: round2(l.cost),
+      line_total: round2(l.qty * l.price), sort_order: i };
+  }
+  // après un enregistrement : stocks du catalogue, historique et statistiques à jour
+  function refreshAfterSave() {
+    catalogLoaded.filament = false; catalogLoaded.spacer = false;
+    if (cat !== 'caisson') loadCatalog(cat);
+    if (window.CA.reloadHistorique) window.CA.reloadHistorique();
+    if (window.CA.reloadStatistiques) window.CA.reloadStatistiques();
+  }
+  function statusButton(label, onClick) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn btn-ghost btn-sm';
+    b.textContent = label;
+    b.addEventListener('click', onClick);
+    elStatus.appendChild(b);
+  }
 
   function onSave() {
     if (saved) return;
+    if (editing) { onSaveEdit(); return; }
     var valid = lines.filter(function (l) { return l.qty > 0; });
     if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
 
     saved = true;   // verrou pendant l'envoi (anti double-clic)
     elSave.disabled = true; elStatus.textContent = 'Attribution du numéro…';
     var t = totals();
-    var specs = specsText();
-    var note = elNote.value.trim();
-    var fullNote = (specs ? ('Caisson — ' + specs) : '') + ((specs && note) ? '\n' : '') + note;
 
     // E2 : n° manuel si l'admin a modifié le champ ; sinon numéro auto atomique.
     var manual = (elNumber.value || '').trim();
@@ -754,30 +801,14 @@
     numberP.then(function (number) {
       elNumber.value = number;
       var doDeduct = !!elDeduct.checked;
-      var invoice = {
-        number: number,
-        client_name: elCliName.value.trim() || null,
-        client_contact: contactStr() || null,
-        client_address: elCliAddress.value.trim() || null,
-        client_city: elCliCity.value.trim() || null,
-        client_type: clientType,
-        category: currentCategory(),
-        invoice_date: /^\d{4}-\d{2}-\d{2}$/.test(elDate.value) ? elDate.value : todayISO(),
-        note: fullNote || null,
-        tax_enabled: taxEnabled,
-        subtotal: round2(t.sub), tax_gst: round2(t.gst), tax_qst: round2(t.qst),
-        total: round2(t.total), cost_total: round2(t.cost),
-        stock_deducted: false, status: 'final'
-      };
+      var invoice = invoiceFields(t);
+      invoice.number = number;
+      invoice.stock_deducted = false; invoice.status = 'final';
       elStatus.textContent = 'Enregistrement…';
       return sb.from('invoices').insert(invoice).select().then(function (r2) {
         if (r2.error || !r2.data || !r2.data.length) throw (r2.error || new Error('Enregistrement refusé (permissions).'));
         var inv = r2.data[0];
-        var lineRows = valid.map(function (l, i) {
-          return { invoice_id: inv.id, product_id: l.productId, label: l.label || null, meta: l.meta || null,
-            kind: l.kind, ptype: l.ptype || null, qty: l.qty, unit_price: round2(l.price), unit_cost: round2(l.cost),
-            line_total: round2(l.qty * l.price), sort_order: i };
-        });
+        var lineRows = valid.map(function (l, i) { var r = lineRow(l, i); r.invoice_id = inv.id; return r; });
         savedRows = lineRows;
         return sb.from('invoice_lines').insert(lineRows).select('id,sort_order').then(function (r3) {
           if (r3.error) throw r3.error;
@@ -796,22 +827,51 @@
       // la vente est enregistrée : on repart d'une facture vierge (réimpression possible ci-dessous ou dans l'Historique)
       resetInvoice();
       elStatus.textContent = '✓ Facture ' + inv.number + ' enregistrée' + (deducted ? ', stock déduit' : '') + '. Nouvelle facture prête. ';
-      if (window.CA.printInvoice) {
-        var pb = document.createElement('button');
-        pb.type = 'button'; pb.className = 'btn btn-ghost btn-sm';
-        pb.textContent = 'Imprimer ' + inv.number;
-        pb.addEventListener('click', function () { window.CA.printInvoice(inv, savedRows); });
-        elStatus.appendChild(pb);
-      }
-      // recharge les stocks du catalogue (badges/plafonds à jour)
-      catalogLoaded.filament = false; catalogLoaded.spacer = false;
-      if (cat !== 'caisson') loadCatalog(cat);
-      if (window.CA.reloadHistorique) window.CA.reloadHistorique();
-      if (window.CA.reloadStatistiques) window.CA.reloadStatistiques();
+      if (window.CA.printInvoice) statusButton('Imprimer ' + inv.number, function () { window.CA.printInvoice(inv, savedRows); });
+      refreshAfterSave();
     }, function (err) {
       unlock();
       var msg = (err && err.message) ? err.message : String(err);
       if (/duplicate|unique|23505/i.test(msg)) msg = 'Ce numéro de facture existe déjà. Choisis-en un autre.';
+      elStatus.textContent = 'Erreur : ' + msg;
+    });
+  }
+
+  // Modification d'une facture de l'Historique : tout passe par la RPC update_invoice
+  // (une seule transaction) : stock d'origine remis, lignes remplacées, nouveau stock
+  // déduit si la case est cochée, en-tête mis à jour. Même id, même n° (modifiable).
+  function onSaveEdit() {
+    var valid = lines.filter(function (l) { return l.qty > 0; });
+    if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
+    var ed = editing;
+    saved = true;   // verrou pendant l'envoi (anti double-clic)
+    elSave.disabled = true; elStatus.textContent = 'Enregistrement des modifications…';
+    var fields = invoiceFields(totals());
+    fields.number = norm(elNumber.value) || ed.number;
+    var lineRows = valid.map(lineRow);
+    var deduct = !!elDeduct.checked;
+    sb.rpc('update_invoice', { p_id: ed.id, p_invoice: fields, p_lines: lineRows, p_deduct: deduct }).then(function (res) {
+      if (res.error) throw res.error;
+      var inv = Array.isArray(res.data) ? res.data[0] : res.data;
+      if (!inv || !inv.id) throw new Error('Modification refusée (permissions).');
+      return inv;
+    }).then(function (inv) {
+      if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value)) {
+        window.CA.rememberClient(clientFields());
+      }
+      resetInvoice();
+      elStatus.textContent = '✓ Facture ' + inv.number + ' mise à jour' + (deduct ? ', stock ajusté' : '') + '. ';
+      if (window.CA.printInvoice) statusButton('Imprimer ' + inv.number, function () { window.CA.printInvoice(inv, lineRows); });
+      statusButton('Voir dans l\'historique', function () {
+        if (window.CA.focusInvoice) window.CA.focusInvoice(inv.id);
+        location.hash = '#historique';
+      });
+      refreshAfterSave();
+    }, function (err) {
+      unlock();
+      var msg = (err && err.message) ? err.message : String(err);
+      if (/duplicate|unique|23505/i.test(msg)) msg = 'Ce numéro de facture existe déjà. Choisis-en un autre.';
+      else if (/PGRST202|could not find the function/i.test(((err && err.code) || '') + ' ' + msg)) msg = 'Fonction update_invoice absente : relance schema-v2.sql dans Supabase.';
       elStatus.textContent = 'Erreur : ' + msg;
     });
   }
@@ -844,6 +904,9 @@
 
   /* ---------- réinitialiser ---------- */
   function resetInvoice() {
+    if (editing && deductBeforeEdit != null) elDeduct.checked = deductBeforeEdit;   // case « Déduire » d'avant la modification
+    deductBeforeEdit = null;
+    setEditing(null);
     lines = []; saved = false; unlock();
     elNote.value = '';
     cxVehicle.value = ''; cxLitrage.value = ''; cxEvent.value = ''; cxFinition.value = '';
@@ -852,7 +915,147 @@
     loadNextNumberHint();
     render();
   }
-  if (elReset) elReset.addEventListener('click', resetInvoice);
+  // en modification : quitter = abandonner les changements (la facture enregistrée reste intacte)
+  function confirmLeaveEdit() {
+    return !editing || !lines.length ||
+      window.confirm('Abandonner la modification de la facture ' + (editing.number || '') + ' ?\nLa facture enregistrée reste inchangée.');
+  }
+  if (elReset) elReset.addEventListener('click', function () { if (confirmLeaveEdit()) resetInvoice(); });
+  if (elEditCancel) elEditCancel.addEventListener('click', function () {
+    if (!confirmLeaveEdit()) return;
+    var id = editing && editing.id;
+    resetInvoice();
+    if (id && window.CA.focusInvoice) window.CA.focusInvoice(id);
+    location.hash = '#historique';
+  });
+
+  /* ---------- modifier une facture enregistrée (bouton « Modifier » de l'Historique) ---------- */
+  function setEditing(ed) {
+    editing = ed;
+    if (!ed) editToken = null;
+    if (elEditBanner) elEditBanner.hidden = !ed;
+    if (elEditNum) elEditNum.textContent = ed ? (ed.number || '') : '';
+    if (elNextHint) elNextHint.hidden = !!ed;
+    unlock();
+  }
+  // « Caisson — Véhicule : … · Litrage : …\nnote » -> champs caisson + note (inverse d'invoiceFields).
+  // Format inattendu : la note est gardée telle quelle (rien n'est perdu).
+  var CX_KEYS = { 'Véhicule': 'vehicle', 'Litrage': 'litrage', 'Évent': 'event', 'Finition': 'finition' };
+  function splitNote(s) {
+    s = String(s == null ? '' : s);
+    var m = /^Caisson — ([^\n]*)(?:\n([\s\S]*))?$/.exec(s);
+    if (!m) return { note: s, cx: {} };
+    var cx = {}, ok = true;
+    m[1].split(' · ').forEach(function (part) {
+      var mm = /^(Véhicule|Litrage|Évent|Finition) : (.*)$/.exec(part);
+      if (mm && cx[CX_KEYS[mm[1]]] == null) cx[CX_KEYS[mm[1]]] = mm[2]; else ok = false;
+    });
+    return ok ? { note: m[2] || '', cx: cx } : { note: s, cx: {} };
+  }
+  // « courriel · téléphone » (contactStr) -> deux champs
+  function splitContact(s) {
+    var email = '', rest = [];
+    String(s || '').split(' · ').forEach(function (p) {
+      p = norm(p); if (!p) return;
+      if (!email && p.indexOf('@') !== -1) email = p; else rest.push(p);
+    });
+    return { email: email, phone: rest.join(' · ') };
+  }
+  function findProduct(id) {
+    var kinds = ['filament', 'spacer', 'accessory'];
+    for (var k = 0; k < kinds.length; k++) { var p = prodInCatalog(kinds[k], id); if (p) return { p: p, c: kinds[k] }; }
+    return null;
+  }
+  // ligne enregistrée -> ligne éditable. Le prix ET le coût d'origine sont conservés
+  // (la marge historique ne bouge pas) ; le tarif catalogue ne sert qu'aux paliers.
+  function lineFromSaved(s) {
+    var kind = s.kind || 'spool';
+    var hit = (s.product_id && kind !== 'free') ? findProduct(s.product_id) : null;
+    // ancienne ligne sans catégorie : même repli que les Statistiques (lineCat)
+    var ptype = s.ptype || (hit ? hit.c
+      : (kind === 'spool' || kind === 'refill') ? 'filament'
+      : kind === 'unit' ? (/accessoire/i.test(s.meta || '') ? 'accessory' : 'spacer')
+      : 'divers');
+    var l = { id: uid(), productId: s.product_id ? String(s.product_id) : null, ptype: ptype, kind: kind,
+      label: s.label || '', meta: s.meta || '', hex: null, qty: +s.qty || 0, base: +s.unit_price || 0, tiers: [],
+      cost: +s.unit_cost || 0, matKey: null, price: +s.unit_price || 0, manual: true, sp: null, live: false };
+    if (hit) {
+      var p = hit.p;
+      if (hit.c === 'filament') {
+        l.base = +filBase(p, kind) || 0; l.tiers = filTiers(p, kind) || []; l.hex = p.hex;
+        l.matKey = (p.brand || '') + '|' + (p.material || '');
+      } else if (hit.c === 'spacer') {
+        l.sp = spacerDual(p); l.base = isDealer() ? l.sp.dealer : l.sp.client; l.tiers = isDealer() ? l.sp.tiers : [];
+      } else {
+        l.base = +p.sell_price || 0;
+      }
+      l.live = true;
+    }
+    return l;
+  }
+  // Une ligne dont le prix enregistré = le tarif actuel (paliers compris) redevient
+  // « vivante » (le palier suit la quantité, comme sur une nouvelle facture). Sinon
+  // (prix forcé à la main, tarif changé depuis…) le prix d'origine reste verrouillé.
+  function settleLoadedPrices() {
+    var keep = lines.map(function (l) { return l.price; });
+    lines.forEach(function (l) { if (l.live) l.manual = false; });
+    repriceLines();
+    lines.forEach(function (l, i) {
+      if (!l.manual && Math.abs(l.price - keep[i]) > 0.005) { l.manual = true; l.price = keep[i]; }
+      delete l.live;
+    });
+  }
+  function fillFromInvoice(inv, savedLines) {
+    var dealer = inv.client_type === 'dealer';
+    setClientType(dealer ? 'dealer' : 'client', true);
+    var ct = splitContact(inv.client_contact);
+    setClientFields({ name: inv.client_name || '', email: ct.email, phone: ct.phone,
+      address: inv.client_address || '', city: inv.client_city || '' });
+    if (elDealerSelect) { var d = dealer ? dealerByEmail(ct.email) : null; elDealerSelect.value = d ? d.email : ''; }
+    if (elCliHint) elCliHint.textContent = '';
+    var n = splitNote(inv.note);
+    elNote.value = n.note;
+    cxVehicle.value = n.cx.vehicle || ''; cxLitrage.value = n.cx.litrage || '';
+    cxEvent.value = n.cx.event || ''; cxFinition.value = n.cx.finition || '';
+    elNumber.value = inv.number || '';
+    elDate.value = inv.invoice_date || todayISO();
+    taxEnabled = !!inv.tax_enabled; if (elTax) elTax.checked = taxEnabled;
+    elDeduct.checked = !!inv.stock_deducted;
+    lines = (savedLines || []).slice()
+      .sort(function (a, b) { return (a.sort_order || 0) - (b.sort_order || 0); })
+      .map(lineFromSaved);
+    settleLoadedPrices();
+    var c = inv.category;
+    if (['filament', 'spacer', 'accessory', 'caisson'].indexOf(c) === -1) {
+      c = (lines[0] && ['filament', 'spacer', 'accessory', 'caisson'].indexOf(lines[0].ptype) !== -1) ? lines[0].ptype : 'filament';
+    }
+    setCat(c);
+    unlock();
+    elStatus.textContent = '';
+    render();
+  }
+  // Appelé par l'Historique. Renvoie false si l'admin refuse de remplacer la facture
+  // en cours ; sinon charge (catalogues -> tarifs/paliers) puis remplit l'éditeur.
+  window.CA.editInvoice = function (inv, savedLines) {
+    if (!inv || !inv.id) return false;
+    if (inv.status === 'cancelled') { window.alert('Une facture annulée ne peut pas être modifiée.'); return false; }
+    if (editing && editing.id === inv.id) return true;   // déjà ouverte
+    if (lines.length && !window.confirm(editing
+        ? 'Abandonner la modification de la facture ' + (editing.number || '') + ' ?'
+        : 'La facture en cours (non enregistrée) sera remplacée. Continuer ?')) return false;
+    ensureLoad();
+    if (!editing) deductBeforeEdit = elDeduct.checked;
+    lines = [];
+    setEditing({ id: inv.id, number: inv.number || '' });
+    var token = {}; editToken = token;
+    elInvoice.innerHTML = '<p class="inv-empty">Chargement de la facture ' + esc(inv.number || '') + '…</p>';
+    elMargin.hidden = true; elStatus.textContent = '';
+    elSave.disabled = true;   // réactivé une fois la facture chargée
+    Promise.resolve(window.CA.loadMaterials ? window.CA.loadMaterials() : null).then(null, function () {})
+      .then(function () { return Promise.all([loadCatalog('filament', true), loadCatalog('spacer', true), loadCatalog('accessory', true)]); })
+      .then(function () { if (editToken === token) fillFromInvoice(inv, savedLines); });
+    return true;
+  };
 
   /* ---------- impression / copie ---------- */
   if (elPrint) elPrint.addEventListener('click', function () {
