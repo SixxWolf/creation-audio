@@ -325,8 +325,11 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
    ONGLETS SPACERS & ACCESSOIRES (cartes produit + prix/marges)
    ========================================================= */
 /* cartes spacers un peu plus larges : chaque ligne de prix tient sur une seule ligne */
-#sp-list { grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); }
-#ac-list { grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); }
+/* cartes assez larges pour que « Prix … + pastille de marge » tienne sur UNE ligne
+   (mesuré : ~260 px accessoire, ~300 px palier spacer + marge pour les gros montants) ;
+   min(…, 100%) : jamais plus large que l'écran sur mobile */
+#sp-list { grid-template-columns:repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
+#ac-list { grid-template-columns:repeat(auto-fill, minmax(min(290px, 100%), 1fr)); }
 .card-desc { margin:-2px 0 0; font-size:.8rem; line-height:1.45; color:var(--muted);
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 /* tableau prix : libellé + prix à gauche, marge à droite (client, dealer, paliers dealer) */
