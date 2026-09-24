@@ -6,6 +6,9 @@
       motion régénéré, cooldown configurable, strip AMS optionnel).
    2) Calculateur de prix : coût de production / prix de vente,
       lecture auto du gcode (poids, temps), totaux du batch.
+   Entrée : .gcode brut OU projet tranché Bambu Studio (.gcode.3mf) ;
+   dans ce cas la sortie est le projet complet, gcode du plateau remplacé
+   (autoloop-3mf.js : lecture/écriture ZIP + MD5).
 
    Réf. ancrages gcode : « Auto Loop.md ». Ne PAS modifier les
    regex sans re-tester contre un vrai fichier gcode multi-loop.
@@ -36,6 +39,9 @@
   /* ================================================================== */
 
   var rawText = '', rawName = '', outText = '', outName = '';
+  // Projet Bambu Studio (.gcode.3mf) : archive d'origine + plateau traité.
+  // null = on a reçu un simple .gcode (sortie = .gcode, comme avant).
+  var project = null, plateName = '';
 
   var num = function (v, dflt) {
     var n = parseFloat(String(v).replace(',', '.'));
@@ -225,6 +231,9 @@
     };
     var idx = raw.indexOf(END_ANCHOR);
     var mz = raw.match(RE_MAXZ);
+    // Déjà un batch (AutoLoop ou FarmLoop) : le re-traiter empilerait des loops dans chaque loop.
+    if (raw.indexOf('Batch généré par AutoLoop') !== -1) { report.error = 'Ce fichier a déjà été traité par AutoLoop. Repars de l\'export brut de Bambu Studio (une pièce).'; return { text: '', report: report }; }
+    if (idx !== -1 && raw.indexOf(END_ANCHOR, idx + END_ANCHOR.length) !== -1) { report.error = 'Ce gcode contient déjà plusieurs pièces enchaînées (fichier FarmLoop ?). Repars de l\'export brut de Bambu Studio (une pièce).'; return { text: '', report: report }; }
     if (idx === -1) { report.error = 'Frontière « ' + END_ANCHOR + ' » introuvable — ce n\'est pas un gcode P2S brut exporté du slicer.'; return { text: '', report: report }; }
     if (!mz) { report.error = 'Impossible de lire « max_z_height » dans l\'en-tête du fichier.'; return { text: '', report: report }; }
     if (!RE_START_ANCHOR.test(raw)) { report.error = 'Ancrage du start gcode P2S introuvable.'; return { text: '', report: report }; }
@@ -304,8 +313,21 @@
           ? 'remplacée par une purge en goulotte (aucune ligne sur le plateau).'
           : '<span class="al-warn">bloc « nozzle load line » introuvable — purge native conservée.</span>') +
       '</p>' +
+      (project
+        ? '<p class="al-fine al-proj">Projet Bambu Studio : ' + esc(plateLabel()) + ' remplacé par le batch, empreinte MD5 recalculée ; ' +
+          'aperçus, réglages et modèle conservés. <b>Télécharge le projet, ouvre-le dans Bambu Studio et lance l\'impression.</b>' +
+          ' <button type="button" class="al-link" id="al-download-gcode">gcode seul</button></p>'
+        : '') +
       '<p class="al-fine al-tip">Vérifie toujours le premier loop sur la P2S avant de lancer le batch complet.</p>';
+    var gOnly = $('#al-download-gcode');
+    if (gOnly) gOnly.addEventListener('click', function () { downloadGcode(); });
   }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function plateLabel() { var m = /plate_(\d+)/.exec(plateName); return 'plateau ' + (m ? m[1] : '1'); }
   function stat(v, label) {
     return '<div class="al-stat"><span class="al-stat-v">' + v + '</span><span class="al-stat-l">' + label + '</span></div>';
   }
@@ -377,22 +399,75 @@
     recompute();  // rafraîchit le résumé (les .value posés en JS ne déclenchent pas « input »)
   }
 
+  // Accepte un .gcode brut OU le projet tranché exporté par Bambu Studio (.gcode.3mf,
+  // une archive ZIP : on y lit Metadata/plate_N.gcode). Détection par signature « PK ».
   function loadFile(file) {
     if (!file) return;
     rawName = file.name;
+    project = null; plateName = ''; showPlatePicker();   // repart de zéro (projet précédent oublié)
+    resetOutput();
+    $('#al-file-name').textContent = 'Lecture de ' + rawName + '…';
     var reader = new FileReader();
     reader.onload = function (e) {
-      rawText = String(e.target.result || '');
-      var mz = rawText.match(RE_MAXZ);
-      $('#al-file-name').textContent = rawName + ' · ' + (rawText.length / 1024).toFixed(0) + ' Ko' +
-        (mz ? ' · pièce ' + parseFloat(mz[1]).toFixed(2) + ' mm' : '');
-      $('#al-process').disabled = false;
-      $('#al-download').disabled = true;
-      $('#al-report').innerHTML = '';
-      outText = '';
-      applyGcodeToPricing(rawText, rawName);
+      var u8 = new Uint8Array(e.target.result);
+      if (window.ALProject && window.ALProject.isZip(u8)) { loadProject(u8); return; }
+      useGcode(new TextDecoder('utf-8').decode(u8));
     };
-    reader.readAsText(file);
+    reader.onerror = function () { fileError('Impossible de lire ce fichier.'); };
+    reader.readAsArrayBuffer(file);
+  }
+  function loadProject(u8) {
+    try { project = window.ALProject.read(u8); }
+    catch (err) { project = null; syncDownloadLabel(); fileError('Archive illisible : ' + (err && err.message ? err.message : err)); return; }
+    if (!project.plates.length) {
+      project = null; showPlatePicker(); syncDownloadLabel();
+      fileError('Ce .3mf ne contient pas de plateau tranché. Dans Bambu Studio, tranche le plateau puis « Exporter le fichier tranché du plateau » (.gcode.3mf) — pas « Enregistrer le projet ».');
+      return;
+    }
+    showPlatePicker();
+    selectPlate(project.plates[0].name);
+  }
+  function selectPlate(name) {
+    plateName = name;
+    resetOutput();
+    useGcode(new TextDecoder('utf-8').decode(project.entries[name]));
+  }
+  // plusieurs plateaux dans le projet : menu pour choisir lequel boucler
+  function showPlatePicker() {
+    var wrap = $('#al-plate-wrap'), sel = $('#al-plate');
+    if (!wrap || !sel) return;
+    var plates = project ? project.plates : [];
+    wrap.hidden = plates.length < 2;
+    sel.innerHTML = plates.map(function (p) { return '<option value="' + esc(p.name) + '">Plateau ' + p.n + '</option>'; }).join('');
+  }
+  function useGcode(text) {
+    rawText = text;
+    var mz = rawText.match(RE_MAXZ);
+    $('#al-file-name').textContent = rawName + (project ? ' · projet Bambu, ' + plateLabel() : '') +
+      ' · gcode ' + fmtSize(rawText.length) + (mz ? ' · pièce ' + parseFloat(mz[1]).toFixed(2) + ' mm' : '');
+    $('#al-process').disabled = false;
+    applyGcodeToPricing(rawText, rawName);
+  }
+  function resetOutput() {
+    outText = '';
+    $('#al-download').disabled = true;
+    $('#al-report').innerHTML = '';
+    syncDownloadLabel();
+  }
+  function fileError(msg) {
+    rawText = '';
+    $('#al-file-name').textContent = rawName;
+    $('#al-process').disabled = true;
+    $('#al-report').innerHTML = '<p class="al-warn">' + esc(msg) + '</p>';
+  }
+  function syncDownloadLabel() {
+    var b = $('#al-download');
+    if (b) b.textContent = project ? '⬇ Télécharger le projet (.gcode.3mf)' : '⬇ Télécharger le gcode';
+  }
+  // « HSB524 1.4.gcode.3mf » -> « HSB524 1.4 AutoLoop x12.gcode.3mf »
+  function projectOutName(loops) {
+    var base = rawName.replace(/(\.gcode)?\.3mf$/i, '') || 'plateau';
+    return base + ' AutoLoop x' + loops + '.gcode.3mf';
   }
 
   function runGenerate() {
@@ -402,11 +477,12 @@
     // Laisse le navigateur peindre l'état « Génération… » avant le gros travail.
     setTimeout(function () {
       try {
-        var res = generateBatch(rawText, readOpts());
+        var opts = readOpts();
+        var res = generateBatch(rawText, opts);
         outText = res.text;
         renderReport(res.report);
         if (res.report.ok) {
-          outName = 'plate_1.gcode';
+          outName = project ? projectOutName(opts.loops) : 'plate_1.gcode';
           $('#al-download').disabled = false;
         } else {
           $('#al-download').disabled = true;
@@ -418,14 +494,34 @@
     }, 30);
   }
 
-  function download() {
-    if (!outText) return;
-    var blob = new Blob([outText], { type: 'text/plain' });
+  function saveBlob(blob, name) {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href = url; a.download = outName || 'autoloop.gcode';
+    a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  function downloadGcode() {
+    if (!outText) return;
+    saveBlob(new Blob([outText], { type: 'text/plain' }), 'plate_1.gcode');
+  }
+  // Projet : on remet le gcode du batch dans l'archive d'origine (MD5 recalculé)
+  function download() {
+    if (!outText) return;
+    if (!project) { saveBlob(new Blob([outText], { type: 'text/plain' }), outName || 'autoloop.gcode'); return; }
+    var btn = $('#al-download'), name = outName;
+    btn.disabled = true; btn.textContent = 'Préparation du projet…';
+    setTimeout(function () {   // laisse peindre l'état avant l'encodage
+      var bytes = new TextEncoder().encode(outText);
+      window.ALProject.build(project, plateName, bytes).then(function (zip) {
+        saveBlob(new Blob([zip], { type: 'application/octet-stream' }), name);
+        btn.disabled = false; syncDownloadLabel();
+      }, function (err) {
+        btn.disabled = false; syncDownloadLabel();
+        $('#al-report').insertAdjacentHTML('afterbegin', '<p class="al-warn">Création du projet impossible : ' +
+          esc(err && err.message ? err.message : err) + '. Utilise « gcode seul ».</p>');
+      });
+    }, 30);
   }
 
   function initGcode() {
@@ -456,6 +552,8 @@
 
     $('#al-process').addEventListener('click', runGenerate);
     $('#al-download').addEventListener('click', download);
+    var plateSel = $('#al-plate');
+    if (plateSel) plateSel.addEventListener('change', function () { if (project) selectPlate(this.value); });
   }
 
   /* ================================================================== */

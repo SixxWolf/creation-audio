@@ -37,7 +37,18 @@
 .al-drop-ic { display:inline-grid; place-items:center; width:46px; height:46px; font-size:1.5rem; line-height:1; color:var(--ember-ink);
   background:var(--paper); border:1px solid var(--line); border-radius:50%; }
 .al-drop-t { margin:10px 0 4px; font-weight:700; }
-.al-drop-s { margin:0; font-size:.8rem; color:var(--muted); }
+.al-drop-s { margin:0; font-size:.8rem; color:var(--muted); overflow-wrap:anywhere; }
+.al-plate { margin-top:12px; max-width:260px; }
+.al-plate[hidden] { display:none; }
+
+/* --- Projet Bambu (.gcode.3mf) : note du rapport + lien « gcode seul » --- */
+.al-proj { padding:10px 12px; color:var(--ink-2); background:color-mix(in srgb, var(--ember) 7%, var(--paper));
+  border:1px solid color-mix(in srgb, var(--ember) 26%, var(--line)); border-radius:10px; }
+.al-proj b { color:var(--ink); }
+.al-link { padding:0; font:inherit; font-weight:600; color:var(--ember-ink); text-decoration:underline; text-underline-offset:2px;
+  cursor:pointer; background:none; border:0; }
+.al-link:hover { color:var(--ink); }
+.al-link:focus-visible { outline:2px solid var(--ember); outline-offset:2px; border-radius:3px; }
 
 /* --- Switch (checkbox stylée) --------------------------- */
 .al-switch { display:inline-flex; align-items:center; gap:9px; margin:0; font-family:var(--display); font-weight:700; font-size:1.02rem; cursor:pointer; }

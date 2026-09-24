@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/admin.css?v=35">
 <link rel="stylesheet" href="assets/facture.css?v=14">
-<link rel="stylesheet" href="assets/autoloop.css?v=7">
+<link rel="stylesheet" href="assets/autoloop.css?v=8">
 <script src="assets/theme.js?v=1" defer></script>
 </head>
 <body>
@@ -1226,7 +1226,7 @@
       <div class="panel-head">
         <div>
           <h1>AutoLoop</h1>
-          <p class="muted">Génère tes batchs d'impression multi-loop à partir d'un gcode d'une seule pièce (calibration, éjection, push, cooldown) et calcule tes prix. Indépendant de FarmLoop. 100&nbsp;% local — aucun fichier n'est envoyé sur le web.</p>
+          <p class="muted">Génère tes batchs d'impression multi-loop à partir du plateau tranché d'une seule pièce (calibration, éjection, push, cooldown) et calcule tes prix. Donne-lui l'export de Bambu Studio : il te rend le projet complet, prêt à imprimer. Indépendant de FarmLoop. 100&nbsp;% local — aucun fichier n'est envoyé sur le web.</p>
         </div>
       </div>
 
@@ -1241,13 +1241,17 @@
           <!-- Colonne réglages -->
           <div class="al-main">
             <div class="al-card">
-              <div class="al-card-head"><span class="al-ic">⬆</span> Gcode brut (une pièce)</div>
+              <div class="al-card-head"><span class="al-ic">⬆</span> Plateau tranché (une pièce)</div>
               <div class="al-drop" id="al-drop">
                 <div class="al-drop-ic">＋</div>
-                <p class="al-drop-t">Glisse ton <b>.gcode</b> / <b>.txt</b> ici, ou clique pour choisir</p>
-                <p class="al-drop-s" id="al-file-name">Export direct du slicer (1 pièce) pour la P2S · 100&nbsp;% local</p>
+                <p class="al-drop-t">Glisse l'export de Bambu Studio (<b>.gcode.3mf</b>) ou un <b>.gcode</b> ici, ou clique pour choisir</p>
+                <p class="al-drop-s" id="al-file-name">Bambu Studio › Exporter le fichier tranché du plateau · 1 pièce pour la P2S · 100&nbsp;% local</p>
               </div>
-              <input type="file" id="al-file" accept=".gcode,.txt,.g,.nc,text/plain" hidden>
+              <input type="file" id="al-file" accept=".3mf,.gcode,.txt,.g,.nc,text/plain" hidden>
+              <div class="field al-plate" id="al-plate-wrap" hidden>
+                <label class="lbl" for="al-plate">Plateau à boucler <span class="hint">(le projet en contient plusieurs)</span></label>
+                <select id="al-plate"></select>
+              </div>
             </div>
 
             <div class="al-card">
@@ -1348,7 +1352,7 @@
           <aside class="al-side">
             <div class="al-card al-report-card">
               <div class="al-card-head"><span class="al-ic">✓</span> Rapport de génération</div>
-              <div id="al-report"><p class="muted">Charge un gcode brut (1 pièce) puis clique « Générer le batch ».</p></div>
+              <div id="al-report"><p class="muted">Charge l'export de Bambu Studio (1 pièce) puis clique « Générer le batch ».</p></div>
             </div>
           </aside>
         </div>
@@ -1488,6 +1492,8 @@
 <script src="assets/cms-facturation.js?v=24"></script>
 <script src="assets/cms-historique.js?v=7"></script>
 <script src="assets/cms-statistiques.js?v=6"></script>
-<script src="assets/cms-autoloop.js?v=10"></script>
+<script src="assets/vendor/fflate-0.8.3.min.js"></script>
+<script src="assets/autoloop-3mf.js?v=1"></script>
+<script src="assets/cms-autoloop.js?v=11"></script>
 </body>
 </html>
