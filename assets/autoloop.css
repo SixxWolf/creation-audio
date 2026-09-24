@@ -1,112 +1,112 @@
 /* =========================================================
-   Création Audio V2 — AutoLoop
+   Création Audio — AutoLoop (admin v3)
    Onglet admin : traitement gcode + calculateur de prix.
-   Reprend les tokens/identité (ember) du reste de l'admin.
+   Même langage que le reste de l'admin v3 (Space Grotesk pour
+   les titres et les chiffres, ember = action, mode sombre).
    ========================================================= */
 
-/* --- Sous-onglets --------------------------------------- */
-.al-subnav { display:flex; gap:6px; background:var(--wash); border:1px solid var(--line);
-  border-radius:var(--radius); padding:4px; margin-bottom:18px; width:fit-content; max-width:100%; }
-.al-seg { font:inherit; font-weight:600; cursor:pointer; border:0; background:transparent;
-  color:var(--muted); padding:8px 18px; border-radius:var(--radius-sm); white-space:nowrap; }
-.al-seg[aria-selected="true"] { background:var(--paper); color:var(--ink); box-shadow:var(--shadow-sm); }
+/* --- Sous-onglets (soulignés, comme Inventaire / Statistiques) --- */
+.al-subnav { display:flex; gap:2px; margin:0 0 18px; overflow-x:auto; scrollbar-width:none; border-bottom:1px solid var(--line); }
+.al-subnav::-webkit-scrollbar { display:none; }
+.al-seg { position:relative; flex:none; padding:10px 14px 13px; font:inherit; font-weight:600; font-size:.92rem; color:var(--muted);
+  white-space:nowrap; cursor:pointer; background:none; border:0; border-radius:9px 9px 0 0; transition:color .15s; }
 .al-seg:hover { color:var(--ink); }
+.al-seg[aria-selected="true"] { color:var(--ink); }
+.al-seg[aria-selected="true"]::after { content:''; position:absolute; left:10px; right:10px; bottom:-1px; height:2px;
+  border-radius:2px 2px 0 0; background:var(--ember); }
+.al-seg:focus-visible { outline:2px solid var(--ember); outline-offset:-2px; }
 
 /* --- Disposition 2 colonnes ----------------------------- */
-.al-cols { display:grid; grid-template-columns:minmax(0,1fr) 420px; gap:18px; align-items:start; }
+.al-cols { display:grid; grid-template-columns:minmax(0, 1fr) 420px; gap:18px; align-items:start; }
 .al-main { display:flex; flex-direction:column; gap:16px; min-width:0; }
-.al-side { display:flex; flex-direction:column; gap:16px; position:sticky; top:14px; }
+/* colonne latérale collée SOUS la barre du haut (avant : 14 px, elle passait dessous) */
+.al-side { position:sticky; top:calc(var(--top-h, 60px) + 16px); display:flex; flex-direction:column; gap:16px; }
 
 /* --- Cartes --------------------------------------------- */
-.al-card { background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-lg);
-  padding:16px 18px; box-shadow:var(--shadow-sm); }
-.al-card-head { display:flex; align-items:center; gap:8px; font-weight:700; font-size:.98rem;
-  margin-bottom:14px; flex-wrap:wrap; }
-.al-ic { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:8px;
-  background:var(--ember); color:#fff; font-size:.85rem; }
-.al-note { font-weight:500; font-size:.75rem; color:var(--muted); }
+.al-card { padding:18px 20px; background:var(--paper); border:1px solid var(--line); border-radius:16px; }
+.al-card-head { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;
+  font-family:var(--display); font-weight:700; font-size:1.04rem; letter-spacing:-.01em; }
+.al-ic { display:inline-grid; place-items:center; width:30px; height:30px; flex:none; font-family:var(--font); font-size:.9rem;
+  color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 14%, var(--paper)); border-radius:9px; }
+.al-note { font-family:var(--font); font-weight:500; font-size:.76rem; letter-spacing:0; color:var(--muted); }
 
 /* --- Zone de dépôt fichier ------------------------------ */
-.al-drop { border:2px dashed var(--ember); border-radius:var(--radius);
-  background:color-mix(in srgb, var(--ember) 5%, transparent); text-align:center;
-  padding:26px 16px; cursor:pointer; transition:background .15s, border-color .15s; }
-.al-drop:hover, .al-drop.drag { background:color-mix(in srgb, var(--ember) 12%, transparent); }
-.al-drop-ic { font-size:1.8rem; color:var(--ember); line-height:1; }
-.al-drop-t { margin:8px 0 4px; font-weight:600; }
+.al-drop { padding:28px 16px; text-align:center; cursor:pointer; background:var(--wash); border:1.5px dashed var(--line-2);
+  border-radius:14px; transition:background .15s, border-color .15s; }
+.al-drop:hover, .al-drop.drag { background:color-mix(in srgb, var(--ember) 7%, var(--wash)); border-color:var(--ember); }
+.al-drop-ic { display:inline-grid; place-items:center; width:46px; height:46px; font-size:1.5rem; line-height:1; color:var(--ember-ink);
+  background:var(--paper); border:1px solid var(--line); border-radius:50%; }
+.al-drop-t { margin:10px 0 4px; font-weight:700; }
 .al-drop-s { margin:0; font-size:.8rem; color:var(--muted); }
 
 /* --- Switch (checkbox stylée) --------------------------- */
-.al-switch { display:inline-flex; align-items:center; gap:9px; font-weight:700; font-size:.98rem;
-  cursor:pointer; margin:0; }
+.al-switch { display:inline-flex; align-items:center; gap:9px; margin:0; font-family:var(--display); font-weight:700; font-size:1.02rem; cursor:pointer; }
 .al-switch input { width:18px; height:18px; accent-color:var(--ember); }
 
 /* --- Actions gcode -------------------------------------- */
-.al-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.al-actions { display:flex; flex-wrap:wrap; gap:10px; }
 
 /* --- Rapport de traitement ------------------------------ */
 .al-report-card .muted { font-size:.85rem; }
 .al-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
-.al-stat { background:var(--wash); border:1px solid var(--line); border-radius:var(--radius-sm);
-  padding:10px 12px; text-align:center; }
-.al-stat-v { display:block; font-size:1.5rem; font-weight:800; color:var(--ember-dim); line-height:1; }
-.al-stat-l { display:block; font-size:.72rem; color:var(--muted); margin-top:4px; }
-.al-fine { font-size:.78rem; color:var(--muted); margin:0 0 10px; }
-.al-warn { font-size:.85rem; color:var(--bad); background:var(--bad-wash);
-  border:1px solid color-mix(in srgb, var(--bad) 30%, transparent); border-radius:var(--radius-sm); padding:10px 12px; }
-.al-table { width:100%; border-collapse:collapse; font-size:.82rem; }
-.al-table th { text-align:left; color:var(--muted); font-weight:600; font-size:.72rem;
-  text-transform:uppercase; letter-spacing:.05em; padding:4px 8px; border-bottom:1px solid var(--line); }
-.al-table td { padding:5px 8px; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+.al-stat { padding:12px; text-align:center; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+.al-stat-v { display:block; font-family:var(--display); font-size:1.6rem; font-weight:700; line-height:1; letter-spacing:-.02em;
+  color:var(--ember-ink); font-variant-numeric:tabular-nums; }
+.al-stat-l { display:block; margin-top:5px; font-size:.72rem; color:var(--muted); }
+.al-fine { margin:0 0 10px; font-size:.78rem; color:var(--muted); }
+.al-warn { padding:10px 12px; font-size:.85rem; color:var(--bad); background:var(--bad-wash);
+  border:1px solid color-mix(in srgb, var(--bad) 30%, transparent); border-radius:10px; }
+.al-table { width:100%; font-size:.84rem; border-collapse:separate; border-spacing:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+.al-table th { padding:8px 10px; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-align:left; text-transform:uppercase;
+  color:var(--muted); background:var(--wash); border-bottom:1px solid var(--line); }
+.al-table td { padding:7px 10px; font-variant-numeric:tabular-nums; border-top:1px solid var(--line); }
+.al-table tbody tr:first-child td { border-top:none; }
 
 /* --- Calculateur : inline & unités ---------------------- */
 .al-inline { display:flex; align-items:center; gap:6px; }
-.al-inline input { width:72px; }
+.al-inline input { width:76px; }
 .al-u { font-size:.8rem; color:var(--muted); }
-.al-rate { margin-left:auto; display:inline-flex; align-items:center; gap:4px; font-weight:600; font-size:.85rem; }
-.al-rate input { width:64px; }
+.al-rate { display:inline-flex; align-items:center; gap:6px; margin-left:auto; font-family:var(--font); font-weight:600; font-size:.85rem; letter-spacing:0; }
+.al-rate input { width:70px; }
 
 /* --- Main d'œuvre --------------------------------------- */
 .al-labor { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
-.al-sub { font-weight:700; font-size:.85rem; margin-bottom:8px; }
-.al-lrow { display:grid; grid-template-columns:1fr 70px auto; align-items:center; gap:8px; margin-bottom:6px; }
-.al-lrow label { font-size:.85rem; color:var(--ink); }
-.al-lfoot { font-size:.8rem; color:var(--muted); border-top:1px dashed var(--line); padding-top:6px; margin-top:4px; }
-
-/* --- Profils -------------------------------------------- */
+.al-sub { margin-bottom:8px; font-size:.7rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+.al-lrow { display:grid; grid-template-columns:1fr 76px auto; align-items:center; gap:8px; margin-bottom:6px; }
+.al-lrow label { font-size:.86rem; color:var(--ink); }
+.al-lfoot { margin-top:6px; padding-top:8px; font-size:.8rem; color:var(--muted); border-top:1px dashed var(--line-2); }
 
 /* --- Résumé des coûts ----------------------------------- */
-.al-summary { position:relative; }
-.al-sum-head { color:#fff; background:var(--ember); margin:-16px -18px 14px; padding:12px 18px;
-  border-radius:var(--radius-lg) var(--radius-lg) 0 0; }
-.al-srow { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
-  font-size:.9rem; padding:5px 0; border-bottom:1px solid var(--line); }
+.al-summary { position:relative; overflow:hidden; }
+.al-sum-head { margin:-18px -20px 14px; padding:14px 20px; color:var(--on-ember); background:var(--ember); }
+.al-srow { display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:6px 0;
+  font-size:.9rem; border-bottom:1px solid var(--line); }
 .al-srow span:last-child, .al-srow b { font-variant-numeric:tabular-nums; }
-.al-srow em { font-style:normal; color:var(--muted); font-size:.78rem; }
-.al-cost { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
-  background:color-mix(in srgb, var(--ember) 8%, transparent); border-radius:var(--radius-sm);
-  padding:12px 14px; margin:12px 0; font-weight:800; }
-.al-cost span { font-size:.72rem; letter-spacing:.06em; color:var(--ember-dim); white-space:nowrap; }
-.al-cost b { font-size:1.5rem; color:var(--ember-dim); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.al-srow em { font-style:normal; font-size:.78rem; color:var(--muted); }
+.al-cost { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:12px 0; padding:12px 14px;
+  background:color-mix(in srgb, var(--ember) 9%, var(--paper)); border:1px solid color-mix(in srgb, var(--ember) 28%, var(--line)); border-radius:12px; }
+.al-cost span { font-size:.72rem; font-weight:700; letter-spacing:.08em; white-space:nowrap; color:var(--ember-ink); }
+.al-cost b { font-family:var(--display); font-size:1.6rem; font-weight:700; letter-spacing:-.02em; white-space:nowrap; color:var(--ember-ink); font-variant-numeric:tabular-nums; }
 .al-margin-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:6px 0 10px; }
 .al-price-set { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0 10px; }
 .al-price-set .lbl { margin:0; }
 .al-price-set .hint { display:block; font-weight:500; letter-spacing:0; text-transform:none; }
-.al-price-set .al-inline input { width:100px; font-size:1.15rem; font-weight:800; text-align:right;
-  border-color:color-mix(in srgb, var(--ember) 45%, var(--line)); }
-.al-price-set .al-u { font-size:1rem; font-weight:700; color:var(--ember-dim); }
+.al-price-set .al-inline input { width:110px; font-family:var(--display); font-size:1.2rem; font-weight:700; text-align:right;
+  border-color:color-mix(in srgb, var(--ember) 45%, var(--line-2)); }
+.al-price-set .al-u { font-size:1rem; font-weight:700; color:var(--ember-ink); }
 .al-price b { font-size:1.05rem; }
 .al-profit { border-bottom:0; }
-.al-profit b { color:var(--good); }
+.al-profit b { font-family:var(--display); color:var(--good); }
 
 /* --- Camembert ------------------------------------------ */
 .al-breakdown { display:flex; flex-direction:column; align-items:center; gap:14px; }
-.ap-donut { width:150px; height:150px; border-radius:50%; display:grid; place-items:center; flex:0 0 auto; }
-.ap-donut-hole { width:92px; height:92px; border-radius:50%; background:var(--paper);
-  display:grid; place-items:center; box-shadow:inset 0 0 0 1px var(--line); }
-.ap-donut-hole span { font-weight:800; font-size:.95rem; color:var(--ink); font-variant-numeric:tabular-nums; }
-.al-legend { width:100%; display:flex; flex-direction:column; gap:5px; }
-.ap-leg { display:flex; align-items:center; gap:8px; font-size:.82rem; }
-.ap-dot { width:11px; height:11px; border-radius:3px; flex:0 0 auto; }
+.ap-donut { display:grid; place-items:center; flex:0 0 auto; width:156px; height:156px; border-radius:50%; }
+.ap-donut-hole { display:grid; place-items:center; width:96px; height:96px; border-radius:50%; background:var(--paper);
+  box-shadow:inset 0 0 0 1px var(--line); }
+.ap-donut-hole span { font-family:var(--display); font-weight:700; font-size:1rem; color:var(--ink); font-variant-numeric:tabular-nums; }
+.al-legend { display:flex; flex-direction:column; gap:6px; width:100%; }
+.ap-leg { display:flex; align-items:center; gap:8px; font-size:.84rem; }
+.ap-dot { flex:0 0 auto; width:11px; height:11px; border-radius:3px; }
 .ap-leg-v { margin-left:auto; color:var(--muted); font-variant-numeric:tabular-nums; }
 
 /* Les libellés du calculateur ont des longueurs inégales (certains passent sur
@@ -117,8 +117,15 @@
 .field-wide .al-fine { margin:0; }
 
 /* --- Responsive ----------------------------------------- */
+@media (max-width:1100px) {
+  .al-cols { grid-template-columns:minmax(0, 1fr) 360px; }
+}
 @media (max-width:900px) {
   .al-cols { grid-template-columns:1fr; }
   .al-side { position:static; }
   .al-labor { grid-template-columns:1fr; }
+}
+@media (max-width:640px) {
+  .al-card { padding:16px; }
+  .al-sum-head { margin:-16px -16px 14px; padding:12px 16px; }
 }
