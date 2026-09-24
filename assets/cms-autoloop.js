@@ -86,7 +86,7 @@
        chaque loop : on la réécrit pour tout le batch (cf. progressSegments).
        « M73 L » (couche) et « M73.2 » ne matchent pas : couches par pièce.    */
   var RE_M73 = /^M73 P(\d+) R(\d+)[^\r\n]*/gm;
-  var EJECT_MIN = 1;   // flexion + push + balayages + pause ≈ 1 min (hors cooldown)
+  var EJECT_MIN = 1;   // flexion + push + balayages + parking ≈ 1 min (hors cooldown)
 
   // Remplace la ligne de purge native par une purge en goulotte. Séquence reprise
   // du fichier FarmLoop qui imprimait déjà ; la température M109 est celle du bloc
@@ -284,12 +284,12 @@
     return L.join(eol) + eol;
   }
 
-  // Séparateur inséré entre la transition du loop k et le loop k+1.
-  function buildSeparator(nextI, N, opts, eol) {
+  // Séparateur inséré entre la transition du loop k et le loop k+1 (repères
+  // seulement). Pas de pause : la transition finit déjà par M400 (mouvements
+  // terminés) et le loop suivant commence par chauffer le plateau.
+  function buildSeparator(nextI, N, eol) {
     return eol +
-      '; === END OF LOOP ' + (nextI - 1) + ' ===' + eol +
-      '; Préparation du loop suivant…' + eol +
-      'G4 S' + Math.round(opts.loopPause) + ' ; pause entre loops' + eol + eol +
+      '; === END OF LOOP ' + (nextI - 1) + ' ===' + eol + eol +
       '; === LOOP ' + nextI + ' OF ' + N + ' ===' + eol;
   }
 
@@ -352,7 +352,7 @@
       if (i === 1) parts.push('; === LOOP 1 OF ' + N + ' ===' + eol);
       parts.push(insertFlags(progressHead(seg, i, N, transMin), i, !!opts.cal.flow[i - 1], !!opts.cal.bed[i - 1], eol));
       parts.push(i === N ? transLast : trans);
-      if (i < N) parts.push(buildSeparator(i + 1, N, opts, eol));
+      if (i < N) parts.push(buildSeparator(i + 1, N, eol));
     }
     var out = parts.join('');
     report.size = out.length;
@@ -455,8 +455,7 @@
       coolMode: $('#al-cool-mode').value,
       coolTemp: num($('#al-cool-temp').value, 45),
       coolSec: num($('#al-cool-sec').value, 60),
-      coolEst: num($('#al-cool-est').value, 5),
-      loopPause: num($('#al-loop-pause').value, 2)
+      coolEst: num($('#al-cool-est').value, 5)
     };
   }
 
