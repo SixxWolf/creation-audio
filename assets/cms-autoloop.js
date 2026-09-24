@@ -81,6 +81,12 @@
        tête : on le remet au DERNIER loop seulement. Cherché après END_ANCHOR ; la
        copie du commentaire de config (\n échappés, une seule ligne) ne matche pas. */
   var RE_AMS_PULLBACK = /; pull back filament to AMS\r?\n(M620 S65535\r?\n[\s\S]*?M621 S65535)\r?\n/;
+  /* - RE_M73 : progression lue par l'imprimante (« M73 P<%> R<min restantes> »).
+       Chaque loop étant une copie de la pièce, elle repartait à 0 % / 1h53 à
+       chaque loop : on la réécrit pour tout le batch (cf. progressSegments).
+       « M73 L » (couche) et « M73.2 » ne matchent pas : couches par pièce.    */
+  var RE_M73 = /^M73 P(\d+) R(\d+)[^\r\n]*/gm;
+  var EJECT_MIN = 1;   // flexion + push + balayages + pause ≈ 1 min (hors cooldown)
 
   // Remplace la ligne de purge native par une purge en goulotte. Séquence reprise
   // du fichier FarmLoop qui imprimait déjà ; la température M109 est celle du bloc
@@ -128,6 +134,42 @@
     return head.replace(RE_START_ANCHOR, '$1' + ins.replace(/\$/g, '$$$$'));
   }
 
+  /* --- Progression du batch complet -----------------------------------
+     On découpe la pièce une fois autour de ses lignes M73 P/R, puis chaque
+     loop recolle les morceaux avec des valeurs globales :
+       cycle    = durée d'un loop (1er R du slicer) + transition estimée
+       restant  = R du loop + transition de ce loop + loops suivants × cycle
+       %        = part du batch écoulée (99 max ; 100 posé à la toute fin).
+     Le restant ne dépend que de ce qui reste à faire : un cooldown plus long
+     que prévu ne s'accumule pas, l'estimation se recale au loop suivant.   */
+  function progressSegments(head) {
+    var chunks = [], rs = [], last = 0, m;
+    RE_M73.lastIndex = 0;
+    while ((m = RE_M73.exec(head))) {
+      chunks.push(head.slice(last, m.index));
+      rs.push(parseInt(m[2], 10));
+      last = m.index + m[0].length;
+    }
+    chunks.push(head.slice(last));
+    return { chunks: chunks, rs: rs, loopMin: rs.length ? Math.max.apply(null, rs) : 0 };
+  }
+  function progressHead(seg, i, N, transMin) {
+    if (!seg.rs.length) return seg.chunks[0];
+    var cycle = seg.loopMin + transMin, total = N * cycle, out = seg.chunks[0];
+    for (var k = 0; k < seg.rs.length; k++) {
+      var rem = seg.rs[k] + transMin + (N - i) * cycle;
+      var pct = total > 0 ? Math.min(99, Math.max(0, Math.floor(100 * (total - rem) / total))) : 0;
+      out += 'M73 P' + pct + ' R' + Math.round(rem) + seg.chunks[k + 1];
+    }
+    return out;
+  }
+  // Transition estimée (min) : cooldown selon le mode + éjection.
+  function transitionMin(opts) {
+    if (opts.coolMode === 'temp') return Math.max(0, opts.coolEst);
+    if (opts.coolMode === 'delay') return opts.coolSec / 60 + EJECT_MIN;
+    return EJECT_MIN;
+  }
+
   // [1,2,3,5,9] -> « 1–3, 5, 9 » (liste compacte pour le rapport et l'en-tête).
   function loopRanges(list) {
     var out = [], a = null, b = null;
@@ -144,9 +186,11 @@
      déjà (dégagement Z, flexion, push, balayages, parking). Seul le push
      est paramétré (= % de la hauteur de la pièce). On n'invente aucun
      mouvement : on rejoue une séquence validée.
-     `unload` (dernier loop seulement) : lignes natives du retrait AMS, placées
-     comme dans le end gcode natif, avant l'extinction de la buse.          */
-  function buildTransition(opts, pushZ, maxZ, eol, unload) {
+     `last` (dernier loop seulement) : { unload } = lignes natives du retrait
+     AMS (ou null), placées comme dans le end gcode natif, avant l'extinction
+     de la buse ; puis progression posée à 100 % tout à la fin.             */
+  function buildTransition(opts, pushZ, maxZ, eol, last) {
+    var unload = last && last.unload;
     var L = [];
     var pushSpeed = Math.round(opts.pushSpeed);
     L.push(';======== P2S end gcode ==========');
@@ -235,6 +279,7 @@
     L.push('M400');
     L.push('M104 S0 ; turn off hotend');
     L.push('M140 S0 ; turn off bed');
+    if (last) L.push('M73 P100 R0 ; AutoLoop : batch terminé');
     L.push('; EXECUTABLE_BLOCK_END');
     return L.join(eol) + eol;
   }
@@ -254,7 +299,8 @@
     var report = {
       ok: false, loops: opts.loops, eol: eol === '\r\n' ? 'CRLF' : 'LF',
       maxZ: null, pushZ: null, flow: [], bed: [], bendsPerLoop: 0, size: 0, error: null,
-      loadLineReplaced: false, amsUnload: false
+      loadLineReplaced: false, amsUnload: false,
+      progress: false, loopMin: 0, transMin: 0, totalMin: 0
     };
     var idx = raw.indexOf(END_ANCHOR);
     var mz = raw.match(RE_MAXZ);
@@ -277,8 +323,14 @@
     var trans = buildTransition(opts, pushZ, maxZ, eol);   // identique pour chaque loop…
     var pb = RE_AMS_PULLBACK.exec(raw.slice(idx));
     var unload = pb ? pb[1].split(/\r?\n/) : null;
-    var transLast = unload ? buildTransition(opts, pushZ, maxZ, eol, unload) : trans;   // …sauf le dernier : retrait AMS
+    var transLast = buildTransition(opts, pushZ, maxZ, eol, { unload: unload });   // …sauf le dernier : retrait AMS + 100 %
     report.amsUnload = !!unload;
+
+    var seg = progressSegments(head);   // progression réécrite pour le batch complet
+    var transMin = transitionMin(opts);
+    report.progress = seg.rs.length > 0;
+    report.loopMin = seg.loopMin; report.transMin = transMin;
+    report.totalMin = N * (seg.loopMin + transMin);
 
     for (var k = 1; k <= N; k++) {
       if (opts.cal.flow[k - 1]) report.flow.push(k);
@@ -290,13 +342,15 @@
                '; Batch généré par AutoLoop — Création Audio' + eol +
                '; ' + N + ' loops · pièce ' + z(maxZ) + ' mm · push ' + z(pushZ) + ' mm (max − ' + opts.pushOffset + ' mm)' + eol +
                '; Flow : ' + (loopRanges(report.flow) || 'aucun loop') + ' · bed leveling : ' + (loopRanges(report.bed) || 'aucun loop') + eol +
+               (report.progress ? '; Durée estimée du batch : ' + fmtDur(report.totalMin) + ' (' + N + ' × ' + seg.loopMin +
+                 ' min + ' + Math.round(transMin) + ' min de cooldown/éjection) — progression M73 réécrite pour le batch' + eol : '') +
                '; Aucune dépendance FarmLoop.' + eol +
                '; ===================================================' + eol + eol);
 
     for (var i = 1; i <= N; i++) {
       // Le header du loop 1 est écrit ici ; ceux des loops suivants viennent du séparateur.
       if (i === 1) parts.push('; === LOOP 1 OF ' + N + ' ===' + eol);
-      parts.push(insertFlags(head, i, !!opts.cal.flow[i - 1], !!opts.cal.bed[i - 1], eol));
+      parts.push(insertFlags(progressHead(seg, i, N, transMin), i, !!opts.cal.flow[i - 1], !!opts.cal.bed[i - 1], eol));
       parts.push(i === N ? transLast : trans);
       if (i < N) parts.push(buildSeparator(i + 1, N, opts, eol));
     }
@@ -401,6 +455,7 @@
       coolMode: $('#al-cool-mode').value,
       coolTemp: num($('#al-cool-temp').value, 45),
       coolSec: num($('#al-cool-sec').value, 60),
+      coolEst: num($('#al-cool-est').value, 5),
       loopPause: num($('#al-loop-pause').value, 2)
     };
   }
@@ -427,6 +482,10 @@
         '<br>Ligne de purge : ' + (rep.loadLineReplaced
           ? 'remplacée par une purge en goulotte (aucune ligne sur le plateau).'
           : '<span class="al-warn">bloc « nozzle load line » introuvable — purge native conservée.</span>') +
+        '<br>Progression : ' + (rep.progress
+          ? 'batch complet · durée estimée <b>' + fmtDur(rep.totalMin) + '</b> (' + rep.loops + ' × ' + rep.loopMin + ' min + ' +
+            Math.round(rep.transMin) + ' min de cooldown/éjection). Le % et l\'heure de fin affichés par l\'imprimante valent pour tout le batch.'
+          : '<span class="al-warn">lignes de progression (M73) introuvables — l\'imprimante affichera la progression pièce par pièce.</span>') +
         '<br>Filament : ' + (rep.amsUnload
           ? 'retiré vers l\'AMS à la fin du dernier loop (loop ' + rep.loops + ').'
           : '<span class="al-warn">bloc de retrait AMS introuvable dans le end gcode — le filament restera dans la tête.</span>') +
@@ -661,6 +720,7 @@
     function syncCool() {
       $('#al-cool-temp-wrap').hidden = coolMode.value !== 'temp';
       $('#al-cool-sec-wrap').hidden = coolMode.value !== 'delay';
+      $('#al-cool-est-wrap').hidden = coolMode.value !== 'temp';   // délai / aucun : durée calculée
     }
     coolMode.addEventListener('change', syncCool); syncCool();
     // Flexion : activer/désactiver les champs.
@@ -739,6 +799,11 @@
     var h = Math.floor(min / 60), m = Math.round(min % 60);
     if (m === 60) { h++; m = 0; }
     return h + 'h' + (m < 10 ? '0' : '') + m;
+  }
+  // « 1 j 13h40 » au-delà de 24 h (durée d'un batch).
+  function fmtDur(min) {
+    var d = Math.floor(min / 1440);
+    return d > 0 ? d + ' j ' + fmtHm(min - d * 1440) : fmtHm(min);
   }
 
   function recompute() {

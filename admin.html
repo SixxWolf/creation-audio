@@ -1348,6 +1348,11 @@
                   <label class="lbl" for="al-cool-sec">Délai (secondes)</label>
                   <input type="number" id="al-cool-sec" min="0" step="1" value="60" class="num">
                 </div>
+                <div class="field" id="al-cool-est-wrap">
+                  <label class="lbl" for="al-cool-est">Durée estimée (min / loop)</label>
+                  <input type="number" id="al-cool-est" min="0" step="1" value="5" class="num">
+                  <span class="hint">Cooldown + éjection. Sert seulement au % et à l'heure de fin du batch affichés par l'imprimante.</span>
+                </div>
               </div>
             </div>
 
@@ -1503,6 +1508,6 @@
 <script src="assets/cms-statistiques.js?v=6"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=1"></script>
-<script src="assets/cms-autoloop.js?v=14"></script>
+<script src="assets/cms-autoloop.js?v=15"></script>
 </body>
 </html>
