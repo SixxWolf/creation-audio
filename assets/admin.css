@@ -455,7 +455,11 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .rcp-table select, .bc-table select { padding-right:30px; background-position:right 9px center; }
 .rcp-table th.num, .rcp-table td.num, .reorder-table th, .reorder-table td { text-align:right; }
 .reorder-table th.l, .reorder-table td.l { text-align:left; }
-.num input, input.num { text-align:right; font-variant-numeric:tabular-nums; }
+/* Nombres : chiffres à chasse fixe partout. Alignement à DROITE seulement dans les
+   tableaux (les unités/décimales s'empilent en colonne) ; dans un formulaire,
+   la valeur reste à gauche, près de son libellé, comme les autres champs. */
+.num input, input.num { font-variant-numeric:tabular-nums; }
+td.num input, .catalog-table input.catcost { text-align:right; }
 
 /* ---- Poste de scan ---- */
 .scan-station { position:relative; margin-bottom:22px; padding:20px; background:var(--paper); border:1px solid var(--line);
