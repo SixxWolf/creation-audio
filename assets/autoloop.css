@@ -123,7 +123,14 @@
 /* Les libellés du calculateur ont des longueurs inégales (certains passent sur
    deux lignes à cause de leur précision entre parenthèses) : on pousse le champ
    en bas de sa cellule pour que tous les inputs d'une même rangée s'alignent. */
-.al-view .grid > .field { justify-content:flex-end; }
+/* Alignement des rangées (subgrid) : chaque champ occupe 3 rangées de la grille
+   parente — libellé / champ / aide. Dans une même rangée, les champs partagent
+   donc la même ligne, même si un libellé passe sur 2 lignes (poussé vers le bas)
+   ou qu'une aide est plus longue que sa voisine. (L'ancien « flex-end » alignait
+   les libellés mais décalait tout dès qu'une aide dépassait l'autre.)          */
+.al-view .grid { row-gap:0; }
+.al-view .grid > .field { display:grid; grid-row:span 3; grid-template-rows:subgrid; row-gap:6px; align-content:start; margin-bottom:16px; }
+.al-view .grid > .field > .lbl { align-self:end; }
 .field-wide { grid-column:1 / -1; }
 .field-wide .al-fine { margin:0; }
 
