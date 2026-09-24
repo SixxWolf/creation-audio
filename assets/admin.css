@@ -332,12 +332,13 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 /* tableau prix : libellé + prix à gauche, marge à droite (client, dealer, paliers dealer) */
 .sp-tiers-break { display:flex; flex-direction:column; margin-top:2px; padding:2px 10px; background:var(--wash);
   border:1px solid var(--line); border-radius:10px; }
-.sp-tierrow { display:flex; align-items:center; justify-content:space-between; flex-wrap:nowrap; gap:8px; padding:6px 0;
+/* carte étroite : la pastille de marge passe sous le prix (calée à droite) au lieu de déborder */
+.sp-tierrow { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px 8px; padding:6px 0;
   font-size:.76rem; border-bottom:1px dashed var(--line-2); }
 .sp-tierrow:last-child { border-bottom:none; }
 .sp-tierrow .tp { color:var(--ink-2); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .sp-tierrow .tp b { font-weight:700; color:var(--ink); }
-.sp-tierrow .card-margin { white-space:nowrap; }
+.sp-tierrow .card-margin { margin-left:auto; white-space:nowrap; }
 
 /* =========================================================
    ONGLETS DEALERS & CLIENTS (lignes contact avec avatar)
