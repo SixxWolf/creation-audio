@@ -973,8 +973,11 @@
     });
     var missing = Object.keys(noPrice);
     var multiBrand = Object.keys(byBrand).length > 1;
+    var tx = taxRates(), taxMul = 1 + (tx.gst + tx.qst) / 100;
     var estHtml = (est > 0 || !missing.length)
-      ? '<span class="reorder-est" title="Prix catalogue × quantités à commander — avant taxes, rabais et livraison">Estimé <b>≈ ' + money(est) + '</b></span>'
+      ? '<span class="reorder-est" title="Prix catalogue × quantités à commander, + TPS ' + fmtRate(tx.gst) + ' % et TVQ ' + fmtRate(tx.qst) +
+          ' % (taux de Facturation) — hors rabais et livraison">Estimé <b>≈ ' + money(est * taxMul) + '</b> taxes incluses' +
+          ' <span class="reorder-est-ht">(' + money(est) + ' avant taxes)</span></span>'
       : '';
     var noteHtml = missing.length
       ? '<p class="reorder-est-note">Sans prix catalogue, non compté' + (missing.length > 1 ? 's' : '') + ' : ' +
@@ -991,7 +994,7 @@
           '<span class="ro-q">×' + it.qty + '</span></li>';
       }).join('');
       return '<div class="reorder-brandgroup"><h3 style="font-size:.9rem;margin:12px 0 4px">' + esc(brand) +
-          (multiBrand && estByBrand[brand] ? '<span class="ro-brand-est">≈ ' + money(estByBrand[brand]) + '</span>' : '') + '</h3>' +
+          (multiBrand && estByBrand[brand] ? '<span class="ro-brand-est">≈ ' + money(estByBrand[brand] * taxMul) + ' taxes incl.</span>' : '') + '</h3>' +
         '<ul class="reorder-list">' + lis + '</ul></div>';
     }).join('');
 
@@ -1017,6 +1020,15 @@
       } else { fallbackCopy(text); done(); }
     });
   }
+
+  // taux TPS / TVQ réglés dans Facturation (« Coordonnées de l'entreprise & taxes »,
+  // mémorisés sur l'appareil) ; défaut Québec 5 % / 9,975 %, comme Facturation.
+  function taxRates() {
+    var co = {}; try { co = JSON.parse(localStorage.getItem('ca_v2_facture_company')) || {}; } catch (e) {}
+    function rate(v, d) { var n = parseFloat(v); return (v != null && v !== '' && isFinite(n)) ? n : d; }
+    return { gst: rate(co.gstRate, 5), qst: rate(co.qstRate, 9.975) };
+  }
+  function fmtRate(n) { return String(n).replace('.', ','); }
 
   function buildOrderText(byBrand) {
     var out = [];
