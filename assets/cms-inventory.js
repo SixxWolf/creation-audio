@@ -961,6 +961,27 @@
     var byBrand = {};
     items.forEach(function (it) { (byBrand[it.f.brand || '—'] = byBrand[it.f.brand || '—'] || []).push(it); });
 
+    // Estimé de la commande = prix catalogue (coût matériau par format, même base que
+    // la réception) × quantité manquante ; avant taxes, rabais et livraison. Les
+    // articles sans prix catalogue ne sont pas comptés (listés pour les compléter).
+    var est = 0, estByBrand = {}, noPrice = {};
+    items.forEach(function (it) {
+      var c = refCostOf(it.f, it.kind), b = it.f.brand || '—';
+      if (c == null) { noPrice[(it.f.material || it.f.name || '—') + ' · ' + kindLabel(it.kind)] = 1; return; }
+      est += c * it.qty;
+      estByBrand[b] = (estByBrand[b] || 0) + c * it.qty;
+    });
+    var missing = Object.keys(noPrice);
+    var multiBrand = Object.keys(byBrand).length > 1;
+    var estHtml = (est > 0 || !missing.length)
+      ? '<span class="reorder-est" title="Prix catalogue × quantités à commander — avant taxes, rabais et livraison">Estimé <b>≈ ' + money(est) + '</b></span>'
+      : '';
+    var noteHtml = missing.length
+      ? '<p class="reorder-est-note">Sans prix catalogue, non compté' + (missing.length > 1 ? 's' : '') + ' : ' +
+          esc(missing.slice(0, 4).join(', ')) + (missing.length > 4 ? '…' : '') +
+          ' — <button type="button" class="ro-link" id="reorder-to-catalog">compléter les prix catalogue</button></p>'
+      : '';
+
     var listHtml = Object.keys(byBrand).map(function (brand) {
       var lis = byBrand[brand].map(function (it) {
         var sw = swatchBg(it.f.hex, colorsOf(it.f));
@@ -969,7 +990,8 @@
           ' <span class="ro-code">' + kindLabel(it.kind) + (it.f.code ? ' · ' + esc(it.f.code) : '') + '</span></span>' +
           '<span class="ro-q">×' + it.qty + '</span></li>';
       }).join('');
-      return '<div class="reorder-brandgroup"><h3 style="font-size:.9rem;margin:12px 0 4px">' + esc(brand) + '</h3>' +
+      return '<div class="reorder-brandgroup"><h3 style="font-size:.9rem;margin:12px 0 4px">' + esc(brand) +
+          (multiBrand && estByBrand[brand] ? '<span class="ro-brand-est">≈ ' + money(estByBrand[brand]) + '</span>' : '') + '</h3>' +
         '<ul class="reorder-list">' + lis + '</ul></div>';
     }).join('');
 
@@ -977,10 +999,15 @@
       '<div class="reorder-card-head">' +
         '<h2>Liste à commander</h2>' +
         '<span class="grow"></span>' +
+        estHtml +
         '<span class="reorder-total">' + totalUnits + ' article' + (totalUnits > 1 ? 's' : '') + '</span>' +
         '<button class="btn btn-ghost btn-sm" id="reorder-copy" type="button">Copier la liste</button>' +
-      '</div>' + listHtml + '</div>';
+      '</div>' + noteHtml + listHtml + '</div>';
 
+    var toCat = $('#reorder-to-catalog');
+    if (toCat) toCat.addEventListener('click', function () {
+      if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub('catalogue'); else showSub('catalogue');
+    });
     var copyBtn = $('#reorder-copy');
     if (copyBtn) copyBtn.addEventListener('click', function () {
       var text = buildOrderText(byBrand);
