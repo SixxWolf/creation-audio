@@ -102,7 +102,7 @@
     return { text: head.slice(0, m.index) + L.join(eol) + eol + head.slice(m.index + m[0].length), replaced: true };
   }
 
-  // Motif « tous les N loops » (raccourci de la grille) : loop 1, puis 1+N, 1+2N…
+  // Motif « tous les N loops » (champ de chaque ligne de la grille) : loop 1, puis 1+N, 1+2N…
   // interval 0 = loop 1 seulement.
   function calibrateLoop(i, interval) {
     if (i === 1) return true;
@@ -292,21 +292,18 @@
   /* --- Grille de calibration par loop ----------------------------------
      Une colonne par loop, deux cases : flow (extrude_cali_flag) et bed
      leveling (g29_before_print_flag). Coché = forcé à 1, décoché = forcé à 0.
-     « Tous les N loops » re-remplit les deux lignes selon le motif ; changer
-     le nombre de loops garde les cases déjà réglées. Nouveaux loops : suivent
-     « Tout » / « Aucun » si c'est le dernier geste sur la ligne, sinon le motif. */
+     Chaque ligne a son champ « tous les X loops » qui la re-remplit selon le
+     motif (défaut 0 = loop 1 seulement). Changer le nombre de loops garde les
+     cases déjà réglées ; les nouveaux loops suivent le motif de leur ligne.  */
   var CAL_CHUNK = 12;                 // loops par rangée de grille
   var cal = { flow: [], bed: [] };    // index 0 = loop 1
-  var calMode = { flow: null, bed: null };   // 'all' | 'none' | null (= motif)
 
   function loopCount() { return Math.max(1, intOr($('#al-loops').value, 12)); }
-  function calInterval() { return Math.max(0, intOr($('#al-cal-interval').value, 0)); }
+  function calInterval(row) { return Math.max(0, intOr($('#al-cal-' + row + '-every').value, 0)); }
   function fitCal(N) {
-    var k = calInterval();
     ['flow', 'bed'].forEach(function (row) {
-      for (var i = cal[row].length; i < N; i++) {
-        cal[row].push(calMode[row] ? calMode[row] === 'all' : calibrateLoop(i + 1, k));
-      }
+      var k = calInterval(row);
+      for (var i = cal[row].length; i < N; i++) cal[row].push(calibrateLoop(i + 1, k));
     });
   }
   function calCell(row, i) {
@@ -357,21 +354,13 @@
       var cb = e.target;
       if (!cb.dataset || !cb.dataset.row) return;
       cal[cb.dataset.row][+cb.dataset.i] = cb.checked;
-      calMode[cb.dataset.row] = null;
       syncCalSum();
     });
-    $$('[data-cal-all]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var row = b.dataset.calAll, on = b.dataset.val === '1';
-        calMode[row] = on ? 'all' : 'none';
-        cal[row] = [];   // fitCal re-remplit la ligne selon le mode
+    ['flow', 'bed'].forEach(function (row) {
+      $('#al-cal-' + row + '-every').addEventListener('input', function () {
+        cal[row] = [];   // le motif remplace les réglages manuels de CETTE ligne
         renderCalGrid();
       });
-    });
-    $('#al-cal-interval').addEventListener('input', function () {
-      cal = { flow: [], bed: [] };   // le motif remplace les réglages manuels
-      calMode = { flow: null, bed: null };
-      renderCalGrid();
     });
     $('#al-loops').addEventListener('input', renderCalGrid);
     renderCalGrid();

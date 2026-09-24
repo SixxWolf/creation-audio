@@ -55,13 +55,11 @@
 .al-switch input { width:18px; height:18px; accent-color:var(--ember); }
 
 /* --- Calibration par loop (grille flow / bed leveling) --- */
-.al-cal-tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
-.al-cal-tools .hint { flex:1 1 220px; }
-.al-cal-bulks { gap:8px 26px; margin-top:12px; }
-.al-cal-every { margin:0; font-size:.9rem; font-weight:600; color:var(--ink); cursor:text; }
+/* un champ « tous les X loops » par ligne de la grille (flow, bed leveling) */
+.al-cal-every { display:grid; grid-template-columns:max-content max-content; align-items:center; gap:8px 16px; }
+.al-cal-every .al-inline { gap:8px; font-size:.9rem; font-weight:600; color:var(--ink); }
 .al-cal-every input { width:64px; text-align:center; }
-.al-cal-bulk { display:flex; align-items:center; gap:6px; }
-.al-cal-bk { margin-right:2px; font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.al-cal-bk { font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); cursor:pointer; }
 .al-cal-help { margin:10px 0 0; }
 .al-cal-grid { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
 .al-calg-wrap { max-width:100%; overflow-x:auto; }

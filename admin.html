@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/admin.css?v=41">
 <link rel="stylesheet" href="assets/facture.css?v=14">
-<link rel="stylesheet" href="assets/autoloop.css?v=10">
+<link rel="stylesheet" href="assets/autoloop.css?v=11">
 <script src="assets/theme.js?v=1" defer></script>
 </head>
 <body>
@@ -1271,22 +1271,13 @@
 
             <div class="al-card">
               <div class="al-card-head"><span class="al-ic">🎯</span> Calibration par loop <span class="al-note">coché = forcé, même si désactivé dans Bambu Studio</span></div>
-              <div class="al-cal-tools">
-                <label class="al-inline al-cal-every" for="al-cal-interval">Cocher tous les <input type="number" id="al-cal-interval" min="0" step="1" value="0" class="num"> loops</label>
-                <span class="hint">Coche 1, 1+N, 1+2N… sur les deux lignes (0 = loop 1 seulement), puis ajuste case par case.</span>
+              <div class="al-cal-every">
+                <label class="al-cal-bk" for="al-cal-flow-every">Flow</label>
+                <span class="al-inline">tous les <input type="number" id="al-cal-flow-every" min="0" step="1" value="0" class="num"> loops</span>
+                <label class="al-cal-bk" for="al-cal-bed-every">Bed leveling</label>
+                <span class="al-inline">tous les <input type="number" id="al-cal-bed-every" min="0" step="1" value="0" class="num"> loops</span>
               </div>
-              <div class="al-cal-tools al-cal-bulks">
-                <div class="al-cal-bulk" role="group" aria-label="Calibration du flow, tous les loops">
-                  <span class="al-cal-bk">Flow</span>
-                  <button type="button" class="btn btn-ghost btn-sm" data-cal-all="flow" data-val="1">Tout</button>
-                  <button type="button" class="btn btn-ghost btn-sm" data-cal-all="flow" data-val="0">Aucun</button>
-                </div>
-                <div class="al-cal-bulk" role="group" aria-label="Bed leveling, tous les loops">
-                  <span class="al-cal-bk">Bed leveling</span>
-                  <button type="button" class="btn btn-ghost btn-sm" data-cal-all="bed" data-val="1">Tout</button>
-                  <button type="button" class="btn btn-ghost btn-sm" data-cal-all="bed" data-val="0">Aucun</button>
-                </div>
-              </div>
+              <p class="hint al-cal-help">Loop 1 toujours inclus · 1 = chaque loop · 0 = loop 1 seulement. Chaque champ remplit sa ligne ; ajuste ensuite case par case.</p>
               <div id="al-cal-grid" class="al-cal-grid"></div>
               <p class="al-fine al-cal-sum" id="al-cal-sum"></p>
               <p class="hint al-cal-help">Le homing (retour à zéro des axes) se fait à chaque loop, peu importe la grille.</p>
@@ -1512,6 +1503,6 @@
 <script src="assets/cms-statistiques.js?v=6"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=1"></script>
-<script src="assets/cms-autoloop.js?v=12"></script>
+<script src="assets/cms-autoloop.js?v=13"></script>
 </body>
 </html>
