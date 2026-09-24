@@ -3,9 +3,9 @@
    Coquille : barre latérale groupée (tiroir ≤ 1024 px) + barre du haut.
    Même langage que le site public (titres Space Grotesk, ember = action)
    en gardant le mode sombre (jetons de tokens.css + ceux ci-dessous).
-   Refonte onglet par onglet : coquille, composants partagés et onglet
-   Filaments sont faits ; les sections plus bas (Inventaire, Facturation…)
-   gardent leur style en attendant leur tour.
+   Refaite onglet par onglet (sept. 2026) : coquille + composants partagés,
+   puis une section par onglet ci-dessous. Facturation, Historique et
+   Statistiques sont dans facture.css ; AutoLoop dans autoloop.css.
    ========================================================= */
 :root {
   --display:'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
