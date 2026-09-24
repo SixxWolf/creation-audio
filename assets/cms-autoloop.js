@@ -364,7 +364,7 @@
      Une colonne par loop, deux cases : flow (extrude_cali_flag) et bed
      leveling (g29_before_print_flag). Coché = forcé à 1, décoché = forcé à 0.
      Chaque ligne a son champ « tous les X loops » qui la re-remplit selon le
-     motif (défaut 0 = loop 1 seulement). Changer le nombre de loops garde les
+     motif (défaut flow 2 / bed leveling 4). Changer le nombre de loops garde les
      cases déjà réglées ; les nouveaux loops suivent le motif de leur ligne.  */
   var CAL_CHUNK = 12;                 // loops par rangée de grille
   var cal = { flow: [], bed: [] };    // index 0 = loop 1
