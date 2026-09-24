@@ -75,6 +75,12 @@
        (la buse y est déjà parquée par le G150.3 précédent). Bambu écrit
        « noozle » dans la balise de fin → orthographe tolérante.                */
   var RE_LOAD_LINE = /^;=+ no+z+le load line =+[^\r\n]*\r?\n([\s\S]*?)^;=+ no+z+le load line end =+[^\r\n]*\r?\n/m;
+  /* - RE_AMS_PULLBACK : retrait du filament vers l'AMS, lu dans le end gcode
+       natif (exécuté buse encore chaude, avant M104 S0). AutoLoop reconstruit la
+       fin de chaque loop, ce bloc était donc perdu et le filament restait dans la
+       tête : on le remet au DERNIER loop seulement. Cherché après END_ANCHOR ; la
+       copie du commentaire de config (\n échappés, une seule ligne) ne matche pas. */
+  var RE_AMS_PULLBACK = /; pull back filament to AMS\r?\n(M620 S65535\r?\n[\s\S]*?M621 S65535)\r?\n/;
 
   // Remplace la ligne de purge native par une purge en goulotte. Séquence reprise
   // du fichier FarmLoop qui imprimait déjà ; la température M109 est celle du bloc
@@ -137,8 +143,10 @@
      Reconstruite à partir des valeurs PROUVÉES du fichier P2S qui imprime
      déjà (dégagement Z, flexion, push, balayages, parking). Seul le push
      est paramétré (= % de la hauteur de la pièce). On n'invente aucun
-     mouvement : on rejoue une séquence validée.                            */
-  function buildTransition(opts, pushZ, maxZ, eol) {
+     mouvement : on rejoue une séquence validée.
+     `unload` (dernier loop seulement) : lignes natives du retrait AMS, placées
+     comme dans le end gcode natif, avant l'extinction de la buse.          */
+  function buildTransition(opts, pushZ, maxZ, eol, unload) {
     var L = [];
     var pushSpeed = Math.round(opts.pushSpeed);
     L.push(';======== P2S end gcode ==========');
@@ -166,6 +174,11 @@
     L.push('M106 P3 S0 ; turn off chamber cooling fan');
     L.push('M106 P10 S0 ; turn off left aux fan');
     L.push('');
+    if (unload) {
+      L.push('; pull back filament to AMS (AutoLoop : dernier loop seulement)');
+      unload.forEach(function (l) { L.push(l); });
+      L.push('');
+    }
     L.push('G150.3');
     L.push('M104 S0 ; turn off hotend');
     L.push('M400 ; wait all motion done');
@@ -241,7 +254,7 @@
     var report = {
       ok: false, loops: opts.loops, eol: eol === '\r\n' ? 'CRLF' : 'LF',
       maxZ: null, pushZ: null, flow: [], bed: [], bendsPerLoop: 0, size: 0, error: null,
-      loadLineReplaced: false
+      loadLineReplaced: false, amsUnload: false
     };
     var idx = raw.indexOf(END_ANCHOR);
     var mz = raw.match(RE_MAXZ);
@@ -261,7 +274,11 @@
     var ll = replaceLoadLine(head, eol);   // purge en goulotte à la place de la ligne G130, sur tous les loops
     head = ll.text; report.loadLineReplaced = ll.replaced;
     var N = opts.loops;
-    var trans = buildTransition(opts, pushZ, maxZ, eol);   // identique pour chaque loop
+    var trans = buildTransition(opts, pushZ, maxZ, eol);   // identique pour chaque loop…
+    var pb = RE_AMS_PULLBACK.exec(raw.slice(idx));
+    var unload = pb ? pb[1].split(/\r?\n/) : null;
+    var transLast = unload ? buildTransition(opts, pushZ, maxZ, eol, unload) : trans;   // …sauf le dernier : retrait AMS
+    report.amsUnload = !!unload;
 
     for (var k = 1; k <= N; k++) {
       if (opts.cal.flow[k - 1]) report.flow.push(k);
@@ -280,7 +297,7 @@
       // Le header du loop 1 est écrit ici ; ceux des loops suivants viennent du séparateur.
       if (i === 1) parts.push('; === LOOP 1 OF ' + N + ' ===' + eol);
       parts.push(insertFlags(head, i, !!opts.cal.flow[i - 1], !!opts.cal.bed[i - 1], eol));
-      parts.push(trans);
+      parts.push(i === N ? transLast : trans);
       if (i < N) parts.push(buildSeparator(i + 1, N, opts, eol));
     }
     var out = parts.join('');
@@ -410,6 +427,9 @@
         '<br>Ligne de purge : ' + (rep.loadLineReplaced
           ? 'remplacée par une purge en goulotte (aucune ligne sur le plateau).'
           : '<span class="al-warn">bloc « nozzle load line » introuvable — purge native conservée.</span>') +
+        '<br>Filament : ' + (rep.amsUnload
+          ? 'retiré vers l\'AMS à la fin du dernier loop (loop ' + rep.loops + ').'
+          : '<span class="al-warn">bloc de retrait AMS introuvable dans le end gcode — le filament restera dans la tête.</span>') +
       '</p>' +
       (project
         ? '<p class="al-fine al-proj">Projet Bambu Studio : ' + esc(plateLabel()) + ' remplacé par le batch, empreinte MD5 recalculée ; ' +
