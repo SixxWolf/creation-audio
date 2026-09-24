@@ -54,6 +54,29 @@
 .al-switch { display:inline-flex; align-items:center; gap:9px; margin:0; font-family:var(--display); font-weight:700; font-size:1.02rem; cursor:pointer; }
 .al-switch input { width:18px; height:18px; accent-color:var(--ember); }
 
+/* --- Calibration par loop (grille flow / bed leveling) --- */
+.al-cal-tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
+.al-cal-tools .hint { flex:1 1 220px; }
+.al-cal-bulks { gap:8px 26px; margin-top:12px; }
+.al-cal-every { margin:0; font-size:.9rem; font-weight:600; color:var(--ink); cursor:text; }
+.al-cal-every input { width:64px; text-align:center; }
+.al-cal-bulk { display:flex; align-items:center; gap:6px; }
+.al-cal-bk { margin-right:2px; font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.al-cal-help { margin:10px 0 0; }
+.al-cal-grid { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+.al-calg-wrap { max-width:100%; overflow-x:auto; }
+.al-calg { border-collapse:separate; border-spacing:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+.al-calg th, .al-calg td { width:36px; min-width:36px; height:36px; padding:0; text-align:center; border-left:1px solid var(--line); }
+.al-calg tbody tr > * { border-top:1px solid var(--line); }
+.al-calg thead th { height:30px; font-family:var(--display); font-size:.8rem; font-weight:700; color:var(--ink-2);
+  font-variant-numeric:tabular-nums; background:var(--wash); }
+.al-calg th.al-calg-l { width:auto; min-width:0; padding:0 12px; font-family:var(--font); font-size:.72rem; font-weight:700;
+  letter-spacing:.08em; text-align:left; text-transform:uppercase; white-space:nowrap; color:var(--muted); background:var(--wash); border-left:0; }
+.al-calg td input { display:block; width:18px; height:18px; margin:auto; }
+.al-calg td:has(input:checked) { background:color-mix(in srgb, var(--ember) 9%, var(--paper)); }
+.al-cal-sum { margin:12px 0 0; color:var(--ink-2); }
+.al-cal-sum b { font-variant-numeric:tabular-nums; color:var(--ink); }
+
 /* --- Actions gcode -------------------------------------- */
 .al-actions { display:flex; flex-wrap:wrap; gap:10px; }
 

@@ -2,7 +2,7 @@
    Création Audio V2 — AutoLoop (intégré à l'admin)
    Outil 100% client-side. Aucune donnée envoyée nulle part.
    1) Traitement Gcode : optimise un fichier multi-loop FarmLoop
-      (calibration par intervalle, hauteur de push auto, bending
+      (flow / bed leveling choisis loop par loop, hauteur de push auto, bending
       motion régénéré, cooldown configurable, strip AMS optionnel).
    2) Calculateur de prix : coût de production / prix de vente,
       lecture auto du gcode (poids, temps), totaux du batch.
@@ -102,21 +102,35 @@
     return { text: head.slice(0, m.index) + L.join(eol) + eol + head.slice(m.index + m[0].length), replaced: true };
   }
 
-  // Loop calibré ? Loop 1 toujours ; puis tous les `interval` loops si interval>0.
+  // Motif « tous les N loops » (raccourci de la grille) : loop 1, puis 1+N, 1+2N…
+  // interval 0 = loop 1 seulement.
   function calibrateLoop(i, interval) {
     if (i === 1) return true;
     if (interval > 0) return ((i - 1) % interval) === 0;
     return false;
   }
 
-  // Insère les flags de calibration au bon endroit du start gcode.
-  // Loop calibré : on ne touche à rien (la calibration native s'exécute).
-  // Loop non calibré : on force extrude_cali_flag=0 / g29_before_print_flag=0.
-  function insertFlags(head, calibrate, eol) {
-    if (calibrate || !RE_START_ANCHOR.test(head)) return head;
-    var ins = 'M1002 set_flag extrude_cali_flag=0' + eol +
-              'M1002 set_flag g29_before_print_flag=0' + eol;
+  // Insère les flags de calibration du loop au début du start gcode.
+  // Toujours écrits (0 ou 1) : la grille a le dernier mot sur la fenêtre d'envoi
+  // de Bambu Studio. Le start gcode P2S lit ces flags à 3 états (M622 J0/J1/J2 :
+  // off / on / auto) ; 1 = branche complète (M983.3 flow, G29 A1 bed leveling).
+  function insertFlags(head, i, flow, bed, eol) {
+    if (!RE_START_ANCHOR.test(head)) return head;
+    var ins = '; AutoLoop — loop ' + i + ' : flow ' + (flow ? 'ON' : 'OFF') + ', bed leveling ' + (bed ? 'ON' : 'OFF') + eol +
+              'M1002 set_flag extrude_cali_flag=' + (flow ? 1 : 0) + eol +
+              'M1002 set_flag g29_before_print_flag=' + (bed ? 1 : 0) + eol;
     return head.replace(RE_START_ANCHOR, '$1' + ins.replace(/\$/g, '$$$$'));
+  }
+
+  // [1,2,3,5,9] -> « 1–3, 5, 9 » (liste compacte pour le rapport et l'en-tête).
+  function loopRanges(list) {
+    var out = [], a = null, b = null;
+    list.concat([null]).forEach(function (n) {
+      if (n !== null && b !== null && n === b + 1) { b = n; return; }
+      if (a !== null) out.push(a === b ? String(a) : a + (b === a + 1 ? ', ' : '–') + b);
+      a = b = n;
+    });
+    return out.join(', ');
   }
 
   /* --- Transition entre deux loops (fin de job + éjection) -------------
@@ -226,7 +240,7 @@
     var eol = detectEol(raw);
     var report = {
       ok: false, loops: opts.loops, eol: eol === '\r\n' ? 'CRLF' : 'LF',
-      maxZ: null, pushZ: null, calibrated: [], bendsPerLoop: 0, size: 0, error: null,
+      maxZ: null, pushZ: null, flow: [], bed: [], bendsPerLoop: 0, size: 0, error: null,
       loadLineReplaced: false
     };
     var idx = raw.indexOf(END_ANCHOR);
@@ -249,19 +263,23 @@
     var N = opts.loops;
     var trans = buildTransition(opts, pushZ, maxZ, eol);   // identique pour chaque loop
 
+    for (var k = 1; k <= N; k++) {
+      if (opts.cal.flow[k - 1]) report.flow.push(k);
+      if (opts.cal.bed[k - 1]) report.bed.push(k);
+    }
+
     var parts = [];
     parts.push('; ===================================================' + eol +
                '; Batch généré par AutoLoop — Création Audio' + eol +
                '; ' + N + ' loops · pièce ' + z(maxZ) + ' mm · push ' + z(pushZ) + ' mm (max − ' + opts.pushOffset + ' mm)' + eol +
+               '; Flow : ' + (loopRanges(report.flow) || 'aucun loop') + ' · bed leveling : ' + (loopRanges(report.bed) || 'aucun loop') + eol +
                '; Aucune dépendance FarmLoop.' + eol +
                '; ===================================================' + eol + eol);
 
     for (var i = 1; i <= N; i++) {
-      var cal = calibrateLoop(i, opts.calInterval);
-      if (cal) report.calibrated.push(i);
       // Le header du loop 1 est écrit ici ; ceux des loops suivants viennent du séparateur.
       if (i === 1) parts.push('; === LOOP 1 OF ' + N + ' ===' + eol);
-      parts.push(insertFlags(head, cal, eol));
+      parts.push(insertFlags(head, i, !!opts.cal.flow[i - 1], !!opts.cal.bed[i - 1], eol));
       parts.push(trans);
       if (i < N) parts.push(buildSeparator(i + 1, N, opts, eol));
     }
@@ -271,11 +289,101 @@
     return { text: out, report: report };
   }
 
+  /* --- Grille de calibration par loop ----------------------------------
+     Une colonne par loop, deux cases : flow (extrude_cali_flag) et bed
+     leveling (g29_before_print_flag). Coché = forcé à 1, décoché = forcé à 0.
+     « Tous les N loops » re-remplit les deux lignes selon le motif ; changer
+     le nombre de loops garde les cases déjà réglées. Nouveaux loops : suivent
+     « Tout » / « Aucun » si c'est le dernier geste sur la ligne, sinon le motif. */
+  var CAL_CHUNK = 12;                 // loops par rangée de grille
+  var cal = { flow: [], bed: [] };    // index 0 = loop 1
+  var calMode = { flow: null, bed: null };   // 'all' | 'none' | null (= motif)
+
+  function loopCount() { return Math.max(1, intOr($('#al-loops').value, 12)); }
+  function calInterval() { return Math.max(0, intOr($('#al-cal-interval').value, 0)); }
+  function fitCal(N) {
+    var k = calInterval();
+    ['flow', 'bed'].forEach(function (row) {
+      for (var i = cal[row].length; i < N; i++) {
+        cal[row].push(calMode[row] ? calMode[row] === 'all' : calibrateLoop(i + 1, k));
+      }
+    });
+  }
+  function calCell(row, i) {
+    var name = row === 'flow' ? 'Calibration du flow' : 'Bed leveling';
+    return '<td><input type="checkbox" data-row="' + row + '" data-i="' + i + '"' + (cal[row][i] ? ' checked' : '') +
+      ' aria-label="' + name + ', loop ' + (i + 1) + '"></td>';
+  }
+  function renderCalGrid() {
+    var box = $('#al-cal-grid');
+    if (!box) return;
+    var N = loopCount(), html = '';
+    fitCal(N);
+    for (var s = 0; s < N; s += CAL_CHUNK) {
+      var e = Math.min(N, s + CAL_CHUNK), th = '', rf = '', rb = '';
+      for (var i = s; i < e; i++) {
+        th += '<th scope="col">' + (i + 1) + '</th>';
+        rf += calCell('flow', i);
+        rb += calCell('bed', i);
+      }
+      html += '<div class="al-calg-wrap"><table class="al-calg">' +
+        '<thead><tr><th scope="row" class="al-calg-l">Loop</th>' + th + '</tr></thead><tbody>' +
+        '<tr><th scope="row" class="al-calg-l">Flow</th>' + rf + '</tr>' +
+        '<tr><th scope="row" class="al-calg-l">Bed leveling</th>' + rb + '</tr>' +
+        '</tbody></table></div>';
+    }
+    box.innerHTML = html;
+    syncCalSum();
+  }
+  function calLoops(row, N) {
+    var out = [];
+    for (var i = 0; i < N; i++) if (cal[row][i]) out.push(i + 1);
+    return out;
+  }
+  function syncCalSum() {
+    var el = $('#al-cal-sum');
+    if (!el) return;
+    var N = loopCount();
+    var line = function (label, list) {
+      return label + ' : <b>' + list.length + '</b> loop' + (list.length > 1 ? 's' : '') + ' sur ' + N +
+        (list.length && list.length < N ? ' (' + loopRanges(list) + ')' : '');
+    };
+    el.innerHTML = line('Flow', calLoops('flow', N)) + ' · ' + line('Bed leveling', calLoops('bed', N));
+  }
+  function initCalGrid() {
+    var box = $('#al-cal-grid');
+    if (!box) return;
+    box.addEventListener('change', function (e) {
+      var cb = e.target;
+      if (!cb.dataset || !cb.dataset.row) return;
+      cal[cb.dataset.row][+cb.dataset.i] = cb.checked;
+      calMode[cb.dataset.row] = null;
+      syncCalSum();
+    });
+    $$('[data-cal-all]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var row = b.dataset.calAll, on = b.dataset.val === '1';
+        calMode[row] = on ? 'all' : 'none';
+        cal[row] = [];   // fitCal re-remplit la ligne selon le mode
+        renderCalGrid();
+      });
+    });
+    $('#al-cal-interval').addEventListener('input', function () {
+      cal = { flow: [], bed: [] };   // le motif remplace les réglages manuels
+      calMode = { flow: null, bed: null };
+      renderCalGrid();
+    });
+    $('#al-loops').addEventListener('input', renderCalGrid);
+    renderCalGrid();
+  }
+
   /* --- UI Générateur -------------------------------------------------- */
   function readOpts() {
+    var N = loopCount();
+    fitCal(N);
     return {
-      loops: Math.max(1, intOr($('#al-loops').value, 12)),
-      calInterval: Math.max(0, intOr($('#al-cal-interval').value, 0)),
+      loops: N,
+      cal: { flow: cal.flow.slice(0, N), bed: cal.bed.slice(0, N) },
       bendEnable: $('#al-bend-enable').checked,
       bendHigh: num($('#al-bend-high').value, 240),
       bendLow: num($('#al-bend-low').value, 205),
@@ -301,14 +409,15 @@
     box.innerHTML =
       '<div class="al-stats">' +
         stat(rep.loops, 'loops générés') +
-        stat(rep.calibrated.length, 'loops calibrés') +
-        stat(rep.bendsPerLoop, 'strokes de flexion / loop') +
         stat(z(rep.pushZ), 'push (mm)') +
+        stat(rep.flow.length, 'calibrations du flow') +
+        stat(rep.bed.length, 'bed levelings') +
       '</div>' +
       '<p class="al-fine">Pièce : ' + z(rep.maxZ) + ' mm · fins de ligne ' + rep.eol +
-        ' · fichier ~' + fmtSize(rep.size) +
-        '<br>Calibration sur loop(s) : ' + (rep.calibrated.join(', ') || '—') +
-        ' · les autres loops sautent extrusion + bed leveling.' +
+        ' · fichier ~' + fmtSize(rep.size) + ' · flexion : ' + rep.bendsPerLoop + ' strokes / loop' +
+        '<br>Flow sur loop(s) : ' + (loopRanges(rep.flow) || '—') +
+        '<br>Bed leveling sur loop(s) : ' + (loopRanges(rep.bed) || '—') +
+        '<br>Forcés dans le gcode, peu importe les options de la fenêtre d\'envoi de Bambu Studio.' +
         '<br>Ligne de purge : ' + (rep.loadLineReplaced
           ? 'remplacée par une purge en goulotte (aucune ligne sur le plateau).'
           : '<span class="al-warn">bloc « nozzle load line » introuvable — purge native conservée.</span>') +
@@ -549,6 +658,7 @@
     var bendEnable = $('#al-bend-enable');
     function syncBend() { $('#al-bend-fields').style.opacity = bendEnable.checked ? '1' : '.4'; }
     bendEnable.addEventListener('change', syncBend); syncBend();
+    initCalGrid();
 
     $('#al-process').addEventListener('click', runGenerate);
     $('#al-download').addEventListener('click', download);
