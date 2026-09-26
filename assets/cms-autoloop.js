@@ -752,6 +752,23 @@
     'ap-price': 'salePrice'
   };
 
+  // Unité du résumé : 1 = à la pièce, 2 = à la paire (les spacers se vendent
+  // par paire). Les entrées restent PAR PIÈCE (le gcode décrit une pièce) : seul
+  // le résumé est multiplié, et le prix de vente saisi vaut pour l'unité choisie.
+  var UNIT_KEY = 'al-price-unit';
+  var unitK = 2;   // paire par défaut, dernier choix mémorisé
+  try { if (localStorage.getItem(UNIT_KEY) === '1') unitK = 1; } catch (e) {}
+
+  function setUnit(k) {
+    if (k === unitK) return;
+    // Le prix suit l'unité (6,94 $/pièce ⇄ 13,88 $/paire) : la marge ne bouge pas.
+    var pe = $('#ap-price');
+    if (pe && pe.value !== '') pe.value = (Math.round(num(pe.value, 0) * k / unitK * 100) / 100).toFixed(2);
+    unitK = k;
+    try { localStorage.setItem(UNIT_KEY, String(k)); } catch (e) {}
+    recompute();
+  }
+
   function priceFields() {
     var f = {};
     Object.keys(PRICE_MAP).forEach(function (id) {
@@ -807,39 +824,47 @@
 
   function recompute() {
     var f = priceFields();
-    var r = compute(f);
+    var k = unitK;
+    f.salePrice = f.salePrice / k;   // prix saisi pour l'unité → prix par pièce
+    var r = compute(f);              // tout est calculé par pièce, puis × k à l'affichage
     var set = function (id, v) { var el = $('#' + id); if (el) el.textContent = v; };
     // Batch = valeurs par pièce × loops (temps, filament, coût, profit).
-    var n = f.loops;
-    var nLabel = '(' + n + ' pièce' + (n > 1 ? 's' : '') + ')';
+    // Les loops restent des pièces (c'est ce que fait l'imprimante) ; en mode
+    // paire on précise juste combien de paires ça donne.
+    var n = f.loops, pairs = n / 2;
+    var pieces = n + ' pièce' + (n > 1 ? 's' : '');
+    var pairsTxt = k === 2 ? String(pairs).replace('.', ',') + ' paire' + (pairs >= 2 ? 's' : '') : '';
+    var nLabel = '(' + pieces + (pairsTxt ? ' · ' + pairsTxt : '') + ')';
     var printMin = (f.timeH * 60 + f.timeM) * n, coolMin = f.cooldown * n;
-    set('ap-batch', 'Batch de ' + n + ' pièce' + (n > 1 ? 's' : '') + ' : ' + fmtHm(printMin + coolMin) +
+    set('ap-batch', 'Batch de ' + pieces + (pairsTxt ? ' (' + pairsTxt + ')' : '') + ' : ' + fmtHm(printMin + coolMin) +
         (coolMin > 0 ? ' (dont ' + fmtHm(coolMin) + ' de refroidissement)' : '') +
         ' · ' + (Math.round(f.weight * n * 100) / 100).toString().replace('.', ',') + ' g de filament');
     set('ap-out-batch-n', nLabel);
     set('ap-out-batch-n2', nLabel);
     set('ap-out-batch-cost', money(r.cost * n));
     set('ap-out-batch-profit', money(r.marginAmt * n));
-    set('ap-out-filament', money(r.filamentCost));
-    set('ap-out-deprec', money(r.deprecCost));
-    set('ap-out-elec', money(r.elecCost));
-    set('ap-out-consumables', money(r.consumables));
-    set('ap-out-prep', money(r.laborPrep));
-    set('ap-out-post', money(r.laborPost));
-    set('ap-out-failure', '+' + money(r.failure));
+    set('ap-out-filament', money(r.filamentCost * k));
+    set('ap-out-deprec', money(r.deprecCost * k));
+    set('ap-out-elec', money(r.elecCost * k));
+    set('ap-out-consumables', money(r.consumables * k));
+    set('ap-out-prep', money(r.laborPrep * k));
+    set('ap-out-post', money(r.laborPost * k));
+    set('ap-out-failure', '+' + money(r.failure * k));
     set('ap-out-failure-pct', '(' + (Math.round(r.failurePct * 10) / 10) + ' %)');
-    set('ap-out-cost', money(r.cost));
+    set('ap-out-cost', money(r.cost * k));
     set('ap-out-margin-pct', (Math.round(r.marginPct * 10) / 10).toString().replace('.', ',') + ' %');
-    set('ap-out-margin-amt', money(r.marginAmt));
+    set('ap-out-margin-amt', money(r.marginAmt * k));
     var profit = $('#ap-out-margin-amt');
     if (profit) profit.style.color = r.marginAmt < 0 ? 'var(--bad)' : '';
     set('ap-prep-permin', (Math.round(r.prepMin * 100) / 100) + ' min/pièce');
     set('ap-post-permin', (Math.round(r.postMin * 100) / 100) + ' min/pièce');
-    drawBreakdown(r);
+    $$('.ap-unit-lbl').forEach(function (el) { el.textContent = k === 2 ? '/ paire' : '/ pièce'; });
+    $$('#ap-unit .al-unit-b').forEach(function (b) { b.setAttribute('aria-checked', String(+b.dataset.unit === k)); });
+    drawBreakdown(r, k);
   }
 
   // Camembert (conic-gradient, sans dépendance) : répartition du coût.
-  function drawBreakdown(r) {
+  function drawBreakdown(r, mult) {
     var wrap = $('#ap-breakdown');
     if (!wrap) return;
     var parts = [
@@ -850,7 +875,8 @@
       { k: 'M.O. prep', v: r.laborPrep, c: '#B7472A' },
       { k: 'M.O. post', v: r.laborPost, c: '#8A5A3B' },
       { k: 'Échec', v: r.failure, c: '#C9A227' }
-    ].filter(function (p) { return p.v > 0.0001; });
+    ].map(function (p) { p.v *= mult || 1; return p; })
+     .filter(function (p) { return p.v > 0.0001; });
     var total = parts.reduce(function (s, p) { return s + p.v; }, 0) || 1;
     var acc = 0, stops = parts.map(function (p) {
       var from = acc / total * 360, to = (acc + p.v) / total * 360; acc += p.v;
@@ -862,7 +888,7 @@
     }).join('');
     wrap.innerHTML =
       '<div class="ap-donut" style="background:conic-gradient(' + (stops || '#E7E7E2 0deg 360deg') + ')">' +
-        '<div class="ap-donut-hole"><span>' + money(r.cost) + '</span></div></div>' +
+        '<div class="ap-donut-hole"><span>' + money(r.cost * (mult || 1)) + '</span></div></div>' +
       '<div class="ap-legend">' + legend + '</div>';
   }
 
@@ -871,10 +897,14 @@
     if (!wrap) return;
     $$('input', wrap).forEach(function (i) { i.addEventListener('input', recompute); });
 
-    // Prix de vente de départ = ~33 % de marge sur le coût, arrondi à 0,05 $.
+    $$('#ap-unit .al-unit-b').forEach(function (b) {
+      b.addEventListener('click', function () { setUnit(+b.dataset.unit); });
+    });
+
+    // Prix de vente de départ = ~33 % de marge sur le coût (de l'unité choisie), arrondi à 0,05 $.
     var pe = $('#ap-price');
     if (pe) {
-      var c = compute(priceFields()).cost;
+      var c = compute(priceFields()).cost * unitK;
       if (c > 0) pe.value = (Math.round(c / (1 - 0.33) * 20) / 20).toFixed(2);
     }
 

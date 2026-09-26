@@ -111,6 +111,13 @@
 /* --- Résumé des coûts ----------------------------------- */
 .al-summary { position:relative; overflow:hidden; }
 .al-sum-head { margin:-18px -20px 14px; padding:14px 20px; color:var(--on-ember); background:var(--ember); }
+/* Sélecteur Pièce | Paire : tout le résumé est calculé pour l'unité choisie. */
+.al-unit { display:inline-flex; gap:2px; margin-left:auto; padding:3px; background:rgba(0,0,0,.16); border-radius:999px; }
+.al-unit-b { padding:4px 12px; font-family:var(--font); font-size:.78rem; font-weight:700; letter-spacing:0; color:var(--on-ember);
+  cursor:pointer; background:none; border:0; border-radius:999px; opacity:.85; transition:background .15s, color .15s, opacity .15s; }
+.al-unit-b:hover { opacity:1; }
+.al-unit-b[aria-checked="true"] { color:var(--ember-ink); background:var(--paper); opacity:1; }
+.al-unit-b:focus-visible { outline:2px solid var(--on-ember); outline-offset:1px; }
 .al-srow { display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:6px 0;
   font-size:.9rem; border-bottom:1px solid var(--line); }
 .al-srow span:last-child, .al-srow b { font-variant-numeric:tabular-nums; }
