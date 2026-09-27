@@ -405,6 +405,92 @@ body.has-buybar .toast { bottom:92px; }
 .sp-add { width:100%; margin-top:auto; }
 
 /* =========================================================
+   SPACERS : recherche + cartes cliquables + fiche (spacer-catalog.js)
+   ========================================================= */
+/* Barre : recherche véhicule/code + puces de taille (collante sous l'en-tête) */
+.spc-bar {
+  position:sticky; top:var(--top-h); z-index:20; display:flex; align-items:center; gap:12px 16px; flex-wrap:wrap;
+  margin:0 calc(var(--gutter) * -1) 10px; padding:12px var(--gutter);
+  background:rgba(255,255,255,.94); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+}
+.spc-search { position:relative; flex:1 1 320px; max-width:560px; min-width:0; }
+.spc-search > svg { position:absolute; left:14px; top:50%; width:19px; height:19px; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+.spc-search input { width:100%; min-width:0; height:46px; padding:0 42px 0 42px; font:inherit; font-size:.98rem; color:var(--ink);
+  background:#fff; border:1px solid var(--line-2); border-radius:14px; -webkit-appearance:none; appearance:none; }
+.spc-search input::placeholder { color:var(--muted); }
+.spc-search input::-webkit-search-cancel-button { display:none; }
+.spc-search input:focus { outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(24,26,31,.1); }
+.spc-clear { position:absolute; right:6px; top:50%; width:34px; height:34px; transform:translateY(-50%); padding:0; font-size:1.3rem; line-height:1;
+  color:var(--muted); cursor:pointer; background:none; border:none; border-radius:10px; }
+.spc-clear:hover { color:var(--ink); background:var(--wash); }
+.spc-chips { flex:0 1 auto; }
+.spc-chips button.chip { font:inherit; font-weight:600; font-size:.9rem; cursor:pointer; }
+.spc-count { margin:4px 0 14px; font-size:.86rem; font-weight:600; color:var(--muted); }
+.spc-count:empty { display:none; }
+.spc-grid .empty .spc-reset { cursor:pointer; }
+.spc-grid .empty a { text-decoration:underline; text-underline-offset:3px; }
+
+/* Carte spacer : zone cliquable (photo + infos) -> fiche ; prix + bouton à part */
+.sp-card { transition:transform .25s cubic-bezier(.2,.7,.2,1), border-color .25s, box-shadow .25s; }
+.sp-card:hover { transform:translateY(-3px); border-color:var(--line-2); box-shadow:0 24px 44px -26px rgba(20,22,26,.38); }
+.sp-card-link { display:flex; flex-direction:column; flex:1; min-width:0; color:inherit; text-decoration:none; }
+.sp-card-link:focus-visible { outline:3px solid var(--ember-dim); outline-offset:-3px; border-radius:18px; }
+.sp-card-link .mat-media img { transition:transform .4s cubic-bezier(.2,.7,.2,1); }
+.sp-card:hover .sp-card-link .mat-media img { transform:scale(1.04); }
+.sp-card-link h3 { transition:color .15s; }
+.sp-card-link:hover h3 { color:var(--ember-ink); }
+.sp-noimg { display:grid; place-items:center; width:100%; height:100%; color:var(--line-2); background:var(--wash); }
+.sp-noimg svg { width:34%; height:34%; }
+.sp-noimg.big svg { width:22%; height:22%; }
+.sp-tags { display:flex; flex-wrap:wrap; gap:6px; }
+.sp-tag { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:7px; font-size:.72rem; font-weight:700;
+  color:var(--ink-2); background:var(--wash-2); }
+.sp-tag svg { width:14px; height:14px; flex:none; }
+.sp-tag.is-fit { color:var(--ember-ink); background:#FFF3EC; }
+.sp-card .sp-desc { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-line; }
+.sp-stock.order { color:var(--ember-ink); background:#FFF3EC; }
+.sp-buy { display:flex; flex-direction:column; gap:10px; padding:0 16px 16px; }
+.sp-buy .sp-prices { margin-top:0; }
+.sp-pr small { font-family:var(--font); font-size:.8rem; font-weight:500; color:var(--muted); letter-spacing:0; }
+.pill.order { color:var(--ember-ink); background:#FFF3EC; }
+
+/* Fiche */
+.sp-summary { margin:10px 0 0; font-size:1rem; line-height:1.55; color:var(--ink-2); white-space:pre-line; }
+.sp-tiers-box:empty { display:none; }
+.sp-tiertable { display:grid; margin:16px 0 0; overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:14px; }
+.sp-tr { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 14px; font-size:.92rem;
+  color:var(--ink-2); font-variant-numeric:tabular-nums; transition:background .15s; }
+.sp-tr + .sp-tr { border-top:1px solid var(--line); }
+.sp-tr-p { font-weight:700; color:var(--ink); white-space:nowrap; }
+.sp-tr-p em { margin-left:4px; font-style:normal; font-size:.8rem; font-weight:700; color:#16794A; }
+.sp-tr.is-active { color:var(--ink); background:#FFF3EC; box-shadow:inset 3px 0 0 var(--ember); }
+.sp-fitsum { margin-top:18px; padding:14px 16px; background:var(--wash); border:1px solid var(--line); border-radius:14px; }
+.sp-fitsum-t { display:flex; align-items:center; gap:8px; margin:0 0 8px; font-size:.72rem; font-weight:700; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted); }
+.sp-fitsum-t svg { width:17px; height:17px; flex:none; color:var(--ember-ink); }
+.sp-fitsum ul { display:grid; gap:4px; margin:0; padding:0; list-style:none; }
+.sp-fitsum li { font-weight:600; font-size:.94rem; }
+.sp-fitsum li span { margin-left:4px; font-weight:500; color:var(--muted); font-variant-numeric:tabular-nums; }
+.sp-fitmore { margin-top:8px; padding:0; font:inherit; font-weight:700; font-size:.88rem; color:var(--ink); cursor:pointer;
+  background:none; border:none; text-decoration:underline; text-underline-offset:3px; }
+.sp-fitmore:hover { color:var(--ember-ink); }
+.sp-made { margin:6px 0 0; font-size:.86rem; font-weight:600; color:var(--ember-ink); }
+.sp-made:empty { display:none; }
+.qty button:disabled { opacity:.35; cursor:not-allowed; background:none; }
+
+/* Onglet Compatibilité */
+.fit-wrap { overflow-x:auto; background:#fff; border:1px solid var(--line); border-radius:14px; }
+.fit-table { width:100%; border-collapse:collapse; font-size:.95rem; }
+.fit-table th { padding:11px 16px; font-size:.68rem; font-weight:700; letter-spacing:.1em; text-align:left; text-transform:uppercase;
+  white-space:nowrap; color:var(--muted); background:var(--wash); border-bottom:1px solid var(--line); }
+.fit-table td { padding:11px 16px; border-bottom:1px solid var(--line); }
+.fit-table tbody tr:last-child td { border-bottom:none; }
+.fit-table td:first-child { font-weight:700; }
+.fit-table td.yrs { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.fit-note { margin:12px 0 0; font-size:.86rem; color:var(--muted); }
+
+/* =========================================================
    PANIER (tiroir) — partagé boutique / spacers / dealer
    ========================================================= */
 .cart-backdrop { position:fixed; inset:0; z-index:40; background:rgba(20,22,26,.42); -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px); }
@@ -522,11 +608,15 @@ body.cart-lock { overflow:hidden; }
   .lb-prev, .lb-next { top:auto; bottom:10px; transform:none; }
   .sp-body { padding:12px; }
   .sp-body h3 { font-size:1.04rem; }
+  .sp-buy { padding:0 12px 12px; }
+  .spc-bar { position:static; }
+  .spc-search { flex-basis:100%; max-width:none; }
+  .fit-table th, .fit-table td { padding:9px 12px; }
 }
 @media (max-width:380px) {
   .shop-grid { grid-template-columns:1fr; }
 }
 @media (prefers-reduced-motion:reduce) {
-  .mcard, .mcard-media img, .gal-shot img, .sw, .cart-panel, .toast, .skel, .buybar { transition:none; animation:none; }
-  .mcard:hover { transform:none; }
+  .mcard, .mcard-media img, .gal-shot img, .sw, .cart-panel, .toast, .skel, .buybar, .sp-card, .sp-card-link .mat-media img { transition:none; animation:none; }
+  .mcard:hover, .sp-card:hover, .sp-card:hover .sp-card-link .mat-media img { transform:none; }
 }

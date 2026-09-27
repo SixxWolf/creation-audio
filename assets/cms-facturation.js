@@ -75,6 +75,7 @@
   var editing = null;        // { id, number } : facture de l'Historique en cours de modification
   var editToken = null;      // chargement en cours d'une facture à modifier (annulé par « Nouvelle facture »)
   var deductBeforeEdit = null;   // état de la case « Déduire le stock » avant la modification
+  var fromOrder = null;      // { id, number } : facture créée depuis une commande dealer (onglet Commandes)
 
   /* ---------- éléments ---------- */
   var elReset = $('#fx-reset'), elNextHint = $('#fx-nexthint'),
@@ -94,6 +95,8 @@
   var cxVehicle = $('#cx-vehicle'), cxLitrage = $('#cx-litrage'), cxEvent = $('#cx-event'), cxFinition = $('#cx-finition');
   // bandeau « modification d'une facture enregistrée »
   var elEditBanner = $('#fx-edit-banner'), elEditNum = $('#fx-edit-num'), elEditCancel = $('#fx-edit-cancel');
+  // bandeau « facture de la commande dealer D-0007 »
+  var elOrderBanner = $('#fx-order-banner'), elOrderNum = $('#fx-order-num'), elOrderDetach = $('#fx-order-detach');
 
   /* ---------- entreprise (localStorage) ---------- */
   var DEFAULT_CO = {
@@ -782,6 +785,7 @@
     if (editing) { onSaveEdit(); return; }
     var valid = lines.filter(function (l) { return l.qty > 0; });
     if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
+    var order = fromOrder;   // commande dealer à marquer « Facturée » une fois la facture enregistrée
 
     saved = true;   // verrou pendant l'envoi (anti double-clic)
     elSave.disabled = true; elStatus.textContent = 'Attribution du numéro…';
@@ -828,6 +832,7 @@
       resetInvoice();
       elStatus.textContent = '✓ Facture ' + inv.number + ' enregistrée' + (deducted ? ', stock déduit' : '') + '. Nouvelle facture prête. ';
       if (window.CA.printInvoice) statusButton('Imprimer ' + inv.number, function () { window.CA.printInvoice(inv, savedRows); });
+      if (order) linkOrder(order, inv);
       refreshAfterSave();
     }, function (err) {
       unlock();
@@ -907,6 +912,7 @@
     if (editing && deductBeforeEdit != null) elDeduct.checked = deductBeforeEdit;   // case « Déduire » d'avant la modification
     deductBeforeEdit = null;
     setEditing(null);
+    setFromOrder(null);
     lines = []; saved = false; unlock();
     elNote.value = '';
     cxVehicle.value = ''; cxLitrage.value = ''; cxEvent.value = ''; cxFinition.value = '';
@@ -1046,6 +1052,7 @@
     ensureLoad();
     if (!editing) deductBeforeEdit = elDeduct.checked;
     lines = [];
+    setFromOrder(null);   // une facture de l'Historique n'est pas liée à une commande dealer
     setEditing({ id: inv.id, number: inv.number || '' });
     var token = {}; editToken = token;
     elInvoice.innerHTML = '<p class="inv-empty">Chargement de la facture ' + esc(inv.number || '') + '…</p>';
@@ -1054,6 +1061,81 @@
     Promise.resolve(window.CA.loadMaterials ? window.CA.loadMaterials() : null).then(null, function () {})
       .then(function () { return Promise.all([loadCatalog('filament', true), loadCatalog('spacer', true), loadCatalog('accessory', true)]); })
       .then(function () { if (editToken === token) fillFromInvoice(inv, savedLines); });
+    return true;
+  };
+
+  /* ---------- facturer une commande dealer (onglet Commandes → « Facturer ») ----------
+     Facture pré-remplie : dealer (coordonnées de l'onglet Dealers), lignes de la
+     commande au PRIX DE LA COMMANDE (verrouillé si le tarif a changé depuis), note
+     « Commande dealer D-0007 — … ». Rien n'est enregistré avant « Enregistrer » ;
+     alors la commande passe « Facturée » (invoice_id) — voir linkOrder(). */
+  function setFromOrder(o) {
+    fromOrder = o ? { id: o.id, number: o.number } : null;
+    if (elOrderBanner) elOrderBanner.hidden = !fromOrder;
+    if (elOrderNum) elOrderNum.textContent = fromOrder ? fromOrder.number : '';
+  }
+  if (elOrderDetach) elOrderDetach.addEventListener('click', function () {
+    // garde la facture en cours, mais ne la relie plus à la commande (qui reste à facturer)
+    setFromOrder(null);
+  });
+  function lineFromOrder(l) {
+    var qty = l.qty | 0, price = +l.unit_price || 0;
+    var p = l.product_id ? prodInCatalog('spacer', l.product_id) : null;
+    if (!p) {   // spacer supprimé depuis : ligne libre au prix de la commande
+      return { id: uid(), productId: null, ptype: 'spacer', kind: 'free', label: l.name || 'Spacer', meta: 'Spacer · paire',
+        hex: null, qty: qty, base: price, tiers: [], cost: 0, matKey: null, price: price, manual: true, sp: null };
+    }
+    var sp = spacerDual(p);
+    var ln = { id: uid(), productId: String(p.id), ptype: 'spacer', kind: 'unit', label: p.name, meta: 'Spacer · paire',
+      hex: null, qty: qty, base: sp.dealer, tiers: sp.tiers, cost: +p.cost_price || 0, matKey: null, price: price, manual: false, sp: sp };
+    // tarif changé depuis la commande : on garde le prix que le dealer a vu
+    if (Math.abs(tierPrice(ln.base, ln.tiers, qty) - price) > 0.005) ln.manual = true;
+    return ln;
+  }
+  function linkOrder(order, inv) {
+    sb.from('dealer_orders').update({ status: 'invoiced', invoice_id: inv.id, updated_at: new Date().toISOString() })
+      .eq('id', order.id).select('id').then(function (res) {
+        if (res.error || !res.data || !res.data.length) {
+          elStatus.appendChild(document.createTextNode(' ⚠ Commande ' + order.number + ' non marquée « Facturée » — fais-le dans l\'onglet Commandes. '));
+          return;
+        }
+        elStatus.insertBefore(document.createTextNode('Commande ' + order.number + ' → Facturée. '), elStatus.firstChild ? elStatus.firstChild.nextSibling : null);
+        if (window.CA.reloadOrders) window.CA.reloadOrders();
+      }, function () {});
+  }
+  // Renvoie false si l'admin refuse de remplacer la facture en cours.
+  window.CA.invoiceFromOrder = function (order, olines) {
+    if (!order || !order.id) return false;
+    if (fromOrder && fromOrder.id === order.id && lines.length) return true;   // déjà ouverte
+    if (lines.length && !window.confirm(editing
+        ? 'Abandonner la modification de la facture ' + (editing.number || '') + ' ?'
+        : 'La facture en cours (non enregistrée) sera remplacée. Continuer ?')) return false;
+    ensureLoad();
+    resetInvoice();
+    setFromOrder(order);
+    var token = {}; editToken = token;
+    elInvoice.innerHTML = '<p class="inv-empty">Chargement de la commande ' + esc(order.number) + '…</p>';
+    elSave.disabled = true;   // réactivé une fois la facture remplie
+    Promise.all([
+      window.CA.loadDealers ? window.CA.loadDealers() : null,
+      loadCatalog('spacer', true)
+    ]).then(null, function () {}).then(function () {
+      if (editToken !== token) return;   // autre facture ouverte entre-temps
+      editToken = null;
+      setClientType('dealer');
+      buildDealerSelect();
+      var d = dealerByEmail(order.dealer_email);
+      if (d && elDealerSelect) elDealerSelect.value = d.email;
+      setClientFields(d
+        ? { name: d.name || d.email, email: d.email || '', phone: d.phone || '', address: d.address || '', city: d.city || '' }
+        : { name: order.dealer_name || order.dealer_email || '', email: order.dealer_email || '' });
+      lines = (olines || []).filter(function (l) { return (l.qty | 0) > 0; }).map(lineFromOrder);
+      elNote.value = 'Commande dealer ' + order.number + (order.note ? ' — ' + order.note : '');
+      setCat('spacer');
+      unlock();
+      elStatus.textContent = '';
+      render();
+    });
     return true;
   };
 

@@ -1,7 +1,10 @@
 /* =========================================================
    Création Audio V2 — page publique Spacers
-   Lit products_public (type='spacer'). Grille + panier ->
-   commande par Messenger (aucun paiement en ligne).
+   Lit products_public (type='spacer'). Catalogue (recherche véhicule +
+   puces de taille) et fiche détaillée : voir spacer-catalog.js.
+   Adresses : #/ (catalogue) · #/s/<slug> (fiche).
+   Panier -> commande par Messenger / courriel (aucun paiement en ligne),
+   plafonné au stock (le public ne commande pas sur demande).
    ========================================================= */
 (function () {
   'use strict';
@@ -11,88 +14,70 @@
   var EMAIL = 'contact@creationaudio.ca';
   var BUCKET = 'products';
   var CART_KEY = 'ca_v2_cart_spacers';
+  var TITLE = document.title;
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
-  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-  function money(n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; }
+  var esc = window.CASpacers.esc, money = window.CASpacers.money;
   function publicUrl(path) { if (!path || !sb) return ''; try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; } catch (e) { return ''; } }
-  function normalizeTiers(raw) {
-    if (!Array.isArray(raw)) return [];
-    return raw.map(function (t) { return { min: parseInt(t.min, 10), price: parseFloat(t.price) }; })
-      .filter(function (t) { return isFinite(t.min) && t.min >= 1 && isFinite(t.price) && t.price >= 0; })
-      .sort(function (a, b) { return a.min - b.min; });
-  }
-  function tierPrice(base, tiers, qty) { var p = +base || 0; normalizeTiers(tiers).forEach(function (t) { if (qty >= t.min) p = t.price; }); return p; }
-  // « 1 paire » (prix de base) + tous les paliers, même format, exactement comme dans l'admin
-  function priceRows(sell, tiers) {
-    var rows = [{ min: 1, price: +sell || 0 }].concat(normalizeTiers(tiers).filter(function (t) { return t.min > 1; }));
-    return rows.map(function (t, i) {
-      var label = t.min === 1 ? '1 paire' : (t.min + '+ paires');
-      return '<div class="sp-pr' + (i === 0 ? ' base' : '') + '">' + label + ' : ' + money(t.price) + '</div>';
-    }).join('');
-  }
 
-  var spacers = [], byId = {};
-  var grid = $('#spacers-grid');
+  var PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
+  var CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5.5h16v10H9l-5 4z"/></svg>';
+  var CARD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>';
 
+  var catalogEl = $('#sp-catalog'), productEl = $('#sp-product');
+  var sc = window.CASpacers.create({
+    sb: sb, mode: 'public',
+    catalogEl: catalogEl, listEl: $('#sp-list'), productEl: productEl,
+    addLabel: 'Ajouter au panier',
+    maxQty: function (p) { return p.qty | 0; },
+    onAdd: function (p, qty, src) { addToCart(p.id, qty, src); },
+    onTitle: function (p) { document.title = p ? p.name + ' — Spacers · Création Audio' : TITLE; },
+    assureHtml: '<li>' + PIN + 'Ramassage local à Québec, sur rendez-vous</li>' +
+      '<li>' + CHAT + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
+      '<li>' + CARD + 'Aucun paiement en ligne</li>',
+    emptyHint: 'Ton véhicule n\'y est pas ? <a href="index.html#contact">Écris-nous</a>, on en imprime sur mesure.'
+  });
+
+  var spacers = [], byId = {}, loaded = false;
   function load() {
-    if (!sb) { grid.innerHTML = '<p class="empty">Boutique momentanément indisponible.</p>'; return; }
+    if (!sb) { $('#sp-list').innerHTML = '<p class="empty">Boutique momentanément indisponible.</p>'; return; }
     sb.from('products_public').select('*').eq('type', 'spacer')
       .order('sort_order', { ascending: true }).order('name', { ascending: true })
       .then(function (res) {
-        if (res.error) { grid.innerHTML = '<p class="empty">Impossible de charger les spacers.</p>'; return; }
+        if (res.error) { $('#sp-list').innerHTML = '<p class="empty">Impossible de charger les spacers.</p>'; return; }
         spacers = res.data || [];
         byId = {}; spacers.forEach(function (p) { byId[p.id] = p; });
-        render(); renderCart();
-      }, function () { grid.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
+        sc.setItems(spacers);
+        loaded = true;
+        applyRoute(); renderCart();
+      }, function () { $('#sp-list').innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
 
-  function render() {
-    if (!spacers.length) { grid.innerHTML = '<p class="empty">Aucun spacer disponible pour le moment.</p>'; return; }
-    grid.innerHTML = spacers.map(function (p) {
-      var url = publicUrl(p.image_path), out = (p.qty | 0) <= 0, q = p.qty | 0;
-      var desc = p.attrs && p.attrs.description ? p.attrs.description : '';
-      return '<article class="sp-card">' +
-        '<div class="mat-media">' +
-          (url ? '<img src="' + esc(url) + '" alt="' + esc(p.name) + '" loading="lazy">' : '<span class="mat-swatch" style="background:var(--wash)"></span>') +
-          (out ? '<span class="col-badge">Rupture</span>' : '') +
-        '</div>' +
-        '<div class="sp-body">' +
-          '<h3>' + esc(p.name) + '</h3>' +
-          '<div class="sp-stock' + (out ? ' out' : '') + '">' + (out ? 'Rupture de stock' : (q + ' paire' + (q > 1 ? 's' : '') + ' en stock')) + '</div>' +
-          (desc ? '<p class="sp-desc">' + esc(desc) + '</p>' : '') +
-          '<div class="sp-prices">' + priceRows(p.sell_price, p.tiers) + '</div>' +
-          '<button class="add-btn sp-add" type="button" data-id="' + esc(p.id) + '"' + (out ? ' disabled' : '') + '>' +
-            (out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
-        '</div>' +
-      '</article>';
-    }).join('');
-    $$('.sp-add', grid).forEach(function (b) {
-      b.addEventListener('click', function () {
-        var card = b.closest ? b.closest('.sp-card') : null;
-        var src = card ? (card.querySelector('.mat-media img') || card.querySelector('.mat-swatch')) : null;
-        addToCart(b.getAttribute('data-id'), src || b);
-      });
-    });
+  /* ---- routage : #/ catalogue · #/s/<slug> fiche ---- */
+  function applyRoute() {
+    if (!loaded) return;
+    var m = /^#\/s\/([^/?#]+)/.exec(location.hash || '');
+    if (m && sc.showProduct(m[1])) return;
+    if (m) history.replaceState(null, '', '#/');   // fiche introuvable (retiré, renommé) -> catalogue
+    sc.showCatalog();
   }
+  window.addEventListener('hashchange', applyRoute);
 
   /* ---- panier ---- */
   var cart = loadCart();
   function loadCart() { try { return JSON.parse(localStorage.getItem(CART_KEY)) || {}; } catch (e) { return {}; } }
   function saveCart() { try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) {} }
 
-  function addToCart(id, srcEl) {
+  function addToCart(id, qty, srcEl) {
     var p = byId[id]; if (!p) return;
     var max = p.qty | 0, cur = cart[id] ? cart[id].qty : 0;
+    qty = Math.max(1, qty | 0);
     if (cur >= max) { toast('Maximum ' + max + ' en stock.'); return; }
+    var n = Math.min(max, cur + qty);
     if (srcEl) flyToCart(srcEl);
-    cart[id] = { id: id, qty: cur + 1 };
-    saveCart(); renderCart(); toast(p.name + ' ajouté au panier.');
+    cart[id] = { id: id, qty: n };
+    saveCart(); renderCart();
+    toast(n - cur < qty ? 'Quantité limitée au stock (' + max + ').' : (qty > 1 ? qty + ' × ' : '') + p.name + ' ajouté au panier.');
   }
   function changeQty(id, d) {
     if (!cart[id]) return; var p = byId[id], max = p ? (p.qty | 0) : cart[id].qty; var n = cart[id].qty + d;
@@ -109,7 +94,7 @@
 
   function entries() { return Object.keys(cart).map(function (k) { return cart[k]; }); }
   function count() { return entries().reduce(function (s, it) { return s + it.qty; }, 0); }
-  function unitOf(it) { var p = byId[it.id]; return p ? tierPrice(p.sell_price, p.tiers, it.qty) : 0; }
+  function unitOf(it) { var p = byId[it.id]; return p ? (+p.sell_price || 0) : 0; }
   function lineTotal(it) { return it.qty * unitOf(it); }
   function total() { return entries().reduce(function (s, it) { return s + lineTotal(it); }, 0); }
 
@@ -130,7 +115,7 @@
       'px;z-index:70;pointer-events:none;box-shadow:0 8px 24px rgba(20,22,26,.28);background-size:cover;background-position:center;' +
       'transition:transform .8s cubic-bezier(.2,.7,.25,1),opacity .8s ease-in;will-change:transform,opacity;';
     if (el.tagName === 'IMG') { fly.style.backgroundImage = 'url("' + el.src + '")'; fly.style.borderRadius = '14px'; }
-    else { fly.style.background = el.style.background || getComputedStyle(el).backgroundColor; fly.style.borderRadius = '50%'; }
+    else { fly.style.background = 'var(--wash-2)'; fly.style.borderRadius = '14px'; }
     document.body.appendChild(fly);
     var dx = (to.left + to.width / 2) - (sx + size / 2), dy = (to.top + to.height / 2) - (sy + size / 2);
     fly.getBoundingClientRect();
@@ -151,13 +136,13 @@
         var url = publicUrl(p.image_path), max = p.qty | 0;
         var row = document.createElement('div'); row.className = 'citem';
         row.innerHTML =
-          '<div class="citem-thumb">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:var(--wash)"></span>') + '</div>' +
+          '<a class="citem-thumb" href="' + esc(sc.hrefOf(p)) + '" aria-label="Voir ' + esc(p.name) + '">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:var(--wash)"></span>') + '</a>' +
           '<div class="citem-main">' +
             '<div class="citem-name">' + esc(p.name) + '</div>' +
             '<div class="citem-type"><span class="citem-unit">' + money(unitOf(it)) + ' / paire</span></div>' +
             '<div class="citem-qty">' +
               '<button type="button" class="cq-minus" aria-label="Retirer un">&minus;</button>' +
-              '<input type="number" class="cq-val" min="0" max="' + max + '" value="' + it.qty + '" inputmode="numeric">' +
+              '<input type="number" class="cq-val" min="0" max="' + max + '" value="' + it.qty + '" inputmode="numeric" aria-label="Quantité">' +
               '<button type="button" class="cq-plus" aria-label="Ajouter un"' + (it.qty >= max ? ' disabled' : '') + '>+</button>' +
             '</div>' +
           '</div>' +
@@ -165,6 +150,7 @@
             '<button type="button" class="citem-del" aria-label="Supprimer">&times;</button>' +
             '<div class="citem-line">' + money(lineTotal(it)) + '</div>' +
           '</div>';
+        $('.citem-thumb', row).addEventListener('click', closeCart);
         $('.cq-minus', row).addEventListener('click', function () { changeQty(it.id, -1); });
         $('.cq-plus', row).addEventListener('click', function () { changeQty(it.id, 1); });
         var inp = $('.cq-val', row);
@@ -238,7 +224,7 @@
         if (p && cart[id].qty > max) { trimmed.push(p.name); if (max <= 0) delete cart[id]; else cart[id].qty = max; }
       });
       if (trimmed.length) { saveCart(); toast('Stock mis à jour : ' + trimmed.join(', ') + ' — quantité ajustée dans ton panier.'); }
-      render();
+      if (!focusedIn(catalogEl) && !focusedIn(productEl)) sc.refresh();
       if (trimmed.length || !focusedIn(cartItems)) renderCart();
     }, function () { refreshing = false; });
   }

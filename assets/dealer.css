@@ -1,8 +1,9 @@
 /* =========================================================
    Création Audio V2 — Portail dealer (privé)
-   Réutilise site.css (barre/marque) + boutique.css (cartes
-   spacer + panier). Ce fichier ajoute : connexion, écran d'accès
-   refusé, bouton dealer, badge de prix dealer.
+   Réutilise site.css (barre/marque) + boutique.css (catalogue, fiche
+   spacer, panier). Ce fichier ajoute : connexion, écran d'accès refusé,
+   onglets Catalogue / Mes commandes, suivi des commandes, note +
+   bandeau « modification » du panier.
    ========================================================= */
 
 /* Barre : bouton déconnexion + badge */
@@ -11,6 +12,7 @@
 .dl-logout { font:inherit; font-weight:600; font-size:.85rem; cursor:pointer; color:var(--ink);
   background:transparent; border:1.5px solid var(--line); border-radius:100px; padding:7px 14px; }
 .dl-logout:hover { border-color:var(--ember); color:var(--ember-dim); }
+.dealer-page .home-top .cart-btn { margin-right:4px; }
 
 /* Connexion + accès refusé */
 .dl-center { min-height:70vh; display:flex; align-items:center; justify-content:center; padding:24px; }
@@ -30,15 +32,89 @@
 .dl-status { color:var(--muted); font-size:.85rem; margin-top:12px; min-height:1.2em; }
 .dl-gate-actions { margin-top:18px; }
 
-/* Bandeau intro dealer */
-.dl-hello { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px;
-  background:var(--wash); border:1px solid var(--line); border-radius:var(--radius); padding:12px 16px; }
-.dl-hello b { color:var(--ink); }
-.dl-hello .muted { font-size:.9rem; }
+/* Bandeau connecté + onglets Catalogue / Mes commandes */
+.dl-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px 20px;
+  padding:clamp(18px, 2.4vw, 26px) 0 0; }
+.dl-hello { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:.9rem; color:var(--ink-2); }
+.dl-hello b { color:var(--ink); font-weight:600; }
+.dl-tabs { display:flex; gap:6px; padding:4px; background:var(--wash); border:1px solid var(--line); border-radius:100px; }
+.dl-tab { display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 16px; font-weight:600; font-size:.92rem;
+  color:var(--ink-2); text-decoration:none; white-space:nowrap; border-radius:100px; transition:color .15s, background .15s; }
+.dl-tab:hover { color:var(--ink); background:#fff; }
+.dl-tab[aria-current="page"] { color:#fff; background:var(--ink); }
+.dl-tab:focus-visible { outline:3px solid var(--ember-dim); outline-offset:2px; }
+.dl-tab-n { min-width:20px; height:20px; padding:0 6px; display:inline-flex; align-items:center; justify-content:center;
+  font-size:.72rem; font-weight:700; color:var(--ink); background:var(--ember); border-radius:100px; }
+.dl-tab-n[hidden] { display:none; }
 
-/* Bouton ajouter (carte spacer) — style dédié dealer */
-.dl-add { margin-top:auto; width:100%; cursor:pointer; font:inherit; font-weight:700; color:#fff;
-  background:var(--ember); border:none; border-radius:100px; padding:11px 14px; transition:background .16s, transform .1s; }
-.dl-add:hover { background:var(--ember-dim); }
-.dl-add:active { transform:translateY(1px); }
-.dl-add:disabled { background:var(--muted); cursor:not-allowed; }
+/* Panier : bandeau « modification », note, message d'erreur */
+.cart-edit { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 20px;
+  font-size:.86rem; color:var(--ember-ink); background:#FFF3EC; border-bottom:1px solid #F7DDCF; }
+.cart-edit[hidden] { display:none; }
+.cart-edit button { flex:none; padding:5px 10px; font:inherit; font-weight:700; font-size:.82rem; color:var(--ink); cursor:pointer;
+  background:#fff; border:1px solid var(--line-2); border-radius:8px; }
+.cart-edit button:hover { border-color:var(--ink); }
+.cart-line-total small { font-family:var(--font); font-size:.78rem; font-weight:500; color:var(--muted); }
+.cart-note-lbl { font-size:.8rem; font-weight:700; color:var(--ink-2); }
+.cart-note-lbl span { font-weight:500; color:var(--muted); }
+#cart-note { width:100%; min-height:58px; margin-top:-4px; padding:9px 12px; font:inherit; font-size:.9rem; line-height:1.4; color:var(--ink);
+  resize:vertical; background:#fff; border:1px solid var(--line-2); border-radius:12px; }
+#cart-note:focus { outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(24,26,31,.1); }
+.cart-msg.is-bad { color:var(--bad); }
+.citem-unit em { font-style:normal; font-weight:700; color:#16794A; }
+.citem-stock { margin-top:2px; font-size:.76rem; font-weight:600; }
+.citem-ok { color:#16794A; }
+.citem-made { color:var(--ember-ink); }
+
+/* Mes commandes */
+.dl-flash { max-width:860px; margin:0 0 16px; padding:13px 16px; font-weight:600; color:#16794A; background:var(--good-wash);
+  border:1px solid #BFE5CF; border-radius:14px; }
+#dl-orders-list { display:grid; gap:14px; max-width:860px; }
+.dl-order { padding:16px 18px; background:#fff; border:1px solid var(--line); border-radius:18px; transition:box-shadow .3s, border-color .3s; }
+.dl-order.is-flash { border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.16); }
+.dl-order.is-cancelled { opacity:.7; }
+.dl-order-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.dl-order-id { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.dl-order-id b { font-family:var(--display); font-size:1.25rem; letter-spacing:-.01em; }
+.dl-order-id span { font-size:.84rem; color:var(--muted); }
+.dl-status { flex:none; display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:100px;
+  font-size:.78rem; font-weight:700; white-space:nowrap; color:var(--ink-2); background:var(--wash-2); }
+.dl-status::before { content:''; width:7px; height:7px; border-radius:50%; background:currentColor; }
+.dl-status.is-new { color:#9A4A0E; background:#FFF3EC; }
+.dl-status.is-preparing { color:#1D5FA8; background:#E8F1FB; }
+.dl-status.is-ready { color:#16794A; background:var(--good-wash); }
+.dl-status.is-invoiced { color:var(--ink-2); background:var(--wash-2); }
+.dl-status.is-cancelled { color:#B42A19; background:var(--bad-wash); }
+.dl-order-hint { margin:6px 0 0; font-size:.84rem; color:var(--muted); }
+.dl-order-lines { display:grid; margin-top:12px; border-top:1px solid var(--line); }
+.dl-ol { display:grid; grid-template-columns:minmax(0, 1fr) auto auto auto; align-items:baseline; gap:6px 16px;
+  padding:8px 0; font-size:.92rem; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+.dl-ol-n { font-weight:700; color:var(--ink); text-decoration:none; overflow-wrap:anywhere; }
+a.dl-ol-n:hover { color:var(--ember-ink); text-decoration:underline; text-underline-offset:3px; }
+.dl-ol-q { color:var(--ink-2); }
+.dl-ol-u { min-width:74px; text-align:right; color:var(--muted); }
+.dl-ol-t { min-width:84px; text-align:right; font-weight:700; }
+.dl-order-note { margin:10px 0 0; padding:9px 12px; font-size:.88rem; color:var(--ink-2); background:var(--wash); border-radius:10px; }
+.dl-order-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; margin-top:12px; }
+.dl-order-total { font-size:.92rem; color:var(--ink-2); font-variant-numeric:tabular-nums; }
+.dl-order-total b { font-family:var(--display); font-size:1.15rem; color:var(--ink); }
+.dl-order-total small { font-size:.78rem; color:var(--muted); }
+.dl-order-actions { display:flex; gap:8px; }
+.dl-btn { height:38px; padding:0 14px; font:inherit; font-weight:700; font-size:.88rem; color:var(--ink); cursor:pointer;
+  background:#fff; border:1px solid var(--line-2); border-radius:10px; transition:border-color .15s, color .15s, background .15s; }
+.dl-btn:hover { border-color:var(--ink); }
+.dl-btn.is-danger:hover { color:var(--bad); border-color:var(--bad); background:var(--bad-wash); }
+.dl-btn:disabled { opacity:.5; cursor:wait; }
+.dl-btn:focus-visible { outline:3px solid var(--ember-dim); outline-offset:2px; }
+
+@media (max-width:560px) {
+  /* en-tête : logo + panier + déconnexion doivent tenir sur un téléphone */
+  .dealer-page .home-top .brand-tx { display:none; }
+  .dealer-page .home-top .dl-logout { padding:7px 12px; font-size:.8rem; }
+  .dl-top { flex-direction:column; align-items:stretch; }
+  .dl-tab { flex:1; justify-content:center; }
+  .dl-ol { grid-template-columns:minmax(0, 1fr) auto auto; }
+  .dl-ol-u { display:none; }
+  .dl-order-actions { width:100%; }
+  .dl-order-actions .dl-btn { flex:1; }
+}

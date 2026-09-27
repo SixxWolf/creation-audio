@@ -182,10 +182,16 @@ with (security_invoker = off) as
   select
     p.id, p.type, p.name, p.material, p.brand, p.code, p.hex,
     jsonb_strip_nulls(jsonb_build_object(
-      'colors',      p.attrs -> 'colors',
-      'img_spool',   p.attrs -> 'img_spool',
-      'img_refill',  p.attrs -> 'img_refill',
-      'description', p.attrs -> 'description'
+      'colors',       p.attrs -> 'colors',
+      'img_spool',    p.attrs -> 'img_spool',
+      'img_refill',   p.attrs -> 'img_refill',
+      'description',  p.attrs -> 'description',
+      -- fiche spacer : taille du haut-parleur, compatibilité véhicules, specs, texte long, photos
+      'speaker_size', p.attrs -> 'speaker_size',
+      'fitment',      p.attrs -> 'fitment',
+      'specs',        p.attrs -> 'specs',
+      'long_desc',    p.attrs -> 'long_desc',
+      'gallery',      p.attrs -> 'gallery'
     )) as attrs,
     p.image_path,
     p.slug,                            -- slug perso de la couleur (null = auto côté boutique)
@@ -491,14 +497,20 @@ drop view if exists public.products_dealer;
 create view public.products_dealer with (security_invoker = off) as
   select p.id, p.type, p.name,
          jsonb_strip_nulls(jsonb_build_object(
-           'colors',      p.attrs -> 'colors',
-           'img_spool',   p.attrs -> 'img_spool',
-           'img_refill',  p.attrs -> 'img_refill',
-           'description', p.attrs -> 'description'
+           'colors',       p.attrs -> 'colors',
+           'img_spool',    p.attrs -> 'img_spool',
+           'img_refill',   p.attrs -> 'img_refill',
+           'description',  p.attrs -> 'description',
+           'speaker_size', p.attrs -> 'speaker_size',
+           'fitment',      p.attrs -> 'fitment',
+           'specs',        p.attrs -> 'specs',
+           'long_desc',    p.attrs -> 'long_desc',
+           'gallery',      p.attrs -> 'gallery'
          )) as attrs,
          p.image_path,
          coalesce(p.dealer_price, p.sell_price) as sell_price,
-         p.tiers, p.qty, p.sort_order
+         p.tiers, p.qty, p.sort_order,
+         p.slug                          -- adresse de la fiche (dealer.html#/s/<slug>) ; null = auto
   from public.products p
   where p.active = true and p.type = 'spacer'
     and (select auth.jwt() ->> 'email') in (select email from public.dealers);
@@ -769,6 +781,200 @@ begin
 end $$;
 revoke all on function public.update_invoice(uuid, jsonb, jsonb, boolean) from public, anon;
 grant execute on function public.update_invoice(uuid, jsonb, jsonb, boolean) to authenticated;
+
+-- ============================================================
+-- COMMANDES DEALER (portail dealer -> onglet admin « Commandes »)
+-- ------------------------------------------------------------
+-- Le dealer envoie son panier depuis dealer.html : la commande est
+-- ENREGISTRÉE ici (plus de copier-coller Messenger). Tout est commandable,
+-- même à stock 0 (impression sur demande) : l'admin voit « à imprimer ».
+--   Statuts : new (Nouvelle) -> preparing -> ready -> invoiced (+ cancelled).
+--   Le dealer peut modifier / annuler tant que la commande est « new ».
+-- Sécurité : le dealer ne LIT que ses propres commandes (RLS) et n'écrit
+-- QUE via les RPC ci-dessous (SECURITY DEFINER), qui recalculent les prix
+-- côté serveur (prix dealer + palier PAR MODÈLE) : un prix trafiqué dans le
+-- navigateur est ignoré. L'admin a tous les droits (passage de statut, lien
+-- vers la facture).
+-- ------------------------------------------------------------
+create sequence if not exists public.dealer_order_seq;
+
+create table if not exists public.dealer_orders (
+  id           uuid primary key default gen_random_uuid(),
+  number       text not null unique,                    -- « D-0001 »
+  dealer_email text not null,
+  dealer_name  text,
+  status       text not null default 'new'
+               check (status in ('new', 'preparing', 'ready', 'invoiced', 'cancelled')),
+  note         text,                                    -- note du dealer
+  total        numeric(10,2) not null default 0,        -- total dealer (hors taxes) au moment de la commande
+  invoice_id   uuid references public.invoices(id) on delete set null,
+  cancelled_by text check (cancelled_by in ('dealer', 'admin')),
+  edited_at    timestamptz,                             -- dernière modification par le dealer
+  notified_at  timestamptz,                             -- dernier courriel d'avis envoyé à l'admin
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists dealer_orders_email_idx  on public.dealer_orders (dealer_email, created_at desc);
+create index if not exists dealer_orders_status_idx on public.dealer_orders (status);
+create index if not exists dealer_orders_invoice_idx on public.dealer_orders (invoice_id);
+
+create table if not exists public.dealer_order_lines (
+  id         uuid primary key default gen_random_uuid(),
+  order_id   uuid not null references public.dealer_orders(id) on delete cascade,
+  product_id uuid references public.products(id) on delete set null,
+  name       text not null,                             -- nom figé au moment de la commande
+  qty        integer not null check (qty > 0),
+  unit_price numeric(10,2) not null default 0,
+  line_total numeric(10,2) not null default 0,
+  sort_order integer not null default 0
+);
+create index if not exists dealer_order_lines_order_idx   on public.dealer_order_lines (order_id);
+create index if not exists dealer_order_lines_product_idx on public.dealer_order_lines (product_id);
+
+alter table public.dealer_orders      enable row level security;
+alter table public.dealer_order_lines enable row level security;
+
+drop policy if exists dealer_orders_admin_all on public.dealer_orders;
+create policy dealer_orders_admin_all on public.dealer_orders for all to authenticated
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+drop policy if exists dealer_orders_own_read on public.dealer_orders;
+create policy dealer_orders_own_read on public.dealer_orders for select to authenticated
+  using ( lower(dealer_email) = lower((select auth.jwt()) ->> 'email') );
+
+drop policy if exists dealer_order_lines_admin_all on public.dealer_order_lines;
+create policy dealer_order_lines_admin_all on public.dealer_order_lines for all to authenticated
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+drop policy if exists dealer_order_lines_own_read on public.dealer_order_lines;
+create policy dealer_order_lines_own_read on public.dealer_order_lines for select to authenticated
+  using ( exists (select 1 from public.dealer_orders o
+                   where o.id = order_id
+                     and lower(o.dealer_email) = lower((select auth.jwt()) ->> 'email')) );
+
+-- Prix dealer d'un spacer pour une quantité : dernier palier dont min <= qté,
+-- sinon prix de base (même règle que tierPrice() côté navigateur).
+create or replace function public._dealer_unit_price(p_base numeric, p_tiers jsonb, p_qty integer)
+returns numeric language sql immutable set search_path = public as $$
+  select coalesce((
+    select (t ->> 'price')::numeric
+      from jsonb_array_elements(case when jsonb_typeof(p_tiers) = 'array' then p_tiers else '[]'::jsonb end) t
+     where (t ->> 'price') ~ '^[0-9]{1,7}(\.[0-9]+)?$'
+       -- CASE : le cast n'est tenté que si le texte est bien un entier (ordre d'évaluation non garanti)
+       and (case when (t ->> 'min') ~ '^[0-9]{1,6}$' then (t ->> 'min')::integer end) between 1 and p_qty
+     order by (t ->> 'min')::integer desc
+     limit 1
+  ), p_base, 0);
+$$;
+
+-- Remplace les lignes d'une commande à partir de [{product_id, qty}] :
+-- doublons fusionnés, seuls les spacers ACTIFS sont gardés, qté 1..999,
+-- prix recalculés. Met à jour le total. Erreur si aucune ligne valide.
+create or replace function public._dealer_fill_lines(p_order uuid, p_lines jsonb)
+returns numeric language plpgsql set search_path = public as $$
+declare v_n integer; v_total numeric;
+begin
+  if jsonb_typeof(p_lines) is distinct from 'array' then raise exception 'Commande vide.'; end if;
+  if jsonb_array_length(p_lines) > 200 then raise exception 'Trop de lignes dans la commande.'; end if;
+  delete from public.dealer_order_lines where order_id = p_order;
+  with raw as (
+    select e ->> 'product_id' as pid_txt, e ->> 'qty' as qty_txt, ord
+      from jsonb_array_elements(p_lines) with ordinality as x(e, ord)
+  ), clean as (
+    select pid_txt::uuid as pid, least(sum(qty_txt::integer), 999)::integer as qty, min(ord) as ord
+      from raw
+     where pid_txt ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+       and qty_txt ~ '^[0-9]{1,4}$'
+     group by 1
+  ), priced as (
+    select c.pid, c.qty, c.ord, p.name,
+           public._dealer_unit_price(coalesce(p.dealer_price, p.sell_price, 0), p.tiers, c.qty) as unit
+      from clean c
+      join public.products p on p.id = c.pid and p.type = 'spacer' and p.active = true
+     where c.qty > 0
+  )
+  insert into public.dealer_order_lines (order_id, product_id, name, qty, unit_price, line_total, sort_order)
+  select p_order, pid, name, qty, round(unit, 2), round(round(unit, 2) * qty, 2),
+         (row_number() over (order by ord))::integer - 1
+    from priced;
+  get diagnostics v_n = row_count;
+  if v_n = 0 then raise exception 'Aucun spacer valide dans la commande.'; end if;
+  select coalesce(sum(line_total), 0) into v_total from public.dealer_order_lines where order_id = p_order;
+  update public.dealer_orders set total = v_total, updated_at = now() where id = p_order;
+  return v_total;
+end $$;
+revoke all on function public._dealer_unit_price(numeric, jsonb, integer) from public, anon, authenticated;
+revoke all on function public._dealer_fill_lines(uuid, jsonb) from public, anon, authenticated;
+
+-- Envoi d'une commande par le dealer connecté.
+create or replace function public.dealer_submit_order(p_lines jsonb, p_note text default null)
+returns public.dealer_orders language plpgsql security definer set search_path = public as $$
+declare
+  v_email  text := lower((select auth.jwt()) ->> 'email');
+  v_dealer public.dealers;
+  v_order  public.dealer_orders;
+begin
+  select * into v_dealer from public.dealers where lower(email) = v_email;
+  if not found then raise exception 'Réservé aux comptes dealer.' using errcode = '42501'; end if;
+  -- garde-fou anti-rafale : 20 commandes max par heure
+  if (select count(*) from public.dealer_orders
+       where lower(dealer_email) = v_email and created_at > now() - interval '1 hour') >= 20 then
+    raise exception 'Trop de commandes envoyées en peu de temps. Réessaie plus tard.';
+  end if;
+  insert into public.dealer_orders (number, dealer_email, dealer_name, note, status)
+  values ('D-' || lpad(nextval('public.dealer_order_seq')::text, 4, '0'),
+          v_dealer.email, v_dealer.name, nullif(left(btrim(coalesce(p_note, '')), 1000), ''), 'new')
+  returning * into v_order;
+  perform public._dealer_fill_lines(v_order.id, p_lines);
+  select * into v_order from public.dealer_orders where id = v_order.id;
+  return v_order;
+end $$;
+
+-- Modification par le dealer (seulement tant que la commande est « Nouvelle »).
+create or replace function public.dealer_update_order(p_id uuid, p_lines jsonb, p_note text default null)
+returns public.dealer_orders language plpgsql security definer set search_path = public as $$
+declare
+  v_email text := lower((select auth.jwt()) ->> 'email');
+  v_order public.dealer_orders;
+begin
+  select * into v_order from public.dealer_orders where id = p_id for update;
+  if not found or lower(v_order.dealer_email) <> v_email then raise exception 'Commande introuvable.' using errcode = '42501'; end if;
+  if v_order.status = 'cancelled' then raise exception 'Cette commande est annulée.' using errcode = 'P0001'; end if;
+  if v_order.status <> 'new' then
+    raise exception 'Cette commande est déjà en préparation : écris-nous pour la modifier.' using errcode = 'P0001';
+  end if;
+  update public.dealer_orders
+     set note = nullif(left(btrim(coalesce(p_note, '')), 1000), ''), edited_at = now(), updated_at = now()
+   where id = p_id;
+  perform public._dealer_fill_lines(p_id, p_lines);
+  select * into v_order from public.dealer_orders where id = p_id;
+  return v_order;
+end $$;
+
+-- Annulation par le dealer (seulement tant que la commande est « Nouvelle »).
+create or replace function public.dealer_cancel_order(p_id uuid)
+returns public.dealer_orders language plpgsql security definer set search_path = public as $$
+declare
+  v_email text := lower((select auth.jwt()) ->> 'email');
+  v_order public.dealer_orders;
+begin
+  select * into v_order from public.dealer_orders where id = p_id for update;
+  if not found or lower(v_order.dealer_email) <> v_email then raise exception 'Commande introuvable.' using errcode = '42501'; end if;
+  if v_order.status = 'cancelled' then return v_order; end if;   -- déjà annulée : rien à faire
+  if v_order.status <> 'new' then
+    raise exception 'Cette commande est déjà en préparation : écris-nous pour l''annuler.' using errcode = 'P0001';
+  end if;
+  update public.dealer_orders set status = 'cancelled', cancelled_by = 'dealer', updated_at = now()
+   where id = p_id returning * into v_order;
+  return v_order;
+end $$;
+
+revoke all on function public.dealer_submit_order(jsonb, text)       from public, anon;
+revoke all on function public.dealer_update_order(uuid, jsonb, text) from public, anon;
+revoke all on function public.dealer_cancel_order(uuid)              from public, anon;
+grant execute on function public.dealer_submit_order(jsonb, text)       to authenticated;
+grant execute on function public.dealer_update_order(uuid, jsonb, text) to authenticated;
+grant execute on function public.dealer_cancel_order(uuid)              to authenticated;
 
 -- ------------------------------------------------------------
 -- Vérification
