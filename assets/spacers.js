@@ -35,7 +35,7 @@
     assureHtml: '<li>' + PIN + 'Ramassage local à Québec, sur rendez-vous</li>' +
       '<li>' + CHAT + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
       '<li>' + CARD + 'Aucun paiement en ligne</li>',
-    emptyHint: 'Ton véhicule n\'y est pas ? <a href="index.html#contact">Écris-nous</a>, on en imprime sur mesure.'
+    emptyHint: 'Ton véhicule n\'y est pas ? <a href="./#contact">Écris-nous</a>, on en imprime sur mesure.'
   });
 
   var spacers = [], byId = {}, loaded = false;

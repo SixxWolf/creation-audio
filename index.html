@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Vieux liens / favoris en « /index.html » : l'adresse affichée redevient « creationaudio.ca/ » (sans recharger) -->
+<script>if (/\/index\.html$/.test(location.pathname)) history.replaceState(null, '', location.pathname.replace(/index\.html$/, '') + location.search + location.hash);</script>
 <title>Création Audio — Filaments 3D, spacers & caissons · Québec</title>
 <meta name="description" content="Filaments d'impression 3D en stock à Québec (PLA, PETG, ABS, Silk, TPU — bobine ou recharge), spacers/adaptateurs audio et caissons de sub sur-mesure. Ramassage local, aucun paiement en ligne.">
 <link rel="canonical" href="https://creationaudio.ca/">
@@ -39,7 +41,7 @@
 
 <!-- ======================= EN-TÊTE ======================= -->
 <header class="home-top">
-  <a class="brand" href="index.html" aria-label="Création Audio — accueil">
+  <a class="brand" href="./" aria-label="Création Audio — accueil">
     <img class="brand-mark" src="assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="42" height="42">
     <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
   </a>
@@ -410,7 +412,7 @@
 <footer class="site-foot">
   <div class="foot-inner">
     <div class="foot-brand">
-      <a class="brand" href="index.html">
+      <a class="brand" href="./">
         <img class="brand-mark" src="assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="42" height="42">
         <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
       </a>
@@ -424,13 +426,13 @@
       <h4>Boutique</h4>
       <a href="boutique.html">Filaments</a>
       <a href="spacers.html">Spacers &amp; adaptateurs</a>
-      <a href="index.html#caissons">Caissons de sub</a>
+      <a href="./#caissons">Caissons de sub</a>
       <a href="boutique.html">Accessoires</a>
     </nav>
     <nav class="foot-col" aria-label="Aide">
       <h4>Aide</h4>
-      <a href="index.html#etapes">Comment commander</a>
-      <a href="index.html#contact">Nous joindre</a>
+      <a href="./#etapes">Comment commander</a>
+      <a href="./#contact">Nous joindre</a>
       <a href="dealer.html">Espace dealer</a>
     </nav>
     <nav class="foot-col" aria-label="Légal">
@@ -457,7 +459,7 @@
     <button class="close" id="nav-close" type="button" aria-label="Fermer le menu">&times;</button>
   </div>
   <nav class="drawer-links" aria-label="Menu mobile">
-    <a href="index.html" class="is-active">Accueil</a>
+    <a href="./" class="is-active">Accueil</a>
     <a href="boutique.html">Filaments</a>
     <a href="spacers.html">Spacers</a>
     <a href="#caissons">Caissons</a>
