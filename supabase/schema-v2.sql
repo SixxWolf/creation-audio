@@ -481,9 +481,12 @@ create policy dealers_admin_all on public.dealers for all to authenticated
   with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
 
 -- Le compte connecté est-il un dealer ? (le portail s'en sert pour ouvrir l'accès)
+-- Le compte ADMIN a aussi accès au portail (aperçu + commandes de test), sans
+-- figurer dans la table dealers (donc absent de l'onglet Dealers / Facturation).
 create or replace function public.is_dealer()
 returns boolean language sql security definer set search_path = public stable as $$
-  select exists (select 1 from public.dealers d where d.email = (select auth.jwt() ->> 'email'));
+  select exists (select 1 from public.dealers d where d.email = (select auth.jwt() ->> 'email'))
+      or lower((select auth.jwt() ->> 'email')) = 'creationaudio.ca@gmail.com';
 $$;
 revoke all on function public.is_dealer() from public, anon;
 grant execute on function public.is_dealer() to authenticated;
@@ -513,7 +516,8 @@ create view public.products_dealer with (security_invoker = off) as
          p.slug                          -- adresse de la fiche (dealer.html#/s/<slug>) ; null = auto
   from public.products p
   where p.active = true and p.type = 'spacer'
-    and (select auth.jwt() ->> 'email') in (select email from public.dealers);
+    and ( (select auth.jwt() ->> 'email') in (select email from public.dealers)
+          or lower((select auth.jwt() ->> 'email')) = 'creationaudio.ca@gmail.com' );   -- admin : aperçu du portail
 grant select on public.products_dealer to authenticated;
 
 -- ------------------------------------------------------------
@@ -915,7 +919,14 @@ declare
   v_order  public.dealer_orders;
 begin
   select * into v_dealer from public.dealers where lower(email) = v_email;
-  if not found then raise exception 'Réservé aux comptes dealer.' using errcode = '42501'; end if;
+  if not found then
+    -- l'admin peut passer une commande de test depuis le portail (visible dans l'onglet Commandes)
+    if v_email = 'creationaudio.ca@gmail.com' then
+      v_dealer.email := v_email; v_dealer.name := 'Création Audio (test admin)';
+    else
+      raise exception 'Réservé aux comptes dealer.' using errcode = '42501';
+    end if;
+  end if;
   -- garde-fou anti-rafale : 20 commandes max par heure
   if (select count(*) from public.dealer_orders
        where lower(dealer_email) = v_email and created_at > now() - interval '1 hour') >= 20 then

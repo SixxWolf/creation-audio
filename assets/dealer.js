@@ -58,6 +58,7 @@
   });
 
   /* ---------- écrans ---------- */
+  var me = '';   // courriel du compte connecté (filtre « Mes commandes » : l'admin voit toutes les commandes en base)
   function show(which, email) {
     loginSec.hidden = which !== 'login';
     gateSec.hidden = which !== 'gate';
@@ -65,7 +66,12 @@
     cartBtn.hidden = which !== 'app';
     logoutBtn.hidden = (which === 'login');
     if (which === 'app' && email) {
-      hello.innerHTML = 'Connecté : <b>' + esc(email) + '</b> <span class="dl-badge">Dealer</span>';
+      me = String(email).toLowerCase();
+      var isAdmin = me === String((window.CA && window.CA.adminEmail) || '').toLowerCase();
+      hello.innerHTML = 'Connecté : <b>' + esc(email) + '</b> ' +
+        (isAdmin
+          ? '<span class="dl-badge is-admin">Admin · aperçu</span><span class="dl-admin-note">Tes commandes de test arrivent dans l\'onglet Commandes de l\'admin — annule-les ensuite.</span>'
+          : '<span class="dl-badge">Dealer</span>');
     }
   }
 
@@ -337,7 +343,7 @@
   function loadOrders() {
     if (ordersLoading) return;
     ordersLoading = true;
-    sb.from('dealer_orders').select('*, dealer_order_lines(*)').order('created_at', { ascending: false }).limit(60)
+    sb.from('dealer_orders').select('*, dealer_order_lines(*)').eq('dealer_email', me).order('created_at', { ascending: false }).limit(60)
       .then(function (res) {
         ordersLoading = false;
         if (res.error) {

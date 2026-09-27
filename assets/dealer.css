@@ -35,8 +35,10 @@
 /* Bandeau connecté + onglets Catalogue / Mes commandes */
 .dl-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px 20px;
   padding:clamp(18px, 2.4vw, 26px) 0 0; }
-.dl-hello { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:.9rem; color:var(--ink-2); }
+.dl-hello { display:flex; align-items:center; gap:4px 8px; flex-wrap:wrap; flex:1 1 380px; min-width:0; font-size:.9rem; color:var(--ink-2); }
 .dl-hello b { color:var(--ink); font-weight:600; }
+.dl-badge.is-admin { background:var(--ink); }
+.dl-admin-note { flex-basis:100%; font-size:.82rem; color:var(--muted); }
 .dl-tabs { display:flex; gap:6px; padding:4px; background:var(--wash); border:1px solid var(--line); border-radius:100px; }
 .dl-tab { display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 16px; font-weight:600; font-size:.92rem;
   color:var(--ink-2); text-decoration:none; white-space:nowrap; border-radius:100px; transition:color .15s, background .15s; }
