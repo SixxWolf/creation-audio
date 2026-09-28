@@ -284,7 +284,7 @@
         var m = B.mats[n], f = m.first;
         m.desc = f.material_desc; m.longDesc = f.material_long_desc; m.specs = f.material_specs;
         m.gallery = f.material_gallery; m.matImage = f.material_image;
-        m.hasTiers = m.items.some(function (p) { return normalizeTiers(p.tiers).length || normalizeTiers(p.tiers_2).length; });
+        m.tierLow = minTierPrice(m);
         return m;
       });
       brandByName[k] = B;
@@ -319,6 +319,15 @@
       if (hasRefill(p)) v.push(+p.sell_price_2);
     });
     v = v.filter(isFinite);
+    return v.length ? Math.min.apply(null, v) : null;
+  }
+  // plus bas prix atteignable en quantité (paliers du matériau), null si aucun palier
+  function minTierPrice(m) {
+    var v = [];
+    m.items.forEach(function (p) {
+      if (hasSpool(p)) normalizeTiers(p.tiers).forEach(function (t) { v.push(t.price); });
+      if (hasRefill(p)) normalizeTiers(p.tiers_2).forEach(function (t) { v.push(t.price); });
+    });
     return v.length ? Math.min.apply(null, v) : null;
   }
 
@@ -399,13 +408,14 @@
     var media = m.repImg ? '<img src="' + esc(m.repImg) + '" alt="" loading="lazy">'
                          : '<span class="mcard-sw" style="background:' + esc(swatchBg(m.rep)) + '"></span>';
     return '<a class="mcard' + (out ? ' is-out' : '') + '" href="' + esc(routeFor(m.brand, m.name)) + '">' +
-      '<span class="mcard-media">' + media + (m.hasTiers ? '<span class="mcard-badge">Rabais quantité</span>' : '') + '</span>' +
+      '<span class="mcard-media">' + media + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(m.name) + '</span>' +
         (tag ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +
         '<span class="mcard-dots" aria-hidden="true">' + dots + (extra > 0 ? '<em>+' + extra + '</em>' : '') + '</span>' +
         '<span class="mcard-foot">' +
-          '<span class="mcard-price">' + (min != null ? 'dès <b>' + money(min) + '</b>' : '') + '</span>' +
+          '<span class="mcard-price">' + (min != null ? 'dès <b>' + money(min) + '</b>' : '') +
+            (min != null && m.tierLow != null && m.tierLow < min ? '<small>' + money(m.tierLow) + ' en quantité</small>' : '') + '</span>' +
           '<span class="pill ' + (out ? 'out' : 'ok') + '">' + (out ? 'Rupture' : stock.length + ' en stock') + '</span>' +
         '</span>' +
       '</span>' +
@@ -532,6 +542,20 @@
   }
   // palier selon ce qui sera dans le panier après l'ajout (même matériau + format, toutes couleurs)
   function unitNow() { return tierPrice(baseOf(curColor, curType), tiersOf(curColor, curType), curQty + groupQty(curColor, curType)); }
+  // grille « prix selon la quantité » : 1 / 2+ / 4+ … ; palier atteint (quantité + panier) surligné
+  function tierGridHtml() {
+    var tiers = normalizeTiers(tiersOf(curColor, curType));
+    if (!tiers.length) return '';
+    var rows = [{ min: 1, price: +baseOf(curColor, curType) || 0 }].concat(tiers);
+    var n = curQty + groupQty(curColor, curType), on = 0;
+    rows.forEach(function (t, i) { if (n >= t.min) on = i; });
+    return '<div class="pdp-tiers">' +
+      '<p class="pdp-tiers-head">Prix selon la quantité <span>· couleurs mélangées</span></p>' +
+      '<div class="pdp-tiergrid">' + rows.map(function (t, i) {
+        return '<div class="pdp-tier' + (i === on ? ' is-on' : '') + '"' + (i === on ? ' aria-current="true"' : '') + '>' +
+          '<span class="pt-q">' + (i === 0 ? '1' : t.min + '+') + '</span><span class="pt-p">' + money(t.price) + '</span></div>';
+      }).join('') + '</div></div>';
+  }
   function buySumText() {
     if (curQty < 2 && unitNow() >= (+baseOf(curColor, curType) || 0)) return '';
     var base = +baseOf(curColor, curType) || 0, u = unitNow();
@@ -542,13 +566,9 @@
     var p = curColor, m = curMat;
     var stock = stockOf(p, curType), out = !offered(p, curType) || stock <= 0;
     var price = baseOf(p, curType);
-    var tiers = normalizeTiers(tiersOf(p, curType));
     curImgs = imagesFor(p);
     if (curImg >= curImgs.length) curImg = 0;
 
-    var tierHtml = tiers.length ? '<div class="pdp-tiers"><span>Rabais quantité</span>' +
-      tiers.map(function (t) { return '<span class="pdp-tier"><b>' + t.min + '+</b> à ' + money(t.price) + '</span>'; }).join('') +
-      '<span class="pdp-tiers-note">couleurs mélangées</span></div>' : '';
 
     // pastilles dans l'ordre de l'admin (sort_order) ; « en stock seulement » garde toujours la couleur affichée
     var items = m.items.slice();
@@ -595,7 +615,7 @@
             '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? 'Rupture' : stock + ' en stock') + '</span>' +
           '</div>' +
           '<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>' +
-          tierHtml +
+          '<div class="js-tiers">' + tierGridHtml() + '</div>' +
 
           '<div class="pdp-sec">' +
             '<p class="pdp-label">Format</p>' +
@@ -784,12 +804,13 @@
     });
     if (swFocus) { swFocus = false; var act = $('.sw.is-active', configEl); if (act) act.focus(); }
 
-    var qv = $('.q-val', configEl), sum = $('.buy-sum', configEl);
+    var qv = $('.q-val', configEl), sum = $('.buy-sum', configEl), tiersBox = $('.js-tiers', configEl);
     var maxStock = stockOf(curColor, curType);
+    function refreshBuy() { sum.innerHTML = buySumText(); if (tiersBox) tiersBox.innerHTML = tierGridHtml(); updateBuybar(); }
     function setQ(n) {
       if (isNaN(n) || n < 1) n = 1;
       if (maxStock && n > maxStock) { n = maxStock; toast('Maximum ' + maxStock + ' en stock.'); }
-      curQty = n; if (qv) qv.value = n; sum.innerHTML = buySumText(); updateBuybar();
+      curQty = n; if (qv) qv.value = n; refreshBuy();
     }
     if (qv) {
       $('.q-minus', configEl).addEventListener('click', function () { setQ(curQty - 1); });
@@ -802,6 +823,7 @@
       if (add.disabled) return;
       flyToCart($('.pdp-stage img', configEl) || $('.pdp-bigsw', configEl));
       addToCart(curColor.id, curType, curQty);
+      refreshBuy();
     });
     $$('.acc-add', configEl).forEach(function (b) {
       b.addEventListener('click', function () { if (b.disabled) return; addAccessory(b.getAttribute('data-acc')); });

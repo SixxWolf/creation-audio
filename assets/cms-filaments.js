@@ -45,15 +45,6 @@
   function brandMaterials() { return ((window.CA.materials && window.CA.materials.list) || []).filter(function (m) { return m.brand === window.CA.currentBrand; }); }
   function matHasSpool(mat) { return !!(mat && mat.sell_spool != null); }
   function matHasRefillM(mat) { return !!(mat && mat.sell_refill != null); }
-  function normalizeTiers(raw) {
-    if (!Array.isArray(raw)) return [];
-    return raw.map(function (t) { return { min: parseInt(t.min, 10), price: parseFloat(t.price) }; })
-      .filter(function (t) { return isFinite(t.min) && t.min >= 1 && isFinite(t.price) && t.price >= 0; })
-      .sort(function (a, b) { return a.min - b.min; });
-  }
-  function tiersSummary(tiers) {
-    return normalizeTiers(tiers).map(function (t) { return t.min + '+ : ' + money(t.price); }).join(' · ');
-  }
 
   var loaded = false, editingId = null, pendingFile = null, cache = [];
 
@@ -429,7 +420,6 @@
 
     // Prix retiré des cartes (l'admin le connaît) — on ne garde que l'alerte « matériau non défini ».
     var priceHtml = mat ? '' : '<span class="card-price is-warn">Matériau non défini</span>';
-    var ts = hasS && mat ? tiersSummary(mat.tiers_spool) : '', tr = hasR && mat ? tiersSummary(mat.tiers_refill) : '';
 
     return '<article class="card' + (r.active ? '' : ' is-hidden') + '" data-id="' + esc(r.id) + '" draggable="true">' +
       '<div class="card-thumb">' +
@@ -447,8 +437,6 @@
           (hasS ? '<span class="stk' + (outB ? ' out' : '') + '">Bobine&nbsp;: ' + qb + '</span>' : '') +
           (hasR ? '<span class="stk' + (outR ? ' out' : '') + '">Recharge&nbsp;: ' + qr + '</span>' : '') +
         '</div>' +
-        (ts ? '<div class="card-tierline">Bobine · ' + esc(ts) + '</div>' : '') +
-        (tr ? '<div class="card-tierline">Recharge · ' + esc(tr) + '</div>' : '') +
         '<div class="card-actions">' +
           '<button class="btn btn-ghost card-edit" type="button">Modifier</button>' +
           '<button class="btn btn-ghost card-del" type="button">Suppr.</button>' +

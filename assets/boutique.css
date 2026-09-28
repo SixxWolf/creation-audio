@@ -109,8 +109,6 @@
 .mcard-media img { width:100%; height:100%; object-fit:contain; transition:transform .4s cubic-bezier(.2,.7,.2,1); }
 .mcard:hover .mcard-media img { transform:scale(1.04); }
 .mcard-sw { width:56%; aspect-ratio:1; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); }
-.mcard-badge { position:absolute; top:12px; left:12px; padding:4px 9px; border-radius:8px; font-size:.7rem; font-weight:700;
-  color:var(--ember-ink); background:#FFF3EC; border:1px solid #F7DDCF; }
 .mcard-body { display:flex; flex-direction:column; gap:6px; flex:1; padding:14px 16px 16px; }
 .mcard-name { font-family:var(--display); font-weight:700; font-size:1.22rem; line-height:1.15; letter-spacing:-.02em; }
 .mcard-tag { font-size:.86rem; line-height:1.4; color:var(--muted);
@@ -122,6 +120,8 @@
 .mcard-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px 8px; margin-top:auto;
   padding-top:10px; font-size:.86rem; color:var(--muted); }
 .mcard-price b { color:var(--ink); font-size:1rem; font-variant-numeric:tabular-nums; }
+.mcard-price small { display:block; margin-top:1px; font-size:.76rem; font-weight:600; color:var(--ember-ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.mcard-price small::before { content:"↓ "; }
 .mcard.is-out .mcard-media img { opacity:.55; filter:grayscale(.35); }
 .mcard.is-out .mcard-dots i { opacity:.45; }
 
@@ -185,11 +185,19 @@
 .pdp-price { font-family:var(--display); font-weight:700; font-size:2.1rem; line-height:1; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .pdp-price small { margin-left:6px; font-family:var(--font); font-size:.9rem; font-weight:500; letter-spacing:0; color:var(--muted); }
 .pdp-final { margin:8px 0 0; font-size:.84rem; color:var(--muted); }
-.pdp-tiers { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:12px 0 0; font-size:.84rem; color:var(--ink-2); }
-.pdp-tiers > span:first-child { font-weight:700; color:var(--ember-ink); margin-right:2px; }
-.pdp-tier { padding:3px 9px; border-radius:8px; background:#FFF3EC; border:1px solid #F7DDCF; font-variant-numeric:tabular-nums; }
-.pdp-tier b { color:var(--ink); }
-.pdp-tiers-note { color:var(--muted); }
+/* Prix selon la quantité : grille 1 / 2+ / 4+ …, palier atteint surligné */
+.pdp-tiers { margin:16px 0 0; max-width:440px; }
+.pdp-tiers-head { margin:0 0 7px; font-size:.74rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ember-ink); }
+.pdp-tiers-head span { font-weight:500; letter-spacing:0; text-transform:none; font-size:.82rem; color:var(--muted); }
+.pdp-tiergrid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; border:1px solid #F1E2D8; border-radius:12px; overflow:hidden; background:#FFFAF6; }
+.pdp-tier { display:flex; flex-direction:column; align-items:center; gap:1px; padding:8px 4px 9px; border-left:1px solid #F1E2D8;
+  transition:background .15s, color .15s; }
+.pdp-tier:first-child { border-left:0; }
+.pt-q { font-size:.74rem; font-weight:700; color:var(--muted); }
+.pt-p { font-size:.95rem; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.pdp-tier.is-on { background:var(--ember-ink); border-left-color:var(--ember-ink); }
+.pdp-tier.is-on + .pdp-tier { border-left-color:var(--ember-ink); }
+.pdp-tier.is-on .pt-q, .pdp-tier.is-on .pt-p { color:#fff; }
 
 .pdp-sec { margin-top:24px; }
 .pdp-label { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 14px; margin:0 0 10px;
@@ -597,7 +605,6 @@ body.cart-lock { overflow:hidden; }
   .mcard-name { font-size:1.04rem; }
   .mcard-dots i { width:15px; height:15px; }
   .mcard-foot { flex-direction:column; align-items:flex-start; }
-  .mcard-badge { top:8px; left:8px; font-size:.64rem; padding:3px 7px; }
   .sw { width:38px; height:38px; }
   .qty button { width:34px; }
   .btn-add { gap:8px; padding:0 14px; white-space:nowrap; }
