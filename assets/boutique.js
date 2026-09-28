@@ -416,7 +416,7 @@
         '<span class="mcard-foot">' +
           '<span class="mcard-price">' + (min != null ? 'dès <b>' + money(min) + '</b>' : '') +
             (min != null && m.tierLow != null && m.tierLow < min ? '<small>' + money(m.tierLow) + ' en quantité</small>' : '') + '</span>' +
-          '<span class="pill ' + (out ? 'out' : 'ok') + '">' + (out ? 'Rupture' : stock.length + ' en stock') + '</span>' +
+          (out ? '<span class="pill out">Rupture</span>' : '') +
         '</span>' +
       '</span>' +
     '</a>';
