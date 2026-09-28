@@ -184,6 +184,7 @@
 .pdp-priceline { display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin:18px 0 0; }
 .pdp-price { font-family:var(--display); font-weight:700; font-size:2.1rem; line-height:1; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
 .pdp-price small { margin-left:6px; font-family:var(--font); font-size:.9rem; font-weight:500; letter-spacing:0; color:var(--muted); }
+.pdp-final { margin:8px 0 0; font-size:.84rem; color:var(--muted); }
 .pdp-tiers { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:12px 0 0; font-size:.84rem; color:var(--ink-2); }
 .pdp-tiers > span:first-child { font-weight:700; color:var(--ember-ink); margin-right:2px; }
 .pdp-tier { padding:3px 9px; border-radius:8px; background:#FFF3EC; border:1px solid #F7DDCF; font-variant-numeric:tabular-nums; }

@@ -592,6 +592,7 @@
             '<span class="pdp-price">' + money(price) + '<small>/ ' + fmtShort(curType) + '</small></span>' +
             '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? 'Rupture' : stock + ' en stock') + '</span>' +
           '</div>' +
+          '<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>' +
           tierHtml +
 
           '<div class="pdp-sec">' +
