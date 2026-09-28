@@ -530,9 +530,10 @@
     var st = stockOf(p, curType);
     return st > 0 ? st + ' en stock' : 'rupture en ' + fmtShort(curType);
   }
-  function unitNow() { return tierPrice(baseOf(curColor, curType), tiersOf(curColor, curType), curQty); }
+  // palier selon ce qui sera dans le panier après l'ajout (même matériau + format, toutes couleurs)
+  function unitNow() { return tierPrice(baseOf(curColor, curType), tiersOf(curColor, curType), curQty + groupQty(curColor, curType)); }
   function buySumText() {
-    if (curQty < 2) return '';
+    if (curQty < 2 && unitNow() >= (+baseOf(curColor, curType) || 0)) return '';
     var base = +baseOf(curColor, curType) || 0, u = unitNow();
     return curQty + ' × ' + money(u) + ' = <b>' + money(u * curQty) + '</b>' + (u < base ? ' <em>· rabais quantité</em>' : '');
   }
@@ -546,7 +547,8 @@
     if (curImg >= curImgs.length) curImg = 0;
 
     var tierHtml = tiers.length ? '<div class="pdp-tiers"><span>Rabais quantité</span>' +
-      tiers.map(function (t) { return '<span class="pdp-tier"><b>' + t.min + '+</b> à ' + money(t.price) + '</span>'; }).join('') + '</div>' : '';
+      tiers.map(function (t) { return '<span class="pdp-tier"><b>' + t.min + '+</b> à ' + money(t.price) + '</span>'; }).join('') +
+      '<span class="pdp-tiers-note">couleurs mélangées</span></div>' : '';
 
     // pastilles dans l'ordre de l'admin (sort_order) ; « en stock seulement » garde toujours la couleur affichée
     var items = m.items.slice();
@@ -928,10 +930,20 @@
   function keyOf(id, type) { return id + '|' + type; }
 
   function metaOf(it) { return it.type === 'accessory' ? accById[it.id] : byId[it.id]; }
+  // Rabais quantité : palier calculé sur le TOTAL du même matériau + format dans le panier
+  // (couleurs mélangées), comme en facturation
+  function groupKey(p, type) { return (p.brand || '') + '|' + (p.material || '') + '|' + type; }
+  function groupQty(p, type) {
+    var g = groupKey(p, type);
+    return Object.keys(cart).reduce(function (s, k) {
+      var it = cart[k], q = it.type !== 'accessory' && byId[it.id];
+      return s + (q && groupKey(q, it.type) === g ? it.qty : 0);
+    }, 0);
+  }
   function unitOf(it) {
     if (it.type === 'accessory') return accById[it.id] ? accById[it.id].price : 0;
     var p = byId[it.id]; if (!p) return 0;
-    return tierPrice(baseOf(p, it.type), tiersOf(p, it.type), it.qty);
+    return tierPrice(baseOf(p, it.type), tiersOf(p, it.type), groupQty(p, it.type));
   }
   function maxOf(it) {
     if (it.type === 'accessory') { var a = accById[it.id]; return a && a.qty != null ? a.qty : Infinity; }

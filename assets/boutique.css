@@ -189,6 +189,7 @@
 .pdp-tiers > span:first-child { font-weight:700; color:var(--ember-ink); margin-right:2px; }
 .pdp-tier { padding:3px 9px; border-radius:8px; background:#FFF3EC; border:1px solid #F7DDCF; font-variant-numeric:tabular-nums; }
 .pdp-tier b { color:var(--ink); }
+.pdp-tiers-note { color:var(--muted); }
 
 .pdp-sec { margin-top:24px; }
 .pdp-label { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 14px; margin:0 0 10px;
