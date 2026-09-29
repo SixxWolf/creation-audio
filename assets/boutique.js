@@ -807,6 +807,7 @@
     var qv = $('.q-val', configEl), sum = $('.buy-sum', configEl), tiersBox = $('.js-tiers', configEl);
     var maxStock = stockOf(curColor, curType);
     function refreshBuy() { sum.innerHTML = buySumText(); if (tiersBox) tiersBox.innerHTML = tierGridHtml(); updateBuybar(); }
+    onCartChange = refreshBuy;   // le panier change (ajout, quantité, retrait) -> palier de la fiche à jour
     function setQ(n) {
       if (isNaN(n) || n < 1) n = 1;
       if (maxStock && n > maxStock) { n = maxStock; toast('Maximum ' + maxStock + ' en stock.'); }
@@ -823,7 +824,6 @@
       if (add.disabled) return;
       flyToCart($('.pdp-stage img', configEl) || $('.pdp-bigsw', configEl));
       addToCart(curColor.id, curType, curQty);
-      refreshBuy();
     });
     $$('.acc-add', configEl).forEach(function (b) {
       b.addEventListener('click', function () { if (b.disabled) return; addAccessory(b.getAttribute('data-acc')); });
@@ -947,6 +947,7 @@
 
   /* ---------- panier ---------- */
   var cart = loadCart();
+  var onCartChange = null;   // rafraîchit la fiche produit ouverte (grille des paliers)
   function loadCart() { try { return JSON.parse(localStorage.getItem(CART_KEY)) || {}; } catch (e) { return {}; } }
   function saveCart() { try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) {} }
   function keyOf(id, type) { return id + '|' + type; }
@@ -1067,6 +1068,7 @@
         });
     }
     cartTotal.textContent = money(total());
+    if (onCartChange && lastScreen === 'product') onCartChange();
     orderBtn.classList.toggle('is-disabled', n === 0);
     if (emailBtn) emailBtn.classList.toggle('is-disabled', n === 0);
   }
