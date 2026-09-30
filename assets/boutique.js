@@ -540,7 +540,7 @@
     var st = stockOf(p, curType);
     return st > 0 ? st + ' en stock' : 'rupture en ' + fmtShort(curType);
   }
-  // palier selon ce qui sera dans le panier après l'ajout (même matériau + format, toutes couleurs)
+  // palier selon ce qui sera dans le panier après l'ajout (même marque + format, couleurs et matériaux mélangés)
   function unitNow() { return tierPrice(baseOf(curColor, curType), tiersOf(curColor, curType), curQty + groupQty(curColor, curType)); }
   // grille « prix selon la quantité » : 1 / 2+ / 4+ … ; palier atteint (quantité + panier) surligné
   function tierGridHtml() {
@@ -549,8 +549,9 @@
     var rows = [{ min: 1, price: +baseOf(curColor, curType) || 0 }].concat(tiers);
     var n = curQty + groupQty(curColor, curType), on = 0;
     rows.forEach(function (t, i) { if (n >= t.min) on = i; });
+    var scope = curColor.brand ? 'Toutes les ' + fmtShort(curType) + 's ' + curColor.brand + ' comptent ensemble' : 'Couleurs mélangées';
     return '<div class="pdp-tiers">' +
-      '<p class="pdp-tiers-head">Prix selon la quantité <span>· couleurs mélangées</span></p>' +
+      '<p class="pdp-tiers-head">Prix selon la quantité <span>' + esc(scope) + '</span></p>' +
       '<div class="pdp-tiergrid">' + rows.map(function (t, i) {
         return '<div class="pdp-tier' + (i === on ? ' is-on' : '') + '"' + (i === on ? ' aria-current="true"' : '') + '>' +
           '<span class="pt-q">' + (i === 0 ? '1' : t.min + '+') + '</span><span class="pt-p">' + money(t.price) + '</span></div>';
@@ -953,9 +954,9 @@
   function keyOf(id, type) { return id + '|' + type; }
 
   function metaOf(it) { return it.type === 'accessory' ? accById[it.id] : byId[it.id]; }
-  // Rabais quantité : palier calculé sur le TOTAL du même matériau + format dans le panier
-  // (couleurs mélangées), comme en facturation
-  function groupKey(p, type) { return (p.brand || '') + '|' + (p.material || '') + '|' + type; }
+  // Rabais quantité : palier calculé sur le TOTAL de la même marque + format dans le panier
+  // (couleurs et matériaux mélangés : 2 PLA + 2 PETG Bambu = palier 4+), comme en facturation
+  function groupKey(p, type) { return (p.brand || p.material || '') + '|' + type; }
   function groupQty(p, type) {
     var g = groupKey(p, type);
     return Object.keys(cart).reduce(function (s, k) {

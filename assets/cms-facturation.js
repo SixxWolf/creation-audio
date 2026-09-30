@@ -168,6 +168,9 @@
     return (kind === 'refill' ? p.cost_price_2 : p.cost_price) || 0;
   }
   function filTiers(p, kind) { var m = matOf(p); if (m) return kind === 'refill' ? m.tiers_refill : m.tiers_spool; return kind === 'refill' ? p.tiers_2 : p.tiers; }
+  // groupe du rabais quantité : palier cumulé par MARQUE + format (couleurs et matériaux
+  // mélangés : 2 PLA + 2 PETG Bambu = palier 4+), comme le panier de la boutique
+  function filTierKey(p) { return 'fil|' + (p.brand || p.material || ''); }
 
   /* ---------- chargement ---------- */
   var prevOnTab = window.CA.onTab;
@@ -501,12 +504,12 @@
     c = c || cat;
     var p = c === cat ? prodById(id) : prodInCatalog(c, id);
     if (!p) return 0;
-    var kind, label, meta, base, cost, tiers, hex = null, ptype = c, sp = null, matKey = null;
+    var kind, label, meta, base, cost, tiers, hex = null, ptype = c, sp = null, tierKey = null;
     if (c === 'filament') {
       kind = pickerKind;
       base = filBase(p, kind); cost = filCost(p, kind); tiers = filTiers(p, kind);
       label = p.name; hex = p.hex;
-      matKey = (p.brand || '') + '|' + (p.material || '');   // rabais quantité cumulé par matériau+format
+      tierKey = filTierKey(p);   // rabais quantité cumulé par marque+format
       meta = [p.brand, p.material, (kind === 'refill' ? 'Recharge' : 'Avec bobine')].filter(Boolean).join(' · ');
     } else if (c === 'accessory') {
       kind = 'unit';
@@ -527,7 +530,7 @@
     if (ex) { ex.qty += 1; ex.price = tierPrice(ex.base, ex.tiers, ex.qty); }
     else {
       lines.push({ id: uid(), productId: String(id), ptype: ptype, kind: kind, label: label, meta: meta,
-        hex: hex, qty: 1, base: +base || 0, tiers: tiers || [], cost: +cost || 0, matKey: matKey,
+        hex: hex, qty: 1, base: +base || 0, tiers: tiers || [], cost: +cost || 0, tierKey: tierKey,
         price: tierPrice(base, tiers, 1), manual: false, sp: sp });
     }
     afterChange();
@@ -543,20 +546,21 @@
     });
   }
   // Rabais quantité : pour les FILAMENTS, le palier se calcule sur le TOTAL des
-  // quantités du même matériau + format (toutes couleurs confondues), puis
-  // s'applique à chaque ligne. Spacer/accessoire restent tarifés par ligne.
+  // quantités de la même marque + format (couleurs et matériaux confondus), puis
+  // s'applique à chaque ligne avec la grille de SON matériau. Spacer/accessoire
+  // restent tarifés par ligne.
   function repriceLines() {
     var totals = {};
     lines.forEach(function (l) {
-      if (l.ptype === 'filament' && l.matKey) {
-        var g = l.matKey + '|' + l.kind;
+      if (l.ptype === 'filament' && l.tierKey) {
+        var g = l.tierKey + '|' + l.kind;
         totals[g] = (totals[g] || 0) + (l.qty | 0);
       }
     });
     lines.forEach(function (l) {
       if (l.manual) return;   // prix forcé à la main : on ne touche pas
-      if (l.ptype === 'filament' && l.matKey) {
-        l.price = tierPrice(l.base, l.tiers, totals[l.matKey + '|' + l.kind] || (l.qty | 0));
+      if (l.ptype === 'filament' && l.tierKey) {
+        l.price = tierPrice(l.base, l.tiers, totals[l.tierKey + '|' + l.kind] || (l.qty | 0));
       } else {
         l.price = tierPrice(l.base, l.tiers, l.qty);
       }
@@ -602,7 +606,7 @@
 
   /* ---------- rendu de la facture ---------- */
   function render() {
-    repriceLines();   // applique le rabais quantité (cumulé par matériau pour les filaments)
+    repriceLines();   // applique le rabais quantité (cumulé par marque pour les filaments)
     if (!lines.length) {
       elInvoice.innerHTML = '<p class="inv-empty">Ajoute des articles depuis le catalogue (ou une ligne libre).</p>';
       elMargin.hidden = true;
@@ -679,7 +683,7 @@
       inp.addEventListener('change', function () {
         var l = lines[+this.getAttribute('data-i')]; if (!l) return;
         l.qty = Math.max(0, parseInt(this.value, 10) || 0);
-        afterChange();   // render() -> repriceLines() applique le palier (cumulé par matériau)
+        afterChange();   // render() -> repriceLines() applique le palier (cumulé par marque)
       });
     });
     $$('.inv-price', elInvoice).forEach(function (inp) {
@@ -984,12 +988,12 @@
       : 'divers');
     var l = { id: uid(), productId: s.product_id ? String(s.product_id) : null, ptype: ptype, kind: kind,
       label: s.label || '', meta: s.meta || '', hex: null, qty: +s.qty || 0, base: +s.unit_price || 0, tiers: [],
-      cost: +s.unit_cost || 0, matKey: null, price: +s.unit_price || 0, manual: true, sp: null, live: false };
+      cost: +s.unit_cost || 0, tierKey: null, price: +s.unit_price || 0, manual: true, sp: null, live: false };
     if (hit) {
       var p = hit.p;
       if (hit.c === 'filament') {
         l.base = +filBase(p, kind) || 0; l.tiers = filTiers(p, kind) || []; l.hex = p.hex;
-        l.matKey = (p.brand || '') + '|' + (p.material || '');
+        l.tierKey = filTierKey(p);
       } else if (hit.c === 'spacer') {
         l.sp = spacerDual(p); l.base = isDealer() ? l.sp.dealer : l.sp.client; l.tiers = isDealer() ? l.sp.tiers : [];
       } else {
@@ -1083,11 +1087,11 @@
     var p = l.product_id ? prodInCatalog('spacer', l.product_id) : null;
     if (!p) {   // spacer supprimé depuis : ligne libre au prix de la commande
       return { id: uid(), productId: null, ptype: 'spacer', kind: 'free', label: l.name || 'Spacer', meta: 'Spacer · paire',
-        hex: null, qty: qty, base: price, tiers: [], cost: 0, matKey: null, price: price, manual: true, sp: null };
+        hex: null, qty: qty, base: price, tiers: [], cost: 0, tierKey: null, price: price, manual: true, sp: null };
     }
     var sp = spacerDual(p);
     var ln = { id: uid(), productId: String(p.id), ptype: 'spacer', kind: 'unit', label: p.name, meta: 'Spacer · paire',
-      hex: null, qty: qty, base: sp.dealer, tiers: sp.tiers, cost: +p.cost_price || 0, matKey: null, price: price, manual: false, sp: sp };
+      hex: null, qty: qty, base: sp.dealer, tiers: sp.tiers, cost: +p.cost_price || 0, tierKey: null, price: price, manual: false, sp: sp };
     // tarif changé depuis la commande : on garde le prix que le dealer a vu
     if (Math.abs(tierPrice(ln.base, ln.tiers, qty) - price) > 0.005) ln.manual = true;
     return ln;
@@ -1318,7 +1322,7 @@
     else {
       lines.push({ id: uid(), productId: String(p.id), ptype: 'filament', kind: kind, label: p.name,
         meta: meta, hex: p.hex, qty: 1, base: +base || 0, tiers: tiers || [], cost: +cost || 0,
-        matKey: (p.brand || '') + '|' + (p.material || ''),
+        tierKey: filTierKey(p),
         price: tierPrice(base, tiers, 1), manual: false, sp: null });
     }
     afterChange();

@@ -188,7 +188,7 @@
 /* Prix selon la quantité : grille 1 / 2+ / 4+ …, palier atteint surligné */
 .pdp-tiers { margin:16px 0 0; max-width:440px; }
 .pdp-tiers-head { margin:0 0 7px; font-size:.74rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ember-ink); }
-.pdp-tiers-head span { font-weight:500; letter-spacing:0; text-transform:none; font-size:.82rem; color:var(--muted); }
+.pdp-tiers-head span { display:block; margin-top:2px; font-weight:500; letter-spacing:0; text-transform:none; font-size:.82rem; color:var(--muted); }
 .pdp-tiergrid { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; border:1px solid #F1E2D8; border-radius:12px; overflow:hidden; background:#FFFAF6; }
 .pdp-tier { display:flex; flex-direction:column; align-items:center; gap:1px; padding:8px 4px 9px; border-left:1px solid #F1E2D8;
   transition:background .15s, color .15s; }
