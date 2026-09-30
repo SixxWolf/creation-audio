@@ -81,17 +81,22 @@
        tête : on le remet au DERNIER loop seulement. Cherché après END_ANCHOR ; la
        copie du commentaire de config (\n échappés, une seule ligne) ne matche pas. */
   var RE_AMS_PULLBACK = /; pull back filament to AMS\r?\n(M620 S65535\r?\n[\s\S]*?M621 S65535)\r?\n/;
-  /* - RE_M73 : progression lue par l'imprimante (« M73 P<%> R<min restantes> »).
-       Chaque loop étant une copie de la pièce, elle repartait à 0 % / 1h53 à
-       chaque loop : on la réécrit pour tout le batch (cf. progressSegments).
-       « M73 L » (couche) et « M73.2 » ne matchent pas : couches par pièce.    */
-  var RE_M73 = /^M73 P(\d+) R(\d+)[^\r\n]*/gm;
+  /* - RE_M73 : progression lue par l'imprimante (« M73 P<%> R<min restantes> »)
+       et couche courante (« M73 L<n> »). Chaque loop étant une copie de la pièce,
+       elle repartait à 0 % / 1h53 à chaque loop, et le firmware restait bloqué
+       sur « couche 70/70 » dès la fin du loop 1 (il ignore un L qui redescend) :
+       on réécrit les deux pour tout le batch (cf. progressSegments). « M73.2 » ne
+       matche pas. M991 S0 P (notification de couche) reste par pièce.
+     - RE_TOTAL_LAYERS : total de couches de l'en-tête, lu par l'imprimante pour
+       afficher « couche x / total » → multiplié par le nombre de loops.       */
+  var RE_M73 = /^M73 (?:P(\d+) R(\d+)|L(\d+))[^\r\n]*/gm;
+  var RE_TOTAL_LAYERS = /^(; total layer number: )(\d+)/m;
   var EJECT_MIN = 1;   // flexion + push + balayages + parking ≈ 1 min (hors cooldown)
 
   // Remplace la ligne de purge native par une purge en goulotte. Séquence reprise
   // du fichier FarmLoop qui imprimait déjà ; la température M109 est celle du bloc
   // d'origine (temp. buse du profil). Bloc absent → gcode inchangé (signalé au rapport).
-  function replaceLoadLine(head, eol) {
+  function replaceLoadLine(head, eol, purgeLen) {
     var m = RE_LOAD_LINE.exec(head);
     if (!m) return { text: head, replaced: false };
     var t = /M109 S(\d+)/.exec(m[1]);
@@ -105,13 +110,50 @@
       '  M83',
       '  T1000',
       '  G92 E0',
-      '  G1 E50 F200 ; purge dans la goulotte à déchets',
+      '  G1 E' + z(purgeLen) + ' F200 ; purge dans la goulotte à déchets',
       '  M400',
       '  G1 X100 F21000',
       '  M400',
       ';===== nozzle load line end ====='
     ];
     return { text: head.slice(0, m.index) + L.join(eol) + eol + head.slice(m.index + m[0].length), replaced: true };
+  }
+
+  /* - Réamorçage après changement de filament : le slicer recule le filament de
+       retract_length_toolchange (+ restart_extra) avant la coupe, puis le repousse
+       d'autant au 1er point du nouveau filament (« G1 E2 F1800 », sur place). Le
+       champ est grisé dans Bambu Studio pour une buse unique ; si le firmware
+       laisse la buse pleine après sa purge, ces 2 mm font un amas au 1er trait.
+       On ne touche qu'à ce réamorçage (la rétraction avant coupe reste), et
+       seulement si la ligne vaut exactement la valeur du slicer.                */
+  var RE_TOOLCHANGE = /^;=+ P2S filament_change gcode =+/gm;
+  function adjustRestart(head, len) {
+    var a = /^; retract_length_toolchange = ([\d.]+)/m.exec(head);
+    var b = /^; retract_restart_extra_toolchange = (-?[\d.]+)/m.exec(head);
+    var res = { text: head, changes: 0, done: 0, orig: a ? parseFloat(a[1]) + (b ? parseFloat(b[1]) : 0) : null };
+    var out = '', last = 0, m;
+    RE_TOOLCHANGE.lastIndex = 0;
+    while ((m = RE_TOOLCHANGE.exec(head))) {
+      res.changes++;
+      var fs = head.indexOf('; filament start gcode', m.index);
+      if (fs === -1 || res.orig == null) continue;
+      // 1re ligne G1 avec extrusion après le start du nouveau filament.
+      var reG = /^G1 ([^\r\n;]*)[^\r\n]*/gm, g;
+      reG.lastIndex = fs;
+      while ((g = reG.exec(head)) && !/(^|\s)E-?[\d.]/.test(g[1])) {}
+      if (!g) continue;
+      var d = /^E(\d*\.?\d+) F(\d+)\s*$/.exec(g[1]);   // réamorçage pur : « G1 E2 F1800 »
+      if (!d || Math.abs(parseFloat(d[1]) - res.orig) > 0.001) continue;
+      res.done++;
+      if (Math.abs(len - res.orig) > 0.001) {
+        out += head.slice(last, g.index) + 'G1 E' + z(len) + ' F' + d[2] +
+               ' ; AutoLoop : réamorçage après changement de filament (' + d[1] + ' mm à l\'origine)';
+        last = g.index + g[0].length;
+      }
+      RE_TOOLCHANGE.lastIndex = Math.max(RE_TOOLCHANGE.lastIndex, g.index + g[0].length);
+    }
+    res.text = last ? out + head.slice(last) : head;
+    return res;
   }
 
   // Motif « tous les N loops » (champ de chaque ligne de la grille) : loop 1, puis 1+N, 1+2N…
@@ -142,22 +184,37 @@
        %        = part du batch écoulée (99 max ; 100 posé à la toute fin).
      Le restant ne dépend que de ce qui reste à faire : un cooldown plus long
      que prévu ne s'accumule pas, l'estimation se recale au loop suivant.   */
-  function progressSegments(head) {
-    var chunks = [], rs = [], last = 0, m;
+  // Couches : loop i, couche n → (i − 1) × couches par pièce + n (toujours croissant).
+  function progressSegments(head, layersPer) {
+    var chunks = [], toks = [], rs = [], maxL = 0, last = 0, m;
     RE_M73.lastIndex = 0;
     while ((m = RE_M73.exec(head))) {
       chunks.push(head.slice(last, m.index));
-      rs.push(parseInt(m[2], 10));
+      if (m[3] != null) {
+        var l = parseInt(m[3], 10);
+        toks.push({ l: l });
+        if (l > maxL) maxL = l;
+      } else {
+        var r = parseInt(m[2], 10);
+        toks.push({ r: r });
+        rs.push(r);
+      }
       last = m.index + m[0].length;
     }
     chunks.push(head.slice(last));
-    return { chunks: chunks, rs: rs, loopMin: rs.length ? Math.max.apply(null, rs) : 0 };
+    return { chunks: chunks, toks: toks, rs: rs, loopMin: rs.length ? Math.max.apply(null, rs) : 0,
+             layers: layersPer || maxL };
   }
   function progressHead(seg, i, N, transMin) {
-    if (!seg.rs.length) return seg.chunks[0];
     var cycle = seg.loopMin + transMin, total = N * cycle, out = seg.chunks[0];
-    for (var k = 0; k < seg.rs.length; k++) {
-      var rem = seg.rs[k] + transMin + (N - i) * cycle;
+    var off = (i - 1) * seg.layers;
+    for (var k = 0; k < seg.toks.length; k++) {
+      var t = seg.toks[k];
+      if (t.l != null) {
+        out += 'M73 L' + (off + t.l) + seg.chunks[k + 1];
+        continue;
+      }
+      var rem = t.r + transMin + (N - i) * cycle;
       var pct = total > 0 ? Math.min(99, Math.max(0, Math.floor(100 * (total - rem) / total))) : 0;
       out += 'M73 P' + pct + ' R' + Math.round(rem) + seg.chunks[k + 1];
     }
@@ -299,7 +356,7 @@
     var report = {
       ok: false, loops: opts.loops, eol: eol === '\r\n' ? 'CRLF' : 'LF',
       maxZ: null, pushZ: null, flow: [], bed: [], bendsPerLoop: 0, size: 0, error: null,
-      loadLineReplaced: false, amsUnload: false,
+      loadLineReplaced: false, amsUnload: false, layersPer: 0, restart: null,
       progress: false, loopMin: 0, transMin: 0, totalMin: 0
     };
     var idx = raw.indexOf(END_ANCHOR);
@@ -317,8 +374,11 @@
     report.bendsPerLoop = (opts.bendEnable && opts.bendCycles > 0) ? opts.bendCycles * 2 : 0;
 
     var head = raw.slice(0, idx);   // pièce complète (header + config + start + corps), sans le end gcode natif
-    var ll = replaceLoadLine(head, eol);   // purge en goulotte à la place de la ligne G130, sur tous les loops
+    var ll = replaceLoadLine(head, eol, opts.purgeLen);   // purge en goulotte à la place de la ligne G130, sur tous les loops
     head = ll.text; report.loadLineReplaced = ll.replaced;
+    var rst = adjustRestart(head, opts.restartLen);   // réamorçage au 1er point après chaque changement de filament
+    head = rst.text;
+    report.restart = { changes: rst.changes, done: rst.done, orig: rst.orig, len: opts.restartLen };
     var N = opts.loops;
     var trans = buildTransition(opts, pushZ, maxZ, eol);   // identique pour chaque loop…
     var pb = RE_AMS_PULLBACK.exec(raw.slice(idx));
@@ -326,7 +386,12 @@
     var transLast = buildTransition(opts, pushZ, maxZ, eol, { unload: unload });   // …sauf le dernier : retrait AMS + 100 %
     report.amsUnload = !!unload;
 
-    var seg = progressSegments(head);   // progression réécrite pour le batch complet
+    // Total de couches annoncé à l'imprimante = couches par pièce × loops.
+    var tl = RE_TOTAL_LAYERS.exec(head);
+    var layersPer = tl ? parseInt(tl[2], 10) : 0;
+    if (tl) head = head.replace(RE_TOTAL_LAYERS, '$1' + (N * layersPer));
+    report.layersPer = layersPer;
+    var seg = progressSegments(head, layersPer);   // progression + couches réécrites pour le batch complet
     var transMin = transitionMin(opts);
     report.progress = seg.rs.length > 0;
     report.loopMin = seg.loopMin; report.transMin = transMin;
@@ -452,6 +517,8 @@
       pushOffset: num($('#al-push-offset').value, 10),
       pushSpeed: num($('#al-push-speed').value, 10000),
       clearZ: num($('#al-clearz').value, 105),
+      purgeLen: Math.max(0, num($('#al-purge-len').value, 100)),
+      restartLen: Math.max(0, num($('#al-restart-len').value, 2)),
       coolMode: $('#al-cool-mode').value,
       coolTemp: num($('#al-cool-temp').value, 45),
       coolSec: num($('#al-cool-sec').value, 60),
@@ -461,6 +528,20 @@
 
   function fmtSize(bytes) {
     return bytes > 1048576 ? (bytes / 1048576).toFixed(1) + ' Mo' : (bytes / 1024).toFixed(0) + ' Ko';
+  }
+
+  // Ligne du rapport pour le réamorçage après changement de filament (rien si la pièce n'a qu'un filament).
+  function restartLine(r) {
+    if (!r || !r.changes) return '';
+    if (r.done < r.changes) {
+      return '<br><span class="al-warn">Réamorçage après changement de filament : ' + r.done + ' / ' + r.changes +
+             ' changement(s) reconnu(s) — les autres gardent la valeur du slicer.</span>';
+    }
+    var same = Math.abs(r.len - r.orig) <= 0.001;
+    return '<br>Réamorçage après changement de filament : ' + (same
+      ? z(r.orig) + ' mm (valeur du slicer, inchangée)'
+      : '<b>' + z(r.len) + ' mm</b> au lieu de ' + z(r.orig) + ' mm') +
+      ' · ' + r.changes + ' changement(s) par pièce.';
   }
 
   function renderReport(rep) {
@@ -481,10 +562,14 @@
         '<br>Ligne de purge : ' + (rep.loadLineReplaced
           ? 'remplacée par une purge en goulotte (aucune ligne sur le plateau).'
           : '<span class="al-warn">bloc « nozzle load line » introuvable — purge native conservée.</span>') +
+        restartLine(rep.restart) +
         '<br>Progression : ' + (rep.progress
           ? 'batch complet · durée estimée <b>' + fmtDur(rep.totalMin) + '</b> (' + rep.loops + ' × ' + rep.loopMin + ' min + ' +
             Math.round(rep.transMin) + ' min de cooldown/éjection). Le % et l\'heure de fin affichés par l\'imprimante valent pour tout le batch.'
           : '<span class="al-warn">lignes de progression (M73) introuvables — l\'imprimante affichera la progression pièce par pièce.</span>') +
+        '<br>Couches : ' + (rep.layersPer
+          ? 'numérotées sur tout le batch (' + rep.layersPer + ' par pièce · total ' + (rep.layersPer * rep.loops) + ').'
+          : '<span class="al-warn">total de couches introuvable dans l\'en-tête — l\'imprimante restera sur la dernière couche du loop 1.</span>') +
         '<br>Filament : ' + (rep.amsUnload
           ? 'retiré vers l\'AMS à la fin du dernier loop (loop ' + rep.loops + ').'
           : '<span class="al-warn">bloc de retrait AMS introuvable dans le end gcode — le filament restera dans la tête.</span>') +
