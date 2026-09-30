@@ -122,8 +122,10 @@
   /* - Réamorçage après changement de filament : le slicer recule le filament de
        retract_length_toolchange (+ restart_extra) avant la coupe, puis le repousse
        d'autant au 1er point du nouveau filament (« G1 E2 F1800 », sur place). Le
-       champ est grisé dans Bambu Studio pour une buse unique ; si le firmware
-       laisse la buse pleine après sa purge, ces 2 mm font un amas au 1er trait.
+       champ est grisé dans Bambu Studio pour une buse unique. Le gcode de
+       changement P2S finit par « M983.3 … R{retract_length_toolchange} » : le
+       firmware recule donc sans doute de 2 mm après sa purge, et ce G1 E2 le
+       compense (le baisser = risque de manque au 1er trait ; réglage de test).
        On ne touche qu'à ce réamorçage (la rétraction avant coupe reste), et
        seulement si la ligne vaut exactement la valeur du slicer.                */
   var RE_TOOLCHANGE = /^;=+ P2S filament_change gcode =+/gm;
@@ -151,6 +153,46 @@
         last = g.index + g[0].length;
       }
       RE_TOOLCHANGE.lastIndex = Math.max(RE_TOOLCHANGE.lastIndex, g.index + g[0].length);
+    }
+    res.text = last ? out + head.slice(last) : head;
+    return res;
+  }
+
+  /* - Nettoyage de la buse après changement de filament. Après sa purge, le gcode
+       de changement P2S fait « M983.3 … » (calibration dynamique) puis s'éloigne
+       de la poubelle (« G1 Y247 ») sans essuyer la buse. Le start gcode P2S, lui,
+       après le même M983.3 : G150.3 (poubelle), puis G150.2 + G150.1 F8000 deux
+       fois, puis s'éloigne. On insère cette séquence native (sans sa rétraction
+       E-3 : le M983.3 … R<n> recule déjà) juste avant le « G1 Y » qui suit le
+       M983.3, dans le chemin normal seulement (avant M621 ; la branche reprise
+       après coupure de courant reste telle quelle). passes = paires G150.2/G150.1. */
+  function addChangeWipe(head, passes, eol) {
+    var res = { text: head, changes: 0, done: 0, passes: passes };
+    var re = /^;=+ P2S filament_change gcode =+/gm, out = '', last = 0, m;
+    var blk = [';===== AutoLoop : nettoyage de la buse après changement de filament (séquence du start gcode P2S) =====',
+               'G150.3 ; poubelle'];
+    for (var k = 0; k < passes; k++) blk.push('G150.2', 'G150.1 F8000');
+    blk.push(';===== AutoLoop : fin du nettoyage =====');
+    while ((m = re.exec(head))) {
+      res.changes++;
+      var end = head.indexOf('\nM621 S', m.index);            // fin du bloc AMS (chemin normal)
+      if (end === -1) continue;
+      var cal = head.indexOf('\nM983.3 ', m.index);
+      if (cal === -1 || cal > end) continue;
+      // Après le M983.3, seules des lignes M400 / vides sont tolérées jusqu'au « G1 Y ».
+      var reY = /^([^\r\n]*)\r?\n/gm, y, at = -1;
+      reY.lastIndex = head.indexOf('\n', cal + 1) + 1;
+      while ((y = reY.exec(head)) && y.index < end) {
+        if (/^G1 Y/.test(y[1])) { at = y.index; break; }
+        if (!/^(M400\b.*|\s*)$/.test(y[1])) break;
+      }
+      if (at === -1) continue;
+      res.done++;
+      if (passes > 0) {
+        out += head.slice(last, at) + blk.join(eol) + eol;
+        last = at;
+      }
+      re.lastIndex = Math.max(re.lastIndex, end);
     }
     res.text = last ? out + head.slice(last) : head;
     return res;
@@ -356,7 +398,7 @@
     var report = {
       ok: false, loops: opts.loops, eol: eol === '\r\n' ? 'CRLF' : 'LF',
       maxZ: null, pushZ: null, flow: [], bed: [], bendsPerLoop: 0, size: 0, error: null,
-      loadLineReplaced: false, amsUnload: false, layersPer: 0, restart: null,
+      loadLineReplaced: false, amsUnload: false, layersPer: 0, restart: null, wipe: null,
       progress: false, loopMin: 0, transMin: 0, totalMin: 0
     };
     var idx = raw.indexOf(END_ANCHOR);
@@ -379,6 +421,9 @@
     var rst = adjustRestart(head, opts.restartLen);   // réamorçage au 1er point après chaque changement de filament
     head = rst.text;
     report.restart = { changes: rst.changes, done: rst.done, orig: rst.orig, len: opts.restartLen };
+    var wp = addChangeWipe(head, opts.wipePasses, eol);   // nettoyage de la buse après chaque changement de filament
+    head = wp.text;
+    report.wipe = { changes: wp.changes, done: wp.done, passes: opts.wipePasses };
     var N = opts.loops;
     var trans = buildTransition(opts, pushZ, maxZ, eol);   // identique pour chaque loop…
     var pb = RE_AMS_PULLBACK.exec(raw.slice(idx));
@@ -519,6 +564,7 @@
       clearZ: num($('#al-clearz').value, 105),
       purgeLen: Math.max(0, num($('#al-purge-len').value, 100)),
       restartLen: Math.max(0, num($('#al-restart-len').value, 2)),
+      wipePasses: Math.min(10, Math.max(0, intOr($('#al-wipe-passes').value, 2))),
       coolMode: $('#al-cool-mode').value,
       coolTemp: num($('#al-cool-temp').value, 45),
       coolSec: num($('#al-cool-sec').value, 60),
@@ -544,6 +590,18 @@
       ' · ' + r.changes + ' changement(s) par pièce.';
   }
 
+  // Ligne du rapport pour le nettoyage de buse après changement (rien si la pièce n'a qu'un filament).
+  function wipeLine(w) {
+    if (!w || !w.changes) return '';
+    if (w.done < w.changes) {
+      return '<br><span class="al-warn">Nettoyage de la buse après changement : ' + w.done + ' / ' + w.changes +
+             ' changement(s) reconnu(s) — les autres restent sans nettoyage ajouté.</span>';
+    }
+    return '<br>Nettoyage de la buse après changement : ' + (w.passes > 0
+      ? '<b>' + w.passes + ' passage(s)</b> (G150.2 + G150.1, séquence du start gcode)'
+      : 'aucun ajouté') + ' · ' + w.changes + ' changement(s) par pièce.';
+  }
+
   function renderReport(rep) {
     var box = $('#al-report');
     if (rep.error) { box.innerHTML = '<p class="al-warn">' + rep.error + '</p>'; return; }
@@ -562,7 +620,7 @@
         '<br>Ligne de purge : ' + (rep.loadLineReplaced
           ? 'remplacée par une purge en goulotte (aucune ligne sur le plateau).'
           : '<span class="al-warn">bloc « nozzle load line » introuvable — purge native conservée.</span>') +
-        restartLine(rep.restart) +
+        restartLine(rep.restart) + wipeLine(rep.wipe) +
         '<br>Progression : ' + (rep.progress
           ? 'batch complet · durée estimée <b>' + fmtDur(rep.totalMin) + '</b> (' + rep.loops + ' × ' + rep.loopMin + ' min + ' +
             Math.round(rep.transMin) + ' min de cooldown/éjection). Le % et l\'heure de fin affichés par l\'imprimante valent pour tout le batch.'
