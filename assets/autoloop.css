@@ -60,7 +60,6 @@
 .al-cal-every .al-inline { gap:8px; font-size:.9rem; font-weight:600; color:var(--ink); }
 .al-cal-every input { width:64px; text-align:center; }
 .al-cal-bk { font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); cursor:pointer; }
-.al-cal-help { margin:10px 0 0; }
 .al-cal-grid { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
 .al-calg-wrap { max-width:100%; overflow-x:auto; }
 .al-calg { border-collapse:separate; border-spacing:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
@@ -72,8 +71,6 @@
   letter-spacing:.08em; text-align:left; text-transform:uppercase; white-space:nowrap; color:var(--muted); background:var(--wash); border-left:0; }
 .al-calg td input { display:block; width:18px; height:18px; margin:auto; }
 .al-calg td:has(input:checked) { background:color-mix(in srgb, var(--ember) 9%, var(--paper)); }
-.al-cal-sum { margin:12px 0 0; color:var(--ink-2); }
-.al-cal-sum b { font-variant-numeric:tabular-nums; color:var(--ink); }
 
 /* --- Actions gcode -------------------------------------- */
 .al-actions { display:flex; flex-wrap:wrap; gap:10px; }
@@ -90,6 +87,11 @@
 
 /* --- Rapport de traitement ------------------------------ */
 .al-report-card .muted { font-size:.85rem; }
+/* lignes libellé → valeur (classe .al-srow du résumé des coûts) */
+.al-report-card .al-srow > span:last-child { text-align:right; font-weight:600; color:var(--ink); }
+.al-report-card .al-srow > span:first-child { flex:none; color:var(--ink-2); }
+.al-report-card .al-srow > .al-bad { color:var(--bad); }
+.al-report-card .al-proj { margin:12px 0 0; }
 .al-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
 .al-stat { padding:12px; text-align:center; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
 .al-stat-v { display:block; font-family:var(--display); font-size:1.6rem; font-weight:700; line-height:1; letter-spacing:-.02em;

@@ -490,22 +490,6 @@
         '</tbody></table></div>';
     }
     box.innerHTML = html;
-    syncCalSum();
-  }
-  function calLoops(row, N) {
-    var out = [];
-    for (var i = 0; i < N; i++) if (cal[row][i]) out.push(i + 1);
-    return out;
-  }
-  function syncCalSum() {
-    var el = $('#al-cal-sum');
-    if (!el) return;
-    var N = loopCount();
-    var line = function (label, list) {
-      return label + ' : <b>' + list.length + '</b> loop' + (list.length > 1 ? 's' : '') + ' sur ' + N +
-        (list.length && list.length < N ? ' (' + loopRanges(list) + ')' : '');
-    };
-    el.innerHTML = line('Flow', calLoops('flow', N)) + ' · ' + line('Bed leveling', calLoops('bed', N));
   }
   function initCalGrid() {
     var box = $('#al-cal-grid');
@@ -514,7 +498,6 @@
       var cb = e.target;
       if (!cb.dataset || !cb.dataset.row) return;
       cal[cb.dataset.row][+cb.dataset.i] = cb.checked;
-      syncCalSum();
     });
     ['flow', 'bed'].forEach(function (row) {
       $('#al-cal-' + row + '-every').addEventListener('input', function () {
@@ -550,68 +533,43 @@
     };
   }
 
-  function fmtSize(bytes) {
-    return bytes > 1048576 ? (bytes / 1048576).toFixed(1) + ' Mo' : (bytes / 1024).toFixed(0) + ' Ko';
-  }
-
   // « 2810.74 » → « 2 810,74 » (poids du rapport)
   function grams(n) {
     var p = (Math.round(n * 100) / 100).toFixed(2).split('.');
     return p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + p[1];
   }
 
-  // Ligne du rapport pour le nettoyage de buse après changement (rien si la pièce n'a qu'un filament).
-  function wipeLine(w) {
-    if (!w || !w.changes) return '';
-    if (w.done < w.changes) {
-      return '<br><span class="al-warn">Nettoyage de la buse après changement : ' + w.done + ' / ' + w.changes +
-             ' changement(s) reconnu(s) — les autres restent sans nettoyage ajouté.</span>';
-    }
-    return '<br>Nettoyage de la buse après changement : ' + (w.passes > 0
-      ? '<b>' + w.passes + ' passage(s)</b> (G150.2 + G150.1, séquence du start gcode)'
-      : 'aucun ajouté') + ' · ' + w.changes + ' changement(s) par pièce.';
+  // Ligne du rapport, libellé → valeur (comme le résumé des coûts). bad = bloc introuvable dans le gcode.
+  function rrow(label, val, bad) {
+    return '<div class="al-srow"><span>' + label + '</span><span' + (bad ? ' class="al-bad"' : '') + '>' + val + '</span></div>';
   }
 
   function renderReport(rep) {
     var box = $('#al-report');
     if (rep.error) { box.innerHTML = '<p class="al-warn">' + rep.error + '</p>'; return; }
+    var w = rep.wipe, wipeOk = w && w.done === w.changes;
     box.innerHTML =
       '<div class="al-stats">' +
-        stat(rep.loops, 'loops générés') +
+        stat(rep.loops, 'loops') +
         stat(z(rep.pushZ), 'push (mm)') +
-        stat(rep.flow.length, 'calibrations du flow') +
-        stat(rep.bed.length, 'bed levelings') +
+        stat(rep.flow.length, 'flow') +
+        stat(rep.bed.length, 'bed leveling') +
       '</div>' +
-      '<p class="al-fine">Pièce : ' + z(rep.maxZ) + ' mm · fins de ligne ' + rep.eol +
-        ' · fichier ~' + fmtSize(rep.size) + ' · flexion : ' + rep.bendsPerLoop + ' strokes / loop' +
-        '<br>Flow sur loop(s) : ' + (loopRanges(rep.flow) || '—') +
-        '<br>Bed leveling sur loop(s) : ' + (loopRanges(rep.bed) || '—') +
-        '<br>Forcés dans le gcode, peu importe les options de la fenêtre d\'envoi de Bambu Studio.' +
-        '<br>Ligne de purge : ' + (rep.loadLineReplaced
-          ? 'remplacée par une purge en goulotte (aucune ligne sur le plateau).'
-          : '<span class="al-warn">bloc « nozzle load line » introuvable — purge native conservée.</span>') +
-        wipeLine(rep.wipe) +
-        (rep.weightPer > 0
-          ? '<br>Filament du batch : <b>' + grams(rep.weightPer * rep.loops) + ' g</b> (' + rep.loops + ' × ' + grams(rep.weightPer) +
-            ' g) — total affiché par Bambu Studio et envoyé à l\'imprimante (purge en goulotte non comptée, comme dans Bambu).'
-          : '<br><span class="al-warn">Poids de filament introuvable dans l\'en-tête — Bambu Studio affichera le poids d\'une seule pièce.</span>') +
-        '<br>Progression : ' + (rep.progress
-          ? 'batch complet · durée estimée <b>' + fmtDur(rep.totalMin) + '</b> (' + rep.loops + ' × ' + rep.loopMin + ' min + ' +
-            Math.round(rep.transMin) + ' min de cooldown/éjection). Le % et l\'heure de fin affichés par l\'imprimante valent pour tout le batch.'
-          : '<span class="al-warn">lignes de progression (M73) introuvables — l\'imprimante affichera la progression pièce par pièce.</span>') +
-        '<br>Couches : ' + (rep.layersPer
-          ? 'numérotées sur tout le batch (' + rep.layersPer + ' par pièce · total ' + (rep.layersPer * rep.loops) + ').'
-          : '<span class="al-warn">total de couches introuvable dans l\'en-tête — l\'imprimante restera sur la dernière couche du loop 1.</span>') +
-        '<br>Filament : ' + (rep.amsUnload
-          ? 'retiré vers l\'AMS à la fin du dernier loop (loop ' + rep.loops + ').'
-          : '<span class="al-warn">bloc de retrait AMS introuvable dans le end gcode — le filament restera dans la tête.</span>') +
-      '</p>' +
-      (project
-        ? '<p class="al-fine al-proj">Projet Bambu Studio : ' + esc(plateLabel()) + ' remplacé par le batch, empreinte MD5 recalculée ; ' +
-          'aperçus, réglages et modèle conservés. <b>Télécharge le projet, ouvre-le dans Bambu Studio et lance l\'impression.</b>' +
-          ' <button type="button" class="al-link" id="al-download-gcode">gcode seul</button></p>'
+      rrow('Flow', loopRanges(rep.flow) || '—') +
+      rrow('Bed leveling', loopRanges(rep.bed) || '—') +
+      rrow('Purge', rep.loadLineReplaced ? 'en goulotte' : 'introuvable — ligne native gardée', !rep.loadLineReplaced) +
+      (w && w.changes
+        ? rrow('Nettoyage de buse', wipeOk ? (w.passes > 0 ? w.passes + ' passages' : 'aucun') : w.done + ' / ' + w.changes + ' changements', !wipeOk)
         : '') +
-      '<p class="al-fine al-tip">Vérifie toujours le premier loop sur la P2S avant de lancer le batch complet.</p>';
+      rrow('Filament', rep.weightPer > 0 ? grams(rep.weightPer * rep.loops) + ' g' : 'introuvable', !(rep.weightPer > 0)) +
+      rrow('Durée estimée', rep.progress ? fmtDur(rep.totalMin) : 'M73 introuvables', !rep.progress) +
+      rrow('Couches', rep.layersPer ? String(rep.layersPer * rep.loops) : 'introuvable', !rep.layersPer) +
+      rrow('Retrait AMS', rep.amsUnload ? 'au loop ' + rep.loops : 'introuvable', !rep.amsUnload) +
+      rrow('Hauteur de la pièce', z(rep.maxZ) + ' mm') +
+      (project
+        ? '<p class="al-fine al-proj">Projet Bambu prêt (' + esc(plateLabel()) + ') · ' +
+          '<button type="button" class="al-link" id="al-download-gcode">gcode seul</button></p>'
+        : '');
     var gOnly = $('#al-download-gcode');
     if (gOnly) gOnly.addEventListener('click', function () { downloadGcode(); });
   }
@@ -736,8 +694,8 @@
   function useGcode(text) {
     rawText = text;
     var mz = rawText.match(RE_MAXZ);
-    $('#al-file-name').textContent = rawName + (project ? ' · projet Bambu, ' + plateLabel() : '') +
-      ' · gcode ' + fmtSize(rawText.length) + (mz ? ' · pièce ' + parseFloat(mz[1]).toFixed(2) + ' mm' : '');
+    $('#al-file-name').textContent = rawName + (project && project.plates.length > 1 ? ' · ' + plateLabel() : '') +
+      (mz ? ' · pièce ' + parseFloat(mz[1]).toFixed(2) + ' mm' : '');
     $('#al-process').disabled = false;
     applyGcodeToPricing(rawText, rawName);
   }
@@ -974,8 +932,8 @@
     set('ap-out-margin-amt', money(r.marginAmt * k));
     var profit = $('#ap-out-margin-amt');
     if (profit) profit.style.color = r.marginAmt < 0 ? 'var(--bad)' : '';
-    set('ap-prep-permin', (Math.round(r.prepMin * 100) / 100) + ' min/pièce');
-    set('ap-post-permin', (Math.round(r.postMin * 100) / 100) + ' min/pièce');
+    set('ap-prep-permin', (Math.round(r.prepMin * 100) / 100) + ' min');
+    set('ap-post-permin', (Math.round(r.postMin * 100) / 100) + ' min');
     $$('.ap-unit-lbl').forEach(function (el) { el.textContent = k === 2 ? '/ paire' : '/ pièce'; });
     $$('#ap-unit .al-unit-b').forEach(function (b) { b.setAttribute('aria-checked', String(+b.dataset.unit === k)); });
     drawBreakdown(r, k);
@@ -1086,17 +1044,17 @@
   function shortDay(iso) {
     try { return new Date(iso).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; }
   }
-  function defsMsg(view, text, tone) {
+  // Statut court à côté de « Valeurs par défaut » ; le détail d'une erreur va dans l'infobulle.
+  function defsMsg(view, text, tone, detail) {
     var el = $('.al-defs[data-defs="' + view + '"] .al-defs-msg');
     if (!el) return;
     el.textContent = text;
+    el.title = detail || '';
     el.className = 'al-defs-msg' + (tone ? ' is-' + tone : '');
   }
   function defsStatus(view) {
     var at = saved && saved.at && saved.at[view];
-    defsMsg(view, saved && saved[view]
-      ? 'Tes défauts sont appliqués' + (at ? ' (enregistrés le ' + shortDay(at) + ')' : '') + '.'
-      : 'Valeurs d\'usine. Ajuste les champs, puis enregistre-les pour les retrouver à chaque ouverture.');
+    defsMsg(view, saved && saved[view] ? 'tes réglages' + (at ? ' du ' + shortDay(at) : '') : 'usine');
   }
 
   // Avant initGcode / initPricing : leur premier rendu part des défauts locaux.
@@ -1138,16 +1096,16 @@
     next.at[view] = new Date().toISOString();
     saved = next; writeLocal(next);
     var sb = window.CA && window.CA.sb;
-    if (!sb) { defsMsg(view, 'Enregistré sur cet appareil seulement (hors ligne).', 'warn'); return; }
+    if (!sb) { defsMsg(view, 'cet appareil seulement', 'warn'); return; }
     btn.disabled = true;
-    defsMsg(view, 'Enregistrement…');
+    defsMsg(view, 'enregistrement…');
     sb.from('admin_settings').upsert({ key: DEF_KEY, value: next, updated_at: next.at[view] }).then(function (res) {
       btn.disabled = false;
-      if (res.error) defsMsg(view, 'Enregistré sur cet appareil seulement — serveur : ' + res.error.message, 'warn');
-      else defsMsg(view, 'Enregistré ✓ Appliqué à chaque ouverture d\'AutoLoop, sur tous tes appareils.', 'ok');
+      if (res.error) defsMsg(view, 'cet appareil seulement', 'warn', res.error.message);
+      else defsMsg(view, 'enregistré ✓', 'ok');
     }, function (err) {
       btn.disabled = false;
-      defsMsg(view, 'Enregistré sur cet appareil seulement — ' + (err && err.message ? err.message : err), 'warn');
+      defsMsg(view, 'cet appareil seulement', 'warn', err && err.message ? err.message : String(err));
     });
   }
 
@@ -1157,7 +1115,7 @@
       $('[data-defs-save]', bar).addEventListener('click', function () { saveDefaults(view, this); });
       $('[data-defs-reset]', bar).addEventListener('click', function () {
         applyValues(factory[view], true);
-        defsMsg(view, 'Valeurs d\'usine remises dans les champs. « Enregistrer » pour en refaire tes défauts.');
+        defsMsg(view, 'usine (non enregistré)');
       });
       defsStatus(view);
     });
