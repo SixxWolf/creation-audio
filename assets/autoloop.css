@@ -88,13 +88,15 @@
 .al-cal-more > summary { display:inline-flex; align-items:center; gap:9px; font-size:.86rem; font-weight:600; color:var(--ember-ink); }
 .al-cal-more > summary:hover { color:var(--ink); }
 .al-acc > summary { margin-bottom:0; }
-.al-acc > summary::after { margin-left:auto; color:var(--muted); }
+.al-acc > summary::after { margin-left:auto; margin-right:3px; color:var(--muted); }   /* chevron tourné : reste dans la carte */
 .al-acc[open] > summary { margin-bottom:16px; }
 .al-acc[open] #al-machine-sum { display:none; }   /* ouvert : les champs suffisent */
 .al-cal-grid { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
 
-/* Réglages machine : 4 sections en 2 colonnes */
-.al-msecs { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px 28px; }
+/* Réglages machine : 4 sections, 2 colonnes seulement si chacune a ≥ 300 px
+   (sinon 1 colonne : à 1280 px, 2 colonnes donnaient des champs de 106 px et
+   des libellés sur 2 lignes) */
+.al-msecs { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap:6px 28px; }
 .al-msec .al-sub { display:flex; align-items:center; min-height:20px; margin:0 0 10px; }
 .al-msw { display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
 .al-msw input { width:16px; height:16px; margin:0; accent-color:var(--ember); }
@@ -149,15 +151,17 @@
 
 /* --- Calculateur : inline & unités ---------------------- */
 .al-inline { display:flex; align-items:center; gap:6px; }
-.al-inline input { width:76px; }
+.al-inline input { width:76px; min-width:0; flex:0 1 auto; }   /* peut rétrécir dans une colonne étroite */
 .al-u { font-size:.8rem; color:var(--muted); }
 .al-rate { display:inline-flex; align-items:center; gap:6px; margin-left:auto; font-family:var(--font); font-weight:600; font-size:.85rem; letter-spacing:0; }
 .al-rate input { width:70px; }
 
 /* --- Main d'œuvre --------------------------------------- */
-.al-labor { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+/* 2 colonnes au plus, 1 seule si chacune ferait < 260 px (débordait à 1100 px ;
+   à 1280 px, 230 px de colonne mettaient les libellés sur 2 lignes) */
+.al-labor { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(260px, calc((100% - 18px) / 2))), 1fr)); gap:18px; }
 .al-sub { margin-bottom:8px; font-size:.7rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
-.al-lrow { display:grid; grid-template-columns:1fr 76px auto; align-items:center; gap:8px; margin-bottom:6px; }
+.al-lrow { display:grid; grid-template-columns:minmax(0, 1fr) 76px auto; align-items:center; gap:8px; margin-bottom:6px; }
 .al-lrow label { font-size:.86rem; color:var(--ink); }
 .al-lfoot { margin-top:6px; padding-top:8px; font-size:.8rem; color:var(--muted); border-top:1px dashed var(--line-2); }
 
@@ -210,6 +214,9 @@
    ou qu'une aide est plus longue que sa voisine. (L'ancien « flex-end » alignait
    les libellés mais décalait tout dès qu'une aide dépassait l'autre.)          */
 .al-view .grid { row-gap:0; }
+/* Calculateur : 2 colonnes au plus, 1 seule si chacune ferait < 200 px (à 1100 px,
+   les libellés passaient sur 2 lignes et le champ Temps débordait) */
+.al-view[data-view="prix"] .grid { grid-template-columns:repeat(auto-fit, minmax(min(100%, max(200px, calc((100% - 18px) / 2))), 1fr)); }
 .al-view .grid > .field { display:grid; grid-row:span 3; grid-template-rows:subgrid; row-gap:6px; align-content:start; margin-bottom:16px; }
 .al-view .grid > .field > .lbl { align-self:end; }
 .field-wide { grid-column:1 / -1; }
@@ -226,7 +233,6 @@
   .al-labor { grid-template-columns:1fr; }
 }
 @media (max-width:640px) {
-  .al-msecs { grid-template-columns:1fr; }
   .al-card { padding:16px; }
   .al-sum-head { margin:-16px -16px 14px; padding:12px 16px; }
 }

@@ -330,13 +330,15 @@
     L.push(';============================= PUSH SECTION =============================');
     L.push('G1 Z' + z(pushZ) + ' F' + pushSpeed + ' ; hauteur de push = hauteur max − ' + opts.pushOffset + ' mm');
     L.push('M400');
-    // Au centre : recul vers l'arrière (à vide, la tête passe derrière la pièce), puis
-    // poussée vers l'avant (fait tomber la pièce du plateau). Nombre et vitesses réglables.
-    L.push('G1 X125 F3000 ; balayage central');
+    // La tête arrive du fond (G150.3, goulotte) : on la place au centre, derrière la pièce,
+    // puis poussée vers l'avant (fait tomber la pièce) et recul vers l'arrière (à vide).
+    // Nombre et vitesses réglables ; avant, le recul passait en premier et ne bougeait
+    // presque pas (tête déjà au fond), le retour se faisait à la vitesse de fin de job.
+    L.push('G1 X125 Y250 F3000 ; centre, derrière la pièce');
     for (var p = 1; p <= opts.pushPasses; p++) {
       var pass = opts.pushPasses > 1 ? ' (passe ' + p + ')' : '';
-      L.push('G1 Y250 F' + Math.round(opts.pushBackF) + ' ; recul vers l\'arrière (à vide)' + pass);
       L.push('G1 Y0 F' + Math.round(opts.pushFrontF) + ' ; poussée vers l\'avant : éjecte la pièce' + pass);
+      L.push('G1 Y250 F' + Math.round(opts.pushBackF) + ' ; recul vers l\'arrière' + pass);
     }
     L.push(';===============================  END SECTION  =============================');
     L.push('G1 X65 Y245 F12000 ; coin sûr avant parking');
