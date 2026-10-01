@@ -1388,12 +1388,24 @@
                     <input type="number" id="al-push-offset" min="0" step="1" value="10" class="num">
                   </div>
                   <div class="field">
-                    <label class="lbl" for="al-push-speed">Vitesse (F)</label>
+                    <label class="lbl" for="al-push-speed">Vitesse Z (F)</label>
                     <input type="number" id="al-push-speed" min="1" step="1" value="10000" class="num">
                   </div>
                   <div class="field">
                     <label class="lbl" for="al-clearz">Dégagement Z (mm)</label>
                     <input type="number" id="al-clearz" min="0" step="1" value="105" class="num">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="al-push-passes">Allers-retours</label>
+                    <input type="number" id="al-push-passes" min="1" max="5" step="1" value="1" class="num">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="al-push-back">Aller vers l'arrière (F)</label>
+                    <input type="number" id="al-push-back" min="1" step="100" value="3000" class="num">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="al-push-front">Retour vers l'avant (F)</label>
+                    <input type="number" id="al-push-front" min="1" step="100" value="3000" class="num">
                   </div>
                 </div>
               </section>
@@ -1598,6 +1610,6 @@
 <script src="assets/cms-statistiques.js?v=6"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
-<script src="assets/cms-autoloop.js?v=27"></script>
+<script src="assets/cms-autoloop.js?v=28"></script>
 </body>
 </html>

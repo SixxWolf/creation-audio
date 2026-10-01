@@ -330,11 +330,14 @@
     L.push(';============================= PUSH SECTION =============================');
     L.push('G1 Z' + z(pushZ) + ' F' + pushSpeed + ' ; hauteur de push = hauteur max − ' + opts.pushOffset + ' mm');
     L.push('M400');
+    // Allers-retours au centre : aller vers l'arrière, retour vers l'avant (c'est le
+    // retour qui pousse la pièce hors du plateau). Nombre et vitesses réglables.
     L.push('G1 X125 F3000 ; balayage central');
-    L.push('G1 Y250 F3000 ; bord arrière');
-    L.push('G1 Y0   F3000 ; bord avant');
-    L.push('G1 Y250 F3000 ; bord arrière (2e passe)');
-    L.push('G1 Y0   F3000 ; bord avant');
+    for (var p = 1; p <= opts.pushPasses; p++) {
+      var pass = opts.pushPasses > 1 ? ' (passe ' + p + ')' : '';
+      L.push('G1 Y250 F' + Math.round(opts.pushBackF) + ' ; aller : bord arrière' + pass);
+      L.push('G1 Y0 F' + Math.round(opts.pushFrontF) + ' ; retour : bord avant' + pass);
+    }
     L.push(';===============================  END SECTION  =============================');
     L.push('G1 X65 Y245 F12000 ; coin sûr avant parking');
     L.push('G1 Y265 F3000 ; parking final (position repos)');
@@ -536,6 +539,9 @@
       bendCycles: Math.max(0, intOr($('#al-bend-cycles').value, 6)),
       pushOffset: num($('#al-push-offset').value, 10),
       pushSpeed: num($('#al-push-speed').value, 10000),
+      pushPasses: Math.min(5, Math.max(1, intOr($('#al-push-passes').value, 1))),
+      pushBackF: Math.max(1, num($('#al-push-back').value, 3000)),
+      pushFrontF: Math.max(1, num($('#al-push-front').value, 3000)),
       clearZ: num($('#al-clearz').value, 105),
       purgeLen: Math.max(0, num($('#al-purge-len').value, 50)),
       wipePasses: Math.min(10, Math.max(0, intOr($('#al-wipe-passes').value, 2))),
@@ -1060,7 +1066,8 @@
      locale appliquée dès l'ouverture, avant la réponse du serveur.        */
   var DEF_FIELDS = {
     gcode: ['al-loops', 'al-cal-flow-every', 'al-cal-bed-every', 'al-bend-enable', 'al-bend-high', 'al-bend-low',
-            'al-bend-speed', 'al-bend-cycles', 'al-push-offset', 'al-push-speed', 'al-clearz', 'al-purge-len',
+            'al-bend-speed', 'al-bend-cycles', 'al-push-offset', 'al-push-speed', 'al-clearz',
+            'al-push-passes', 'al-push-back', 'al-push-front', 'al-purge-len',
             'al-wipe-passes', 'al-cool-mode', 'al-cool-temp', 'al-cool-sec', 'al-cool-est'],
     prix: ['ap-cooldown', 'ap-failure', 'ap-filament-kg', 'ap-consumables', 'ap-deprec', 'ap-elec', 'ap-rate',
            'ap-prep-model', 'ap-prep-slice', 'ap-prep-transfer', 'ap-post-removal', 'ap-post-support', 'ap-post-additional']
