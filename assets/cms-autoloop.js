@@ -990,7 +990,7 @@
   /* ================================================================== */
   /*  3) VALEURS PAR DÉFAUT (réglées par Théo, sans toucher au code)      */
   /* ================================================================== */
-  /* Défauts d'usine = les value="" du HTML. « Enregistrer comme défauts »
+  /* Sans défauts enregistrés : les value="" du HTML. « Enregistrer comme défauts »
      mémorise les champs d'une vue — générateur : réglages du batch (pas la
      grille case par case, qui suit les « tous les X ») ; calculateur : les
      coûts (pas le temps / poids / loops / prix de la pièce chargée) — dans
@@ -1004,7 +1004,7 @@
            'ap-prep-model', 'ap-prep-slice', 'ap-prep-transfer', 'ap-post-removal', 'ap-post-support', 'ap-post-additional']
   };
   var DEF_KEY = 'autoloop', DEF_LS = 'al-defaults';
-  var factory = {}, saved = null;          // saved = { gcode: {id: valeur}, prix: {…}, at: { gcode: iso, prix: iso } }
+  var saved = null;                        // saved = { gcode: {id: valeur}, prix: {…}, at: { gcode: iso, prix: iso } }
   var touched = { gcode: false, prix: false };   // champs modifiés à la main depuis l'ouverture
 
   function readLocal() {
@@ -1054,13 +1054,11 @@
   }
   function defsStatus(view) {
     var at = saved && saved.at && saved.at[view];
-    defsMsg(view, saved && saved[view] ? 'tes réglages' + (at ? ' du ' + shortDay(at) : '') : 'usine');
+    defsMsg(view, saved && saved[view] ? 'enregistrées' + (at ? ' le ' + shortDay(at) : '') : '');
   }
 
   // Avant initGcode / initPricing : leur premier rendu part des défauts locaux.
   function loadLocalDefaults() {
-    factory.gcode = snapshot('gcode');
-    factory.prix = snapshot('prix');
     saved = readLocal();
     if (saved) { applyValues(saved.gcode, false); applyValues(saved.prix, false); }
   }
@@ -1113,10 +1111,6 @@
     $$('.al-defs').forEach(function (bar) {
       var view = bar.dataset.defs;
       $('[data-defs-save]', bar).addEventListener('click', function () { saveDefaults(view, this); });
-      $('[data-defs-reset]', bar).addEventListener('click', function () {
-        applyValues(factory[view], true);
-        defsMsg(view, 'usine (non enregistré)');
-      });
       defsStatus(view);
     });
     $$('.al-view').forEach(function (v) {
