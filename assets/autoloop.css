@@ -38,6 +38,12 @@
   background:var(--paper); border:1px solid var(--line); border-radius:50%; }
 .al-drop-t { margin:10px 0 4px; font-weight:700; }
 .al-drop-s { margin:0; font-size:.8rem; color:var(--muted); overflow-wrap:anywhere; }
+/* fichier chargé : une seule ligne (toujours cliquable / déposable pour en changer) */
+.al-drop.has-file { display:flex; align-items:center; gap:12px; padding:12px 14px; text-align:left; border-style:solid; }
+.al-drop.has-file .al-drop-ic { flex:none; width:34px; height:34px; font-size:0; }   /* « ＋ » → « ↻ » (changer) */
+.al-drop.has-file .al-drop-ic::before { content:'↻'; font-size:1rem; }
+.al-drop.has-file .al-drop-t { display:none; }
+.al-drop.has-file .al-drop-s { font-size:.9rem; font-weight:600; color:var(--ink); }
 .al-plate { margin-top:12px; max-width:260px; }
 .al-plate[hidden] { display:none; }
 
@@ -54,13 +60,46 @@
 .al-switch { display:inline-flex; align-items:center; gap:9px; margin:0; font-family:var(--display); font-weight:700; font-size:1.02rem; cursor:pointer; }
 .al-switch input { width:18px; height:18px; accent-color:var(--ember); }
 
-/* --- Calibration par loop (grille flow / bed leveling) --- */
-/* un champ « tous les X loops » par ligne de la grille (flow, bed leveling) */
-.al-cal-every { display:grid; grid-template-columns:max-content max-content; align-items:center; gap:8px 16px; }
-.al-cal-every .al-inline { gap:8px; font-size:.9rem; font-weight:600; color:var(--ink); }
-.al-cal-every input { width:64px; text-align:center; }
+/* --- Générateur : étapes à gauche, boutons + rapport collants à droite,
+       réglages machine repliés sous les étapes (sur mobile : après le rapport).
+       1fr sur la 2e rangée : si la colonne de droite est plus haute, l'espace
+       en trop va sous les réglages, pas entre les étapes et les réglages. --- */
+.al-cols-gen { grid-template-areas:"main side" "more side"; grid-template-rows:auto 1fr; row-gap:16px; }
+.al-cols-gen > .al-main { grid-area:main; }
+.al-cols-gen > .al-side { grid-area:side; }
+.al-cols-gen > .al-more { grid-area:more; align-self:start; }
+.al-step { font-family:var(--display); font-weight:700; font-size:.95rem; }
+
+/* ② Batch : loops + « tous les X » (flow, bed leveling) + nombre de loops calibrés */
+.al-batch { display:grid; grid-template-columns:max-content max-content 1fr; align-items:center; gap:10px 16px; }
+.al-batch .al-inline { gap:8px; font-size:.9rem; font-weight:600; color:var(--ink); }
+.al-batch input { width:72px; text-align:center; }
+.al-cal-n { font-size:.86rem; color:var(--muted); font-variant-numeric:tabular-nums; }
 .al-cal-bk { font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); cursor:pointer; }
+
+/* Repliables : grille loop par loop + panneau Réglages machine (chevron CSS) */
+.al-cal-more > summary, .al-acc > summary { cursor:pointer; list-style:none; }
+.al-cal-more > summary::-webkit-details-marker, .al-acc > summary::-webkit-details-marker { display:none; }
+.al-cal-more > summary::before, .al-acc > summary::after { content:''; flex:none; width:7px; height:7px;
+  border:solid currentColor; border-width:0 2px 2px 0; transform:rotate(-45deg); transition:transform .15s; }
+.al-cal-more[open] > summary::before, .al-acc[open] > summary::after { transform:rotate(45deg); }
+.al-cal-more > summary:focus-visible, .al-acc > summary:focus-visible { outline:2px solid var(--ember); outline-offset:3px; border-radius:6px; }
+.al-cal-more { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+.al-cal-more > summary { display:inline-flex; align-items:center; gap:9px; font-size:.86rem; font-weight:600; color:var(--ember-ink); }
+.al-cal-more > summary:hover { color:var(--ink); }
+.al-acc > summary { margin-bottom:0; }
+.al-acc > summary::after { margin-left:auto; color:var(--muted); }
+.al-acc[open] > summary { margin-bottom:16px; }
+.al-acc[open] #al-machine-sum { display:none; }   /* ouvert : les champs suffisent */
 .al-cal-grid { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+
+/* Réglages machine : 4 sections en 2 colonnes */
+.al-msecs { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px 28px; }
+.al-msec .al-sub { display:flex; align-items:center; min-height:20px; margin:0 0 10px; }
+.al-msw { display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+.al-msw input { width:16px; height:16px; margin:0; accent-color:var(--ember); }
+.al-msec .grid { column-gap:12px; }
+.al-defs.al-defs-in { margin-top:2px; padding:14px 0 0; background:none; border:0; border-top:1px solid var(--line); border-radius:0; }
 .al-calg-wrap { max-width:100%; overflow-x:auto; }
 .al-calg { border-collapse:separate; border-spacing:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
 .al-calg th, .al-calg td { width:36px; min-width:36px; height:36px; padding:0; text-align:center; border-left:1px solid var(--line); }
@@ -72,8 +111,6 @@
 .al-calg td input { display:block; width:18px; height:18px; margin:auto; }
 .al-calg td:has(input:checked) { background:color-mix(in srgb, var(--ember) 9%, var(--paper)); }
 
-/* --- Actions gcode -------------------------------------- */
-.al-actions { display:flex; flex-wrap:wrap; gap:10px; }
 
 /* --- Valeurs par défaut (enregistrées par Théo) --------- */
 .al-defs { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px 16px; padding:12px 16px;
@@ -86,25 +123,29 @@
 .al-defs-b { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; font-size:.86rem; }
 
 /* --- Rapport de traitement ------------------------------ */
-.al-report-card .muted { font-size:.85rem; }
+/* boutons en tête de la colonne de droite, rapport dessous */
+.al-run { display:grid; gap:8px; }
+.al-run .btn { width:100%; }
+#al-report { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+.al-report-card .muted { margin:0; font-size:.85rem; }
+/* filament + temps : batch | par paire */
+.al-rtab { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+.al-rtab th { padding:0 0 6px; font-size:.68rem; font-weight:700; letter-spacing:.08em; text-align:right; text-transform:uppercase; color:var(--muted); }
+.al-rtab td { padding:8px 0; font-size:.95rem; font-weight:700; text-align:right; white-space:nowrap; color:var(--ink); border-top:1px solid var(--line); }
+.al-rtab th:first-child, .al-rtab td:first-child { text-align:left; }
+.al-rtab td:first-child { font-size:.9rem; font-weight:500; color:var(--ink-2); }
+.al-rtab td + td { padding-left:12px; }
+.al-rsec { margin-top:14px; }
 /* lignes libellé → valeur (classe .al-srow du résumé des coûts) */
 .al-report-card .al-srow > span:last-child { text-align:right; font-weight:600; color:var(--ink); }
 .al-report-card .al-srow > span:first-child { flex:none; color:var(--ink-2); }
-.al-report-card .al-srow > .al-bad { color:var(--bad); }
-.al-report-card .al-proj { margin:12px 0 0; }
-.al-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
-.al-stat { padding:12px; text-align:center; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
-.al-stat-v { display:block; font-family:var(--display); font-size:1.6rem; font-weight:700; line-height:1; letter-spacing:-.02em;
-  color:var(--ember-ink); font-variant-numeric:tabular-nums; }
-.al-stat-l { display:block; margin-top:5px; font-size:.72rem; color:var(--muted); }
+.al-report-card .al-srow > .al-bad, .al-rtab .al-bad { color:var(--bad); }
+.al-report-card .al-srow > .al-good { color:var(--good); }
+.al-rlink { margin-top:10px; font-size:.86rem; }
+.al-report-card .al-proj { margin:14px 0 0; }
 .al-fine { margin:0 0 10px; font-size:.78rem; color:var(--muted); }
 .al-warn { padding:10px 12px; font-size:.85rem; color:var(--bad); background:var(--bad-wash);
   border:1px solid color-mix(in srgb, var(--bad) 30%, transparent); border-radius:10px; }
-.al-table { width:100%; font-size:.84rem; border-collapse:separate; border-spacing:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
-.al-table th { padding:8px 10px; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-align:left; text-transform:uppercase;
-  color:var(--muted); background:var(--wash); border-bottom:1px solid var(--line); }
-.al-table td { padding:7px 10px; font-variant-numeric:tabular-nums; border-top:1px solid var(--line); }
-.al-table tbody tr:first-child td { border-top:none; }
 
 /* --- Calculateur : inline & unités ---------------------- */
 .al-inline { display:flex; align-items:center; gap:6px; }
@@ -180,10 +221,12 @@
 }
 @media (max-width:900px) {
   .al-cols { grid-template-columns:1fr; }
+  .al-cols-gen { grid-template-areas:"main" "side" "more"; grid-template-rows:auto; }
   .al-side { position:static; }
   .al-labor { grid-template-columns:1fr; }
 }
 @media (max-width:640px) {
+  .al-msecs { grid-template-columns:1fr; }
   .al-card { padding:16px; }
   .al-sum-head { margin:-16px -16px 14px; padding:12px 16px; }
 }

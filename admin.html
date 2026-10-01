@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/admin.css?v=42">
 <link rel="stylesheet" href="assets/facture.css?v=14">
-<link rel="stylesheet" href="assets/autoloop.css?v=14">
+<link rel="stylesheet" href="assets/autoloop.css?v=17">
 <script src="assets/theme.js?v=1" defer></script>
 </head>
 <body>
@@ -1306,12 +1306,13 @@
       </div>
 
       <!-- ===== VUE : GÉNÉRATEUR DE BATCH ===== -->
+      <!-- Étapes ① ② à gauche ; boutons + rapport collants à droite ; réglages
+           machine repliés sous les étapes (sur mobile : après le rapport). -->
       <div class="al-view" data-view="gcode">
-        <div class="al-cols">
-          <!-- Colonne réglages -->
+        <div class="al-cols al-cols-gen">
           <div class="al-main">
             <div class="al-card">
-              <div class="al-card-head"><span class="al-ic">⬆</span> Plateau tranché (une pièce)</div>
+              <div class="al-card-head"><span class="al-ic al-step">1</span> Plateau tranché</div>
               <div class="al-drop" id="al-drop">
                 <div class="al-drop-ic">＋</div>
                 <p class="al-drop-t">Glisse l'export de Bambu Studio (<b>.gcode.3mf</b>) ou un <b>.gcode</b> ici, ou clique pour choisir</p>
@@ -1325,128 +1326,126 @@
             </div>
 
             <div class="al-card">
-              <div class="al-card-head"><span class="al-ic">🔁</span> Batch</div>
-              <div class="grid">
-                <div class="field">
-                  <label class="lbl" for="al-loops">Nombre de loops</label>
-                  <input type="number" id="al-loops" min="1" step="1" value="12" class="num">
-                </div>
-              </div>
-            </div>
-
-            <div class="al-card">
-              <div class="al-card-head"><span class="al-ic">🎯</span> Calibration par loop <span class="al-note">coché = forcé, même si off dans Bambu</span></div>
-              <div class="al-cal-every">
+              <div class="al-card-head"><span class="al-ic al-step">2</span> Batch <span class="al-note">calibration forcée, même si off dans Bambu</span></div>
+              <div class="al-batch">
+                <label class="al-cal-bk" for="al-loops">Loops</label>
+                <span class="al-inline"><input type="number" id="al-loops" min="1" step="1" value="12" class="num"></span>
+                <span></span>
                 <label class="al-cal-bk" for="al-cal-flow-every">Flow</label>
-                <span class="al-inline">tous les <input type="number" id="al-cal-flow-every" min="0" step="1" value="2" class="num"> loops</span>
+                <span class="al-inline">tous les <input type="number" id="al-cal-flow-every" min="0" step="1" value="2" class="num"></span>
+                <span class="al-cal-n" id="al-cal-flow-n"></span>
                 <label class="al-cal-bk" for="al-cal-bed-every">Bed leveling</label>
-                <span class="al-inline">tous les <input type="number" id="al-cal-bed-every" min="0" step="1" value="4" class="num"> loops</span>
+                <span class="al-inline">tous les <input type="number" id="al-cal-bed-every" min="0" step="1" value="4" class="num"></span>
+                <span class="al-cal-n" id="al-cal-bed-n"></span>
               </div>
-              <div id="al-cal-grid" class="al-cal-grid"></div>
+              <details class="al-cal-more">
+                <summary>Ajuster loop par loop</summary>
+                <div id="al-cal-grid" class="al-cal-grid"></div>
+              </details>
+            </div>
+          </div>
+
+          <aside class="al-side">
+            <div class="al-card al-report-card">
+              <div class="al-run">
+                <button class="btn btn-accent" id="al-process" type="button" disabled>Générer le batch</button>
+                <button class="btn btn-ghost" id="al-download" type="button" disabled>⬇ Télécharger le gcode</button>
+              </div>
+              <div id="al-report"><p class="muted">Aucun batch généré.</p></div>
+            </div>
+          </aside>
+
+          <details class="al-card al-acc al-more" id="al-machine">
+            <summary class="al-card-head"><span class="al-ic">⚙</span> Réglages machine <span class="al-note" id="al-machine-sum"></span></summary>
+            <div class="al-msecs">
+              <section class="al-msec">
+                <div class="al-sub"><label class="al-msw"><input type="checkbox" id="al-bend-enable" checked> Flexion</label></div>
+                <div class="grid" id="al-bend-fields">
+                  <div class="field">
+                    <label class="lbl" for="al-bend-high">Z haut (mm)</label>
+                    <input type="number" id="al-bend-high" min="0" step="1" value="240" class="num">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="al-bend-low">Z bas (mm)</label>
+                    <input type="number" id="al-bend-low" min="0" step="1" value="205" class="num">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="al-bend-speed">Vitesse (F)</label>
+                    <input type="number" id="al-bend-speed" min="1" step="1" value="12000" class="num">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="al-bend-cycles">Cycles</label>
+                    <input type="number" id="al-bend-cycles" min="0" step="1" value="6" class="num">
+                  </div>
+                </div>
+              </section>
+
+              <section class="al-msec">
+                <div class="al-sub">Push · hauteur max − retrait</div>
+                <div class="grid">
+                  <div class="field">
+                    <label class="lbl" for="al-push-offset">Retrait (mm)</label>
+                    <input type="number" id="al-push-offset" min="0" step="1" value="10" class="num">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="al-push-speed">Vitesse (F)</label>
+                    <input type="number" id="al-push-speed" min="1" step="1" value="10000" class="num">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="al-clearz">Dégagement Z (mm)</label>
+                    <input type="number" id="al-clearz" min="0" step="1" value="105" class="num">
+                  </div>
+                </div>
+              </section>
+
+              <section class="al-msec">
+                <div class="al-sub">Purge en goulotte</div>
+                <div class="grid">
+                  <div class="field">
+                    <label class="lbl" for="al-purge-len">Longueur (mm)</label>
+                    <input type="number" id="al-purge-len" min="0" step="10" value="50" class="num">
+                  </div>
+                  <div class="field">
+                    <label class="lbl" for="al-wipe-passes">Nettoyages de buse</label>
+                    <input type="number" id="al-wipe-passes" min="0" max="10" step="1" value="2" class="num">
+                  </div>
+                </div>
+              </section>
+
+              <section class="al-msec">
+                <div class="al-sub">Cooldown</div>
+                <div class="grid">
+                  <div class="field field-wide">
+                    <label class="lbl" for="al-cool-mode">Mode</label>
+                    <select id="al-cool-mode">
+                      <option value="temp">Température (M190)</option>
+                      <option value="delay">Temps (G4)</option>
+                      <option value="none">Aucun</option>
+                    </select>
+                  </div>
+                  <div class="field" id="al-cool-temp-wrap">
+                    <label class="lbl" for="al-cool-temp">Cible (°C)</label>
+                    <input type="number" id="al-cool-temp" min="0" step="1" value="45" class="num">
+                  </div>
+                  <div class="field" id="al-cool-sec-wrap" hidden>
+                    <label class="lbl" for="al-cool-sec">Délai (s)</label>
+                    <input type="number" id="al-cool-sec" min="0" step="1" value="60" class="num">
+                  </div>
+                  <div class="field" id="al-cool-est-wrap">
+                    <label class="lbl" for="al-cool-est">Durée estimée (min)</label>
+                    <input type="number" id="al-cool-est" min="0" step="1" value="5" class="num">
+                  </div>
+                </div>
+              </section>
             </div>
 
-            <div class="al-card">
-              <div class="al-card-head">
-                <label class="al-switch"><input type="checkbox" id="al-bend-enable" checked> Mouvement de flexion (éjection)</label>
-              </div>
-              <div class="grid" id="al-bend-fields">
-                <div class="field">
-                  <label class="lbl" for="al-bend-high">Z haut (mm)</label>
-                  <input type="number" id="al-bend-high" min="0" step="1" value="240" class="num">
-                </div>
-                <div class="field">
-                  <label class="lbl" for="al-bend-low">Z bas (mm)</label>
-                  <input type="number" id="al-bend-low" min="0" step="1" value="205" class="num">
-                </div>
-                <div class="field">
-                  <label class="lbl" for="al-bend-speed">Vitesse (F)</label>
-                  <input type="number" id="al-bend-speed" min="1" step="1" value="12000" class="num">
-                </div>
-                <div class="field">
-                  <label class="lbl" for="al-bend-cycles">Nombre de cycles</label>
-                  <input type="number" id="al-bend-cycles" min="0" step="1" value="6" class="num">
-                </div>
-              </div>
-            </div>
-
-            <div class="al-card">
-              <div class="al-card-head"><span class="al-ic">⤓</span> Push (éjection) <span class="al-note">auto : hauteur max − retrait</span></div>
-              <div class="grid">
-                <div class="field">
-                  <label class="lbl" for="al-push-offset">Retrait sous la hauteur max (mm)</label>
-                  <input type="number" id="al-push-offset" min="0" step="1" value="10" class="num">
-                </div>
-                <div class="field">
-                  <label class="lbl" for="al-push-speed">Vitesse de push (F)</label>
-                  <input type="number" id="al-push-speed" min="1" step="1" value="10000" class="num">
-                </div>
-                <div class="field">
-                  <label class="lbl" for="al-clearz">Dégagement Z avant éjection (mm)</label>
-                  <input type="number" id="al-clearz" min="0" step="1" value="105" class="num">
-                </div>
-              </div>
-            </div>
-
-            <div class="al-card">
-              <div class="al-card-head"><span class="al-ic">◌</span> Purge au démarrage <span class="al-note">à chaque loop, dans la goulotte</span></div>
-              <div class="grid">
-                <div class="field">
-                  <label class="lbl" for="al-purge-len">Longueur de purge (mm de filament)</label>
-                  <input type="number" id="al-purge-len" min="0" step="10" value="50" class="num">
-                </div>
-                <div class="field">
-                  <label class="lbl" for="al-wipe-passes">Nettoyages de buse après changement</label>
-                  <input type="number" id="al-wipe-passes" min="0" max="10" step="1" value="2" class="num">
-                </div>
-              </div>
-            </div>
-
-            <div class="al-card">
-              <div class="al-card-head"><span class="al-ic">❄</span> Cooldown</div>
-              <div class="grid">
-                <div class="field">
-                  <label class="lbl" for="al-cool-mode">Mode</label>
-                  <select id="al-cool-mode">
-                    <option value="temp">Basé sur la température (M190)</option>
-                    <option value="delay">Basé sur le temps (G4)</option>
-                    <option value="none">Aucun</option>
-                  </select>
-                </div>
-                <div class="field" id="al-cool-temp-wrap">
-                  <label class="lbl" for="al-cool-temp">Température cible (°C)</label>
-                  <input type="number" id="al-cool-temp" min="0" step="1" value="45" class="num">
-                </div>
-                <div class="field" id="al-cool-sec-wrap" hidden>
-                  <label class="lbl" for="al-cool-sec">Délai (secondes)</label>
-                  <input type="number" id="al-cool-sec" min="0" step="1" value="60" class="num">
-                </div>
-                <div class="field" id="al-cool-est-wrap">
-                  <label class="lbl" for="al-cool-est">Durée estimée (min / loop)</label>
-                  <input type="number" id="al-cool-est" min="0" step="1" value="5" class="num">
-                </div>
-              </div>
-            </div>
-
-            <div class="al-actions">
-              <button class="btn btn-accent" id="al-process" type="button" disabled>Générer le batch</button>
-              <button class="btn btn-ghost" id="al-download" type="button" disabled>⬇ Télécharger le gcode</button>
-            </div>
-
-            <div class="al-defs" data-defs="gcode">
+            <div class="al-defs al-defs-in" data-defs="gcode">
               <p class="al-defs-t"><b>Valeurs par défaut</b> <span class="al-defs-msg" aria-live="polite"></span></p>
               <div class="al-defs-b">
                 <button class="btn btn-ghost" type="button" data-defs-save>Enregistrer comme défauts</button>
               </div>
             </div>
-          </div>
-
-          <!-- Colonne rapport -->
-          <aside class="al-side">
-            <div class="al-card al-report-card">
-              <div class="al-card-head"><span class="al-ic">✓</span> Rapport de génération</div>
-              <div id="al-report"><p class="muted">Aucun batch généré.</p></div>
-            </div>
-          </aside>
+          </details>
         </div>
       </div>
 
@@ -1599,6 +1598,6 @@
 <script src="assets/cms-statistiques.js?v=6"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
-<script src="assets/cms-autoloop.js?v=25"></script>
+<script src="assets/cms-autoloop.js?v=27"></script>
 </body>
 </html>

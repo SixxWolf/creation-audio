@@ -490,6 +490,18 @@
         '</tbody></table></div>';
     }
     box.innerHTML = html;
+    syncCalCounts();
+  }
+  // « 36 loops » à côté de chaque « tous les X » (suit aussi les cases cochées à la main).
+  function syncCalCounts() {
+    var N = loopCount();
+    ['flow', 'bed'].forEach(function (row) {
+      var el = $('#al-cal-' + row + '-n');
+      if (!el) return;
+      var n = 0;
+      for (var i = 0; i < N; i++) if (cal[row][i]) n++;
+      el.textContent = n + ' loop' + (n > 1 ? 's' : '');
+    });
   }
   function initCalGrid() {
     var box = $('#al-cal-grid');
@@ -498,6 +510,7 @@
       var cb = e.target;
       if (!cb.dataset || !cb.dataset.row) return;
       cal[cb.dataset.row][+cb.dataset.i] = cb.checked;
+      syncCalCounts();
     });
     ['flow', 'bed'].forEach(function (row) {
       $('#al-cal-' + row + '-every').addEventListener('input', function () {
@@ -539,39 +552,55 @@
     return p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + p[1];
   }
 
-  // Ligne du rapport, libellé → valeur (comme le résumé des coûts). bad = bloc introuvable dans le gcode.
-  function rrow(label, val, bad) {
-    return '<div class="al-srow"><span>' + label + '</span><span' + (bad ? ' class="al-bad"' : '') + '>' + val + '</span></div>';
+  // Ligne du rapport, libellé → valeur (comme le résumé des coûts). cls : 'al-bad' (bloc
+  // introuvable dans le gcode, profit négatif) ou 'al-good'.
+  function rrow(label, val, cls) {
+    return '<div class="al-srow"><span>' + label + '</span><span' + (cls ? ' class="' + cls + '"' : '') + '>' + val + '</span></div>';
   }
 
+  /* Rapport : filament + temps (batch | par paire ou pièce, l'unité du calculateur),
+     puis le prix de ce batch (calculateur synchronisé à la génération, cf.
+     runGenerate ; re-rendu à chaque changement du calculateur), puis les détails.
+     null = rien de généré. */
+  var lastRep = null;
   function renderReport(rep) {
     var box = $('#al-report');
+    if (!rep) { box.innerHTML = '<p class="muted">Aucun batch généré.</p>'; return; }
     if (rep.error) { box.innerHTML = '<p class="al-warn">' + rep.error + '</p>'; return; }
+    var N = rep.loops, k = unitK, unit = k === 2 ? '/ paire' : '/ pièce';
     var w = rep.wipe, wipeOk = w && w.done === w.changes;
+    var r = pricePerPiece().r;
+    var bad = function (t) { return '<td colspan="2" class="al-bad">' + t + '</td>'; };
     box.innerHTML =
-      '<div class="al-stats">' +
-        stat(rep.loops, 'loops') +
-        stat(z(rep.pushZ), 'push (mm)') +
-        stat(rep.flow.length, 'flow') +
-        stat(rep.bed.length, 'bed leveling') +
+      '<table class="al-rtab"><thead><tr><th></th><th>Batch</th><th>' + unit + '</th></tr></thead><tbody>' +
+        '<tr><td>Filament</td>' + (rep.weightPer > 0
+          ? '<td>' + grams(rep.weightPer * N) + ' g</td><td>' + grams(rep.weightPer * k) + ' g</td>'
+          : bad('introuvable')) + '</tr>' +
+        '<tr><td>Temps</td>' + (rep.progress
+          ? '<td>' + fmtDur(rep.totalMin) + '</td><td>' + fmtHm((rep.loopMin + rep.transMin) * k) + '</td>'
+          : bad('M73 introuvables')) + '</tr>' +
+      '</tbody></table>' +
+      '<div class="al-rsec">' +
+        rrow('Coût ' + unit, money(r.cost * k)) +
+        rrow('Prix ' + unit, money(r.price * k)) +
+        rrow('Profit ' + unit, money(r.marginAmt * k), r.marginAmt < 0 ? 'al-bad' : 'al-good') +
+        '<button type="button" class="al-link al-rlink" data-goto="prix">Détail du prix →</button>' +
       '</div>' +
-      rrow('Flow', loopRanges(rep.flow) || '—') +
-      rrow('Bed leveling', loopRanges(rep.bed) || '—') +
-      rrow('Purge', rep.loadLineReplaced ? 'en goulotte' : 'introuvable — ligne native gardée', !rep.loadLineReplaced) +
-      (w && w.changes
-        ? rrow('Nettoyage de buse', wipeOk ? (w.passes > 0 ? w.passes + ' passages' : 'aucun') : w.done + ' / ' + w.changes + ' changements', !wipeOk)
-        : '') +
-      rrow('Filament', rep.weightPer > 0 ? grams(rep.weightPer * rep.loops) + ' g' : 'introuvable', !(rep.weightPer > 0)) +
-      rrow('Durée estimée', rep.progress ? fmtDur(rep.totalMin) : 'M73 introuvables', !rep.progress) +
-      rrow('Couches', rep.layersPer ? String(rep.layersPer * rep.loops) : 'introuvable', !rep.layersPer) +
-      rrow('Retrait AMS', rep.amsUnload ? 'au loop ' + rep.loops : 'introuvable', !rep.amsUnload) +
-      rrow('Hauteur de la pièce', z(rep.maxZ) + ' mm') +
+      '<div class="al-rsec">' +
+        rrow('Flow', rep.flow.length + ' loop' + (rep.flow.length > 1 ? 's' : '')) +
+        rrow('Bed leveling', rep.bed.length + ' loop' + (rep.bed.length > 1 ? 's' : '')) +
+        rrow('Push', z(rep.pushZ) + ' mm') +
+        rrow('Purge', rep.loadLineReplaced ? 'en goulotte' : 'introuvable', rep.loadLineReplaced ? '' : 'al-bad') +
+        (w && w.changes
+          ? rrow('Nettoyage de buse', wipeOk ? (w.passes > 0 ? w.passes + ' passages' : 'aucun') : w.done + ' / ' + w.changes + ' changements', wipeOk ? '' : 'al-bad')
+          : '') +
+        rrow('Couches', rep.layersPer ? String(rep.layersPer * N) : 'introuvable', rep.layersPer ? '' : 'al-bad') +
+        rrow('Retrait AMS', rep.amsUnload ? 'au loop ' + N : 'introuvable', rep.amsUnload ? '' : 'al-bad') +
+      '</div>' +
       (project
-        ? '<p class="al-fine al-proj">Projet Bambu prêt (' + esc(plateLabel()) + ') · ' +
+        ? '<p class="al-fine al-proj">Projet Bambu (' + esc(plateLabel()) + ') · ' +
           '<button type="button" class="al-link" id="al-download-gcode">gcode seul</button></p>'
         : '');
-    var gOnly = $('#al-download-gcode');
-    if (gOnly) gOnly.addEventListener('click', function () { downloadGcode(); });
   }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -579,8 +608,16 @@
     });
   }
   function plateLabel() { var m = /plate_(\d+)/.exec(plateName); return 'plateau ' + (m ? m[1] : '1'); }
-  function stat(v, label) {
-    return '<div class="al-stat"><span class="al-stat-v">' + v + '</span><span class="al-stat-l">' + label + '</span></div>';
+
+  // Résumé d'une ligne dans l'en-tête du panneau replié « Réglages machine ».
+  function syncMachineSum() {
+    var el = $('#al-machine-sum');
+    if (!el) return;
+    var o = readOpts();
+    var cool = o.coolMode === 'temp' ? Math.round(o.coolTemp) + ' °C'
+             : o.coolMode === 'delay' ? Math.round(o.coolSec) + ' s' : 'sans cooldown';
+    el.textContent = [o.bendEnable ? 'flexion ×' + o.bendCycles : 'sans flexion',
+                      'push −' + o.pushOffset + ' mm', 'purge ' + o.purgeLen + ' mm', cool].join(' · ');
   }
 
   /* --- Extraction des données du gcode → calculateur de prix ----------
@@ -696,24 +733,26 @@
     var mz = rawText.match(RE_MAXZ);
     $('#al-file-name').textContent = rawName + (project && project.plates.length > 1 ? ' · ' + plateLabel() : '') +
       (mz ? ' · pièce ' + parseFloat(mz[1]).toFixed(2) + ' mm' : '');
+    $('#al-drop').classList.add('has-file');   // zone compacte : une ligne avec le fichier
     $('#al-process').disabled = false;
     applyGcodeToPricing(rawText, rawName);
   }
   function resetOutput() {
-    outText = ''; outBatch = null;
+    outText = ''; outBatch = null; lastRep = null;
     $('#al-download').disabled = true;
-    $('#al-report').innerHTML = '';
+    renderReport(null);
     syncDownloadLabel();
   }
   function fileError(msg) {
     rawText = '';
     $('#al-file-name').textContent = rawName;
+    $('#al-drop').classList.remove('has-file');
     $('#al-process').disabled = true;
     $('#al-report').innerHTML = '<p class="al-warn">' + esc(msg) + '</p>';
   }
   function syncDownloadLabel() {
     var b = $('#al-download');
-    if (b) b.textContent = project ? '⬇ Télécharger le projet (.gcode.3mf)' : '⬇ Télécharger le gcode';
+    if (b) b.textContent = project ? '⬇ Télécharger le projet' : '⬇ Télécharger le gcode';
   }
   // « HSB524 1.4.gcode.3mf » -> « HSB524 1.4 AutoLoop x12.gcode.3mf »
   function projectOutName(loops) {
@@ -731,12 +770,19 @@
         var opts = readOpts();
         var res = generateBatch(rawText, opts);
         outText = res.text;
-        renderReport(res.report);
         if (res.report.ok) {
+          lastRep = res.report;
+          // Le calculateur décrit maintenant CE batch : loops (prep amortie) et
+          // refroidissement = cooldown + éjection estimés par loop.
+          $('#ap-loops').value = opts.loops;
+          $('#ap-cooldown').value = Math.round(res.report.transMin);
+          recompute();   // → renderReport(lastRep) avec le prix à jour
           outName = project ? projectOutName(opts.loops) : 'plate_1.gcode';
           outBatch = { loops: opts.loops, predictionSec: res.report.progress ? res.report.totalMin * 60 : 0 };
           $('#al-download').disabled = false;
         } else {
+          lastRep = null;
+          renderReport(res.report);
           $('#al-download').disabled = true;
         }
       } catch (err) {
@@ -803,9 +849,19 @@
     function syncBend() { $('#al-bend-fields').style.opacity = bendEnable.checked ? '1' : '.4'; }
     bendEnable.addEventListener('change', syncBend); syncBend();
     initCalGrid();
+    // Résumé de l'en-tête des réglages machine, tenu à jour (saisie ou défauts appliqués).
+    var machine = $('#al-machine');
+    if (machine) { machine.addEventListener('input', syncMachineSum); machine.addEventListener('change', syncMachineSum); }
+    syncMachineSum();
 
     $('#al-process').addEventListener('click', runGenerate);
     $('#al-download').addEventListener('click', download);
+    // Rapport (re-rendu à chaque fois) : « gcode seul » et « Détail du prix → ».
+    $('#al-report').addEventListener('click', function (e) {
+      var t = e.target;
+      if (t.id === 'al-download-gcode') downloadGcode();
+      else if (t.dataset && t.dataset.goto) { var seg = $('.al-seg[data-view="' + t.dataset.goto + '"]'); if (seg) seg.click(); }
+    });
     var plateSel = $('#al-plate');
     if (plateSel) plateSel.addEventListener('change', function () { if (project) selectPlate(this.value); });
   }
@@ -898,11 +954,16 @@
     return d > 0 ? d + ' j ' + fmtHm(min - d * 1440) : fmtHm(min);
   }
 
-  function recompute() {
+  // Prix saisi pour l'unité → prix par pièce ; tout est calculé par pièce, puis × k à l'affichage.
+  function pricePerPiece() {
     var f = priceFields();
+    f.salePrice = f.salePrice / unitK;
+    return { f: f, r: compute(f) };
+  }
+
+  function recompute() {
+    var p = pricePerPiece(), f = p.f, r = p.r;
     var k = unitK;
-    f.salePrice = f.salePrice / k;   // prix saisi pour l'unité → prix par pièce
-    var r = compute(f);              // tout est calculé par pièce, puis × k à l'affichage
     var set = function (id, v) { var el = $('#' + id); if (el) el.textContent = v; };
     // Batch = valeurs par pièce × loops (temps, filament, coût, profit).
     // Les loops restent des pièces (c'est ce que fait l'imprimante) ; en mode
@@ -937,6 +998,7 @@
     $$('.ap-unit-lbl').forEach(function (el) { el.textContent = k === 2 ? '/ paire' : '/ pièce'; });
     $$('#ap-unit .al-unit-b').forEach(function (b) { b.setAttribute('aria-checked', String(+b.dataset.unit === k)); });
     drawBreakdown(r, k);
+    if (lastRep) renderReport(lastRep);   // l'aperçu du prix dans le rapport suit le calculateur
   }
 
   // Camembert (conic-gradient, sans dépendance) : répartition du coût.
