@@ -27,19 +27,51 @@
     return { entries: entries, plates: plates };
   }
 
-  // Reconstruit l'archive : même contenu, même ordre ; seuls plate_N.gcode et son .md5
-  // changent. Les images restent « stockées » (déjà compressées), le reste en deflate.
+  /* ---- Metadata/slice_info.config : résumé de chaque plateau tranché. Bambu Studio
+     y lit le filament total (« Total Filament », poids de la fenêtre d'envoi et
+     envoyé à l'imprimante) sans le recalculer depuis le gcode, contrairement au
+     temps : sans réécriture, un batch de 72 affichait le poids d'UNE pièce.
+     Pour le plateau bouclé : poids, longueurs/poids et temps de chargement AMS
+     de chaque filament, pauses × loops ; durée prévue = estimation du batch
+     d'AutoLoop (cooldown compris) ou, à défaut, durée d'origine × loops.     */
+  function fix2(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+  function scaleSliceInfo(xml, plateN, batch) {
+    var N = batch.loops;
+    return xml.replace(/<plate>[\s\S]*?<\/plate>/g, function (blk) {
+      var idx = /<metadata key="index" value="(\d+)"/.exec(blk);
+      if (!idx || +idx[1] !== plateN) return blk;
+      return blk
+        .replace(/(<metadata key="weight" value=")([\d.]+)"/, function (m, a, v) { return a + fix2(v * N) + '"'; })
+        .replace(/(<metadata key="pause_count" value=")(\d+)"/, function (m, a, v) { return a + (v * N) + '"'; })
+        .replace(/(<metadata key="prediction" value=")(\d+)"/, function (m, a, v) {
+          return a + Math.round(batch.predictionSec > 0 ? batch.predictionSec : v * N) + '"';
+        })
+        .replace(/<filament [^>]*>/g, function (tag) {
+          return tag.replace(/ (used_m|used_g|total_load_time|total_unload_time)="([\d.]+)"/g, function (m, k, v) {
+            return ' ' + k + '="' + fix2(v * N) + '"';
+          });
+        });
+    });
+  }
+
+  // Reconstruit l'archive : même contenu, même ordre ; seuls plate_N.gcode, son .md5
+  // et (si `batch` = { loops, predictionSec }) slice_info.config changent. Les images
+  // restent « stockées » (déjà compressées), le reste en deflate.
   // -> Promise(Uint8Array)
-  function build(project, plateName, gcodeBytes) {
+  function build(project, plateName, gcodeBytes, batch) {
     var ff = root.fflate;
     if (!ff) return Promise.reject(new Error('Module ZIP (fflate) non chargé.'));
     var files = {}, sawMd5 = false, md5Name = plateName + '.md5';
     var hash = md5(gcodeBytes);
+    var plateN = +((RE_PLATE.exec(plateName) || [])[1] || 1);
     Object.keys(project.entries).forEach(function (name) {
       if (/\/$/.test(name)) return;                          // dossiers : implicites
       var data = project.entries[name];
       if (name === plateName) data = gcodeBytes;
       else if (name === md5Name) { data = asciiBytes(hash); sawMd5 = true; }
+      else if (name === 'Metadata/slice_info.config' && batch && batch.loops > 1) {
+        data = new TextEncoder().encode(scaleSliceInfo(new TextDecoder('utf-8').decode(data), plateN, batch));
+      }
       files[name] = [data, { level: /\.(png|jpe?g)$/i.test(name) ? 0 : 6 }];
     });
     if (!sawMd5) files[md5Name] = [asciiBytes(hash), { level: 6 }];
@@ -108,5 +140,5 @@
     st[0] = (st[0] + A) | 0; st[1] = (st[1] + B) | 0; st[2] = (st[2] + C) | 0; st[3] = (st[3] + D) | 0;
   }
 
-  root.ALProject = { isZip: isZip, read: read, build: build, md5: md5 };
+  root.ALProject = { isZip: isZip, read: read, build: build, md5: md5, scaleSliceInfo: scaleSliceInfo };
 })(typeof self !== 'undefined' ? self : this);

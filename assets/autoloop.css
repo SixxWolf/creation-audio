@@ -78,6 +78,16 @@
 /* --- Actions gcode -------------------------------------- */
 .al-actions { display:flex; flex-wrap:wrap; gap:10px; }
 
+/* --- Valeurs par défaut (enregistrées par Théo) --------- */
+.al-defs { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px 16px; padding:12px 16px;
+  background:var(--wash); border:1px dashed var(--line-2); border-radius:14px; }
+.al-defs-t { flex:1 1 260px; margin:0; font-size:.84rem; color:var(--ink-2); }
+.al-defs-t b { margin-right:4px; font-family:var(--display); color:var(--ink); }
+.al-defs-msg { color:var(--muted); }
+.al-defs-msg.is-ok { color:var(--good); }
+.al-defs-msg.is-warn { color:var(--bad); }
+.al-defs-b { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; font-size:.86rem; }
+
 /* --- Rapport de traitement ------------------------------ */
 .al-report-card .muted { font-size:.85rem; }
 .al-stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }

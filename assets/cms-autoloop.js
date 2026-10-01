@@ -39,6 +39,8 @@
   /* ================================================================== */
 
   var rawText = '', rawName = '', outText = '', outName = '';
+  // Résumé du batch pour slice_info.config du projet : { loops, predictionSec }.
+  var outBatch = null;
   // Projet Bambu Studio (.gcode.3mf) : archive d'origine + plateau traité.
   // null = on a reçu un simple .gcode (sortie = .gcode, comme avant).
   var project = null, plateName = '';
@@ -119,43 +121,21 @@
     return { text: head.slice(0, m.index) + L.join(eol) + eol + head.slice(m.index + m[0].length), replaced: true };
   }
 
-  /* - Réamorçage après changement de filament : le slicer recule le filament de
-       retract_length_toolchange (+ restart_extra) avant la coupe, puis le repousse
-       d'autant au 1er point du nouveau filament (« G1 E2 F1800 », sur place). Le
-       champ est grisé dans Bambu Studio pour une buse unique. Le gcode de
-       changement P2S finit par « M983.3 … R{retract_length_toolchange} » : le
-       firmware recule donc sans doute de 2 mm après sa purge, et ce G1 E2 le
-       compense (le baisser = risque de manque au 1er trait ; réglage de test).
-       On ne touche qu'à ce réamorçage (la rétraction avant coupe reste), et
-       seulement si la ligne vaut exactement la valeur du slicer.                */
-  var RE_TOOLCHANGE = /^;=+ P2S filament_change gcode =+/gm;
-  function adjustRestart(head, len) {
-    var a = /^; retract_length_toolchange = ([\d.]+)/m.exec(head);
-    var b = /^; retract_restart_extra_toolchange = (-?[\d.]+)/m.exec(head);
-    var res = { text: head, changes: 0, done: 0, orig: a ? parseFloat(a[1]) + (b ? parseFloat(b[1]) : 0) : null };
-    var out = '', last = 0, m;
-    RE_TOOLCHANGE.lastIndex = 0;
-    while ((m = RE_TOOLCHANGE.exec(head))) {
-      res.changes++;
-      var fs = head.indexOf('; filament start gcode', m.index);
-      if (fs === -1 || res.orig == null) continue;
-      // 1re ligne G1 avec extrusion après le start du nouveau filament.
-      var reG = /^G1 ([^\r\n;]*)[^\r\n]*/gm, g;
-      reG.lastIndex = fs;
-      while ((g = reG.exec(head)) && !/(^|\s)E-?[\d.]/.test(g[1])) {}
-      if (!g) continue;
-      var d = /^E(\d*\.?\d+) F(\d+)\s*$/.exec(g[1]);   // réamorçage pur : « G1 E2 F1800 »
-      if (!d || Math.abs(parseFloat(d[1]) - res.orig) > 0.001) continue;
-      res.done++;
-      if (Math.abs(len - res.orig) > 0.001) {
-        out += head.slice(last, g.index) + 'G1 E' + z(len) + ' F' + d[2] +
-               ' ; AutoLoop : réamorçage après changement de filament (' + d[1] + ' mm à l\'origine)';
-        last = g.index + g[0].length;
-      }
-      RE_TOOLCHANGE.lastIndex = Math.max(RE_TOOLCHANGE.lastIndex, g.index + g[0].length);
-    }
-    res.text = last ? out + head.slice(last) : head;
-    return res;
+  /* - RE_FIL_TOTALS : totaux de filament de l'en-tête (longueur, volume, poids ;
+       une valeur par filament, « 38.87,0.17 ») → multipliés par le nombre de
+       loops, comme le total de couches. Bambu Studio, lui, affiche le total lu
+       dans slice_info.config du projet (pas recalculé depuis le gcode,
+       contrairement au temps) : réécrit à part, cf. autoloop-3mf.js.          */
+  var RE_FIL_TOTALS = /^(; total filament (?:length \[mm\]|volume \[cm\^3\]|weight \[g\]) : )([\d.,]+)/gm;
+  function scaleFilTotals(head, N) {
+    return head.replace(RE_FIL_TOTALS, function (m, label, list) {
+      return label + list.split(',').map(function (v) { return z(parseFloat(v) * N); }).join(',');
+    });
+  }
+  // Poids d'une pièce (somme des filaments), lu dans l'en-tête — pour le rapport.
+  function pieceWeight(head) {
+    var m = /^; total filament weight \[g\] : ([\d.,]+)/m.exec(head);
+    return m ? m[1].split(',').reduce(function (s, v) { return s + (parseFloat(v) || 0); }, 0) : 0;
   }
 
   /* - Nettoyage de la buse après changement de filament. Après sa purge, le gcode
@@ -398,7 +378,7 @@
     var report = {
       ok: false, loops: opts.loops, eol: eol === '\r\n' ? 'CRLF' : 'LF',
       maxZ: null, pushZ: null, flow: [], bed: [], bendsPerLoop: 0, size: 0, error: null,
-      loadLineReplaced: false, amsUnload: false, layersPer: 0, restart: null, wipe: null,
+      loadLineReplaced: false, amsUnload: false, layersPer: 0, wipe: null, weightPer: 0,
       progress: false, loopMin: 0, transMin: 0, totalMin: 0
     };
     var idx = raw.indexOf(END_ANCHOR);
@@ -418,9 +398,6 @@
     var head = raw.slice(0, idx);   // pièce complète (header + config + start + corps), sans le end gcode natif
     var ll = replaceLoadLine(head, eol, opts.purgeLen);   // purge en goulotte à la place de la ligne G130, sur tous les loops
     head = ll.text; report.loadLineReplaced = ll.replaced;
-    var rst = adjustRestart(head, opts.restartLen);   // réamorçage au 1er point après chaque changement de filament
-    head = rst.text;
-    report.restart = { changes: rst.changes, done: rst.done, orig: rst.orig, len: opts.restartLen };
     var wp = addChangeWipe(head, opts.wipePasses, eol);   // nettoyage de la buse après chaque changement de filament
     head = wp.text;
     report.wipe = { changes: wp.changes, done: wp.done, passes: opts.wipePasses };
@@ -436,6 +413,8 @@
     var layersPer = tl ? parseInt(tl[2], 10) : 0;
     if (tl) head = head.replace(RE_TOTAL_LAYERS, '$1' + (N * layersPer));
     report.layersPer = layersPer;
+    report.weightPer = pieceWeight(head);
+    head = scaleFilTotals(head, N);   // filament de l'en-tête : total du batch
     var seg = progressSegments(head, layersPer);   // progression + couches réécrites pour le batch complet
     var transMin = transitionMin(opts);
     report.progress = seg.rs.length > 0;
@@ -562,8 +541,7 @@
       pushOffset: num($('#al-push-offset').value, 10),
       pushSpeed: num($('#al-push-speed').value, 10000),
       clearZ: num($('#al-clearz').value, 105),
-      purgeLen: Math.max(0, num($('#al-purge-len').value, 100)),
-      restartLen: Math.max(0, num($('#al-restart-len').value, 2)),
+      purgeLen: Math.max(0, num($('#al-purge-len').value, 50)),
       wipePasses: Math.min(10, Math.max(0, intOr($('#al-wipe-passes').value, 2))),
       coolMode: $('#al-cool-mode').value,
       coolTemp: num($('#al-cool-temp').value, 45),
@@ -576,18 +554,10 @@
     return bytes > 1048576 ? (bytes / 1048576).toFixed(1) + ' Mo' : (bytes / 1024).toFixed(0) + ' Ko';
   }
 
-  // Ligne du rapport pour le réamorçage après changement de filament (rien si la pièce n'a qu'un filament).
-  function restartLine(r) {
-    if (!r || !r.changes) return '';
-    if (r.done < r.changes) {
-      return '<br><span class="al-warn">Réamorçage après changement de filament : ' + r.done + ' / ' + r.changes +
-             ' changement(s) reconnu(s) — les autres gardent la valeur du slicer.</span>';
-    }
-    var same = Math.abs(r.len - r.orig) <= 0.001;
-    return '<br>Réamorçage après changement de filament : ' + (same
-      ? z(r.orig) + ' mm (valeur du slicer, inchangée)'
-      : '<b>' + z(r.len) + ' mm</b> au lieu de ' + z(r.orig) + ' mm') +
-      ' · ' + r.changes + ' changement(s) par pièce.';
+  // « 2810.74 » → « 2 810,74 » (poids du rapport)
+  function grams(n) {
+    var p = (Math.round(n * 100) / 100).toFixed(2).split('.');
+    return p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ',' + p[1];
   }
 
   // Ligne du rapport pour le nettoyage de buse après changement (rien si la pièce n'a qu'un filament).
@@ -620,7 +590,11 @@
         '<br>Ligne de purge : ' + (rep.loadLineReplaced
           ? 'remplacée par une purge en goulotte (aucune ligne sur le plateau).'
           : '<span class="al-warn">bloc « nozzle load line » introuvable — purge native conservée.</span>') +
-        restartLine(rep.restart) + wipeLine(rep.wipe) +
+        wipeLine(rep.wipe) +
+        (rep.weightPer > 0
+          ? '<br>Filament du batch : <b>' + grams(rep.weightPer * rep.loops) + ' g</b> (' + rep.loops + ' × ' + grams(rep.weightPer) +
+            ' g) — total affiché par Bambu Studio et envoyé à l\'imprimante (purge en goulotte non comptée, comme dans Bambu).'
+          : '<br><span class="al-warn">Poids de filament introuvable dans l\'en-tête — Bambu Studio affichera le poids d\'une seule pièce.</span>') +
         '<br>Progression : ' + (rep.progress
           ? 'batch complet · durée estimée <b>' + fmtDur(rep.totalMin) + '</b> (' + rep.loops + ' × ' + rep.loopMin + ' min + ' +
             Math.round(rep.transMin) + ' min de cooldown/éjection). Le % et l\'heure de fin affichés par l\'imprimante valent pour tout le batch.'
@@ -768,7 +742,7 @@
     applyGcodeToPricing(rawText, rawName);
   }
   function resetOutput() {
-    outText = '';
+    outText = ''; outBatch = null;
     $('#al-download').disabled = true;
     $('#al-report').innerHTML = '';
     syncDownloadLabel();
@@ -802,6 +776,7 @@
         renderReport(res.report);
         if (res.report.ok) {
           outName = project ? projectOutName(opts.loops) : 'plate_1.gcode';
+          outBatch = { loops: opts.loops, predictionSec: res.report.progress ? res.report.totalMin * 60 : 0 };
           $('#al-download').disabled = false;
         } else {
           $('#al-download').disabled = true;
@@ -832,7 +807,7 @@
     btn.disabled = true; btn.textContent = 'Préparation du projet…';
     setTimeout(function () {   // laisse peindre l'état avant l'encodage
       var bytes = new TextEncoder().encode(outText);
-      window.ALProject.build(project, plateName, bytes).then(function (zip) {
+      window.ALProject.build(project, plateName, bytes, outBatch).then(function (zip) {
         saveBlob(new Blob([zip], { type: 'application/octet-stream' }), name);
         btn.disabled = false; syncDownloadLabel();
       }, function (err) {
@@ -1054,9 +1029,150 @@
     recompute();
   }
 
+  /* ================================================================== */
+  /*  3) VALEURS PAR DÉFAUT (réglées par Théo, sans toucher au code)      */
+  /* ================================================================== */
+  /* Défauts d'usine = les value="" du HTML. « Enregistrer comme défauts »
+     mémorise les champs d'une vue — générateur : réglages du batch (pas la
+     grille case par case, qui suit les « tous les X ») ; calculateur : les
+     coûts (pas le temps / poids / loops / prix de la pièce chargée) — dans
+     admin_settings (clé « autoloop », synchro entre appareils) + une copie
+     locale appliquée dès l'ouverture, avant la réponse du serveur.        */
+  var DEF_FIELDS = {
+    gcode: ['al-loops', 'al-cal-flow-every', 'al-cal-bed-every', 'al-bend-enable', 'al-bend-high', 'al-bend-low',
+            'al-bend-speed', 'al-bend-cycles', 'al-push-offset', 'al-push-speed', 'al-clearz', 'al-purge-len',
+            'al-wipe-passes', 'al-cool-mode', 'al-cool-temp', 'al-cool-sec', 'al-cool-est'],
+    prix: ['ap-cooldown', 'ap-failure', 'ap-filament-kg', 'ap-consumables', 'ap-deprec', 'ap-elec', 'ap-rate',
+           'ap-prep-model', 'ap-prep-slice', 'ap-prep-transfer', 'ap-post-removal', 'ap-post-support', 'ap-post-additional']
+  };
+  var DEF_KEY = 'autoloop', DEF_LS = 'al-defaults';
+  var factory = {}, saved = null;          // saved = { gcode: {id: valeur}, prix: {…}, at: { gcode: iso, prix: iso } }
+  var touched = { gcode: false, prix: false };   // champs modifiés à la main depuis l'ouverture
+
+  function readLocal() {
+    try { var v = JSON.parse(localStorage.getItem(DEF_LS) || 'null'); return v && typeof v === 'object' ? v : null; }
+    catch (e) { return null; }
+  }
+  function writeLocal(v) { try { localStorage.setItem(DEF_LS, JSON.stringify(v)); } catch (e) {} }
+
+  function snapshot(view) {
+    var o = {};
+    DEF_FIELDS[view].forEach(function (id) {
+      var el = $('#' + id);
+      if (el) o[id] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+    return o;
+  }
+  // Pose les valeurs ; `notify` relance les écouteurs (grille, cooldown, flexion, résumé des prix).
+  function applyValues(vals, notify) {
+    Object.keys(vals || {}).forEach(function (id) {
+      var el = $('#' + id), v = vals[id];
+      if (!el || DEF_FIELDS.gcode.concat(DEF_FIELDS.prix).indexOf(id) === -1) return;
+      if (el.type === 'checkbox') {
+        if (el.checked === !!v) return;
+        el.checked = !!v;
+      } else {
+        v = String(v);
+        if (el.value === v) return;
+        if (el.tagName === 'SELECT' && !$$('option', el).some(function (o) { return o.value === v; })) return;
+        el.value = v;
+      }
+      if (notify) {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+  }
+  function shortDay(iso) {
+    try { return new Date(iso).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return ''; }
+  }
+  function defsMsg(view, text, tone) {
+    var el = $('.al-defs[data-defs="' + view + '"] .al-defs-msg');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'al-defs-msg' + (tone ? ' is-' + tone : '');
+  }
+  function defsStatus(view) {
+    var at = saved && saved.at && saved.at[view];
+    defsMsg(view, saved && saved[view]
+      ? 'Tes défauts sont appliqués' + (at ? ' (enregistrés le ' + shortDay(at) + ')' : '') + '.'
+      : 'Valeurs d\'usine. Ajuste les champs, puis enregistre-les pour les retrouver à chaque ouverture.');
+  }
+
+  // Avant initGcode / initPricing : leur premier rendu part des défauts locaux.
+  function loadLocalDefaults() {
+    factory.gcode = snapshot('gcode');
+    factory.prix = snapshot('prix');
+    saved = readLocal();
+    if (saved) { applyValues(saved.gcode, false); applyValues(saved.prix, false); }
+  }
+
+  // Après connexion : la version serveur (enregistrée sur un autre appareil ?) remplace
+  // la copie locale ; une vue déjà modifiée à la main n'est pas écrasée.
+  function loadRemoteDefaults() {
+    var sb = window.CA && window.CA.sb;
+    if (!sb) return;
+    sb.from('admin_settings').select('value').eq('key', DEF_KEY).maybeSingle().then(function (res) {
+      if (res.error || !res.data || !res.data.value) return;   // rien en ligne : on garde le local
+      // Vue par vue, la version la plus récente gagne (un enregistrement resté
+      // local faute de réseau n'est pas écrasé par une version serveur plus vieille).
+      var remote = res.data.value, cur = saved || {}, merged = { at: {} };
+      ['gcode', 'prix'].forEach(function (view) {
+        var ra = (remote.at && remote.at[view]) || '', la = (cur.at && cur.at[view]) || '';
+        var src = remote[view] && (!cur[view] || ra >= la) ? remote : cur;
+        if (src[view]) { merged[view] = src[view]; merged.at[view] = src.at && src.at[view]; }
+      });
+      if (JSON.stringify(merged) === JSON.stringify(cur)) return;
+      saved = merged; writeLocal(merged);
+      ['gcode', 'prix'].forEach(function (view) {
+        if (!touched[view] && merged[view]) applyValues(merged[view], true);
+        defsStatus(view);
+      });
+    }, function () {});
+  }
+
+  function saveDefaults(view, btn) {
+    var next = JSON.parse(JSON.stringify(saved || {}));
+    next[view] = snapshot(view);
+    next.at = next.at || {};
+    next.at[view] = new Date().toISOString();
+    saved = next; writeLocal(next);
+    var sb = window.CA && window.CA.sb;
+    if (!sb) { defsMsg(view, 'Enregistré sur cet appareil seulement (hors ligne).', 'warn'); return; }
+    btn.disabled = true;
+    defsMsg(view, 'Enregistrement…');
+    sb.from('admin_settings').upsert({ key: DEF_KEY, value: next, updated_at: next.at[view] }).then(function (res) {
+      btn.disabled = false;
+      if (res.error) defsMsg(view, 'Enregistré sur cet appareil seulement — serveur : ' + res.error.message, 'warn');
+      else defsMsg(view, 'Enregistré ✓ Appliqué à chaque ouverture d\'AutoLoop, sur tous tes appareils.', 'ok');
+    }, function (err) {
+      btn.disabled = false;
+      defsMsg(view, 'Enregistré sur cet appareil seulement — ' + (err && err.message ? err.message : err), 'warn');
+    });
+  }
+
+  function initDefaults() {
+    $$('.al-defs').forEach(function (bar) {
+      var view = bar.dataset.defs;
+      $('[data-defs-save]', bar).addEventListener('click', function () { saveDefaults(view, this); });
+      $('[data-defs-reset]', bar).addEventListener('click', function () {
+        applyValues(factory[view], true);
+        defsMsg(view, 'Valeurs d\'usine remises dans les champs. « Enregistrer » pour en refaire tes défauts.');
+      });
+      defsStatus(view);
+    });
+    $$('.al-view').forEach(function (v) {
+      var view = v.dataset.view;
+      var mark = function (e) { if (e.isTrusted && DEF_FIELDS[view].indexOf(e.target.id) !== -1) touched[view] = true; };
+      v.addEventListener('input', mark, true);
+      v.addEventListener('change', mark, true);
+    });
+    if (window.CA && window.CA.onAdminReady) window.CA.onAdminReady(loadRemoteDefaults);
+  }
+
   /* ------------------------------------------------------------------ */
   function init() {
-    if ($('#al-subnav')) { initSubtabs(); initGcode(); initPricing(); }
+    if ($('#al-subnav')) { loadLocalDefaults(); initSubtabs(); initGcode(); initPricing(); initDefaults(); }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

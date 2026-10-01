@@ -988,6 +988,27 @@ grant execute on function public.dealer_update_order(uuid, jsonb, text) to authe
 grant execute on function public.dealer_cancel_order(uuid)              to authenticated;
 
 -- ------------------------------------------------------------
+-- TABLE admin_settings — réglages de l'admin, clé → JSON
+-- (ex. « autoloop » : valeurs par défaut d'AutoLoop enregistrées par Théo,
+-- synchronisées entre ses appareils). Admin seulement, jamais lue en public.
+-- ------------------------------------------------------------
+create table if not exists public.admin_settings (
+  key        text primary key,
+  value      jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.admin_settings enable row level security;
+
+drop policy if exists admin_settings_admin_all on public.admin_settings;
+create policy admin_settings_admin_all
+  on public.admin_settings for all
+  to authenticated
+  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
+  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+
+revoke all on public.admin_settings from anon;
+
+-- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
 select count(*) as produits_v2 from public.products;
