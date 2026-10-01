@@ -260,15 +260,27 @@
     return out.join(', ');
   }
 
+  /* --- Hauteur de push ------------------------------------------------
+     Normalement hauteur max − retrait. Pièce de 10 mm ou moins (ou retrait
+     plus grand que la pièce) : ce calcul tombait à 0 (borné) → la tête
+     descendait au ras du plateau. On pousse alors à mi-hauteur de la pièce
+     (règle de Théo) et un avertissement s'affiche.                        */
+  var PUSH_LOW_MAX = 10;
+  function pushHeight(maxZ, offset) {
+    var half = maxZ <= PUSH_LOW_MAX || maxZ - offset <= 0;
+    return { z: half ? maxZ / 2 : maxZ - offset, half: half };
+  }
+
   /* --- Transition entre deux loops (fin de job + éjection) -------------
      Reconstruite à partir des valeurs PROUVÉES du fichier P2S qui imprime
      déjà (dégagement Z, flexion, push, balayages, parking). Seul le push
-     est paramétré (= % de la hauteur de la pièce). On n'invente aucun
+     est paramétré (hauteur : cf. pushHeight). On n'invente aucun
      mouvement : on rejoue une séquence validée.
+     `push` = { z, half } (pushHeight).
      `last` (dernier loop seulement) : { unload } = lignes natives du retrait
      AMS (ou null), placées comme dans le end gcode natif, avant l'extinction
      de la buse ; puis progression posée à 100 % tout à la fin.             */
-  function buildTransition(opts, pushZ, maxZ, eol, last) {
+  function buildTransition(opts, push, maxZ, eol, last) {
     var unload = last && last.unload;
     var L = [];
     var pushSpeed = Math.round(opts.pushSpeed);
@@ -328,7 +340,8 @@
     // Push + balayages centraux (éjection)
     L.push('');
     L.push(';============================= PUSH SECTION =============================');
-    L.push('G1 Z' + z(pushZ) + ' F' + pushSpeed + ' ; hauteur de push = hauteur max − ' + opts.pushOffset + ' mm');
+    L.push('G1 Z' + z(push.z) + ' F' + pushSpeed + ' ; hauteur de push = ' +
+           (push.half ? 'mi-hauteur (pièce de ' + z(maxZ) + ' mm)' : 'hauteur max − ' + opts.pushOffset + ' mm'));
     L.push('M400');
     // La tête arrive du fond (G150.3, goulotte) : on la place au centre, derrière la pièce,
     // puis poussée vers l'avant (fait tomber la pièce) et recul vers l'arrière (à vide).
@@ -382,7 +395,7 @@
     var eol = detectEol(raw);
     var report = {
       ok: false, loops: opts.loops, eol: eol === '\r\n' ? 'CRLF' : 'LF',
-      maxZ: null, pushZ: null, flow: [], bed: [], bendsPerLoop: 0, size: 0, error: null,
+      maxZ: null, pushZ: null, pushHalf: false, flow: [], bed: [], bendsPerLoop: 0, size: 0, error: null,
       loadLineReplaced: false, amsUnload: false, layersPer: 0, wipe: null, weightPer: 0,
       progress: false, loopMin: 0, transMin: 0, totalMin: 0
     };
@@ -396,8 +409,8 @@
     if (!RE_START_ANCHOR.test(raw)) { report.error = 'Ancrage du start gcode P2S introuvable.'; return { text: '', report: report }; }
 
     var maxZ = parseFloat(mz[1]);
-    var pushZ = Math.max(maxZ - opts.pushOffset, 0);
-    report.maxZ = maxZ; report.pushZ = pushZ;
+    var push = pushHeight(maxZ, opts.pushOffset);
+    report.maxZ = maxZ; report.pushZ = push.z; report.pushHalf = push.half;
     report.bendsPerLoop = (opts.bendEnable && opts.bendCycles > 0) ? opts.bendCycles * 2 : 0;
 
     var head = raw.slice(0, idx);   // pièce complète (header + config + start + corps), sans le end gcode natif
@@ -407,10 +420,10 @@
     head = wp.text;
     report.wipe = { changes: wp.changes, done: wp.done, passes: opts.wipePasses };
     var N = opts.loops;
-    var trans = buildTransition(opts, pushZ, maxZ, eol);   // identique pour chaque loop…
+    var trans = buildTransition(opts, push, maxZ, eol);   // identique pour chaque loop…
     var pb = RE_AMS_PULLBACK.exec(raw.slice(idx));
     var unload = pb ? pb[1].split(/\r?\n/) : null;
-    var transLast = buildTransition(opts, pushZ, maxZ, eol, { unload: unload });   // …sauf le dernier : retrait AMS + 100 %
+    var transLast = buildTransition(opts, push, maxZ, eol, { unload: unload });   // …sauf le dernier : retrait AMS + 100 %
     report.amsUnload = !!unload;
 
     // Total de couches annoncé à l'imprimante = couches par pièce × loops.
@@ -434,7 +447,9 @@
     var parts = [];
     parts.push('; ===================================================' + eol +
                '; Batch généré par AutoLoop — Création Audio' + eol +
-               '; ' + N + ' loops · pièce ' + z(maxZ) + ' mm · push ' + z(pushZ) + ' mm (max − ' + opts.pushOffset + ' mm)' + eol +
+               '; ' + N + ' loops · pièce ' + z(maxZ) + ' mm · push ' + z(push.z) + ' mm (' +
+                 (push.half ? 'mi-hauteur : ' + (maxZ <= PUSH_LOW_MAX ? 'pièce ≤ ' + PUSH_LOW_MAX + ' mm' : 'retrait ≥ hauteur')
+                            : 'max − ' + opts.pushOffset + ' mm') + ')' + eol +
                '; Flow : ' + (loopRanges(report.flow) || 'aucun loop') + ' · bed leveling : ' + (loopRanges(report.bed) || 'aucun loop') + eol +
                (report.progress ? '; Durée estimée du batch : ' + fmtDur(report.totalMin) + ' (' + N + ' × ' + seg.loopMin +
                  ' min + ' + Math.round(transMin) + ' min de cooldown/éjection) — progression M73 réécrite pour le batch' + eol : '') +
@@ -597,7 +612,7 @@
       '<div class="al-rsec">' +
         rrow('Flow', rep.flow.length + ' loop' + (rep.flow.length > 1 ? 's' : '')) +
         rrow('Bed leveling', rep.bed.length + ' loop' + (rep.bed.length > 1 ? 's' : '')) +
-        rrow('Push', z(rep.pushZ) + ' mm') +
+        rrow('Push', z(rep.pushZ) + ' mm' + (rep.pushHalf ? ' · mi-hauteur' : ''), rep.pushHalf ? 'al-caution-t' : '') +
         rrow('Purge', rep.loadLineReplaced ? 'en goulotte' : 'introuvable', rep.loadLineReplaced ? '' : 'al-bad') +
         (w && w.changes
           ? rrow('Nettoyage de buse', wipeOk ? (w.passes > 0 ? w.passes + ' passages' : 'aucun') : w.done + ' / ' + w.changes + ' changements', wipeOk ? '' : 'al-bad')
@@ -743,7 +758,22 @@
       (mz ? ' · pièce ' + parseFloat(mz[1]).toFixed(2) + ' mm' : '');
     $('#al-drop').classList.add('has-file');   // zone compacte : une ligne avec le fichier
     $('#al-process').disabled = false;
+    syncPushWarn();
     applyGcodeToPricing(rawText, rawName);
+  }
+  // Avertissement sous le fichier dès qu'il est chargé : pièce ≤ 10 mm (ou retrait ≥ hauteur)
+  // → push à mi-hauteur (cf. pushHeight). Suit aussi le champ Retrait.
+  function syncPushWarn() {
+    var el = $('#al-push-warn');
+    if (!el) return;
+    var mz = rawText ? RE_MAXZ.exec(rawText) : null;
+    var maxZ = mz ? parseFloat(mz[1]) : 0;
+    var p = mz ? pushHeight(maxZ, num($('#al-push-offset').value, 10)) : null;
+    el.hidden = !(p && p.half);
+    if (p && p.half) {
+      el.textContent = 'Pièce de ' + z(maxZ) + ' mm' + (maxZ <= PUSH_LOW_MAX ? ' (≤ ' + PUSH_LOW_MAX + ' mm)' : ', retrait trop grand') +
+        ' : push à mi-hauteur, ' + z(p.z) + ' mm. Vérifie l\'éjection au 1er loop.';
+    }
   }
   function resetOutput() {
     outText = ''; outBatch = null; lastRep = null;
@@ -755,6 +785,7 @@
     rawText = '';
     $('#al-file-name').textContent = rawName;
     $('#al-drop').classList.remove('has-file');
+    syncPushWarn();
     $('#al-process').disabled = true;
     $('#al-report').innerHTML = '<p class="al-warn">' + esc(msg) + '</p>';
   }
@@ -861,6 +892,7 @@
     var machine = $('#al-machine');
     if (machine) { machine.addEventListener('input', syncMachineSum); machine.addEventListener('change', syncMachineSum); }
     syncMachineSum();
+    $('#al-push-offset').addEventListener('input', syncPushWarn);
 
     $('#al-process').addEventListener('click', runGenerate);
     $('#al-download').addEventListener('click', download);

@@ -46,6 +46,11 @@
 .al-drop.has-file .al-drop-s { font-size:.9rem; font-weight:600; color:var(--ink); }
 .al-plate { margin-top:12px; max-width:260px; }
 .al-plate[hidden] { display:none; }
+/* Avertissement (pas une erreur) : fond orangé, comme la note « Projet Bambu » */
+.al-caution { margin:12px 0 0; padding:10px 12px; font-size:.85rem; font-weight:600; color:var(--ember-ink);
+  background:color-mix(in srgb, var(--ember) 10%, var(--paper)); border:1px solid color-mix(in srgb, var(--ember) 35%, var(--line)); border-radius:10px; }
+.al-caution[hidden] { display:none; }
+.al-report-card .al-srow > .al-caution-t { color:var(--ember-ink); }
 
 /* --- Projet Bambu (.gcode.3mf) : note du rapport + lien « gcode seul » --- */
 .al-proj { padding:10px 12px; color:var(--ink-2); background:color-mix(in srgb, var(--ember) 7%, var(--paper));
