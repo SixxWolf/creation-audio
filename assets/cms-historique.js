@@ -147,8 +147,8 @@
       var dealer = inv.client_type === 'dealer' ? '<span class="hist-dealer">Dealer</span>' : '';
       return '<div class="hist-row' + (cancelled ? ' is-cancelled' : '') + '" data-id="' + esc(inv.id) + '">' +
         '<div class="hist-head">' +
-          '<span class="hist-num">' + esc(inv.number || '—') + '</span>' + badge +
-          (cancelled ? '<span class="hist-annul">Annulée</span>' : '') +
+          '<span class="hist-id"><span class="hist-num">' + esc(inv.number || '—') + '</span>' + badge +
+          (cancelled ? '<span class="hist-annul">Annulée</span>' : '') + '</span>' +
           '<span class="hist-client">' + esc(inv.client_name || 'Sans client') + ' ' + dealer + '</span>' +
           '<span class="grow"></span>' +
           '<span class="hist-date">' + esc(fmtDateFR(inv.invoice_date)) + '</span>' +

@@ -292,6 +292,7 @@
 .hist-head:hover { background:color-mix(in srgb, var(--wash) 60%, transparent); }
 .hist-head::after { content:''; width:16px; height:16px; flex:none; background:var(--chev) center / 14px no-repeat; transition:transform .2s; }
 .hist-row.open .hist-head::after { transform:rotate(180deg); }
+.hist-id { display:contents; }
 .hist-num { font-family:var(--display); font-weight:700; font-size:1rem; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
 .hist-cat { padding:2px 9px; font-size:.66rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-2);
   background:var(--wash); border:1px solid var(--line); border-radius:100px; }
@@ -419,8 +420,14 @@
   .stat-soldname { align-items:flex-start; }
   .stat-soldlabel { white-space:normal; line-height:1.35; }
   .stat-soldname .stat-chip { margin-top:2px; }
-  .hist-head { padding:12px; }
-  .hist-total { min-width:0; }
-  .hist-client { flex-basis:100%; order:3; }
+  /* mobile : grille fixe (n° + badges · date / total + chevron / client), quelle que soit la largeur du badge */
+  .hist-head { display:grid; grid-template-columns:auto minmax(0, 1fr) auto; grid-template-areas:"id id date" "total chev chev" "client client client";
+    align-items:center; gap:6px 12px; padding:12px; }
+  .hist-id { grid-area:id; display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; min-width:0; }
+  .hist-head .grow { display:none; }
+  .hist-date { grid-area:date; justify-self:end; white-space:nowrap; }
+  .hist-total { grid-area:total; min-width:0; text-align:left; }
+  .hist-head::after { grid-area:chev; justify-self:start; }
+  .hist-client { grid-area:client; min-width:0; }
   .stat-card-value { font-size:1.45rem; }
 }
