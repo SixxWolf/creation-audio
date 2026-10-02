@@ -50,7 +50,6 @@
 .al-caution { margin:12px 0 0; padding:10px 12px; font-size:.85rem; font-weight:600; color:var(--ember-ink);
   background:color-mix(in srgb, var(--ember) 10%, var(--paper)); border:1px solid color-mix(in srgb, var(--ember) 35%, var(--line)); border-radius:10px; }
 .al-caution[hidden] { display:none; }
-.al-report-card .al-srow > .al-caution-t { color:var(--ember-ink); }
 
 /* --- Projet Bambu (.gcode.3mf) : note du rapport + lien « gcode seul » --- */
 .al-proj { padding:10px 12px; color:var(--ink-2); background:color-mix(in srgb, var(--ember) 7%, var(--paper));
@@ -82,16 +81,20 @@
 .al-cal-n { font-size:.86rem; color:var(--muted); font-variant-numeric:tabular-nums; }
 .al-cal-bk { font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); cursor:pointer; }
 
-/* Repliables : grille loop par loop + panneau Réglages machine (chevron CSS) */
-.al-cal-more > summary, .al-acc > summary { cursor:pointer; list-style:none; }
-.al-cal-more > summary::-webkit-details-marker, .al-acc > summary::-webkit-details-marker { display:none; }
-.al-cal-more > summary::before, .al-acc > summary::after { content:''; flex:none; width:7px; height:7px;
+/* Repliables : grille loop par loop, détails du rapport (.al-rmore) + panneau
+   Réglages machine (chevron CSS) */
+.al-cal-more > summary, .al-rmore > summary, .al-acc > summary { cursor:pointer; list-style:none; }
+.al-cal-more > summary::-webkit-details-marker, .al-rmore > summary::-webkit-details-marker,
+.al-acc > summary::-webkit-details-marker { display:none; }
+.al-cal-more > summary::before, .al-rmore > summary::before, .al-acc > summary::after { content:''; flex:none; width:7px; height:7px;
   border:solid currentColor; border-width:0 2px 2px 0; transform:rotate(-45deg); transition:transform .15s; }
-.al-cal-more[open] > summary::before, .al-acc[open] > summary::after { transform:rotate(45deg); }
-.al-cal-more > summary:focus-visible, .al-acc > summary:focus-visible { outline:2px solid var(--ember); outline-offset:3px; border-radius:6px; }
-.al-cal-more { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
-.al-cal-more > summary { display:inline-flex; align-items:center; gap:9px; font-size:.86rem; font-weight:600; color:var(--ember-ink); }
-.al-cal-more > summary:hover { color:var(--ink); }
+.al-cal-more[open] > summary::before, .al-rmore[open] > summary::before, .al-acc[open] > summary::after { transform:rotate(45deg); }
+.al-cal-more > summary:focus-visible, .al-rmore > summary:focus-visible, .al-acc > summary:focus-visible { outline:2px solid var(--ember); outline-offset:3px; border-radius:6px; }
+.al-cal-more, .al-rmore { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+.al-cal-more > summary, .al-rmore > summary { display:inline-flex; align-items:center; gap:9px; font-size:.86rem; font-weight:600; color:var(--ember-ink); }
+.al-cal-more > summary:hover, .al-rmore > summary:hover { color:var(--ink); }
+.al-rmore > summary .al-bad { color:var(--bad); }   /* « · 1 à vérifier » : un bloc introuvable caché dedans */
+.al-rmore > .al-rsec { margin-top:8px; }
 .al-acc > summary { margin-bottom:0; }
 .al-acc > summary::after { margin-left:auto; margin-right:3px; color:var(--muted); }   /* chevron tourné : reste dans la carte */
 .al-acc[open] > summary { margin-bottom:16px; }
@@ -146,8 +149,11 @@
 /* lignes libellé → valeur (classe .al-srow du résumé des coûts) */
 .al-report-card .al-srow > span:last-child { text-align:right; font-weight:600; color:var(--ink); }
 .al-report-card .al-srow > span:first-child { flex:none; color:var(--ink-2); }
-.al-report-card .al-srow > .al-bad, .al-rtab .al-bad { color:var(--bad); }
-.al-report-card .al-srow > .al-good { color:var(--good); }
+/* couleurs d'état : « span. » + placées après « span:last-child » (même spécificité),
+   sinon la couleur encre ci-dessus l'emportait (rouge / vert / orange jamais affichés) */
+.al-report-card .al-srow > span.al-bad, .al-rtab .al-bad { color:var(--bad); }
+.al-report-card .al-srow > span.al-good { color:var(--good); }
+.al-report-card .al-srow > span.al-caution-t { color:var(--ember-ink); }
 .al-rlink { margin-top:10px; font-size:.86rem; }
 .al-report-card .al-proj { margin:14px 0 0; }
 .al-fine { margin:0 0 10px; font-size:.78rem; color:var(--muted); }

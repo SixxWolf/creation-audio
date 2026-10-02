@@ -587,10 +587,13 @@
   }
 
   /* Rapport : filament + temps (batch | par paire ou pièce, l'unité du calculateur),
-     puis le prix de ce batch (calculateur synchronisé à la génération, cf.
-     runGenerate ; re-rendu à chaque changement du calculateur), puis les détails.
+     puis le coût et le profit de ce batch (calculateur synchronisé à la génération,
+     cf. runGenerate ; re-rendu à chaque changement du calculateur), puis les détails
+     (flow → retrait AMS) dans un repliable FERMÉ par défaut (demande de Théo) ; un
+     bloc introuvable dedans est signalé en rouge dans son en-tête, pour ne pas
+     passer inaperçu. L'état ouvert/fermé survit aux re-rendus (reportMoreOpen).
      null = rien de généré. */
-  var lastRep = null;
+  var lastRep = null, reportMoreOpen = false;
   function renderReport(rep) {
     var box = $('#al-report');
     if (!rep) { box.innerHTML = '<p class="muted">Aucun batch généré.</p>'; return; }
@@ -598,6 +601,8 @@
     var N = rep.loops, k = unitK, unit = k === 2 ? '/ paire' : '/ pièce';
     var w = rep.wipe, wipeOk = w && w.done === w.changes;
     var r = pricePerPiece().r;
+    var issues = (rep.loadLineReplaced ? 0 : 1) + (w && w.changes && !wipeOk ? 1 : 0) +
+                 (rep.layersPer ? 0 : 1) + (rep.amsUnload ? 0 : 1);
     var bad = function (t) { return '<td colspan="2" class="al-bad">' + t + '</td>'; };
     box.innerHTML =
       '<table class="al-rtab"><thead><tr><th></th><th>Batch</th><th>' + unit + '</th></tr></thead><tbody>' +
@@ -610,10 +615,11 @@
       '</tbody></table>' +
       '<div class="al-rsec">' +
         rrow('Coût ' + unit, money(r.cost * k)) +
-        rrow('Prix ' + unit, money(r.price * k)) +
         rrow('Profit ' + unit, money(r.marginAmt * k), r.marginAmt < 0 ? 'al-bad' : 'al-good') +
         '<button type="button" class="al-link al-rlink" data-goto="prix">Détail du prix →</button>' +
       '</div>' +
+      '<details class="al-rmore"' + (reportMoreOpen ? ' open' : '') + '>' +
+        '<summary>Détails du batch' + (issues ? ' <span class="al-bad">· ' + issues + ' à vérifier</span>' : '') + '</summary>' +
       '<div class="al-rsec">' +
         rrow('Flow', rep.flow.length + ' loop' + (rep.flow.length > 1 ? 's' : '')) +
         rrow('Bed leveling', rep.bed.length + ' loop' + (rep.bed.length > 1 ? 's' : '')) +
@@ -625,6 +631,7 @@
         rrow('Couches', rep.layersPer ? String(rep.layersPer * N) : 'introuvable', rep.layersPer ? '' : 'al-bad') +
         rrow('Retrait AMS', rep.amsUnload ? 'au loop ' + N : 'introuvable', rep.amsUnload ? '' : 'al-bad') +
       '</div>' +
+      '</details>' +
       (project
         ? '<p class="al-fine al-proj">Projet Bambu (' + esc(plateLabel()) + ') · ' +
           '<button type="button" class="al-link" id="al-download-gcode">gcode seul</button></p>'
@@ -907,6 +914,11 @@
       if (t.id === 'al-download-gcode') downloadGcode();
       else if (t.dataset && t.dataset.goto) { var seg = $('.al-seg[data-view="' + t.dataset.goto + '"]'); if (seg) seg.click(); }
     });
+    // « Détails du batch » : on retient ouvert/fermé pour les re-rendus (« toggle » ne
+    // remonte pas → écouté en capture).
+    $('#al-report').addEventListener('toggle', function (e) {
+      if (e.target.classList && e.target.classList.contains('al-rmore')) reportMoreOpen = e.target.open;
+    }, true);
     var plateSel = $('#al-plate');
     if (plateSel) plateSel.addEventListener('change', function () { if (project) selectPlate(this.value); });
   }
@@ -1016,7 +1028,10 @@
     var n = f.loops, pairs = n / 2;
     var pieces = n + ' pièce' + (n > 1 ? 's' : '');
     var pairsTxt = k === 2 ? String(pairs).replace('.', ',') + ' paire' + (pairs >= 2 ? 's' : '') : '';
-    var nLabel = '(' + pieces + (pairsTxt ? ' · ' + pairsTxt : '') + ')';
+    // Libellés du batch dans le résumé : l'unité choisie seulement (« (36 paires) ») —
+    // le nombre de pièces est déjà sur la ligne Batch ; « 72 pièces · 36 paires »
+    // passait sur 2 lignes sur téléphone.
+    var nLabel = '(' + (pairsTxt || pieces) + ')';
     var printMin = (f.timeH * 60 + f.timeM) * n, coolMin = f.cooldown * n;
     set('ap-batch', 'Batch de ' + pieces + (pairsTxt ? ' (' + pairsTxt + ')' : '') + ' : ' + fmtHm(printMin + coolMin) +
         (coolMin > 0 ? ' (dont ' + fmtHm(coolMin) + ' de refroidissement)' : '') +
