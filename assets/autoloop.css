@@ -163,6 +163,9 @@
 /* --- Calculateur : inline & unités ---------------------- */
 .al-inline { display:flex; align-items:center; gap:6px; }
 .al-inline input { width:76px; min-width:0; flex:0 1 auto; }   /* peut rétrécir dans une colonne étroite */
+/* unité dans le champ (temps h + min) */
+.al-inline .unit { flex:0 1 96px; }
+.al-inline .unit > input { width:100%; }
 .al-u { font-size:.8rem; color:var(--muted); }
 .al-rate { display:inline-flex; align-items:center; gap:6px; margin-left:auto; font-family:var(--font); font-weight:600; font-size:.85rem; letter-spacing:0; }
 .al-rate input { width:70px; }
@@ -172,7 +175,7 @@
    à 1280 px, 230 px de colonne mettaient les libellés sur 2 lignes) */
 .al-labor { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(260px, calc((100% - 18px) / 2))), 1fr)); gap:18px; }
 .al-sub { margin-bottom:8px; font-size:.7rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
-.al-lrow { display:grid; grid-template-columns:minmax(0, 1fr) 76px auto; align-items:center; gap:8px; margin-bottom:6px; }
+.al-lrow { display:grid; grid-template-columns:minmax(0, 1fr) 96px; align-items:center; gap:8px; margin-bottom:6px; }   /* « min » dans le champ */
 .al-lrow label { font-size:.86rem; color:var(--ink); }
 .al-lfoot { margin-top:6px; padding-top:8px; font-size:.8rem; color:var(--muted); border-top:1px dashed var(--line-2); }
 
@@ -238,12 +241,15 @@
   .al-cols { grid-template-columns:minmax(0, 1fr) 360px; }
 }
 @media (max-width:900px) {
-  .al-cols { grid-template-columns:1fr; }
+  .al-cols { grid-template-columns:minmax(0, 1fr); }   /* minmax(0) : un contenu large ne fait plus déborder la colonne */
   .al-cols-gen { grid-template-areas:"main" "side" "more"; grid-template-rows:auto; }
   .al-side { position:static; }
   .al-labor { grid-template-columns:1fr; }
 }
 @media (max-width:640px) {
+  /* téléphone : les petits champs des réglages machine restent 2 par rangée (moins de
+     défilement). Le calculateur reste sur 1 colonne : ses libellés sont trop longs. */
+  .al-view .al-msec .grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .al-card { padding:16px; }
   .al-sum-head { margin:-16px -16px 14px; padding:12px 16px; }
 }

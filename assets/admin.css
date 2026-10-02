@@ -18,6 +18,8 @@
   /* Boutons « Relief » : face neutre en dégradé + reflet du haut + ombre portée */
   --btn-face-top:#FFFFFF; --btn-face-bot:#F1F0EC; --btn-hi:rgba(255,255,255,.95);
   --btn-drop:0 1px 2px rgba(20,22,26,.10); --btn-drop-up:0 3px 8px -2px rgba(20,22,26,.18);
+  /* Champs « Creusé » : fond plus sombre que la carte + ombre intérieure (répond aux boutons en relief) */
+  --field-bg:#F3F2EE; --field-bg-focus:#FFFFFF; --field-line:#D9D6CD; --field-inset:inset 0 1px 2px rgba(20,22,26,.09);
   /* Icônes des boutons (masques SVG, trait 2 px — la couleur vient du texte du bouton) */
   --ic-edit:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
   --ic-trash:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3C/svg%3E");
@@ -42,6 +44,7 @@
   --ring:0 0 0 3px color-mix(in srgb, var(--ember) 32%, transparent);
   --btn-face-top:#2A2F38; --btn-face-bot:#21252D; --btn-hi:rgba(255,255,255,.07);
   --btn-drop:0 1px 2px rgba(0,0,0,.45); --btn-drop-up:0 4px 10px -2px rgba(0,0,0,.55);
+  --field-bg:#14171C; --field-bg-focus:#191C22; --field-line:#2C3139; --field-inset:inset 0 1px 2px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.12);
   --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239BA1AB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
@@ -201,14 +204,24 @@ main { width:100%; max-width:1280px; margin:0 auto; padding:26px clamp(16px, 2.4
 .field.col-2 { grid-column:1 / -1; }
 label.lbl { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
 label.lbl .hint { text-transform:none; letter-spacing:0; font-weight:500; }
+/* Champs — style « Creusé » (oct. 2026, choisi par Théo sur planche) : le champ est
+   enfoncé dans la carte (fond plus sombre + ombre intérieure) ; au focus il s'éclaire
+   et prend l'anneau de la couleur d'accent. */
 input[type=text], input[type=number], input[type=email], input[type=search], input[type=password], input[type=date], select, textarea {
   width:100%; padding:9px 12px; font:inherit; font-size:.94rem; color:var(--ink);
-  background:var(--paper); border:1px solid var(--line-2); border-radius:var(--radius-ctl);
-  transition:border-color .15s, box-shadow .15s; }
+  background:var(--field-bg); border:1px solid var(--field-line); border-radius:var(--radius-ctl); box-shadow:var(--field-inset);
+  transition-property:border-color, box-shadow, background-color; transition-duration:.15s; transition-timing-function:ease-out; }
 select { padding-right:34px; -webkit-appearance:none; appearance:none; cursor:pointer;
-  background:var(--paper) var(--chev) right 11px center / 15px no-repeat; }
-input:hover:not(:focus):not(:disabled), select:hover:not(:focus):not(:disabled), textarea:hover:not(:focus):not(:disabled) { border-color:var(--ink-2); }
-input:focus, select:focus, textarea:focus { outline:none; border-color:var(--ember); box-shadow:var(--ring); }
+  background:var(--field-bg) var(--chev) right 11px center / 15px no-repeat; }
+input:hover:not(:focus):not(:disabled), select:hover:not(:focus):not(:disabled), textarea:hover:not(:focus):not(:disabled) { border-color:color-mix(in srgb, var(--ink-2) 55%, var(--field-line)); }
+input:focus, select:focus, textarea:focus { outline:none; background-color:var(--field-bg-focus); border-color:var(--ember); box-shadow:var(--field-inset), var(--ring); }
+input:disabled, select:disabled, textarea:disabled { opacity:.55; box-shadow:none; cursor:not-allowed; }
+/* Unité dans le champ (« 240 mm ») : <span class="unit" data-unit="mm"><input …></span> */
+.unit { position:relative; display:block; min-width:0; }
+.unit::after { content:attr(data-unit); position:absolute; right:12px; top:50%; transform:translateY(-50%);
+  font-size:.82rem; font-weight:600; color:var(--muted); pointer-events:none; }
+.unit > input { padding-right:52px; -moz-appearance:textfield; appearance:textfield; }
+.unit > input::-webkit-outer-spin-button, .unit > input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 input::placeholder, textarea::placeholder { color:var(--muted); opacity:.8; }
 input[type=checkbox], input[type=radio] { width:16px; height:16px; accent-color:var(--ember); cursor:pointer; }
 textarea { min-height:60px; line-height:1.5; resize:vertical; }
