@@ -720,6 +720,7 @@
     var src = $('#ap-gcode-src');
     if (src) src.textContent = applied.length ? ('↺ ' + name + ' · ' + applied.join(' · ')) : '';
     recompute();  // rafraîchit le résumé (les .value posés en JS ne déclenchent pas « input »)
+    priceFromFileName(name);
   }
 
   // Accepte un .gcode brut OU le projet tranché exporté par Bambu Studio (.gcode.3mf,
@@ -951,8 +952,10 @@
   function setUnit(k) {
     if (k === unitK) return;
     // Le prix suit l'unité (6,94 $/pièce ⇄ 13,88 $/paire) : la marge ne bouge pas.
-    var pe = $('#ap-price');
-    if (pe && pe.value !== '') pe.value = (Math.round(num(pe.value, 0) * k / unitK * 100) / 100).toFixed(2);
+    // Tarif de spacer choisi : repris tel quel (pas d'arrondi qui dérive à chaque bascule).
+    var pe = $('#ap-price'), lvl = spacer && spacer.levels[spacerLvl];
+    if (pe && lvl) pe.value = (Math.round(lvl.p * k / 2 * 100) / 100).toFixed(2);
+    else if (pe && pe.value !== '') pe.value = (Math.round(num(pe.value, 0) * k / unitK * 100) / 100).toFixed(2);
     unitK = k;
     try { localStorage.setItem(UNIT_KEY, String(k)); } catch (e) {}
     recompute();
@@ -1011,6 +1014,89 @@
     return d > 0 ? d + ' j ' + fmtHm(min - d * 1440) : fmtHm(min);
   }
 
+  /* Prix du spacer d'après le nom du fichier ----------------------------- */
+  // Théo nomme ses fichiers comme le spacer (« HKSB110 1.1.gcode.3mf ») : on retrouve
+  // le spacer par son nom exact en début de fichier — casse, accents, espaces, tirets,
+  // version et « AutoLoop xN » ignorés ; « AP 5 / SRX52V » répond aussi à « AP 5 » ou
+  // « SRX52V » (un « / » est interdit dans un nom de fichier). Son prix client remplace
+  // le prix de vente ; le menu « Tarif » passe au prix dealer ou à un palier.
+  // Prix des spacers = par paire (cf. cms-spacers.js).
+  var spacer = null, spacerLvl = -1, spacerFile = '', spacerReq = 0;
+
+  function nameTokens(s) {
+    return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+      .split(/[^a-z0-9]+/).filter(Boolean);
+  }
+  // Le nom du spacer doit couvrir des mots ENTIERS du début du fichier :
+  // « HSB524 1.4 » ne répond pas à un spacer « HSB52 ». Le plus long gagne.
+  function matchSpacer(fileName, rows) {
+    var base = String(fileName || '').replace(/(\.gcode)?\.3mf$|\.gcode$/i, '').replace(/^FL_S\d+_/i, '')   // préfixe FarmLoop
+      .replace(/\bautoloop\b(\s*x\s*\d+)?/ig, ' ');
+    var toks = nameTokens(base), flat = toks.join(''), ends = {}, n = 0;
+    toks.forEach(function (t) { n += t.length; ends[n] = true; });
+    var best = null, bestLen = 0;
+    (rows || []).forEach(function (r) {
+      var name = String(r.name || '');
+      [name].concat(name.indexOf('/') !== -1 ? name.split('/') : []).forEach(function (alias) {
+        var key = nameTokens(alias).join('');
+        if (!key || !ends[key.length] || flat.lastIndexOf(key, 0) !== 0) return;
+        if (key.length > bestLen || (key.length === bestLen && r.active && !best.active)) { best = r; bestLen = key.length; }
+      });
+    });
+    return best;
+  }
+  // Client, Dealer, puis les paliers dealer (« Dealer 6+ » = 6 paires et plus).
+  function spacerLevels(r) {
+    var L = [{ k: 'Client', p: parseFloat(r.sell_price) }];
+    if (r.dealer_price != null) L.push({ k: 'Dealer', p: parseFloat(r.dealer_price) });
+    (Array.isArray(r.tiers) ? r.tiers : [])
+      .map(function (t) { return { min: parseInt(t.min, 10), p: parseFloat(t.price) }; })
+      .filter(function (t) { return t.min > 1; })
+      .sort(function (a, b) { return a.min - b.min; })
+      .forEach(function (t) { L.push({ k: 'Dealer ' + t.min + '+', p: t.p }); });
+    return L.filter(function (l) { return isFinite(l.p) && l.p > 0; });
+  }
+  function priceFromFileName(name) {
+    var sb = window.CA && window.CA.sb;
+    if (!sb || (spacer && name === spacerFile)) return;   // autre plateau du même fichier : on garde le tarif choisi
+    var req = ++spacerReq;
+    sb.from('products').select('name,sell_price,dealer_price,tiers,active').eq('type', 'spacer').then(function (res) {
+      if (req !== spacerReq || res.error) return;
+      var r = matchSpacer(name, res.data), had = !!spacer;
+      spacer = r ? { name: r.name, levels: spacerLevels(r) } : null;
+      if (spacer && !spacer.levels.length) spacer = null;
+      spacerFile = spacer ? name : '';
+      if (spacer) { setSpacerLevel(0); return; }
+      spacerLvl = -1;
+      if (had) autoPrice();   // le prix du spacer précédent ne vaut pas pour ce fichier
+      recompute();
+    }, function () {});
+  }
+  function setSpacerLevel(i) {
+    spacerLvl = i;
+    var lvl = spacer && spacer.levels[i], pe = $('#ap-price');
+    if (lvl && pe) pe.value = (Math.round(lvl.p * unitK / 2 * 100) / 100).toFixed(2);
+    recompute();
+  }
+  function renderSpacer() {
+    var wrap = $('#ap-spacer'), sel = $('#ap-spacer-lvl');
+    if (!wrap || !sel) return;
+    wrap.hidden = !spacer;
+    if (!spacer) return;
+    $('#ap-spacer-name').textContent = spacer.name;
+    sel.innerHTML = spacer.levels.map(function (l, i) {
+      return '<option value="' + i + '">' + esc(l.k) + ' — ' + money(l.p * unitK / 2) + '</option>';
+    }).join('') + (spacerLvl < 0 ? '<option value="-1">Autre prix</option>' : '');
+    sel.value = String(spacerLvl);
+  }
+  // Prix de départ sans spacer reconnu : ~33 % de marge sur le coût (de l'unité choisie), arrondi à 0,05 $.
+  function autoPrice() {
+    var pe = $('#ap-price');
+    if (!pe) return;
+    var c = compute(priceFields()).cost * unitK;
+    if (c > 0) pe.value = (Math.round(c / (1 - 0.33) * 20) / 20).toFixed(2);
+  }
+
   // Prix saisi pour l'unité → prix par pièce ; tout est calculé par pièce, puis × k à l'affichage.
   function pricePerPiece() {
     var f = priceFields();
@@ -1057,6 +1143,7 @@
     set('ap-post-permin', (Math.round(r.postMin * 100) / 100) + ' min');
     $$('.ap-unit-lbl').forEach(function (el) { el.textContent = k === 2 ? '/ paire' : '/ pièce'; });
     $$('#ap-unit .al-unit-b').forEach(function (b) { b.setAttribute('aria-checked', String(+b.dataset.unit === k)); });
+    renderSpacer();
     drawBreakdown(r, k);
     if (lastRep) renderReport(lastRep);   // l'aperçu du prix dans le rapport suit le calculateur
   }
@@ -1099,13 +1186,12 @@
       b.addEventListener('click', function () { setUnit(+b.dataset.unit); });
     });
 
-    // Prix de vente de départ = ~33 % de marge sur le coût (de l'unité choisie), arrondi à 0,05 $.
-    var pe = $('#ap-price');
-    if (pe) {
-      var c = compute(priceFields()).cost * unitK;
-      if (c > 0) pe.value = (Math.round(c / (1 - 0.33) * 20) / 20).toFixed(2);
-    }
+    // Tarif du spacer reconnu ; un prix tapé à la main passe le menu à « Autre prix ».
+    var lvlSel = $('#ap-spacer-lvl'), pe = $('#ap-price');
+    if (lvlSel) lvlSel.addEventListener('change', function () { setSpacerLevel(+this.value); });
+    if (pe) pe.addEventListener('input', function () { if (spacer && spacerLvl >= 0) { spacerLvl = -1; renderSpacer(); } });
 
+    autoPrice();
     recompute();
   }
 

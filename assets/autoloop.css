@@ -180,7 +180,7 @@
 .al-lfoot { margin-top:6px; padding-top:8px; font-size:.8rem; color:var(--muted); border-top:1px dashed var(--line-2); }
 
 /* --- Résumé des coûts ----------------------------------- */
-.al-summary { position:relative; overflow:hidden; }
+.al-summary { position:relative; overflow:hidden; container:al-sum / inline-size; }
 .al-sum-head { margin:-18px -20px 14px; padding:14px 20px; color:var(--on-ember); background:var(--ember); }
 /* Sélecteur Pièce | Paire : tout le résumé est calculé pour l'unité choisie. */
 .al-unit { display:inline-flex; gap:2px; margin-left:auto; padding:3px; background:rgba(0,0,0,.16); border-radius:999px; }
@@ -198,6 +198,18 @@
 .al-cost span { font-size:.72rem; font-weight:700; letter-spacing:.08em; white-space:nowrap; color:var(--ember-ink); }
 .al-cost b { font-family:var(--display); font-size:1.6rem; font-weight:700; letter-spacing:-.02em; white-space:nowrap; color:var(--ember-ink); font-variant-numeric:tabular-nums; }
 .al-margin-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:6px 0 10px; }
+/* tarif du spacer reconnu d'après le nom du fichier : le menu passe sous le libellé si le nom est long */
+.al-spacer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 10px; margin:12px 0 0; }
+.al-spacer[hidden] { display:none; }
+.al-spacer .lbl { margin:0; white-space:nowrap; }
+.al-spacer select { flex:0 1 200px; min-width:0; margin-left:auto; }
+/* résumé étroit (téléphone, mais aussi 1100 px où la colonne fait ~320 px) : « COÛT DE PRODUCTION / paire »
+   + « 11,28 $ » débordaient dans la marge intérieure de la boîte */
+@container al-sum (max-width:359px) {
+  .al-cost { padding:12px; }
+  .al-cost span { letter-spacing:.04em; }
+  .al-cost b { font-size:1.35rem; }
+}
 .al-price-set { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:12px 0 10px; }
 .al-price-set .lbl { margin:0; }
 .al-price-set .hint { display:block; font-weight:500; letter-spacing:0; text-transform:none; }
