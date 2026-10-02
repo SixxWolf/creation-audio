@@ -168,8 +168,8 @@
     return (kind === 'refill' ? p.cost_price_2 : p.cost_price) || 0;
   }
   function filTiers(p, kind) { var m = matOf(p); if (m) return kind === 'refill' ? m.tiers_refill : m.tiers_spool; return kind === 'refill' ? p.tiers_2 : p.tiers; }
-  // groupe du rabais quantité : palier cumulé par MARQUE + format (couleurs et matériaux
-  // mélangés : 2 PLA + 2 PETG Bambu = palier 4+), comme le panier de la boutique
+  // groupe du rabais quantité : palier cumulé par MARQUE (couleurs, matériaux et formats
+  // mélangés : 1 bobine + 3 recharges Bambu = palier 4+), comme le panier de la boutique
   function filTierKey(p) { return 'fil|' + (p.brand || p.material || ''); }
 
   /* ---------- chargement ---------- */
@@ -546,21 +546,18 @@
     });
   }
   // Rabais quantité : pour les FILAMENTS, le palier se calcule sur le TOTAL des
-  // quantités de la même marque + format (couleurs et matériaux confondus), puis
-  // s'applique à chaque ligne avec la grille de SON matériau. Spacer/accessoire
-  // restent tarifés par ligne.
+  // quantités de la même marque (couleurs, matériaux, bobines et recharges confondus),
+  // puis s'applique à chaque ligne avec la grille de SON matériau et de SON format.
+  // Spacer/accessoire restent tarifés par ligne.
   function repriceLines() {
     var totals = {};
     lines.forEach(function (l) {
-      if (l.ptype === 'filament' && l.tierKey) {
-        var g = l.tierKey + '|' + l.kind;
-        totals[g] = (totals[g] || 0) + (l.qty | 0);
-      }
+      if (l.ptype === 'filament' && l.tierKey) totals[l.tierKey] = (totals[l.tierKey] || 0) + (l.qty | 0);
     });
     lines.forEach(function (l) {
       if (l.manual) return;   // prix forcé à la main : on ne touche pas
       if (l.ptype === 'filament' && l.tierKey) {
-        l.price = tierPrice(l.base, l.tiers, totals[l.tierKey + '|' + l.kind] || (l.qty | 0));
+        l.price = tierPrice(l.base, l.tiers, totals[l.tierKey] || (l.qty | 0));
       } else {
         l.price = tierPrice(l.base, l.tiers, l.qty);
       }

@@ -540,7 +540,7 @@
     var st = stockOf(p, curType);
     return st > 0 ? st + ' en stock' : 'rupture en ' + fmtShort(curType);
   }
-  // palier selon ce qui sera dans le panier après l'ajout (même marque + format, couleurs et matériaux mélangés)
+  // palier selon ce qui sera dans le panier après l'ajout (même marque, couleurs, matériaux et formats mélangés)
   function unitNow() { return tierPrice(baseOf(curColor, curType), tiersOf(curColor, curType), curQty + groupQty(curColor, curType)); }
   // grille « prix selon la quantité » : 1 / 2+ / 4+ … ; palier atteint (quantité + panier) surligné
   function tierGridHtml() {
@@ -549,7 +549,7 @@
     var rows = [{ min: 1, price: +baseOf(curColor, curType) || 0 }].concat(tiers);
     var n = curQty + groupQty(curColor, curType), on = 0;
     rows.forEach(function (t, i) { if (n >= t.min) on = i; });
-    var scope = curColor.brand ? 'Toutes les ' + fmtShort(curType) + 's ' + curColor.brand + ' comptent ensemble' : 'Couleurs mélangées';
+    var scope = curColor.brand ? 'Bobines et recharges ' + curColor.brand + ' comptent ensemble' : 'Couleurs mélangées';
     return '<div class="pdp-tiers">' +
       '<p class="pdp-tiers-head">Prix selon la quantité <span>' + esc(scope) + '</span></p>' +
       '<div class="pdp-tiergrid">' + rows.map(function (t, i) {
@@ -954,14 +954,14 @@
   function keyOf(id, type) { return id + '|' + type; }
 
   function metaOf(it) { return it.type === 'accessory' ? accById[it.id] : byId[it.id]; }
-  // Rabais quantité : palier calculé sur le TOTAL de la même marque + format dans le panier
-  // (couleurs et matériaux mélangés : 2 PLA + 2 PETG Bambu = palier 4+), comme en facturation
-  function groupKey(p, type) { return (p.brand || p.material || '') + '|' + type; }
-  function groupQty(p, type) {
-    var g = groupKey(p, type);
+  // Rabais quantité : palier calculé sur le TOTAL de la même marque dans le panier
+  // (couleurs, matériaux et formats mélangés : 1 bobine + 3 recharges Bambu = palier 4+), comme en facturation
+  function groupKey(p) { return p.brand || p.material || ''; }
+  function groupQty(p) {
+    var g = groupKey(p);
     return Object.keys(cart).reduce(function (s, k) {
       var it = cart[k], q = it.type !== 'accessory' && byId[it.id];
-      return s + (q && groupKey(q, it.type) === g ? it.qty : 0);
+      return s + (q && groupKey(q) === g ? it.qty : 0);
     }, 0);
   }
   function unitOf(it) {
