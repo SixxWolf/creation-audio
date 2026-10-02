@@ -214,7 +214,7 @@
 @media (max-width:640px) {
   /* gabarits sur toute la largeur, 4 boutons égaux ; client/dealer sous les taxes */
   .fx-bar > .fx-seg:first-child { display:flex; width:100%; }
-  .fx-bar > .fx-seg:first-child .fx-seg-btn { flex:1; min-width:0; padding:0 6px; font-size:.84rem; }
+  .fx-bar > .fx-seg:first-child .fx-seg-btn { flex:1; min-width:0; padding:0 4px; font-size:.8rem; }   /* « Accessoire » tient à 375 px */
   .fx-cli-seg { margin-left:auto; }
   .fx-actions { padding:10px; }
   .fx-actions-2 { width:100%; margin-left:0; justify-content:stretch; }
