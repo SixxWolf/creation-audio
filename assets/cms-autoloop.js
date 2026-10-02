@@ -261,14 +261,19 @@
   }
 
   /* --- Hauteur de push ------------------------------------------------
-     Normalement hauteur max − retrait. Pièce de 10 mm ou moins (ou retrait
-     plus grand que la pièce) : ce calcul tombait à 0 (borné) → la tête
-     descendait au ras du plateau. On pousse alors à mi-hauteur de la pièce
-     (règle de Théo) et un avertissement s'affiche.                        */
-  var PUSH_LOW_MAX = 10;
+     Normalement hauteur max − retrait. Pièce de 10 mm ou moins : ce calcul
+     tombait à 0 (borné) → la tête descendait au ras du plateau. Juste
+     au-dessus (10,5 mm → 0,5 mm), le push restait presque au ras aussi.
+     Règles de Théo : mi-hauteur de la pièce si elle fait ≤ 10 mm (low) OU si
+     le push calculé ferait moins de 2 mm (couvre aussi un retrait plus grand
+     que la pièce) ; un avertissement s'affiche. Arrondi au centième avant de
+     comparer : 12,2 − 10,2 ne doit pas donner 1,9999… et basculer.          */
+  var PUSH_LOW_MAX = 10, PUSH_MIN = 2;
   function pushHeight(maxZ, offset) {
-    var half = maxZ <= PUSH_LOW_MAX || maxZ - offset <= 0;
-    return { z: half ? maxZ / 2 : maxZ - offset, half: half };
+    var std = Math.round((maxZ - offset) * 100) / 100;
+    var low = maxZ <= PUSH_LOW_MAX;
+    var half = low || std < PUSH_MIN;
+    return { z: half ? maxZ / 2 : std, half: half, low: low };
   }
 
   /* --- Transition entre deux loops (fin de job + éjection) -------------
@@ -448,7 +453,7 @@
     parts.push('; ===================================================' + eol +
                '; Batch généré par AutoLoop — Création Audio' + eol +
                '; ' + N + ' loops · pièce ' + z(maxZ) + ' mm · push ' + z(push.z) + ' mm (' +
-                 (push.half ? 'mi-hauteur : ' + (maxZ <= PUSH_LOW_MAX ? 'pièce ≤ ' + PUSH_LOW_MAX + ' mm' : 'retrait ≥ hauteur')
+                 (push.half ? 'mi-hauteur : ' + (push.low ? 'pièce ≤ ' + PUSH_LOW_MAX + ' mm' : 'max − retrait < ' + PUSH_MIN + ' mm')
                             : 'max − ' + opts.pushOffset + ' mm') + ')' + eol +
                '; Flow : ' + (loopRanges(report.flow) || 'aucun loop') + ' · bed leveling : ' + (loopRanges(report.bed) || 'aucun loop') + eol +
                (report.progress ? '; Durée estimée du batch : ' + fmtDur(report.totalMin) + ' (' + N + ' × ' + seg.loopMin +
@@ -761,7 +766,7 @@
     syncPushWarn();
     applyGcodeToPricing(rawText, rawName);
   }
-  // Avertissement sous le fichier dès qu'il est chargé : pièce ≤ 10 mm (ou retrait ≥ hauteur)
+  // Avertissement sous le fichier dès qu'il est chargé : pièce ≤ 10 mm ou push calculé < 2 mm
   // → push à mi-hauteur (cf. pushHeight). Suit aussi le champ Retrait.
   function syncPushWarn() {
     var el = $('#al-push-warn');
@@ -771,7 +776,7 @@
     var p = mz ? pushHeight(maxZ, num($('#al-push-offset').value, 10)) : null;
     el.hidden = !(p && p.half);
     if (p && p.half) {
-      el.textContent = 'Pièce de ' + z(maxZ) + ' mm' + (maxZ <= PUSH_LOW_MAX ? ' (≤ ' + PUSH_LOW_MAX + ' mm)' : ', retrait trop grand') +
+      el.textContent = 'Pièce de ' + z(maxZ) + ' mm (' + (p.low ? '≤ ' + PUSH_LOW_MAX + ' mm' : 'push < ' + PUSH_MIN + ' mm') + ')' +
         ' : push à mi-hauteur, ' + z(p.z) + ' mm. Vérifie l\'éjection au 1er loop.';
     }
   }
