@@ -312,7 +312,8 @@
     scanInput.disabled = !scanActive;
     scanStation.classList.toggle('is-armed', scanActive);
     scanToggle.setAttribute('aria-pressed', String(scanActive));
-    scanToggle.textContent = scanActive ? '⏸ Réception en cours…' : '▶ Démarrer la réception';
+    scanToggle.textContent = scanActive ? 'Réception en cours…' : 'Démarrer la réception';
+    scanToggle.dataset.ic = scanActive ? 'pause' : 'scan';
     scanInput.placeholder = scanActive ? 'En attente d\'un scan… (garde cette case active)' : 'Clique « Démarrer » puis scanne un code-barres…';
     if (scanActive) { scanInput.value = ''; focusScan(); }
     else { closeLearn(); }
@@ -1001,7 +1002,7 @@
         '<span class="grow"></span>' +
         estHtml +
         '<span class="reorder-total">' + totalUnits + ' article' + (totalUnits > 1 ? 's' : '') + '</span>' +
-        '<button class="btn btn-ghost btn-sm" id="reorder-copy" type="button">Copier la liste</button>' +
+        '<button class="btn btn-ghost btn-sm" id="reorder-copy" type="button" data-ic="copy">Copier la liste</button>' +
       '</div>' + noteHtml + listHtml + '</div>';
 
     var toCat = $('#reorder-to-catalog');
@@ -1011,7 +1012,10 @@
     var copyBtn = $('#reorder-copy');
     if (copyBtn) copyBtn.addEventListener('click', function () {
       var text = buildOrderText(byBrand);
-      var done = function () { copyBtn.textContent = '✓ Copié'; setTimeout(function () { copyBtn.textContent = 'Copier la liste'; }, 1600); };
+      var done = function () {
+        copyBtn.textContent = 'Copié'; copyBtn.dataset.ic = 'check';
+        setTimeout(function () { copyBtn.textContent = 'Copier la liste'; copyBtn.dataset.ic = 'copy'; }, 1600);
+      };
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); });
       } else { fallbackCopy(text); done(); }
@@ -1217,7 +1221,8 @@
     if (bcScan) bcScan.classList.toggle('is-armed', bcScanActive);
     if (bcScanToggle) {
       bcScanToggle.setAttribute('aria-pressed', String(bcScanActive));
-      bcScanToggle.textContent = bcScanActive ? '⏸ Scan en cours…' : '▶ Scanner pour vérifier';
+      bcScanToggle.textContent = bcScanActive ? 'Scan en cours…' : 'Scanner pour vérifier';
+      bcScanToggle.dataset.ic = bcScanActive ? 'pause' : 'scan';
     }
     if (bcScanActive) { bcScanFb('En attente d\'un scan…', ''); bcFocusScan(); } else { bcScanFb('', ''); }
   }

@@ -11,14 +11,37 @@
   --display:'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   --ink-2:#3A3D45; --ember-ink:#B23F12; --line-2:#DAD7CF; --wash-2:#EFEDE8;
   --on-ember:#181A1F;                 /* texte sur ember : encre (contraste AA), même en sombre */
-  --ring:0 0 0 3px rgba(255,106,43,.22);
+  /* Accent réglable (Réglages › Apparence, admin-accent.js) : --ember et dérivés
+     peuvent être surchargés ; tout ce qui en découle passe par color-mix. */
+  --ring:0 0 0 3px color-mix(in srgb, var(--ember) 22%, transparent);
   --radius-ctl:10px;                  /* champs + boutons */
+  /* Boutons « Relief » : face neutre en dégradé + reflet du haut + ombre portée */
+  --btn-face-top:#FFFFFF; --btn-face-bot:#F1F0EC; --btn-hi:rgba(255,255,255,.95);
+  --btn-drop:0 1px 2px rgba(20,22,26,.10); --btn-drop-up:0 3px 8px -2px rgba(20,22,26,.18);
+  /* Icônes des boutons (masques SVG, trait 2 px — la couleur vient du texte du bouton) */
+  --ic-edit:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
+  --ic-trash:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3C/svg%3E");
+  --ic-plus:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+  --ic-save:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z'/%3E%3Cpath d='M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7'/%3E%3Cpath d='M7 3v4a1 1 0 0 0 1 1h7'/%3E%3C/svg%3E");
+  --ic-play:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M7 4.6v14.8a1 1 0 0 0 1.5.86l12.2-7.4a1 1 0 0 0 0-1.72L8.5 3.74A1 1 0 0 0 7 4.6z'/%3E%3C/svg%3E");
+  --ic-download:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V3'/%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3C/svg%3E");
+  --ic-print:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6'/%3E%3Crect x='6' y='14' width='12' height='8' rx='1'/%3E%3C/svg%3E");
+  --ic-mail:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='4' width='20' height='16' rx='2'/%3E%3Cpath d='m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7'/%3E%3C/svg%3E");
+  --ic-copy:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='8' y='8' width='14' height='14' rx='2'/%3E%3Cpath d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/%3E%3C/svg%3E");
+  --ic-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  --ic-refresh:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/%3E%3Cpath d='M8 16H3v5'/%3E%3C/svg%3E");
+  --ic-scan:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7V5a2 2 0 0 1 2-2h2'/%3E%3Cpath d='M17 3h2a2 2 0 0 1 2 2v2'/%3E%3Cpath d='M21 17v2a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M7 21H5a2 2 0 0 1-2-2v-2'/%3E%3Cpath d='M8 7v10M12 7v10M16 7v10'/%3E%3C/svg%3E");
+  --ic-pause:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M9 5v14M15 5v14'/%3E%3C/svg%3E");
+  --ic-receipt:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 3h13v18l-2.2-1.5-2.1 1.5-2.2-1.5-2.1 1.5-2.2-1.5L5.5 21z'/%3E%3Cpath d='M9 8h6M9 12h6M9 16h3'/%3E%3C/svg%3E");
+  --ic-login:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4'/%3E%3Cpath d='m10 17 5-5-5-5'/%3E%3Cpath d='M15 12H3'/%3E%3C/svg%3E");
   --side-w:252px; --top-h:60px;
   --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 :root[data-theme="dark"] {
   --ink-2:#C5C9D1; --ember-ink:#FF8B5A; --line-2:#3A414C; --wash-2:#20242B;
-  --ring:0 0 0 3px rgba(255,106,43,.32);
+  --ring:0 0 0 3px color-mix(in srgb, var(--ember) 32%, transparent);
+  --btn-face-top:#2A2F38; --btn-face-bot:#21252D; --btn-hi:rgba(255,255,255,.07);
+  --btn-drop:0 1px 2px rgba(0,0,0,.45); --btn-drop-up:0 4px 10px -2px rgba(0,0,0,.55);
   --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239BA1AB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
@@ -28,7 +51,7 @@ html, body { overflow-x:hidden; overscroll-behavior-x:none; }
 /* « clip » coupe pareil sans créer de conteneur de défilement : sinon la barre
    latérale et la barre du haut (position:sticky) défilent avec la page */
 @supports (overflow:clip) { html, body { overflow-x:clip; } }
-::selection { background:rgba(255,106,43,.24); }
+::selection { background:color-mix(in srgb, var(--ember) 24%, transparent); }
 
 /* =========================================================
    COQUILLE : barre latérale + zone principale
@@ -111,25 +134,66 @@ main { width:100%; max-width:1280px; margin:0 auto; padding:26px clamp(16px, 2.4
 /* le bloc titre + description prend la place : les boutons restent à droite sur la même ligne */
 .panel-head > div:first-child { flex:1 1 380px; min-width:0; }
 
-/* Boutons */
-.btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:40px; padding:0 16px;
-  font:inherit; font-weight:600; font-size:.92rem; line-height:1.2; color:#fff; text-decoration:none; cursor:pointer;
-  background:var(--fill-strong); border:1px solid var(--fill-strong); border-radius:var(--radius-ctl);
-  transition:transform .06s, background .15s, border-color .15s, color .15s, box-shadow .15s; }
+/* Boutons — style « Relief » (oct. 2026, choisi par Théo sur planche) : face en
+   dégradé + reflet en haut + ombre ; se soulève au survol, s'enfonce à l'appui.
+   Le principal prend la couleur d'accent (réglable : Réglages › Apparence) avec
+   un halo de la même teinte — tout est dérivé de --ember par color-mix. */
+.btn { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px; padding:0 16px;
+  font:inherit; font-weight:600; font-size:.92rem; line-height:1.2; letter-spacing:-.005em; color:#fff; text-decoration:none; cursor:pointer;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--fill-strong) 86%, #fff), var(--fill-strong));
+  border:1px solid var(--fill-strong-hover); border-radius:var(--radius-ctl);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12), var(--btn-drop);
+  transition-property:transform, box-shadow, background-color, border-color, color, filter;
+  transition-duration:.15s; transition-timing-function:ease-out; }
 .btn svg { width:17px; height:17px; flex:none; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
-.btn:hover { background:var(--fill-strong-hover); border-color:var(--fill-strong-hover); }
-.btn:active { transform:translateY(1px); }
+.btn:hover { transform:translateY(-1px); box-shadow:inset 0 1px 0 rgba(255,255,255,.14), var(--btn-drop-up); }
+.btn:active { transform:scale(.97); transition-duration:.06s; box-shadow:inset 0 2px 4px rgba(0,0,0,.22); }
 .btn:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
-.btn-accent { color:var(--on-ember); background:var(--ember); border-color:var(--ember); }
-.btn-accent:hover { background:var(--ember-dim); border-color:var(--ember-dim); }
-.btn-ghost { color:var(--ink); background:var(--paper); border-color:var(--line-2); }
-.btn-ghost:hover { color:var(--ink); background:var(--wash); border-color:var(--ink-2); }
-.btn-sm { min-height:34px; padding:0 12px; font-size:.84rem; border-radius:9px; }
+/* principal : l'accent en dégradé + reflet + halo de la même teinte */
+.btn-accent { color:var(--on-ember); border-color:color-mix(in srgb, var(--ember) 80%, #000);
+  background:linear-gradient(180deg, color-mix(in srgb, var(--ember) 80%, #fff) 0%, var(--ember) 52%, color-mix(in srgb, var(--ember) 90%, #000) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.36), 0 1px 2px rgba(0,0,0,.22), 0 8px 20px -8px color-mix(in srgb, var(--ember) 70%, transparent); }
+.btn-accent:hover { box-shadow:inset 0 1px 0 rgba(255,255,255,.42), 0 2px 4px rgba(0,0,0,.22), 0 12px 26px -8px color-mix(in srgb, var(--ember) 85%, transparent); }
+.btn-accent:active { background:linear-gradient(180deg, color-mix(in srgb, var(--ember) 90%, #000), var(--ember));
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.28), 0 1px 1px rgba(0,0,0,.18); }
+/* secondaire : face neutre en relief discret ; la bordure prend l'accent au survol */
+.btn-ghost { color:var(--ink); background:linear-gradient(180deg, var(--btn-face-top), var(--btn-face-bot)); border-color:var(--line-2);
+  box-shadow:inset 0 1px 0 var(--btn-hi), var(--btn-drop); }
+.btn-ghost:hover { color:var(--ink); border-color:color-mix(in srgb, var(--ember) 60%, var(--line-2)); box-shadow:inset 0 1px 0 var(--btn-hi), var(--btn-drop-up); }
+.btn-ghost:active { box-shadow:inset 0 2px 4px rgba(0,0,0,.14); }
+.btn-sm { min-height:34px; padding:0 12px; gap:6px; font-size:.84rem; border-radius:9px; }
 .btn-icon { width:34px; padding:0; }
-.btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
 .theme-toggle { font-size:1rem; line-height:1; }
 /* suppressions : la couleur d'alerte n'apparaît qu'au survol */
-.card-del:hover, .mat-del:hover, #brand-del:hover { color:var(--bad); border-color:var(--bad); background:var(--bad-wash); }
+.btn:is(.card-del, .mat-del, .cl-del, .hd-del, .rcp-del, .bc-del, .dl-del):hover, .btn#brand-del:hover {
+  color:var(--bad); border-color:color-mix(in srgb, var(--bad) 70%, var(--line-2)); background:var(--bad-wash); }
+.btn:disabled, .btn:disabled:hover { opacity:.45; filter:saturate(.5); box-shadow:none; transform:none; cursor:not-allowed; }
+@media (prefers-reduced-motion:reduce) { .btn:hover, .btn:active { transform:none; } }
+
+/* Icônes des actions principales : masque SVG peint avec la couleur du texte.
+   Attribut data-ic="…" sur le bouton, ou classes d'action déjà posées par les
+   modules (Modifier / Suppr. / Réimprimer / Copier…). */
+.btn[data-ic]::before, .btn#brand-del::before,
+.btn:is(.card-edit, .cl-edit, .dl-edit, .hd-edit, .mat-edit, .rcp-edit, .bc-edit,
+        .card-del, .cl-del, .hd-del, .mat-del, .rcp-del, .bc-del, .dl-del, .hd-print, .wl-copy)::before {
+  content:''; flex:none; width:var(--ic-size, 16px); height:var(--ic-size, 16px); background-color:currentColor;
+  -webkit-mask:var(--ic) center / contain no-repeat; mask:var(--ic) center / contain no-repeat; }
+.btn-sm { --ic-size:14px; }   /* variable héritée : pas de guerre de spécificité avec #brand-del */
+.btn[data-ic="edit"], .btn:is(.card-edit, .cl-edit, .dl-edit, .hd-edit, .mat-edit, .rcp-edit, .bc-edit) { --ic:var(--ic-edit); }
+.btn[data-ic="trash"], .btn#brand-del, .btn:is(.card-del, .cl-del, .hd-del, .mat-del, .rcp-del, .bc-del, .dl-del) { --ic:var(--ic-trash); }
+.btn[data-ic="print"], .btn.hd-print { --ic:var(--ic-print); }
+.btn[data-ic="copy"], .btn.wl-copy { --ic:var(--ic-copy); }
+.btn[data-ic="plus"] { --ic:var(--ic-plus); }
+.btn[data-ic="save"] { --ic:var(--ic-save); }
+.btn[data-ic="play"] { --ic:var(--ic-play); }
+.btn[data-ic="download"] { --ic:var(--ic-download); }
+.btn[data-ic="mail"] { --ic:var(--ic-mail); }
+.btn[data-ic="check"] { --ic:var(--ic-check); }
+.btn[data-ic="refresh"] { --ic:var(--ic-refresh); }
+.btn[data-ic="scan"] { --ic:var(--ic-scan); }
+.btn[data-ic="pause"] { --ic:var(--ic-pause); }
+.btn[data-ic="receipt"] { --ic:var(--ic-receipt); }
+.btn[data-ic="login"] { --ic:var(--ic-login); }
 
 /* Champs */
 .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px 18px; }
@@ -318,8 +382,13 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
   background:var(--wash); border:1px solid var(--line); border-radius:100px; }
 .stk.out { color:var(--bad); background:var(--bad-wash); border-color:transparent; }
 .card-tierline { font-size:.74rem; color:var(--muted); }
-.card-actions { display:flex; gap:6px; margin-top:auto; padding-top:4px; }
-.card-actions .btn-ghost { flex:1; min-height:32px; padding:0 8px; font-size:.8rem; }
+.card-actions { display:flex; gap:6px; margin-top:auto; padding-top:4px; container-type:inline-size; }
+.card-actions .btn-ghost { flex:1; min-width:0; min-height:32px; padding:0 7px; gap:5px; font-size:.8rem; --ic-size:14px; }
+/* carte étroite (téléphone, grille serrée) : Modifier / Suppr. en icône seule —
+   le texte reste dans le bouton pour les lecteurs d'écran */
+@container (max-width:180px) {
+  .card-actions .btn-ghost { gap:0; padding:0; font-size:0; --ic-size:16px; }
+}
 
 /* =========================================================
    ONGLETS SPACERS & ACCESSOIRES (cartes produit + prix/marges)
@@ -846,3 +915,33 @@ td.num input, .catalog-table input.catcost { text-align:right; }
   .co-actions { width:100%; }
   .co-actions .btn { flex:1 1 auto; }
 }
+
+/* =========================================================
+   RÉGLAGES › APPARENCE — couleur des accents (admin-accent.js)
+   ========================================================= */
+.set-card { max-width:760px; padding:20px 22px; background:var(--paper); border:1px solid var(--line); border-radius:16px; }
+.set-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 12px; margin-bottom:16px; }
+.set-head b { font-family:var(--display); font-size:1.05rem; letter-spacing:-.01em; }
+.set-msg { font-size:.84rem; color:var(--muted); }
+.set-msg.is-ok { color:var(--good); }
+.set-msg.is-warn { color:var(--bad); }
+/* pastilles : relief comme les boutons, anneau de la teinte quand elle est choisie */
+.acc-swatches { display:flex; flex-wrap:wrap; gap:12px; }
+.acc-sw { width:38px; height:38px; padding:0; cursor:pointer; border:0; border-radius:50%;
+  background:linear-gradient(180deg, color-mix(in srgb, var(--sw) 78%, #fff), var(--sw) 55%, color-mix(in srgb, var(--sw) 88%, #000));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 1px 2px rgba(0,0,0,.25);
+  transition-property:transform, box-shadow; transition-duration:.15s; transition-timing-function:ease-out; }
+.acc-sw:hover { transform:scale(1.08); }
+.acc-sw[aria-checked="true"] { box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 3px var(--paper), 0 0 0 5px var(--sw); }
+.acc-sw:focus-visible { outline:2px solid var(--ink); outline-offset:4px; }
+.acc-row { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px 20px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.acc-free { margin:0; }
+.acc-pick { display:flex; align-items:center; gap:8px; }
+.acc-pick input[type="color"] { width:46px; min-width:46px; height:40px; padding:3px; cursor:pointer; background:var(--paper); border:1px solid var(--line-2); border-radius:var(--radius-ctl); }
+.acc-pick input[type="text"] { width:112px; min-width:112px; font-variant-numeric:tabular-nums; text-transform:uppercase; }
+/* aperçu : les vrais composants de l'admin, dans la couleur choisie */
+.acc-preview { display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px; margin-top:18px; padding:16px; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+.acc-link { font-weight:600; color:var(--ember-ink); text-decoration:underline; text-underline-offset:2px; }
+.acc-chk { display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--ink); }
+.acc-tab { position:relative; padding:4px 2px 9px; font-weight:600; font-size:.9rem; color:var(--ink); }
+.acc-tab::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--ember); }

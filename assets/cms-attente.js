@@ -116,12 +116,12 @@
     if (w.source === 'site' && w.name && w.contact) bits.push(w.contact);
     var act;
     if (w.source === 'site') {
-      act = '<button type="button" class="btn btn-accent btn-sm wl-notify" data-id="' + esc(w.id) + '">✉ Envoyer le courriel</button>';
+      act = '<button type="button" class="btn btn-accent btn-sm wl-notify" data-ic="mail" data-id="' + esc(w.id) + '">Envoyer le courriel</button>';
     } else if (copied[w.id]) {
-      act = '<button type="button" class="btn btn-accent btn-sm wl-done" data-id="' + esc(w.id) + '">✓ Marquer avisé</button>' +
+      act = '<button type="button" class="btn btn-accent btn-sm wl-done" data-ic="check" data-id="' + esc(w.id) + '">Marquer avisé</button>' +
             '<button type="button" class="btn btn-ghost btn-sm wl-copy" data-id="' + esc(w.id) + '">Recopier</button>';
     } else {
-      act = '<button type="button" class="btn btn-accent btn-sm wl-copy" data-id="' + esc(w.id) + '">⧉ Copier le message</button>';
+      act = '<button type="button" class="btn btn-accent btn-sm wl-copy" data-id="' + esc(w.id) + '">Copier le message</button>';
     }
     return '<div class="wl-req" data-id="' + esc(w.id) + '">' +
       '<div class="wl-req-main"><span class="wl-req-who">' + esc(who) + '</span>' +
@@ -146,7 +146,7 @@
     var kinds = reqs.map(function (w) { return w.kind || null; });
     var sites = reqs.filter(function (w) { return w.source === 'site'; });
     var all = (opts && opts.bulk && sites.length > 1)
-      ? '<button type="button" class="btn btn-accent btn-sm wl-notify-all" data-ids="' + esc(sites.map(function (w) { return w.id; }).join(',')) + '">✉ Aviser les ' + sites.length + ' courriels</button>' : '';
+      ? '<button type="button" class="btn btn-accent btn-sm wl-notify-all" data-ids="' + esc(sites.map(function (w) { return w.id; }).join(',')) + '" data-ic="mail">Aviser les ' + sites.length + ' courriels</button>' : '';
     return '<div class="wl-group" data-pid="' + esc(pid) + '">' +
       '<div class="wl-group-head">' +
         (p && p.type === 'filament' ? '<span class="wl-sw" style="background:' + esc(swatchBg(p)) + '"></span>' : '') +

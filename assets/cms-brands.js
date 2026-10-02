@@ -87,7 +87,7 @@ window.CA = window.CA || {};
           '<button type="button" class="btn btn-ghost btn-sm" id="brand-rename">Renommer</button>' +
           '<button type="button" class="btn btn-ghost btn-sm" id="brand-slug" title="Segment d\'URL de la marque en boutique">URL</button>' +
           '<button type="button" class="btn btn-ghost btn-sm" id="brand-del">Supprimer</button>' : '') +
-        '<button type="button" class="btn btn-accent btn-sm" id="brand-new">+ Nouvelle marque</button>' +
+        '<button type="button" class="btn btn-accent btn-sm" id="brand-new" data-ic="plus">Nouvelle marque</button>' +
       '</div>';
 
     $$('.brand-chip', bar).forEach(function (c) {

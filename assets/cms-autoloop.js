@@ -803,7 +803,7 @@
   }
   function syncDownloadLabel() {
     var b = $('#al-download');
-    if (b) b.textContent = project ? '⬇ Télécharger le projet' : '⬇ Télécharger le gcode';
+    if (b) b.textContent = project ? 'Télécharger le projet' : 'Télécharger le gcode';   // icône : data-ic="download"
   }
   // « HSB524 1.4.gcode.3mf » -> « HSB524 1.4 AutoLoop x12.gcode.3mf »
   function projectOutName(loops) {

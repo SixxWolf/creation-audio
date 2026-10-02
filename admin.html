@@ -15,9 +15,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=42">
-<link rel="stylesheet" href="assets/facture.css?v=14">
+<link rel="stylesheet" href="assets/admin.css?v=44">
+<link rel="stylesheet" href="assets/facture.css?v=15">
 <link rel="stylesheet" href="assets/autoloop.css?v=23">
+<!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
+<script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
 <script src="assets/theme.js?v=1" defer></script>
 </head>
 <body>
@@ -39,7 +41,7 @@
       <label class="lbl" for="login-pass">Mot de passe</label>
       <input type="text" id="login-pass" style="-webkit-text-security:disc;text-security:disc" autocomplete="current-password">
     </div>
-    <button class="btn btn-accent" type="submit" id="login-btn">Se connecter</button>
+    <button class="btn btn-accent" type="submit" id="login-btn" data-ic="login">Se connecter</button>
     <p class="status" id="login-status" style="margin-top:12px"></p>
   </form>
 </section>
@@ -76,6 +78,9 @@
 
       <p class="side-group" aria-hidden="true">Atelier</p>
       <button class="tab" type="button" data-tab="autoloop" data-group="Atelier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3.5l3 3-3 3"/><path d="M20 6.5H8.5a5 5 0 0 0-5 5"/><path d="M7 20.5l-3-3 3-3"/><path d="M4 17.5h11.5a5 5 0 0 0 5-5"/></svg><span>AutoLoop</span></button>
+
+      <p class="side-group" aria-hidden="true">Réglages</p>
+      <button class="tab" type="button" data-tab="apparence" data-group="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9.5 9.5 0 0 0 0 19c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.7-1.7h2a5.5 5.5 0 0 0 5.5-5.5c0-4.3-4.3-7.7-9.8-7.7z"/><circle cx="7.5" cy="11.5" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/></svg><span>Apparence</span></button>
     </nav>
     <div class="side-foot">
       <a class="side-site" href="./" target="_blank" rel="noopener">
@@ -150,8 +155,8 @@
           <label class="lbl" for="lb-url">Lien complet</label>
           <div class="inline" style="gap:8px; flex-wrap:wrap">
             <input type="text" id="lb-url" readonly spellcheck="false" style="flex:1; min-width:240px; font-family:monospace">
-            <button type="button" class="btn btn-accent btn-sm" id="lb-save">Enregistrer l'URL</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="lb-copy">Copier</button>
+            <button type="button" class="btn btn-accent btn-sm" id="lb-save" data-ic="save">Enregistrer l'URL</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="lb-copy" data-ic="copy">Copier</button>
             <a class="btn btn-ghost btn-sm" id="lb-open" target="_blank" rel="noopener">Ouvrir</a>
           </div>
           <span class="hint" id="lb-status">Modifie un segment ci-dessus puis « Enregistrer l'URL ».</span>
@@ -166,7 +171,7 @@
         </div>
         <span class="grow"></span>
         <button class="btn btn-ghost btn-sm" id="m-toggle" type="button" aria-expanded="true">Masquer</button>
-        <button class="btn btn-accent" id="m-new" type="button">+ Nouveau matériau</button>
+        <button class="btn btn-accent" id="m-new" type="button" data-ic="plus">Nouveau matériau</button>
       </div>
 
       <div id="m-section">
@@ -231,13 +236,13 @@
             <div class="field col-2 spool-only">
               <label class="lbl">Rabais quantité — Bobine</label>
               <div class="tiers" id="m-tiers-spool"></div>
-              <div><button type="button" class="btn btn-ghost btn-sm" id="m-tier-add-spool">+ Ajouter un palier</button></div>
+              <div><button type="button" class="btn btn-ghost btn-sm" id="m-tier-add-spool" data-ic="plus">Ajouter un palier</button></div>
             </div>
             <!-- Paliers — Recharge -->
             <div class="field col-2 refill-only">
               <label class="lbl">Rabais quantité — Recharge</label>
               <div class="tiers" id="m-tiers-refill"></div>
-              <div><button type="button" class="btn btn-ghost btn-sm" id="m-tier-add-refill">+ Ajouter un palier</button></div>
+              <div><button type="button" class="btn btn-ghost btn-sm" id="m-tier-add-refill" data-ic="plus">Ajouter un palier</button></div>
             </div>
 
             <!-- ============================================================
@@ -252,7 +257,7 @@
             <div class="field col-2">
               <label class="lbl">Galerie « Imprimé avec ce filament » <span class="hint">(tes photos — la 1re est mise en avant)</span></label>
               <div class="gallery-grid" id="m-gallery"></div>
-              <div><button type="button" class="btn btn-ghost btn-sm" id="m-gallery-add">+ Ajouter des photos</button></div>
+              <div><button type="button" class="btn btn-ghost btn-sm" id="m-gallery-add" data-ic="plus">Ajouter des photos</button></div>
               <input type="file" id="m-gallery-file" accept="image/*" multiple hidden>
               <span class="hint">Glisse les vignettes pour réordonner. Clique ✕ pour retirer une photo.</span>
             </div>
@@ -267,12 +272,12 @@
             <div class="field col-2">
               <label class="lbl">Spécifications techniques <span class="hint">(autant que tu veux)</span></label>
               <div class="specs" id="m-specs"></div>
-              <div><button type="button" class="btn btn-ghost btn-sm" id="m-spec-add">+ Ajouter une spec</button></div>
+              <div><button type="button" class="btn btn-ghost btn-sm" id="m-spec-add" data-ic="plus">Ajouter une spec</button></div>
             </div>
           </div>
 
           <div class="editor-actions">
-            <button class="btn btn-accent" type="submit" id="m-save">Enregistrer</button>
+            <button class="btn btn-accent" type="submit" id="m-save" data-ic="save">Enregistrer</button>
             <button class="btn btn-ghost" type="button" id="m-cancel">Annuler</button>
             <span class="status" id="m-status"></span>
           </div>
@@ -289,8 +294,8 @@
           <p class="muted">Chaque couleur hérite du prix de son matériau. Glisse une carte pour changer l'ordre.</p>
         </div>
         <span class="grow"></span>
-        <button class="btn btn-ghost btn-sm" id="f-refresh" type="button">Actualiser</button>
-        <button class="btn btn-accent" id="f-new" type="button">+ Nouveau filament</button>
+        <button class="btn btn-ghost btn-sm" id="f-refresh" type="button" data-ic="refresh">Actualiser</button>
+        <button class="btn btn-accent" id="f-new" type="button" data-ic="plus">Nouveau filament</button>
       </div>
 
       <!-- Éditeur filament (identité + stock ; le prix vient du matériau) -->
@@ -333,7 +338,7 @@
             <div id="f-colors-wrap" hidden style="padding-top:4px">
               <div id="f-colors-list"></div>
               <div class="inline" style="gap:16px; align-items:center; padding-top:8px; flex-wrap:wrap">
-                <button type="button" class="btn btn-ghost" id="f-color-add">+ Ajouter une couleur</button>
+                <button type="button" class="btn btn-ghost" id="f-color-add" data-ic="plus">Ajouter une couleur</button>
                 <span class="inline" style="gap:8px; align-items:center">
                   <span class="hint">Aperçu&nbsp;:</span>
                   <span id="f-colors-preview" class="swatch" style="border-radius:50%"></span>
@@ -426,7 +431,7 @@
         </div>
 
         <div class="editor-actions">
-          <button class="btn btn-accent" type="submit" id="f-save">Enregistrer</button>
+          <button class="btn btn-accent" type="submit" id="f-save" data-ic="save">Enregistrer</button>
           <button class="btn btn-ghost" type="button" id="f-cancel">Annuler</button>
           <span class="status" id="f-status"></span>
         </div>
@@ -460,7 +465,7 @@
         <!-- Poste de scan -->
         <div class="scan-station" id="scan-station">
           <div class="scan-head">
-            <button type="button" class="btn btn-accent scan-toggle" id="scan-toggle" aria-pressed="false">▶ Démarrer la réception</button>
+            <button type="button" class="btn btn-accent scan-toggle" id="scan-toggle" aria-pressed="false" data-ic="scan">Démarrer la réception</button>
             <div class="scan-count" id="scan-count" aria-live="polite">
               <span class="scan-count-num">0</span><span class="scan-count-lbl">article scanné</span>
             </div>
@@ -539,14 +544,14 @@
               <textarea id="r-paste" rows="5" placeholder="Copie-colle le récapitulatif de ta commande Bambu ici, puis clique « Analyser »."></textarea>
               <div class="inline" style="margin-top:8px; gap:8px">
                 <button type="button" class="btn btn-ghost btn-sm" id="r-parse">Analyser le texte</button>
-                <button type="button" class="btn btn-ghost btn-sm" id="r-add-line">+ Ajouter une ligne</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="r-add-line" data-ic="plus">Ajouter une ligne</button>
                 <span class="hint" id="r-parse-hint"></span>
               </div>
             </div>
           </details>
 
           <div class="editor-actions">
-            <button class="btn btn-accent" type="submit" id="r-confirm">Confirmer la réception</button>
+            <button class="btn btn-accent" type="submit" id="r-confirm" data-ic="check">Confirmer la réception</button>
             <button class="btn btn-ghost" type="button" id="r-reset">Vider</button>
             <span class="status" id="r-status"></span>
           </div>
@@ -556,7 +561,7 @@
         <div class="panel-head" style="margin-top:26px">
           <div><h1 style="font-size:1.1rem">Historique des réceptions</h1></div>
           <span class="grow"></span>
-          <button class="btn btn-ghost btn-sm" id="r-refresh" type="button">Actualiser</button>
+          <button class="btn btn-ghost btn-sm" id="r-refresh" type="button" data-ic="refresh">Actualiser</button>
         </div>
         <div id="r-history" class="mat-rows"></div>
       </div>
@@ -574,7 +579,7 @@
           </div>
           <span class="grow"></span>
           <label class="fx-check" style="margin-right:6px"><input type="checkbox" id="reorder-onlymiss"> Manques seulement</label>
-          <button class="btn btn-ghost btn-sm" id="reorder-refresh" type="button">Actualiser</button>
+          <button class="btn btn-ghost btn-sm" id="reorder-refresh" type="button" data-ic="refresh">Actualiser</button>
         </div>
 
         <!-- Filtre marque → matériau (pour saisir les cibles tranquillement) -->
@@ -601,7 +606,7 @@
           <label class="reorder-flabel">Marque
             <select id="catalog-brand"></select>
           </label>
-          <button class="btn btn-ghost btn-sm" id="catalog-refresh" type="button">Actualiser</button>
+          <button class="btn btn-ghost btn-sm" id="catalog-refresh" type="button" data-ic="refresh">Actualiser</button>
         </div>
 
         <!-- Application groupée : un prix -> plusieurs matériaux cochés -->
@@ -625,13 +630,13 @@
             <p class="muted">Chaque code scanné et le filament (+ format) ou l'accessoire auquel il est rattaché. Corrige ou supprime au besoin.</p>
           </div>
           <span class="grow"></span>
-          <button class="btn btn-ghost btn-sm" id="bc-add" type="button">+ Associer un code</button>
-          <button class="btn btn-ghost btn-sm" id="bc-refresh" type="button">Actualiser</button>
+          <button class="btn btn-ghost btn-sm" id="bc-add" type="button" data-ic="plus">Associer un code</button>
+          <button class="btn btn-ghost btn-sm" id="bc-refresh" type="button" data-ic="refresh">Actualiser</button>
         </div>
 
         <!-- Poste de scan : vérifier au fur et à mesure quel filament correspond -->
         <div class="bc-scan" id="bc-scan">
-          <button type="button" class="btn btn-accent bc-scan-toggle" id="bc-scan-toggle" aria-pressed="false">▶ Scanner pour vérifier</button>
+          <button type="button" class="btn btn-accent bc-scan-toggle" id="bc-scan-toggle" aria-pressed="false" data-ic="scan">Scanner pour vérifier</button>
           <input type="text" id="bc-scan-input" class="bc-scan-input" autocomplete="off" autocorrect="off"
                  autocapitalize="off" spellcheck="false" placeholder="Clique « Scanner » puis scanne un code pour le vérifier…" disabled>
           <span class="bc-scan-feedback" id="bc-scan-feedback" aria-live="polite"></span>
@@ -652,7 +657,7 @@
             <p class="muted">Qui attend quel produit. Demandes du site = courriel envoyé automatiquement ; Marketplace = message prêt à copier. Les coordonnées sont effacées après l'avis ou après 60 jours.</p>
           </div>
           <span class="grow"></span>
-          <button class="btn btn-ghost btn-sm" id="wl-refresh" type="button">Actualiser</button>
+          <button class="btn btn-ghost btn-sm" id="wl-refresh" type="button" data-ic="refresh">Actualiser</button>
         </div>
 
         <details class="wl-add" id="wl-add">
@@ -674,7 +679,7 @@
               </select></label>
             <label class="field wl-f-contact"><span>Contact <small class="muted" id="wl-add-contact-hint">(facultatif)</small></span><input type="text" id="wl-add-contact" maxlength="254" placeholder="Messenger, téléphone…"></label>
             <div class="wl-add-actions">
-              <button type="submit" class="btn btn-accent btn-sm" id="wl-add-save">Ajouter</button>
+              <button type="submit" class="btn btn-accent btn-sm" id="wl-add-save" data-ic="plus">Ajouter</button>
               <span class="hint" id="wl-add-status"></span>
             </div>
           </form>
@@ -693,8 +698,8 @@
           <p class="muted">Tes pièces imprimées 3D (adaptateurs, entretoises…). Glisse une carte pour changer l'ordre.</p>
         </div>
         <span class="grow"></span>
-        <button class="btn btn-ghost btn-sm" id="sp-refresh" type="button">Actualiser</button>
-        <button class="btn btn-accent" id="sp-new" type="button">+ Nouveau spacer</button>
+        <button class="btn btn-ghost btn-sm" id="sp-refresh" type="button" data-ic="refresh">Actualiser</button>
+        <button class="btn btn-accent" id="sp-new" type="button" data-ic="plus">Nouveau spacer</button>
       </div>
 
       <!-- Éditeur spacer -->
@@ -721,7 +726,7 @@
           <div class="field col-2">
             <label class="lbl">Photos <span class="hint">(la 1re est la photo principale — glisse pour réordonner)</span></label>
             <div class="gallery-grid" id="sp-gallery"></div>
-            <div><button type="button" class="btn btn-ghost btn-sm" id="sp-gallery-add">+ Ajouter des photos</button></div>
+            <div><button type="button" class="btn btn-ghost btn-sm" id="sp-gallery-add" data-ic="plus">Ajouter des photos</button></div>
             <input type="file" id="sp-file" accept="image/*" multiple hidden>
           </div>
 
@@ -758,7 +763,7 @@
           <div class="field col-2">
             <label class="lbl">Rabais quantité — dealer <span class="hint">(par paires)</span></label>
             <div class="tiers" id="sp-tiers"></div>
-            <div><button type="button" class="btn btn-ghost btn-sm" id="sp-tier-add">+ Ajouter un palier</button></div>
+            <div><button type="button" class="btn btn-ghost btn-sm" id="sp-tier-add" data-ic="plus">Ajouter un palier</button></div>
             <span class="hint">S'applique uniquement au prix dealer (portail + facture dealer).</span>
           </div>
 
@@ -785,7 +790,7 @@
           <div class="field col-2">
             <label class="lbl">Compatibilité véhicules <span class="hint">(une ligne par véhicule — sert à la recherche « civic 2008 »)</span></label>
             <div class="fit-rows" id="sp-fit"></div>
-            <div><button type="button" class="btn btn-ghost btn-sm" id="sp-fit-add">+ Ajouter un véhicule</button></div>
+            <div><button type="button" class="btn btn-ghost btn-sm" id="sp-fit-add" data-ic="plus">Ajouter un véhicule</button></div>
             <datalist id="sp-make-list"></datalist>
             <datalist id="sp-pos-list">
               <option value="Portes avant"><option value="Portes arrière"><option value="Portes avant + arrière"><option value="Tableau de bord"><option value="Plage arrière">
@@ -802,12 +807,12 @@
           <div class="field col-2">
             <label class="lbl">Spécifications <span class="hint">(ex. Matériau · PETG, Épaisseur · 12 mm, Visserie · incluse)</span></label>
             <div class="specs" id="sp-specs"></div>
-            <div><button type="button" class="btn btn-ghost btn-sm" id="sp-spec-add">+ Ajouter une spec</button></div>
+            <div><button type="button" class="btn btn-ghost btn-sm" id="sp-spec-add" data-ic="plus">Ajouter une spec</button></div>
           </div>
         </div>
 
         <div class="editor-actions">
-          <button class="btn btn-accent" type="submit" id="sp-save">Enregistrer</button>
+          <button class="btn btn-accent" type="submit" id="sp-save" data-ic="save">Enregistrer</button>
           <button class="btn btn-ghost" type="button" id="sp-cancel">Annuler</button>
           <span class="status" id="sp-status"></span>
         </div>
@@ -825,8 +830,8 @@
           <p class="muted">Bobines vides réutilisables et autres extras proposés en boutique (prix + stock réels). Glisse une carte pour changer l'ordre.</p>
         </div>
         <span class="grow"></span>
-        <button class="btn btn-ghost btn-sm" id="ac-refresh" type="button">Actualiser</button>
-        <button class="btn btn-accent" id="ac-new" type="button">+ Nouvel accessoire</button>
+        <button class="btn btn-ghost btn-sm" id="ac-refresh" type="button" data-ic="refresh">Actualiser</button>
+        <button class="btn btn-accent" id="ac-new" type="button" data-ic="plus">Nouvel accessoire</button>
       </div>
 
       <!-- Éditeur accessoire -->
@@ -879,7 +884,7 @@
         </div>
 
         <div class="editor-actions">
-          <button class="btn btn-accent" type="submit" id="ac-save">Enregistrer</button>
+          <button class="btn btn-accent" type="submit" id="ac-save" data-ic="save">Enregistrer</button>
           <button class="btn btn-ghost" type="button" id="ac-cancel">Annuler</button>
           <span class="status" id="ac-status"></span>
         </div>
@@ -897,8 +902,8 @@
           <p class="muted">Comptes autorisés au <b>portail dealer</b> (prix de gros + rabais quantité sur les spacers).</p>
         </div>
         <span class="grow"></span>
-        <button class="btn btn-ghost btn-sm" id="dl-refresh" type="button">Actualiser</button>
-        <button class="btn btn-accent" id="dl-new" type="button">+ Ajouter un dealer</button>
+        <button class="btn btn-ghost btn-sm" id="dl-refresh" type="button" data-ic="refresh">Actualiser</button>
+        <button class="btn btn-accent" id="dl-new" type="button" data-ic="plus">Ajouter un dealer</button>
       </div>
 
       <form class="editor" id="dl-editor" hidden>
@@ -927,7 +932,7 @@
           </div>
         </div>
         <div class="editor-actions">
-          <button class="btn btn-accent" type="submit" id="dl-save">Enregistrer</button>
+          <button class="btn btn-accent" type="submit" id="dl-save" data-ic="save">Enregistrer</button>
           <button class="btn btn-ghost" type="button" id="dl-cancel">Annuler</button>
           <span class="status" id="dl-status"></span>
         </div>
@@ -950,8 +955,8 @@
           <p class="muted">Ton carnet de clients pour la facturation (nom, courriel, téléphone). Ils sont resuggérés dans la facture, et chaque facture enregistrée mémorise son client ici.</p>
         </div>
         <span class="grow"></span>
-        <button class="btn btn-ghost btn-sm" id="cl-refresh" type="button">Actualiser</button>
-        <button class="btn btn-accent" id="cl-new" type="button">+ Ajouter un client</button>
+        <button class="btn btn-ghost btn-sm" id="cl-refresh" type="button" data-ic="refresh">Actualiser</button>
+        <button class="btn btn-accent" id="cl-new" type="button" data-ic="plus">Ajouter un client</button>
       </div>
 
       <form class="editor" id="cl-editor" hidden>
@@ -979,7 +984,7 @@
           </div>
         </div>
         <div class="editor-actions">
-          <button class="btn btn-accent" type="submit" id="cl-save">Enregistrer</button>
+          <button class="btn btn-accent" type="submit" id="cl-save" data-ic="save">Enregistrer</button>
           <button class="btn btn-ghost" type="button" id="cl-cancel">Annuler</button>
           <span class="status" id="cl-status"></span>
         </div>
@@ -1001,7 +1006,7 @@
           <button type="button" class="fx-seg-btn co-filter is-active" data-f="open">En cours <span class="co-filter-n" id="co-open-n"></span></button>
           <button type="button" class="fx-seg-btn co-filter" data-f="all">Toutes</button>
         </div>
-        <button class="btn btn-ghost btn-sm" id="co-refresh" type="button">Actualiser</button>
+        <button class="btn btn-ghost btn-sm" id="co-refresh" type="button" data-ic="refresh">Actualiser</button>
       </div>
       <div id="co-print"></div>
       <div class="co-list" id="co-list"><p class="muted">Chargement…</p></div>
@@ -1015,7 +1020,7 @@
         </div>
         <span class="grow"></span>
         <span class="hint" id="fx-nexthint"></span>
-        <button class="btn btn-ghost btn-sm" id="fx-reset" type="button">Nouvelle facture</button>
+        <button class="btn btn-ghost btn-sm" id="fx-reset" type="button" data-ic="plus">Nouvelle facture</button>
       </div>
 
       <!-- Modification d'une facture de l'Historique (bouton « Modifier ») -->
@@ -1146,7 +1151,7 @@
             </div>
           </div>
           <div class="editor-actions">
-            <button type="button" class="btn btn-ghost btn-sm" id="co-save">Enregistrer l'entreprise</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="co-save" data-ic="save">Enregistrer l'entreprise</button>
             <span class="status" id="co-msg"></span>
           </div>
         </details>
@@ -1200,12 +1205,12 @@
             </div>
             <h3 style="margin-top:16px">Ajouter une ligne</h3>
             <p class="hint">Matériaux, main-d'œuvre, transport… Chaque ligne est libre.</p>
-            <button type="button" class="btn btn-ghost btn-sm" id="cx-add-line">+ Ligne libre</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="cx-add-labor">+ Main-d'œuvre</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="cx-add-line" data-ic="plus">Ligne libre</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="cx-add-labor" data-ic="plus">Main-d'œuvre</button>
           </div>
 
           <!-- Bouton ligne libre pour filament/spacer aussi -->
-          <button type="button" class="btn btn-ghost btn-sm fx-freeline" id="fx-add-free">+ Ligne libre</button>
+          <button type="button" class="btn btn-ghost btn-sm fx-freeline" id="fx-add-free" data-ic="plus">Ligne libre</button>
         </aside>
 
         <!-- Colonne droite : la facture -->
@@ -1216,12 +1221,12 @@
           <div class="fx-margin no-print" id="fx-margin" hidden></div>
 
           <div class="fx-actions no-print">
-            <button class="btn btn-accent" id="fx-save" type="button">Enregistrer la facture</button>
+            <button class="btn btn-accent" id="fx-save" type="button" data-ic="save">Enregistrer la facture</button>
             <label class="fx-check" id="fx-deduct-wrap"><input type="checkbox" id="fx-deduct" checked> Déduire le stock</label>
             <div class="fx-actions-2">
-              <button class="btn btn-ghost" id="fx-print" type="button">Imprimer / PDF</button>
-              <button class="btn btn-ghost" id="fx-email" type="button">Envoyer par courriel</button>
-              <button class="btn btn-ghost" id="fx-copy" type="button">Copier</button>
+              <button class="btn btn-ghost" id="fx-print" type="button" data-ic="print">Imprimer / PDF</button>
+              <button class="btn btn-ghost" id="fx-email" type="button" data-ic="mail">Envoyer par courriel</button>
+              <button class="btn btn-ghost" id="fx-copy" type="button" data-ic="copy">Copier</button>
             </div>
             <span class="status" id="fx-status"></span>
           </div>
@@ -1237,7 +1242,7 @@
           <p class="muted">Toutes les factures. Tu peux <b>annuler</b> une facture à tout moment (le stock est remis).</p>
         </div>
         <span class="grow"></span>
-        <button class="btn btn-ghost btn-sm" id="hist-refresh" type="button">Actualiser</button>
+        <button class="btn btn-ghost btn-sm" id="hist-refresh" type="button" data-ic="refresh">Actualiser</button>
       </div>
 
       <div class="hist-bar">
@@ -1270,7 +1275,7 @@
           <p class="muted">Factures annulées exclues. Marge = ventes − coûts (hors taxes).</p>
         </div>
         <span class="grow"></span>
-        <button class="btn btn-ghost btn-sm" id="stat-refresh" type="button">Actualiser</button>
+        <button class="btn btn-ghost btn-sm" id="stat-refresh" type="button" data-ic="refresh">Actualiser</button>
       </div>
 
       <div class="stat-subtabs" role="tablist" aria-label="Sections statistiques">
@@ -1349,8 +1354,8 @@
           <aside class="al-side">
             <div class="al-card al-report-card">
               <div class="al-run">
-                <button class="btn btn-accent" id="al-process" type="button" disabled>Générer le batch</button>
-                <button class="btn btn-ghost" id="al-download" type="button" disabled>⬇ Télécharger le gcode</button>
+                <button class="btn btn-accent" id="al-process" type="button" disabled data-ic="play">Générer le batch</button>
+                <button class="btn btn-ghost" id="al-download" type="button" disabled data-ic="download">Télécharger le gcode</button>
               </div>
               <div id="al-report"><p class="muted">Aucun batch généré.</p></div>
             </div>
@@ -1455,7 +1460,7 @@
             <div class="al-defs al-defs-in" data-defs="gcode">
               <p class="al-defs-t"><b>Valeurs par défaut</b> <span class="al-defs-msg" aria-live="polite"></span></p>
               <div class="al-defs-b">
-                <button class="btn btn-ghost" type="button" data-defs-save>Enregistrer comme défauts</button>
+                <button class="btn btn-ghost" type="button" data-defs-save data-ic="save">Enregistrer comme défauts</button>
               </div>
             </div>
           </details>
@@ -1541,7 +1546,7 @@
             <div class="al-defs" data-defs="prix">
               <p class="al-defs-t"><b>Valeurs par défaut</b> <span class="al-defs-msg" aria-live="polite"></span></p>
               <div class="al-defs-b">
-                <button class="btn btn-ghost" type="button" data-defs-save>Enregistrer comme défauts</button>
+                <button class="btn btn-ghost" type="button" data-defs-save data-ic="save">Enregistrer comme défauts</button>
               </div>
             </div>
           </div>
@@ -1582,6 +1587,37 @@
         </div>
       </div>
     </section>
+
+    <!-- ---------------- RÉGLAGES › APPARENCE ---------------- -->
+    <!-- Couleur d'accent de l'admin (boutons, onglets actifs, liens, cases…) : admin-accent.js -->
+    <section class="tabpanel" data-panel="apparence" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Apparence</h1>
+        </div>
+      </div>
+      <div class="set-card">
+        <div class="set-head"><b>Couleur des accents</b> <span class="set-msg" id="acc-msg" aria-live="polite"></span></div>
+        <div class="acc-swatches" id="acc-swatches" role="radiogroup" aria-label="Couleur des accents"></div>
+        <div class="acc-row">
+          <div class="field acc-free">
+            <label class="lbl" for="acc-hex">Couleur libre</label>
+            <div class="acc-pick">
+              <input type="color" id="acc-pick" value="#ff6a2b" aria-label="Choisir une couleur">
+              <input type="text" id="acc-hex" value="#FF6A2B" maxlength="7" spellcheck="false" autocomplete="off">
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="acc-reset" type="button" data-ic="refresh">Orange d'origine</button>
+        </div>
+        <div class="acc-preview" aria-label="Aperçu">
+          <button class="btn btn-accent" type="button" data-ic="play" tabindex="-1">Générer</button>
+          <button class="btn btn-ghost" type="button" data-ic="download" tabindex="-1">Télécharger</button>
+          <span class="acc-link">Lien</span>
+          <label class="acc-chk"><input type="checkbox" checked tabindex="-1"> Coché</label>
+          <span class="acc-tab">Onglet actif</span>
+        </div>
+      </div>
+    </section>
   </main>
   </div><!-- /.adm-main -->
 
@@ -1594,23 +1630,24 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/admin-core.js?v=6"></script>
+<script src="assets/admin-accent.js?v=1"></script>
 <script src="assets/cms-costing.js?v=2"></script>
-<script src="assets/cms-brands.js?v=4"></script>
+<script src="assets/cms-brands.js?v=5"></script>
 <script src="assets/cms-materials.js?v=11"></script>
 <script src="assets/cms-filaments.js?v=14"></script>
 <script src="assets/cms-linkbuilder.js?v=2"></script>
 <script src="assets/cms-spacers.js?v=6"></script>
 <script src="assets/cms-accessories.js?v=2"></script>
-<script src="assets/cms-inventory.js?v=24"></script>
-<script src="assets/cms-attente.js?v=2"></script>
+<script src="assets/cms-inventory.js?v=25"></script>
+<script src="assets/cms-attente.js?v=3"></script>
 <script src="assets/cms-dealers.js?v=3"></script>
 <script src="assets/cms-clients.js?v=2"></script>
 <script src="assets/cms-facturation.js?v=26"></script>
 <script src="assets/cms-historique.js?v=7"></script>
-<script src="assets/cms-commandes.js?v=1"></script>
+<script src="assets/cms-commandes.js?v=2"></script>
 <script src="assets/cms-statistiques.js?v=6"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
-<script src="assets/cms-autoloop.js?v=35"></script>
+<script src="assets/cms-autoloop.js?v=36"></script>
 </body>
 </html>

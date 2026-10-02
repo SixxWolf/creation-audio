@@ -132,6 +132,9 @@
   --fill-strong:#181A1F; --fill-strong-hover:#14161A;
   background:var(--paper); color:var(--ink);
 }
+/* Le document facture garde l'orange de la marque, peu importe la couleur
+   d'accent choisie dans Réglages › Apparence : c'est ce que reçoivent les clients. */
+#fx-invoice, #hist-print { --ember:#FF6A2B; --ember-dim:#E24E15; --ember-ink:#B23F12; --on-ember:#181A1F; }
 
 .inv-top { display:flex; justify-content:space-between; gap:20px; align-items:flex-start;
   border-bottom:2px solid var(--ink); padding-bottom:16px; margin-bottom:16px; }

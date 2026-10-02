@@ -149,7 +149,7 @@
       '<div class="co-print-head">' +
         '<div class="co-print-title"><b>À imprimer</b> · ' + plural(total, 'paire', 'paires') +
           ' <span class="hint">commandes « Nouvelle » + « En préparation », moins le stock</span></div>' +
-        '<button type="button" class="btn btn-ghost btn-sm" id="co-print-copy">Copier la liste</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" id="co-print-copy" data-ic="copy">Copier la liste</button>' +
       '</div>' +
       '<div class="co-print-items">' + rows.map(function (r) {
         return '<span class="co-print-item"><b>' + esc(r.name) + '</b> × ' + r.print +
@@ -158,14 +158,22 @@
     '</section>';
     $('#co-print-copy').addEventListener('click', function () {
       var txt = 'À imprimer :\n' + rows.map(function (r) { return '- ' + r.name + ' × ' + r.print + ' paire' + (r.print > 1 ? 's' : ''); }).join('\n');
-      var done = function () { var b = $('#co-print-copy'); if (b) { b.textContent = 'Copié ✓'; setTimeout(function () { if (b) b.textContent = 'Copier la liste'; }, 1800); } };
+      var done = function () {
+        var b = $('#co-print-copy');
+        if (!b) return;
+        b.textContent = 'Copié'; b.dataset.ic = 'check';
+        setTimeout(function () { if (b) { b.textContent = 'Copier la liste'; b.dataset.ic = 'copy'; } }, 1800);
+      };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, function () {}); else done();
     });
   }
 
   /* ---- liste ---- */
   function actionsFor(o) {
-    var b = function (act, label, cls) { return '<button type="button" class="btn ' + (cls || 'btn-ghost') + ' btn-sm" data-act="' + act + '">' + label + '</button>'; };
+    var b = function (act, label, cls) {
+      return '<button type="button" class="btn ' + (cls || 'btn-ghost') + ' btn-sm" data-act="' + act + '"' +
+        (act === 'invoice' ? ' data-ic="receipt"' : '') + '>' + label + '</button>';
+    };
     switch (o.status) {
       case 'new': return b('preparing', 'Commencer la préparation', 'btn-accent') + b('invoice', 'Facturer') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'preparing': return b('ready', 'Marquer prête', 'btn-accent') + b('invoice', 'Facturer') + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
