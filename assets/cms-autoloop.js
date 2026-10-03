@@ -98,10 +98,21 @@
   // Remplace la ligne de purge native par une purge en goulotte. Séquence reprise
   // du fichier FarmLoop qui imprimait déjà ; la température M109 est celle du bloc
   // d'origine (temp. buse du profil). Bloc absent → gcode inchangé (signalé au rapport).
-  function replaceLoadLine(head, eol, purgeLen) {
+  // Après la purge, la buse suinte encore : sans essuyage, ce filet (couleur du 1er
+  // filament de la pièce, pur) partait avec la tête et se collait au premier point
+  // imprimé. On le fige (ventilo, comme après le M983.3 natif) puis on essuie avec la
+  // séquence native du start gcode (G150.2 / G150.1, même nombre de passes qu'après
+  // un changement) et on s'éloigne de la poubelle comme le start gcode.
+  function replaceLoadLine(head, eol, purgeLen, passes) {
     var m = RE_LOAD_LINE.exec(head);
     if (!m) return { text: head, replaced: false };
     var t = /M109 S(\d+)/.exec(m[1]);
+    var wipe = ['  M106 P1 S255 ; fige le filet de purge', '  M400 S5', '  M106 P1 S0'];
+    if (passes > 0) {
+      wipe.push('  G150.3 ; poubelle');
+      for (var k = 0; k < passes; k++) wipe.push('  G150.2', '  G150.1 F8000');
+      wipe.push('  G91', '  G1 Y-16 F12000 ; move away from the trash bin', '  G90', '  M400');
+    }
     var L = [
       ';===== nozzle load line (AutoLoop : purge en goulotte, pas de ligne sur le plateau) =====',
       'M1002 gcode_claim_action : 51',
@@ -113,11 +124,12 @@
       '  T1000',
       '  G92 E0',
       '  G1 E' + z(purgeLen) + ' F200 ; purge dans la goulotte à déchets',
-      '  M400',
+      '  M400'
+    ].concat(wipe, [
       '  G1 X100 F21000',
       '  M400',
       ';===== nozzle load line end ====='
-    ];
+    ]);
     return { text: head.slice(0, m.index) + L.join(eol) + eol + head.slice(m.index + m[0].length), replaced: true };
   }
 
@@ -419,7 +431,7 @@
     report.bendsPerLoop = (opts.bendEnable && opts.bendCycles > 0) ? opts.bendCycles * 2 : 0;
 
     var head = raw.slice(0, idx);   // pièce complète (header + config + start + corps), sans le end gcode natif
-    var ll = replaceLoadLine(head, eol, opts.purgeLen);   // purge en goulotte à la place de la ligne G130, sur tous les loops
+    var ll = replaceLoadLine(head, eol, opts.purgeLen, opts.wipePasses);   // purge en goulotte à la place de la ligne G130, sur tous les loops
     head = ll.text; report.loadLineReplaced = ll.replaced;
     var wp = addChangeWipe(head, opts.wipePasses, eol);   // nettoyage de la buse après chaque changement de filament
     head = wp.text;
