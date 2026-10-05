@@ -68,7 +68,8 @@
        réglages machine repliés sous les étapes (sur mobile : après le rapport).
        1fr sur la 2e rangée : si la colonne de droite est plus haute, l'espace
        en trop va sous les réglages, pas entre les étapes et les réglages. --- */
-.al-cols-gen { grid-template-areas:"main side" "more side"; grid-template-rows:auto 1fr; row-gap:16px; }
+.al-cols-gen { grid-template-columns:minmax(0, 1fr) clamp(300px, 45%, 420px);   /* 1101-1200 px : étapes moins serrées */
+  grid-template-areas:"main side" "more side"; grid-template-rows:auto 1fr; row-gap:16px; }
 .al-cols-gen > .al-main { grid-area:main; }
 .al-cols-gen > .al-side { grid-area:side; }
 .al-cols-gen > .al-more { grid-area:more; align-self:start; }
@@ -76,9 +77,18 @@
 
 /* ② Batch : loops + « tous les X » (flow, bed leveling) + nombre de loops calibrés */
 .al-batch { display:grid; grid-template-columns:max-content max-content 1fr; align-items:center; gap:10px 16px; }
+/* carte étroite : écart réduit, puis « N loops » passe sous la case (au lieu de déborder) */
+.al-batch-card { container:al-batch / inline-size; }
+@container al-batch (max-width:339px) { .al-batch { column-gap:12px; } }
+@container al-batch (max-width:311px) {
+  .al-batch { grid-template-columns:max-content 1fr; }
+  .al-batch > span:empty { display:none; }
+  .al-batch .al-cal-bk { grid-column:1; }
+  .al-batch .al-cal-n { grid-column:2; margin-top:-6px; }
+}
 .al-batch .al-inline { gap:8px; font-size:.9rem; font-weight:600; color:var(--ink); }
 .al-batch input { width:72px; text-align:center; }
-.al-cal-n { font-size:.86rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.al-cal-n { font-size:.86rem; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .al-cal-bk { font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); cursor:pointer; }
 
 /* Repliables : grille loop par loop, détails du rapport (.al-rmore) + panneau
@@ -251,6 +261,8 @@
 /* --- Responsive ----------------------------------------- */
 @media (max-width:1100px) {
   .al-cols { grid-template-columns:minmax(0, 1fr) 360px; }
+  /* générateur à 1025 px (barre latérale encore là) : la colonne de droite cède de la place aux étapes */
+  .al-cols-gen { grid-template-columns:minmax(0, 1fr) clamp(300px, 45%, 360px); }
 }
 @media (max-width:900px) {
   .al-cols { grid-template-columns:minmax(0, 1fr); }   /* minmax(0) : un contenu large ne fait plus déborder la colonne */

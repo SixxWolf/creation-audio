@@ -118,7 +118,7 @@
   }
   function readCompanyForm() {
     return {
-      name: $('#co-name').value.trim(), tagline: $('#co-tagline').value.trim(),
+      name: $('#co-name').value.trim(), tagline: $('#co-tagline').value.replace(/\s+/g, ' ').trim(),   // textarea : une seule ligne
       address: $('#co-address').value.trim(), city: $('#co-city').value.trim(),
       email: $('#co-email').value.trim(), phone: $('#co-phone').value.trim(),
       gst: $('#co-gst').value.trim(), qst: $('#co-qst').value.trim(),

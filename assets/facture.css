@@ -69,8 +69,8 @@
 .fx-combo-item .ct { font-size:.8rem; color:var(--muted); }
 .fx-combo-empty { padding:10px; font-size:.86rem; color:var(--muted); }
 
-.fx-filters { display:flex; gap:8px; }
-.fx-filters select { flex:1; min-width:0; padding:8px 26px 8px 10px; font-size:.86rem; background-position:right 7px center; background-size:13px; }
+.fx-filters { display:flex; flex-wrap:wrap; gap:8px; }
+.fx-filters select { flex:1 1 164px; min-width:0; padding:8px 26px 8px 10px; font-size:.86rem; background-position:right 7px center; background-size:13px; }   /* 164 px : « Toutes les marques » entier, sinon l'un sous l'autre */
 .fx-type { align-self:flex-start; }
 .fx-type-btn { min-height:30px; padding:0 13px; font:inherit; font-weight:600; font-size:.84rem; color:var(--muted); cursor:pointer;
   background:none; border:none; border-radius:8px; transition:background .15s, color .15s; }

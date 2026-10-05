@@ -50,7 +50,7 @@
   }
   function marginPill(price, cost) {
     var p = +price || 0, c = +cost || 0, m = p - c, pct = p > 0 ? Math.round(m / p * 100) : 0;
-    return '<span class="card-margin ' + (m >= 0 ? 'pos' : 'neg') + '">marge ' + money(m) + (p > 0 ? ' · ' + pct + '%' : '') + '</span>';
+    return '<span class="card-margin ' + (m >= 0 ? 'pos' : 'neg') + '"><span class="cm-w">marge </span>' + money(m) + (p > 0 ? ' · ' + pct + '%' : '') + '</span>';
   }
   // Prix CLIENT (public, à plat) puis prix DEALER (base + rabais quantité),
   // chacun avec sa marge. Les rabais quantité ne concernent que le dealer.

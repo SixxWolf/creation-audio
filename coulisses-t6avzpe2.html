@@ -15,9 +15,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=49">
-<link rel="stylesheet" href="assets/facture.css?v=18">
-<link rel="stylesheet" href="assets/autoloop.css?v=25">
+<link rel="stylesheet" href="assets/admin.css?v=50">
+<link rel="stylesheet" href="assets/facture.css?v=19">
+<link rel="stylesheet" href="assets/autoloop.css?v=26">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
 <script src="assets/theme.js?v=1" defer></script>
@@ -167,7 +167,7 @@
         </div>
         <!-- Segments d'URL modifiables : tape le slug voulu pour chaque niveau -->
         <div class="field" style="margin-top:6px">
-          <label class="lbl">URL — segments modifiables <span class="hint">(vide = auto depuis le nom)</span></label>
+          <label class="lbl">URL — segments modifiables</label>
           <div class="grid" id="lb-seg-grid">
             <div class="field" id="lb-seg-brand-wrap">
               <label class="lbl" for="lb-seg-brand" style="font-weight:500">Marque</label>
@@ -187,7 +187,7 @@
         <div class="field" style="margin-top:6px">
           <label class="lbl" for="lb-url">Lien complet</label>
           <div class="inline" style="gap:8px; flex-wrap:wrap">
-            <input type="text" id="lb-url" readonly spellcheck="false" style="flex:1; min-width:240px; font-family:monospace">
+            <textarea id="lb-url" class="lb-url" rows="2" readonly spellcheck="false"></textarea>
             <button type="button" class="btn btn-accent btn-sm" id="lb-save" data-ic="save">Enregistrer l'URL</button>
             <button type="button" class="btn btn-ghost btn-sm" id="lb-copy" data-ic="copy">Copier</button>
             <a class="btn btn-ghost btn-sm" id="lb-open" target="_blank" rel="noopener">Ouvrir</a>
@@ -506,7 +506,7 @@
 
           <div class="scan-inputwrap">
             <input type="text" id="scan-input" class="scan-input" autocomplete="off" autocorrect="off"
-                   autocapitalize="off" spellcheck="false" placeholder="Clique « Démarrer » puis scanne un code-barres…" disabled>
+                   autocapitalize="off" spellcheck="false" placeholder="Clique « Démarrer » puis scanne…" disabled>
           </div>
           <div class="scan-feedback" id="scan-feedback" aria-live="polite"></div>
 
@@ -1131,10 +1131,9 @@
           <div class="field" id="fx-client-field">
             <label class="lbl" for="fx-client-search">Trouver un client</label>
             <div class="fx-combo">
-              <input type="search" id="fx-client-search" placeholder="Rechercher (nom, courriel, téléphone)…" autocomplete="off">
+              <input type="search" id="fx-client-search" placeholder="Nom, courriel ou téléphone…" autocomplete="off">
               <div class="fx-combo-list" id="fx-client-results" hidden></div>
             </div>
-            <span class="hint">Choisis un client existant, ou tape un nom à droite pour en créer un nouveau.</span>
           </div>
           <div class="field">
             <label class="lbl" for="fx-cli-name">Client / entreprise</label>
@@ -1171,8 +1170,8 @@
               <input type="text" id="fx-date" placeholder="AAAA-MM-JJ" autocomplete="off">
             </div>
             <div class="field col-2">
-              <label class="lbl" for="fx-note">Note / paiement <span class="hint">(optionnel, affichée sur la facture)</span></label>
-              <input type="text" id="fx-note" placeholder="Ex. Paiement à la livraison · Interac · ramassage Québec" autocomplete="off">
+              <label class="lbl" for="fx-note">Note / paiement</label>
+              <input type="text" id="fx-note" placeholder="Ex. Interac · ramassage Québec" autocomplete="off">
             </div>
           </div>
         </details>
@@ -1181,8 +1180,8 @@
         <details class="fx-company" id="fx-company">
           <summary>Coordonnées de l'entreprise &amp; taxes <span class="hint">(mémorisées sur cet appareil)</span></summary>
           <div class="grid" style="margin-top:14px">
-            <div class="field"><label class="lbl" for="co-name">Nom</label><input type="text" id="co-name" autocomplete="off"></div>
-            <div class="field"><label class="lbl" for="co-tagline">Slogan</label><input type="text" id="co-tagline" autocomplete="off"></div>
+            <div class="field col-2"><label class="lbl" for="co-name">Nom</label><input type="text" id="co-name" autocomplete="off"></div>
+            <div class="field col-2"><label class="lbl" for="co-tagline">Slogan</label><textarea id="co-tagline" class="fx-oneline" rows="2" autocomplete="off"></textarea></div>
             <div class="field"><label class="lbl" for="co-email">Courriel</label><input type="text" id="co-email" autocomplete="off"></div>
             <div class="field"><label class="lbl" for="co-phone">Téléphone</label><input type="text" id="co-phone" autocomplete="off"></div>
             <div class="field"><label class="lbl" for="co-address">Adresse</label><input type="text" id="co-address" autocomplete="off"></div>
@@ -1375,7 +1374,7 @@
               <p class="al-caution" id="al-push-warn" role="status" hidden></p>
             </div>
 
-            <div class="al-card">
+            <div class="al-card al-batch-card">
               <div class="al-card-head"><span class="al-ic al-step">2</span> Batch <span class="al-note">calibration forcée, même si off dans Bambu</span></div>
               <div class="al-batch">
                 <label class="al-cal-bk" for="al-loops">Loops</label>
@@ -1712,13 +1711,13 @@
 <script src="assets/cms-materials.js?v=11"></script>
 <script src="assets/cms-filaments.js?v=14"></script>
 <script src="assets/cms-linkbuilder.js?v=2"></script>
-<script src="assets/cms-spacers.js?v=6"></script>
-<script src="assets/cms-accessories.js?v=4"></script>
-<script src="assets/cms-inventory.js?v=25"></script>
+<script src="assets/cms-spacers.js?v=7"></script>
+<script src="assets/cms-accessories.js?v=5"></script>
+<script src="assets/cms-inventory.js?v=26"></script>
 <script src="assets/cms-attente.js?v=3"></script>
 <script src="assets/cms-dealers.js?v=4"></script>
 <script src="assets/cms-clients.js?v=2"></script>
-<script src="assets/cms-facturation.js?v=29"></script>
+<script src="assets/cms-facturation.js?v=30"></script>
 <script src="assets/cms-historique.js?v=9"></script>
 <script src="assets/cms-commandes.js?v=2"></script>
 <script src="assets/cms-statistiques.js?v=7"></script>

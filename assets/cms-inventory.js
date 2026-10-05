@@ -314,7 +314,7 @@
     scanToggle.setAttribute('aria-pressed', String(scanActive));
     scanToggle.textContent = scanActive ? 'Réception en cours…' : 'Démarrer la réception';
     scanToggle.dataset.ic = scanActive ? 'pause' : 'scan';
-    scanInput.placeholder = scanActive ? 'En attente d\'un scan… (garde cette case active)' : 'Clique « Démarrer » puis scanne un code-barres…';
+    scanInput.placeholder = scanActive ? 'En attente d\'un scan…' : 'Clique « Démarrer » puis scanne…';
     if (scanActive) { scanInput.value = ''; focusScan(); }
     else { closeLearn(); }
   }
