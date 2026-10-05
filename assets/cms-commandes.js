@@ -147,8 +147,7 @@
     var total = rows.reduce(function (s, r) { return s + r.print; }, 0);
     printEl.innerHTML = '<section class="co-print" aria-label="À imprimer">' +
       '<div class="co-print-head">' +
-        '<div class="co-print-title"><b>À imprimer</b> · ' + plural(total, 'paire', 'paires') +
-          ' <span class="hint">commandes « Nouvelle » + « En préparation », moins le stock</span></div>' +
+        '<div class="co-print-title"><b>À imprimer</b> · ' + plural(total, 'paire', 'paires') + '</div>' +
         '<button type="button" class="btn btn-ghost btn-sm" id="co-print-copy" data-ic="copy">Copier la liste</button>' +
       '</div>' +
       '<div class="co-print-items">' + rows.map(function (r) {

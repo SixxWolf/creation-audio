@@ -202,8 +202,10 @@ main { width:100%; max-width:1280px; margin:0 auto; padding:26px clamp(16px, 2.4
 .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px 18px; }
 .field { display:flex; flex-direction:column; gap:6px; min-width:0; }
 .field.col-2 { grid-column:1 / -1; }
+/* Case seule dans une rangée de champs (« Visible en boutique ») : centrée sur le champ voisin */
+.field.field-check { justify-content:flex-end; }
+.field-check > label.lbl { min-height:43px; }
 label.lbl { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
-label.lbl .hint { text-transform:none; letter-spacing:0; font-weight:500; }
 /* Champs — style « Creusé » (oct. 2026, choisi par Théo sur planche) : le champ est
    enfoncé dans la carte (fond plus sombre + ombre intérieure) ; au focus il s'éclaire
    et prend l'anneau de la couleur d'accent. */
@@ -221,6 +223,7 @@ input:disabled, select:disabled, textarea:disabled { opacity:.55; box-shadow:non
 .unit::after { content:attr(data-unit); position:absolute; right:12px; top:50%; transform:translateY(-50%);
   font-size:.82rem; font-weight:600; color:var(--muted); pointer-events:none; }
 .unit > input { padding-right:52px; -moz-appearance:textfield; appearance:textfield; }
+.unit-sm > input { padding-right:30px; }
 .unit > input::-webkit-outer-spin-button, .unit > input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 input::placeholder, textarea::placeholder { color:var(--muted); opacity:.8; }
 input[type=checkbox], input[type=radio] { width:16px; height:16px; accent-color:var(--ember); cursor:pointer; }
@@ -229,6 +232,7 @@ textarea { min-height:60px; line-height:1.5; resize:vertical; }
 textarea.lb-url, textarea.fx-oneline { min-height:0; resize:none; field-sizing:content; overflow-wrap:anywhere; }
 textarea.lb-url { flex:1 1 100%; font-family:monospace; }
 .hint { font-size:.76rem; line-height:1.45; color:var(--muted); }
+.hint:empty { display:none; }
 .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .row-2 > div { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .inline { display:flex; align-items:center; gap:9px; }
@@ -279,6 +283,12 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .spec-row { display:flex; align-items:center; gap:8px; }
 .spec-row .spec-k { width:38%; min-width:120px; }
 .spec-row .spec-v { flex:1; min-width:100px; }
+/* Étroit : nom de la spec (+ ✕) sur une ligne, valeur dessous — sinon « Température de buse » est coupé */
+@media (max-width:560px) {
+  .spec-row { display:grid; grid-template-columns:minmax(0, 1fr) 32px; padding-bottom:8px; border-bottom:1px dashed var(--line-2); }
+  .spec-row .spec-k, .spec-row .spec-v { width:auto; min-width:0; grid-column:1; }
+  .spec-row .spec-del { grid-column:2; grid-row:1; }
+}
 .tier-del, .spec-del { display:grid; place-items:center; width:32px; height:32px; flex:none; padding:0; font-size:1rem; line-height:1;
   color:var(--muted); cursor:pointer; background:none; border:none; border-radius:8px; }
 .tier-del:hover, .spec-del:hover { color:var(--bad); background:var(--bad-wash); }
@@ -472,13 +482,6 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
   .mat-row.person .mat-actions { flex-basis:100%; justify-content:flex-end; }
 }
 
-/* Encadré d'information (ex. rappel du portail dealer) */
-.callout { display:flex; align-items:flex-start; gap:12px; margin-bottom:16px; padding:14px 16px; font-size:.9rem; line-height:1.55;
-  color:var(--ink-2); background:color-mix(in srgb, var(--ember) 6%, var(--paper)); border:1px solid color-mix(in srgb, var(--ember) 28%, var(--line));
-  border-radius:14px; }
-.callout svg { width:20px; height:20px; flex:none; margin-top:1px; fill:none; stroke:var(--ember-ink); stroke-width:2; stroke-linecap:round; }
-.callout p { margin:0; }
-.callout b { color:var(--ink); }
 
 /* =========================================================
    CONNEXION
@@ -625,7 +628,6 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .rcp-pricebar-lbl { margin-right:4px; font-size:.86rem; font-weight:700; }
 .rcp-pricebar select { width:auto; min-width:150px; }
 .rcp-pricebar #r-disc-val { width:110px; text-align:right; }
-.rcp-pricebar .hint { flex-basis:100%; }
 .rcp-table-wrap { margin-top:16px; }
 .rcp-table-wrap > .hint { margin:0; padding:16px; text-align:center; }
 .rcp-table .rcp-qty { width:90px; text-align:right; }
@@ -913,7 +915,6 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .co-print-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px; }
 .co-print-title { font-size:.95rem; }
 .co-print-title b { font-family:var(--display); font-size:1.05rem; color:var(--ember-ink); }
-.co-print-title .hint { margin-left:6px; }
 .co-print-items { display:flex; flex-wrap:wrap; gap:8px; }
 .co-print-item { display:inline-flex; align-items:baseline; gap:6px; padding:6px 12px; font-size:.9rem; font-variant-numeric:tabular-nums;
   background:var(--paper); border:1px solid var(--line); border-radius:10px; }

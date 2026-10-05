@@ -391,7 +391,7 @@ window.CA = window.CA || {};
     }
     listEl.innerHTML = list.map(function (m) {
       var hasS = m.sell_spool != null, hasR = m.sell_refill != null;
-      var tag = hasS && hasR ? '' : (hasS ? ' <span class="hint">(bobine seulement)</span>' : ' <span class="hint">(recharge seulement)</span>');
+      var tag = hasS && hasR ? '' : (hasS ? ' <span class="hint">· bobine seulement</span>' : ' <span class="hint">· recharge seulement</span>');
       var ts = tiersSummary(m.tiers_spool), tr = tiersSummary(m.tiers_refill);
       return '<article class="mat-row" id="mat-' + slug(m.name) + '" data-name="' + esc(m.name) + '" draggable="true">' +
         '<span class="mat-drag" title="Glisser pour réordonner">⠿</span>' +

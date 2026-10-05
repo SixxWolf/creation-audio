@@ -316,7 +316,7 @@
   /* ---------- ajout manuel ---------- */
   var addForm = $('#wl-add-form'), addProd = $('#wl-add-prod'), addKind = $('#wl-add-kind'),
       addName = $('#wl-add-name'), addSource = $('#wl-add-source'), addContact = $('#wl-add-contact'),
-      addSave = $('#wl-add-save'), addStatus = $('#wl-add-status'), addHint = $('#wl-add-contact-hint');
+      addSave = $('#wl-add-save'), addStatus = $('#wl-add-status'), addHint = $('#wl-add-contact-lbl');
   function fillProdSelect() {
     if (!addProd) return;
     var cur = addProd.value;
@@ -337,7 +337,7 @@
     if (addKind) addKind.disabled = !!(p && p.type !== 'filament');
     var site = addSource && addSource.value === 'site';
     if (addContact) { addContact.type = site ? 'email' : 'text'; addContact.placeholder = site ? 'courriel@exemple.com' : 'Messenger, téléphone…'; addContact.required = site; }
-    if (addHint) addHint.textContent = site ? '(courriel requis)' : '(facultatif)';
+    if (addHint) addHint.textContent = site ? 'Courriel' : 'Contact';
   }
   if (addProd) addProd.addEventListener('change', syncAddForm);
   if (addSource) addSource.addEventListener('change', syncAddForm);

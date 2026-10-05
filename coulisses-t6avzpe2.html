@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=50">
+<link rel="stylesheet" href="assets/admin.css?v=51">
 <link rel="stylesheet" href="assets/facture.css?v=19">
 <link rel="stylesheet" href="assets/autoloop.css?v=26">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
@@ -148,9 +148,7 @@
 
       <!-- ===== GÉNÉRATEUR DE LIEN BOUTIQUE ===== -->
       <details class="editor" id="lb-panel" style="margin-bottom:18px">
-        <summary style="cursor:pointer; font-weight:700; list-style:none">🔗 Générateur de lien boutique
-          <span class="hint" style="font-weight:400">— choisis marque → matériau → couleur, copie le lien.</span>
-        </summary>
+        <summary style="cursor:pointer; font-weight:700; list-style:none">🔗 Générateur de lien boutique</summary>
         <div class="grid" style="margin-top:14px">
           <div class="field">
             <label class="lbl" for="lb-brand">Marque</label>
@@ -192,7 +190,7 @@
             <button type="button" class="btn btn-ghost btn-sm" id="lb-copy" data-ic="copy">Copier</button>
             <a class="btn btn-ghost btn-sm" id="lb-open" target="_blank" rel="noopener">Ouvrir</a>
           </div>
-          <span class="hint" id="lb-status">Modifie un segment ci-dessus puis « Enregistrer l'URL ».</span>
+          <span class="hint" id="lb-status" aria-live="polite"></span>
         </div>
       </details>
 
@@ -215,12 +213,10 @@
             <div class="field">
               <label class="lbl" for="m-name">Nom du matériau</label>
               <input type="text" id="m-name" placeholder="PLA Basic" autocomplete="off">
-              <span class="hint">Ex. « PLA Basic ». Doit correspondre exactement au matériau choisi sur les filaments.</span>
             </div>
             <div class="field">
-              <label class="lbl" for="m-slug">URL (matériau) <span class="hint">(optionnel)</span></label>
+              <label class="lbl" for="m-slug">URL (matériau)</label>
               <input type="text" id="m-slug" placeholder="auto : pla-basic" autocomplete="off" spellcheck="false">
-              <span class="hint">Segment du lien boutique. Vide = généré depuis le nom.</span>
             </div>
             <div class="field">
               <label class="lbl">Formats vendus</label>
@@ -228,7 +224,6 @@
                 <label class="inline" style="gap:7px"><input type="checkbox" id="m-has-spool" style="width:auto"> Avec bobine</label>
                 <label class="inline" style="gap:7px"><input type="checkbox" id="m-has-refill" style="width:auto"> Recharge</label>
               </div>
-              <span class="hint">Coche au moins un format.</span>
             </div>
 
             <div class="field">
@@ -244,25 +239,20 @@
                 </div>
               </div>
             </div>
-            <div class="field col-2">
-              <span class="hint">Le coût (prix catalogue) se règle dans l'onglet <b>Inventaire → À commander</b>, puis s'ajuste automatiquement à chaque réception (coût moyen pondéré).</span>
-            </div>
 
             <div class="field col-2">
-              <label class="lbl" for="m-desc">Caractéristiques <span class="hint">(affichées en boutique)</span></label>
+              <label class="lbl" for="m-desc">Caractéristiques</label>
               <textarea id="m-desc" rows="6" placeholder="Une caractéristique par ligne, ex :&#10;Facile à imprimer — idéal pour débuter&#10;Faibles émissions en intérieur&#10;Compatible avec tous les AMS&#10;Ø 1,75 mm ± 0,03 mm"></textarea>
-              <span class="hint">Chaque ligne devient un point dans la liste « Caractéristiques » de la boutique.</span>
             </div>
 
             <!-- Image vitrine du matériau (E4) -->
             <div class="field col-2">
-              <label class="lbl">Image vitrine <span class="hint">(optionnel — la tuile du matériau en boutique)</span></label>
+              <label class="lbl">Image vitrine</label>
               <div class="drop" id="m-drop">
                 <img id="m-preview" alt="" hidden>
                 <span class="drop-hint" id="m-drop-hint">Clique pour choisir une image (JPG/PNG).</span>
               </div>
               <input type="file" id="m-file" accept="image/*" hidden>
-              <span class="hint">Sans image, la boutique choisit automatiquement une couleur représentative.</span>
             </div>
 
             <!-- Paliers — Bobine -->
@@ -283,27 +273,26 @@
                  (galerie de prints → description → specs ; nuancier auto)
                  ============================================================ -->
             <div class="field col-2 fiche-sep">
-              <h3 class="fiche-title">Fiche détaillée <span class="hint">(bas de la page filament — commune à toutes les couleurs)</span></h3>
+              <h3 class="fiche-title">Fiche détaillée</h3>
             </div>
 
             <!-- Galerie « prints » -->
             <div class="field col-2">
-              <label class="lbl">Galerie « Imprimé avec ce filament » <span class="hint">(tes photos — la 1re est mise en avant)</span></label>
+              <label class="lbl">Galerie « Imprimé avec ce filament »</label>
               <div class="gallery-grid" id="m-gallery"></div>
               <div><button type="button" class="btn btn-ghost btn-sm" id="m-gallery-add" data-ic="plus">Ajouter des photos</button></div>
               <input type="file" id="m-gallery-file" accept="image/*" multiple hidden>
-              <span class="hint">Glisse les vignettes pour réordonner. Clique ✕ pour retirer une photo.</span>
             </div>
 
             <!-- Description longue -->
             <div class="field col-2">
-              <label class="lbl" for="m-long-desc">Description longue <span class="hint">(un paragraphe par ligne vide)</span></label>
+              <label class="lbl" for="m-long-desc">Description longue</label>
               <textarea id="m-long-desc" rows="5" placeholder="Le PLA Basic, c'est le filament passe-partout : facile à imprimer, sans odeur…&#10;&#10;Fini mat-satiné, couleurs franches. Idéal pour la déco, les prototypes, les figurines…"></textarea>
             </div>
 
             <!-- Specs libres -->
             <div class="field col-2">
-              <label class="lbl">Spécifications techniques <span class="hint">(autant que tu veux)</span></label>
+              <label class="lbl">Spécifications techniques</label>
               <div class="specs" id="m-specs"></div>
               <div><button type="button" class="btn btn-ghost btn-sm" id="m-spec-add" data-ic="plus">Ajouter une spec</button></div>
             </div>
@@ -342,24 +331,21 @@
           <div class="field">
             <label class="lbl" for="f-material">Matériau</label>
             <select id="f-material"></select>
-            <span class="hint" id="f-material-hint">Le prix et les rabais viennent du matériau.</span>
           </div>
 
           <div class="field">
-            <label class="lbl" for="f-code">Code Bambu <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="f-code">Code Bambu</label>
             <input type="text" id="f-code" placeholder="Ex. 10100" autocomplete="off" inputmode="numeric">
-            <span class="hint">Sert au rattachement automatique en réception de commande.</span>
           </div>
           <div class="field">
-            <label class="lbl" for="f-slug">URL (couleur) <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="f-slug">URL (couleur)</label>
             <input type="text" id="f-slug" placeholder="auto : rouge-galaxie" autocomplete="off" spellcheck="false">
-            <span class="hint">Dernier segment du lien boutique. Vide = généré depuis le nom. Les tirets/minuscules sont appliqués automatiquement.</span>
           </div>
           <div class="field col-2">
             <label class="lbl inline" style="gap:12px; justify-content:space-between; flex-wrap:wrap">
               <span>Couleur (pastille)</span>
               <span class="inline" style="gap:7px; font-weight:600">
-                <input type="checkbox" id="f-multi" style="width:auto"> Multi-colore (bi/tri-colore)
+                <input type="checkbox" id="f-multi" style="width:auto"> Multicolore
               </span>
             </label>
             <!-- mono : une seule couleur -->
@@ -377,7 +363,6 @@
                   <span id="f-colors-preview" class="swatch" style="border-radius:50%"></span>
                 </span>
               </div>
-              <span class="hint">La pastille est découpée en parts égales (moitié-moitié pour deux couleurs). Minimum deux couleurs.</span>
             </div>
           </div>
           <div class="field">
@@ -403,22 +388,22 @@
           <!-- Images par format (optionnel) : affichées dynamiquement en boutique
                selon le format choisi (recharge / avec bobine). Repli = image principale. -->
           <div class="field col-2">
-            <label class="lbl">Images par format <span class="hint">(optionnel — sinon l'image principale est utilisée)</span></label>
+            <label class="lbl">Images par format</label>
             <div class="row-2">
               <div id="f-img-refill-wrap">
-                <span class="hint">Quand « Recharge » est sélectionnée</span>
+                <span class="hint">Recharge</span>
                 <div class="drop" id="f-drop-refill">
                   <img id="f-preview-refill" alt="" hidden>
-                  <span class="drop-hint" id="f-drop-hint-refill">Image recharge (optionnel)</span>
+                  <span class="drop-hint" id="f-drop-hint-refill">Image recharge</span>
                 </div>
                 <input type="file" id="f-file-refill" accept="image/*" hidden>
                 <button type="button" class="btn btn-ghost btn-sm" id="f-img-refill-clear" hidden>Retirer</button>
               </div>
               <div id="f-img-spool-wrap">
-                <span class="hint">Quand « Avec bobine » est sélectionnée</span>
+                <span class="hint">Avec bobine</span>
                 <div class="drop" id="f-drop-spool">
                   <img id="f-preview-spool" alt="" hidden>
-                  <span class="drop-hint" id="f-drop-hint-spool">Image avec bobine (optionnel)</span>
+                  <span class="drop-hint" id="f-drop-hint-spool">Image avec bobine</span>
                 </div>
                 <input type="file" id="f-file-spool" accept="image/*" hidden>
                 <button type="button" class="btn btn-ghost btn-sm" id="f-img-spool-clear" hidden>Retirer</button>
@@ -433,7 +418,6 @@
               <label class="inline" style="gap:7px"><input type="checkbox" id="f-offer-spool" style="width:auto"> Avec bobine</label>
               <label class="inline" style="gap:7px"><input type="checkbox" id="f-offer-refill" style="width:auto"> Recharge</label>
             </div>
-            <span class="hint" id="f-offer-hint">Décoche un format si cette couleur n'existe pas dans ce format (ex. certaines couleurs uniquement en recharge). Limité aux formats proposés par le matériau.</span>
           </div>
 
           <!-- Prix hérité (lecture seule, informatif) -->
@@ -455,11 +439,10 @@
               </div>
             </div>
           </div>
-          <div class="field">
+          <div class="field field-check">
             <label class="lbl inline" style="gap:8px">
               <input type="checkbox" id="f-active" checked style="width:auto"> Visible en boutique
             </label>
-            <span class="hint">Décoche pour masquer sans supprimer.</span>
           </div>
         </div>
 
@@ -515,7 +498,6 @@
             <div class="scan-learn-head">
               <span>Code-barres inconnu&nbsp;: <code id="scan-learn-code"></code></span>
             </div>
-            <p class="hint">Associe-le une seule fois — il sera mémorisé pour les prochains scans.</p>
             <div class="scan-learn-row">
               <select id="scan-learn-fil" class="scan-learn-fil"></select>
               <select id="scan-learn-kind" class="scan-learn-kind">
@@ -536,7 +518,7 @@
           <h2 id="r-editor-title">Nouvelle réception</h2>
           <div class="grid">
             <div class="field">
-              <label class="lbl" for="r-order">N° de commande Bambu <span class="hint">(optionnel)</span></label>
+              <label class="lbl" for="r-order">N° de commande Bambu</label>
               <input type="text" id="r-order" placeholder="Ex. US2409..." autocomplete="off">
             </div>
             <div class="field">
@@ -555,7 +537,6 @@
             <input type="number" id="r-disc-val" class="num" min="0" step="0.01" placeholder="0" aria-label="Valeur">
             <button type="button" class="btn btn-ghost btn-sm" id="r-disc-apply">Appliquer à toutes les lignes</button>
             <button type="button" class="btn btn-ghost btn-sm" id="r-disc-reset">Prix catalogue</button>
-            <span class="hint">Vide = tu as payé le prix catalogue. Chaque ligne reste ajustable.</span>
           </div>
 
           <!-- Tableau de confirmation (rempli par les scans, corrigeable) -->
@@ -566,7 +547,7 @@
               </thead>
               <tbody id="r-rows"></tbody>
             </table>
-            <p class="hint" id="r-empty-hint">Rien pour l'instant. Démarre la réception et scanne tes bobines, ou ajoute une ligne à la main.</p>
+            <p class="hint" id="r-empty-hint">Aucun article scanné.</p>
           </div>
 
           <!-- Saisie manuelle (repli sans scanner) -->
@@ -608,7 +589,7 @@
         <div class="panel-head" style="margin-top:22px">
           <div>
             <h1 style="font-size:1.1rem">Cibles de stock</h1>
-            <p class="muted">Fixe la quantité à garder en tout temps pour chaque format. Le manque se calcule tout seul.</p>
+            <p class="muted">Quantité à garder en tout temps, par format.</p>
           </div>
           <span class="grow"></span>
           <label class="fx-check" style="margin-right:6px"><input type="checkbox" id="reorder-onlymiss"> Manques seulement</label>
@@ -633,7 +614,7 @@
         <div class="panel-head" style="margin-top:4px">
           <div>
             <h1 style="font-size:1.1rem">Prix catalogue</h1>
-            <p class="muted">Le <b>coût de base</b> de chaque matériau (bobine / recharge). C'est la référence du rabais&nbsp;% à la réception, avant que le coût moyen pondéré prenne le relais.</p>
+            <p class="muted">Coût de base de chaque matériau.</p>
           </div>
           <span class="grow"></span>
           <label class="reorder-flabel">Marque
@@ -650,7 +631,6 @@
           <button class="btn btn-accent btn-sm" id="catalog-apply" type="button">Appliquer</button>
           <span class="cb-status" id="catalog-status" aria-live="polite"></span>
         </div>
-        <p class="hint" style="margin:2px 0 10px">Laisse un champ vide pour ne pas toucher ce format. Chaque prix se modifie aussi directement dans le tableau.</p>
 
         <div id="catalog-body"></div>
       </div>
@@ -660,7 +640,7 @@
         <div class="panel-head" style="margin-top:4px">
           <div>
             <h1 style="font-size:1.1rem">Codes-barres associés</h1>
-            <p class="muted">Chaque code scanné et le filament (+ format) ou l'accessoire auquel il est rattaché. Corrige ou supprime au besoin.</p>
+            <p class="muted">Chaque code scanné et l'article rattaché.</p>
           </div>
           <span class="grow"></span>
           <button class="btn btn-ghost btn-sm" id="bc-add" type="button" data-ic="plus">Associer un code</button>
@@ -687,7 +667,7 @@
         <div class="panel-head">
           <div>
             <h1 style="font-size:1.1rem">Liste d'attente</h1>
-            <p class="muted">Qui attend quel produit. Demandes du site = courriel envoyé automatiquement ; Marketplace = message prêt à copier. Les coordonnées sont effacées après l'avis ou après 60 jours.</p>
+            <p class="muted">Qui attend quel produit.</p>
           </div>
           <span class="grow"></span>
           <button class="btn btn-ghost btn-sm" id="wl-refresh" type="button" data-ic="refresh">Actualiser</button>
@@ -710,7 +690,7 @@
                 <option value="autre">Autre</option>
                 <option value="site">Courriel (auto)</option>
               </select></label>
-            <label class="field wl-f-contact"><span>Contact <small class="muted" id="wl-add-contact-hint">(facultatif)</small></span><input type="text" id="wl-add-contact" maxlength="254" placeholder="Messenger, téléphone…"></label>
+            <label class="field wl-f-contact"><span id="wl-add-contact-lbl">Contact</span><input type="text" id="wl-add-contact" maxlength="254" placeholder="Messenger, téléphone…"></label>
             <div class="wl-add-actions">
               <button type="submit" class="btn btn-accent btn-sm" id="wl-add-save" data-ic="plus">Ajouter</button>
               <span class="hint" id="wl-add-status"></span>
@@ -743,21 +723,20 @@
             <label class="lbl" for="sp-name">Nom</label>
             <input type="text" id="sp-name" placeholder="Ex. Adaptateur 6x9 → 6.5" autocomplete="off">
           </div>
-          <div class="field">
+          <div class="field field-check">
             <label class="lbl inline" style="gap:8px">
               <input type="checkbox" id="sp-active" checked style="width:auto"> Visible en boutique
             </label>
-            <span class="hint">Décoche pour masquer sans supprimer.</span>
           </div>
 
           <div class="field col-2">
-            <label class="lbl" for="sp-desc">Résumé <span class="hint">(sous le nom, sur la carte et la fiche)</span></label>
+            <label class="lbl" for="sp-desc">Résumé</label>
             <textarea id="sp-desc" rows="2" placeholder="Ex. Honda 2006-2011 · 6,5&quot; — la compatibilité détaillée va plus bas"></textarea>
           </div>
 
           <!-- Photos (la 1re = photo principale : carte, panier, facture) -->
           <div class="field col-2">
-            <label class="lbl">Photos <span class="hint">(la 1re est la photo principale — glisse pour réordonner)</span></label>
+            <label class="lbl">Photos</label>
             <div class="gallery-grid" id="sp-gallery"></div>
             <div><button type="button" class="btn btn-ghost btn-sm" id="sp-gallery-add" data-ic="plus">Ajouter des photos</button></div>
             <input type="file" id="sp-file" accept="image/*" multiple hidden>
@@ -765,19 +744,17 @@
 
           <!-- Prix CLIENT (public) -->
           <div class="field">
-            <label class="lbl" for="sp-price">Prix client <span class="hint">(public · par paire)</span></label>
+            <label class="lbl" for="sp-price">Prix client / paire</label>
             <input type="number" id="sp-price" min="0" step="0.01" placeholder="19.99" class="money">
-            <span class="hint">Affiché sur le site, à plat (sans rabais quantité).</span>
           </div>
           <!-- Prix DEALER (portail privé) -->
           <div class="field">
-            <label class="lbl" for="sp-dealer-price">Prix dealer <span class="hint">(dealer · par paire)</span></label>
+            <label class="lbl" for="sp-dealer-price">Prix dealer / paire</label>
             <input type="number" id="sp-dealer-price" min="0" step="0.01" placeholder="16.99" class="money">
-            <span class="hint">Visible uniquement dans le portail dealer.</span>
           </div>
 
           <div class="field">
-            <label class="lbl" for="sp-cost">Coût payé <span class="hint">(privé)</span></label>
+            <label class="lbl" for="sp-cost">Coût payé</label>
             <input type="number" id="sp-cost" min="0" step="0.01" placeholder="0.00" class="money">
           </div>
           <div class="field">
@@ -794,34 +771,33 @@
 
           <!-- Paliers de rabais DEALER uniquement -->
           <div class="field col-2">
-            <label class="lbl">Rabais quantité — dealer <span class="hint">(par paires)</span></label>
+            <label class="lbl">Rabais quantité — dealer</label>
             <div class="tiers" id="sp-tiers"></div>
             <div><button type="button" class="btn btn-ghost btn-sm" id="sp-tier-add" data-ic="plus">Ajouter un palier</button></div>
-            <span class="hint">S'applique uniquement au prix dealer (portail + facture dealer).</span>
           </div>
 
           <!-- ============================================================
                FICHE DÉTAILLÉE — page du spacer (spacers.html + portail dealer)
                ============================================================ -->
           <div class="field col-2 fiche-sep">
-            <h3 class="fiche-title">Fiche détaillée <span class="hint">(page du spacer sur le site et le portail dealer)</span></h3>
+            <h3 class="fiche-title">Fiche détaillée</h3>
           </div>
 
           <div class="field">
-            <label class="lbl" for="sp-size">Taille du haut-parleur <span class="hint">(puces de filtre)</span></label>
+            <label class="lbl" for="sp-size">Taille du haut-parleur</label>
             <input type="text" id="sp-size" list="sp-size-list" placeholder="6,5&quot;" autocomplete="off">
             <datalist id="sp-size-list">
               <option value="4&quot;"><option value="5,25&quot;"><option value="6,5&quot;"><option value="6×8"><option value="6×9"><option value="8&quot;"><option value="Tweeter">
             </datalist>
           </div>
-          <div class="field">
-            <label class="lbl">Voir la fiche <span class="hint">(nouvel onglet)</span></label>
-            <div class="sp-fiche-links" id="sp-fiche-links"><span class="hint">Enregistre le spacer pour obtenir ses liens.</span></div>
+          <div class="field" id="sp-fiche-field" hidden>
+            <label class="lbl">Voir la fiche</label>
+            <div class="sp-fiche-links" id="sp-fiche-links"></div>
           </div>
 
           <!-- Compatibilité véhicules -->
           <div class="field col-2">
-            <label class="lbl">Compatibilité véhicules <span class="hint">(une ligne par véhicule — sert à la recherche « civic 2008 »)</span></label>
+            <label class="lbl">Compatibilité véhicules</label>
             <div class="fit-rows" id="sp-fit"></div>
             <div><button type="button" class="btn btn-ghost btn-sm" id="sp-fit-add" data-ic="plus">Ajouter un véhicule</button></div>
             <datalist id="sp-make-list"></datalist>
@@ -832,13 +808,13 @@
 
           <!-- Description longue -->
           <div class="field col-2">
-            <label class="lbl" for="sp-long-desc">Description <span class="hint">(onglet Description — un paragraphe par ligne vide)</span></label>
+            <label class="lbl" for="sp-long-desc">Description</label>
             <textarea id="sp-long-desc" rows="4" placeholder="Adaptateur direct pour installer un 6,5&quot; à la place de l'origine, sans couper.&#10;&#10;Imprimé en PETG : résiste à la chaleur et à l'humidité des portières."></textarea>
           </div>
 
           <!-- Specs libres -->
           <div class="field col-2">
-            <label class="lbl">Spécifications <span class="hint">(ex. Matériau · PETG, Épaisseur · 12 mm, Visserie · incluse)</span></label>
+            <label class="lbl">Spécifications</label>
             <div class="specs" id="sp-specs"></div>
             <div><button type="button" class="btn btn-ghost btn-sm" id="sp-spec-add" data-ic="plus">Ajouter une spec</button></div>
           </div>
@@ -960,7 +936,7 @@
       <div class="panel-head">
         <div>
           <h1>Dealers</h1>
-          <p class="muted">Comptes autorisés au <b>portail dealer</b> (prix de gros + rabais quantité sur les spacers).</p>
+          <p class="muted">Comptes autorisés au portail dealer.</p>
         </div>
         <span class="grow"></span>
         <button class="btn btn-ghost btn-sm" id="dl-refresh" type="button" data-ic="refresh">Actualiser</button>
@@ -971,24 +947,23 @@
         <h2 id="dl-editor-title">Nouveau dealer</h2>
         <div class="grid">
           <div class="field">
-            <label class="lbl" for="dl-email">Courriel du compte</label>
+            <label class="lbl" for="dl-email">Courriel du compte Supabase</label>
             <input type="text" id="dl-email" placeholder="dealer@example.com" autocomplete="off" inputmode="email">
-            <span class="hint">Doit correspondre exactement au compte Supabase que tu as créé pour ce dealer.</span>
           </div>
           <div class="field">
-            <label class="lbl" for="dl-name">Nom / entreprise <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="dl-name">Nom / entreprise</label>
             <input type="text" id="dl-name" placeholder="Nom du dealer ou de son entreprise" autocomplete="off">
           </div>
           <div class="field">
-            <label class="lbl" for="dl-phone">Téléphone <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="dl-phone">Téléphone</label>
             <input type="text" id="dl-phone" placeholder="418 555-1234" autocomplete="off">
           </div>
           <div class="field">
-            <label class="lbl" for="dl-address">Adresse <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="dl-address">Adresse</label>
             <input type="text" id="dl-address" placeholder="123 rue Exemple" autocomplete="off">
           </div>
           <div class="field">
-            <label class="lbl" for="dl-city">Ville, code postal <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="dl-city">Ville, code postal</label>
             <input type="text" id="dl-city" placeholder="Québec, QC  G1A 1A1" autocomplete="off">
           </div>
         </div>
@@ -999,12 +974,6 @@
         </div>
       </form>
 
-      <div class="callout">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
-        <p><b>Rappel.</b> Le dealer se connecte sur <b>dealer.html</b> avec son compte. Il y voit les spacers
-        au <b>prix dealer</b> (avec rabais quantité) et son stock. Les autres visiteurs ne voient jamais ces prix.</p>
-      </div>
-
       <div id="dl-list" class="mat-rows"><p class="muted">Chargement…</p></div>
     </section>
 
@@ -1013,7 +982,7 @@
       <div class="panel-head">
         <div>
           <h1>Clients</h1>
-          <p class="muted">Ton carnet de clients pour la facturation (nom, courriel, téléphone). Ils sont resuggérés dans la facture, et chaque facture enregistrée mémorise son client ici.</p>
+          <p class="muted">Ton carnet de clients pour la facturation.</p>
         </div>
         <span class="grow"></span>
         <button class="btn btn-ghost btn-sm" id="cl-refresh" type="button" data-ic="refresh">Actualiser</button>
@@ -1028,19 +997,19 @@
             <input type="text" id="cl-name" placeholder="Nom ou raison sociale" autocomplete="off">
           </div>
           <div class="field">
-            <label class="lbl" for="cl-email">Courriel <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="cl-email">Courriel</label>
             <input type="text" id="cl-email" placeholder="client@example.com" autocomplete="off" inputmode="email">
           </div>
           <div class="field">
-            <label class="lbl" for="cl-phone">Téléphone <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="cl-phone">Téléphone</label>
             <input type="text" id="cl-phone" placeholder="418 555-1234" autocomplete="off">
           </div>
           <div class="field">
-            <label class="lbl" for="cl-address">Adresse <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="cl-address">Adresse</label>
             <input type="text" id="cl-address" placeholder="123 rue Exemple" autocomplete="off">
           </div>
           <div class="field">
-            <label class="lbl" for="cl-city">Ville, code postal <span class="hint">(optionnel)</span></label>
+            <label class="lbl" for="cl-city">Ville, code postal</label>
             <input type="text" id="cl-city" placeholder="Québec, QC  G1A 1A1" autocomplete="off">
           </div>
         </div>
@@ -1060,7 +1029,7 @@
       <div class="panel-head">
         <div>
           <h1>Commandes dealer</h1>
-          <p class="muted">Envoyées depuis le portail dealer. Passe-les « En préparation » (le dealer ne peut plus les modifier), puis « Facturer » : la facture s'ouvre déjà remplie.</p>
+          <p class="muted">Envoyées depuis le portail dealer.</p>
         </div>
         <span class="grow"></span>
         <div class="fx-seg" role="group" aria-label="Filtre des commandes">
@@ -1126,7 +1095,6 @@
           <div class="field" id="fx-dealer-field" hidden>
             <label class="lbl" for="fx-dealer-select">Dealer</label>
             <select id="fx-dealer-select"><option value="">— choisir un dealer —</option></select>
-            <span class="hint">Gérés dans l'onglet Dealers · les prix dealer s'appliquent.</span>
           </div>
           <div class="field" id="fx-client-field">
             <label class="lbl" for="fx-client-search">Trouver un client</label>
@@ -1143,26 +1111,26 @@
 
         <!-- Détails client + facture (repliable, rarement utilisés) -->
         <details class="fx-company fx-details" id="fx-details">
-          <summary>Coordonnées du client, n° de facture &amp; note <span class="hint">(courriel, téléphone, adresse, date…)</span></summary>
+          <summary>Coordonnées du client, n° de facture &amp; note</summary>
           <div class="grid" style="margin-top:14px">
             <div class="field">
-              <label class="lbl" for="fx-cli-email">Courriel <span class="hint">(optionnel)</span></label>
+              <label class="lbl" for="fx-cli-email">Courriel</label>
               <input type="text" id="fx-cli-email" placeholder="client@example.com" autocomplete="off" inputmode="email">
             </div>
             <div class="field">
-              <label class="lbl" for="fx-cli-phone">Téléphone <span class="hint">(optionnel)</span></label>
+              <label class="lbl" for="fx-cli-phone">Téléphone</label>
               <input type="text" id="fx-cli-phone" placeholder="418 555-1234" autocomplete="off">
             </div>
             <div class="field">
-              <label class="lbl" for="fx-cli-address">Adresse <span class="hint">(optionnel)</span></label>
+              <label class="lbl" for="fx-cli-address">Adresse</label>
               <input type="text" id="fx-cli-address" placeholder="123 rue Exemple" autocomplete="off">
             </div>
             <div class="field">
-              <label class="lbl" for="fx-cli-city">Ville, code postal <span class="hint">(optionnel)</span></label>
+              <label class="lbl" for="fx-cli-city">Ville, code postal</label>
               <input type="text" id="fx-cli-city" placeholder="Québec, QC  G1A 1A1" autocomplete="off">
             </div>
             <div class="field">
-              <label class="lbl" for="fx-number">N° de facture <span class="hint">(auto — modifiable)</span></label>
+              <label class="lbl" for="fx-number">N° de facture</label>
               <input type="text" id="fx-number" placeholder="F-2026-001" autocomplete="off">
             </div>
             <div class="field">
@@ -1178,7 +1146,7 @@
 
         <!-- Entreprise (repliable) -->
         <details class="fx-company" id="fx-company">
-          <summary>Coordonnées de l'entreprise &amp; taxes <span class="hint">(mémorisées sur cet appareil)</span></summary>
+          <summary>Coordonnées de l'entreprise &amp; taxes</summary>
           <div class="grid" style="margin-top:14px">
             <div class="field col-2"><label class="lbl" for="co-name">Nom</label><input type="text" id="co-name" autocomplete="off"></div>
             <div class="field col-2"><label class="lbl" for="co-tagline">Slogan</label><textarea id="co-tagline" class="fx-oneline" rows="2" autocomplete="off"></textarea></div>
@@ -1187,17 +1155,17 @@
             <div class="field"><label class="lbl" for="co-address">Adresse</label><input type="text" id="co-address" autocomplete="off"></div>
             <div class="field"><label class="lbl" for="co-city">Ville</label><input type="text" id="co-city" autocomplete="off"></div>
             <div class="field">
-              <label class="lbl">N° de taxes <span class="hint">(TPS · TVQ)</span></label>
+              <label class="lbl" for="co-gst">N° TPS · TVQ</label>
               <div class="row-2">
-                <input type="text" id="co-gst" placeholder="TPS" autocomplete="off">
-                <input type="text" id="co-qst" placeholder="TVQ" autocomplete="off">
+                <input type="text" id="co-gst" placeholder="TPS" aria-label="N° TPS" autocomplete="off">
+                <input type="text" id="co-qst" placeholder="TVQ" aria-label="N° TVQ" autocomplete="off">
               </div>
             </div>
             <div class="field">
-              <label class="lbl">Taux (%) <span class="hint">TPS · TVQ</span></label>
+              <label class="lbl" for="gst-rate">Taux TPS · TVQ</label>
               <div class="row-2">
-                <input type="number" id="gst-rate" step="0.001" placeholder="5">
-                <input type="number" id="qst-rate" step="0.001" placeholder="9.975">
+                <span class="unit unit-sm" data-unit="%"><input type="number" id="gst-rate" step="0.001" placeholder="5" aria-label="Taux TPS"></span>
+                <span class="unit unit-sm" data-unit="%"><input type="number" id="qst-rate" step="0.001" placeholder="9.975" aria-label="Taux TVQ"></span>
               </div>
             </div>
             <div class="field col-2">
@@ -1219,8 +1187,7 @@
       <!-- Scanner toujours à l'écoute : ce panneau n'apparaît que pour associer un code inconnu -->
       <div class="fx-pos no-print" id="fx-pos" hidden>
         <div class="fx-scan-learn" id="fx-scan-learn" hidden>
-          <div class="fx-scan-learn-head">Code-barres inconnu&nbsp;: <code id="fx-scan-learn-code"></code>
-            <span class="hint">— associe-le une fois, il sera mémorisé.</span></div>
+          <div class="fx-scan-learn-head">Code-barres inconnu&nbsp;: <code id="fx-scan-learn-code"></code></div>
           <div class="fx-scan-learn-row">
             <select id="fx-scan-learn-fil" class="fx-scan-learn-fil"></select>
             <select id="fx-scan-learn-kind" class="fx-scan-learn-kind">
@@ -1708,18 +1675,18 @@
 <script src="assets/cms-securite.js?v=1"></script>
 <script src="assets/cms-costing.js?v=2"></script>
 <script src="assets/cms-brands.js?v=5"></script>
-<script src="assets/cms-materials.js?v=11"></script>
+<script src="assets/cms-materials.js?v=12"></script>
 <script src="assets/cms-filaments.js?v=14"></script>
-<script src="assets/cms-linkbuilder.js?v=2"></script>
-<script src="assets/cms-spacers.js?v=7"></script>
+<script src="assets/cms-linkbuilder.js?v=3"></script>
+<script src="assets/cms-spacers.js?v=8"></script>
 <script src="assets/cms-accessories.js?v=5"></script>
-<script src="assets/cms-inventory.js?v=26"></script>
-<script src="assets/cms-attente.js?v=3"></script>
+<script src="assets/cms-inventory.js?v=27"></script>
+<script src="assets/cms-attente.js?v=4"></script>
 <script src="assets/cms-dealers.js?v=4"></script>
 <script src="assets/cms-clients.js?v=2"></script>
 <script src="assets/cms-facturation.js?v=30"></script>
 <script src="assets/cms-historique.js?v=9"></script>
-<script src="assets/cms-commandes.js?v=2"></script>
+<script src="assets/cms-commandes.js?v=3"></script>
 <script src="assets/cms-statistiques.js?v=7"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>

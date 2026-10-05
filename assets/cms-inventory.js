@@ -459,9 +459,9 @@
     var text = pasteI.value || '';
     if (!text.trim()) { parseHint.textContent = 'Colle d\'abord le texte de la commande.'; return; }
     var found = parseText(text);
-    if (!found.length) { parseHint.textContent = 'Rien reconnu automatiquement — ajoute les lignes à la main.'; return; }
+    if (!found.length) { parseHint.textContent = 'Rien reconnu.'; return; }
     found.forEach(function (r) { rows.push(r); });
-    parseHint.textContent = found.length + ' ligne(s) détectée(s) — vérifie/complète avant de confirmer.';
+    parseHint.textContent = found.length + ' ligne(s) détectée(s).';
     renderRows();
   });
 

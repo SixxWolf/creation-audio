@@ -82,7 +82,7 @@
       dealerPriceI = $('#sp-dealer-price'), marginEl = $('#sp-margin'), marginDealerEl = $('#sp-margin-dealer'),
       qtyI = $('#sp-qty'), activeI = $('#sp-active'),
       tiersEl = $('#sp-tiers'), tierAdd = $('#sp-tier-add'),
-      sizeI = $('#sp-size'), linksEl = $('#sp-fiche-links'),
+      sizeI = $('#sp-size'), linksEl = $('#sp-fiche-links'), linksField = $('#sp-fiche-field'),
       fitEl = $('#sp-fit'), fitAdd = $('#sp-fit-add'), makeList = $('#sp-make-list'),
       longDescI = $('#sp-long-desc'), specsEl = $('#sp-specs'), specAdd = $('#sp-spec-add'),
       statusEl = $('#sp-status'), listEl = $('#sp-list'),
@@ -262,13 +262,14 @@
   function renderLinks() {
     if (!linksEl) return;
     var name = nameI.value.trim();
-    if (!editingId || !name) { linksEl.innerHTML = '<span class="hint">Enregistre le spacer pour obtenir ses liens.</span>'; return; }
+    if (linksField) linksField.hidden = !editingId || !name;
+    if (!editingId || !name) { linksEl.innerHTML = ''; return; }
     // le slug suit le nom ENREGISTRÉ (un nom modifié non enregistré n'a pas encore de fiche)
     var s = encodeURIComponent((editingRow && editingRow.slug) || slugify(editingRow ? editingRow.name : name));
     linksEl.innerHTML =
       '<a class="btn btn-ghost btn-sm" href="' + SITE + 'spacers.html#/s/' + s + '" target="_blank" rel="noopener">Site public ↗</a>' +
       '<a class="btn btn-ghost btn-sm" href="' + SITE + 'dealer.html#/s/' + s + '" target="_blank" rel="noopener">Portail dealer ↗</a>' +
-      (activeI.checked ? '' : '<span class="hint">Masqué : la fiche n\'est pas visible.</span>');
+      (activeI.checked ? '' : '<span class="hint">Masqué en boutique</span>');
   }
 
   /* ---- éditeur ---- */
