@@ -38,11 +38,11 @@
       <p>Espace privé. Connecte-toi avec le compte administrateur.</p>
       <div class="field">
         <label class="lbl" for="login-email">Courriel</label>
-        <input type="text" id="login-email" autocomplete="username" inputmode="email">
+        <input type="text" id="login-email" name="email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false">
       </div>
       <div class="field">
         <label class="lbl" for="login-pass">Mot de passe</label>
-        <input type="text" id="login-pass" style="-webkit-text-security:disc;text-security:disc" autocomplete="current-password">
+        <input type="password" id="login-pass" name="password" autocomplete="current-password">
       </div>
       <button class="btn btn-accent" type="submit" id="login-btn" data-ic="login">Se connecter</button>
       <p class="status" id="login-status" style="margin-top:12px" aria-live="polite"></p>
