@@ -13,7 +13,7 @@
    (--ring, ::selection et les halos des boutons en découlent par color-mix.)
    Stockage : admin_settings clé « apparence » { accent, at } — synchro entre
    appareils — + localStorage (ca-accent, ca-accent-css), appliqué dès le
-   <head> d'admin.html pour éviter un éclair orange au chargement.
+   <head> de la page admin pour éviter un éclair orange au chargement.
    Orange d'origine = aucune surcharge : les jetons des feuilles s'appliquent.
    ========================================================= */
 (function () {

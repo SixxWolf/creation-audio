@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
   const pairs = L.reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const label = EVENT_LABEL[event];
   const subject = label + " " + order.number + " — " + who + (event === "cancelled" ? "" : " (" + pairs + " paire" + (pairs > 1 ? "s" : "") + ")");
-  const adminUrl = SITE + "/admin.html#commandes";
+  const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes";
 
   const rowsTxt = L.map((l) => {
     const st = l.product_id ? (stock.get(l.product_id) ?? 0) : 0;

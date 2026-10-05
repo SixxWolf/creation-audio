@@ -120,3 +120,11 @@ a.dl-ol-n:hover { color:var(--ember-ink); text-decoration:underline; text-underl
   .dl-order-actions { width:100%; }
   .dl-order-actions .dl-btn { flex:1; }
 }
+
+/* Messages des écrans de connexion (p.dl-status) : pas le style « pastille » des statuts de commande */
+p.dl-status { display:block; padding:0; border-radius:0; background:none; white-space:normal;
+  font-size:.85rem; font-weight:400; color:var(--muted); }
+p.dl-status::before { content:none; }
+/* code de vérification (2FA) */
+#dl-mfa-code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:1.3rem;
+  letter-spacing:.35em; text-align:center; font-variant-numeric:tabular-nums; }

@@ -15,8 +15,22 @@
 --     lecture + écriture réservées au compte admin (par e-mail).
 -- ============================================================
 
--- Compte admin (une seule source de vérité pour toutes les policies).
--- Si tu changes d'e-mail admin un jour, remplace-le partout ci-dessous.
+-- ------------------------------------------------------------
+-- COMPTE ADMIN + DOUBLE AUTHENTIFICATION (2FA)
+-- is_admin() = le compte admin ET une session validée par le 2e facteur
+-- (aal2 : mot de passe + code TOTP de l'application d'authentification).
+-- Toutes les policies et fonctions admin passent par ici : un mot de passe
+-- volé, sans le code, ne donne accès à rien (ni lecture ni écriture).
+-- Une seule source de vérité : si l'e-mail admin change, c'est ICI
+-- (+ assets/supabase-config.js).
+-- ------------------------------------------------------------
+create or replace function public.is_admin()
+returns boolean language sql stable set search_path = '' as $$
+  select coalesce(lower((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com'
+              and ((select auth.jwt()) ->> 'aal') = 'aal2', false);
+$$;
+revoke all on function public.is_admin() from public, anon;
+grant execute on function public.is_admin() to authenticated;
 
 -- ------------------------------------------------------------
 -- TABLE products
@@ -88,8 +102,8 @@ drop policy if exists products_admin_all   on public.products;
 create policy products_admin_all
   on public.products for all
   to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 -- ------------------------------------------------------------
 -- TABLE brands — marques (Bambu Lab, Elegoo, Anycubic…)
@@ -111,8 +125,8 @@ drop policy if exists brands_public_read on public.brands;
 create policy brands_public_read on public.brands for select to anon, authenticated using (true);
 drop policy if exists brands_admin_write on public.brands;
 create policy brands_admin_write on public.brands for all to authenticated
-  using ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 -- ------------------------------------------------------------
 -- TABLE materials — PRIX & COÛTS PAR (MARQUE, MATÉRIAU)
@@ -162,8 +176,8 @@ drop policy if exists materials_admin_all   on public.materials;
 create policy materials_admin_all
   on public.materials for all
   to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 -- ------------------------------------------------------------
 -- VUE publique : produits actifs, SANS les coûts.
@@ -255,15 +269,15 @@ drop policy if exists receipts_admin_all on public.receipts;
 create policy receipts_admin_all
   on public.receipts for all
   to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 drop policy if exists receipt_lines_admin_all on public.receipt_lines;
 create policy receipt_lines_admin_all
   on public.receipt_lines for all
   to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 -- Incrément de stock atomique (évite un read-modify-write côté client).
 -- kind = 'refill' -> qty_2 ; sinon -> qty.
@@ -275,7 +289,7 @@ begin
   -- Garde : fonction SECURITY DEFINER réservée à l'admin (sinon n'importe quel
   -- compte connecté, ex. un dealer, pourrait modifier le stock). Advisor
   -- « Signed-In Users Can Execute SECURITY DEFINER Function ».
-  if coalesce((select auth.jwt() ->> 'email'), '') <> 'creationaudio.ca@gmail.com' then
+  if not public.is_admin() then
     raise exception 'Réservé à l''administrateur.';
   end if;
   update public.products
@@ -307,20 +321,20 @@ drop policy if exists products_files_admin_insert on storage.objects;
 create policy products_files_admin_insert
   on storage.objects for insert
   to authenticated
-  with check (bucket_id = 'products' and ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com');
+  with check (bucket_id = 'products' and (select public.is_admin()));
 
 drop policy if exists products_files_admin_update on storage.objects;
 create policy products_files_admin_update
   on storage.objects for update
   to authenticated
-  using  (bucket_id = 'products' and ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com')
-  with check (bucket_id = 'products' and ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com');
+  using  (bucket_id = 'products' and (select public.is_admin()))
+  with check (bucket_id = 'products' and (select public.is_admin()));
 
 drop policy if exists products_files_admin_delete on storage.objects;
 create policy products_files_admin_delete
   on storage.objects for delete
   to authenticated
-  using (bucket_id = 'products' and ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com');
+  using (bucket_id = 'products' and (select public.is_admin()));
 
 -- ============================================================
 -- PHASE 4 — FACTURATION
@@ -338,7 +352,7 @@ create table if not exists public.invoice_counters (
 alter table public.invoice_counters enable row level security;
 drop policy if exists invoice_counters_admin_read on public.invoice_counters;
 create policy invoice_counters_admin_read on public.invoice_counters for select to authenticated
-  using ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using ( (select public.is_admin()) );
 
 -- Réserve et renvoie le prochain numéro (incrément atomique).
 create or replace function public.next_invoice_number()
@@ -347,7 +361,7 @@ declare y int := extract(year from current_date)::int; n int;
 begin
   -- Garde admin (voir receive_stock) : évite qu'un compte connecté non-admin
   -- incrémente le compteur de factures.
-  if coalesce((select auth.jwt() ->> 'email'), '') <> 'creationaudio.ca@gmail.com' then
+  if not public.is_admin() then
     raise exception 'Réservé à l''administrateur.';
   end if;
   insert into public.invoice_counters (year, seq) values (y, 1)
@@ -416,15 +430,15 @@ drop policy if exists invoices_admin_all on public.invoices;
 create policy invoices_admin_all
   on public.invoices for all
   to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 drop policy if exists invoice_lines_admin_all on public.invoice_lines;
 create policy invoice_lines_admin_all
   on public.invoice_lines for all
   to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 -- ------------------------------------------------------------
 -- POPULARITÉ PUBLIQUE (agrégat marketing, SANS donnée sensible)
@@ -477,8 +491,8 @@ create table if not exists public.dealers (
 alter table public.dealers enable row level security;
 drop policy if exists dealers_admin_all on public.dealers;
 create policy dealers_admin_all on public.dealers for all to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 -- Le compte connecté est-il un dealer ? (le portail s'en sert pour ouvrir l'accès)
 -- Le compte ADMIN a aussi accès au portail (aperçu + commandes de test), sans
@@ -486,7 +500,7 @@ create policy dealers_admin_all on public.dealers for all to authenticated
 create or replace function public.is_dealer()
 returns boolean language sql security definer set search_path = public stable as $$
   select exists (select 1 from public.dealers d where d.email = (select auth.jwt() ->> 'email'))
-      or lower((select auth.jwt() ->> 'email')) = 'creationaudio.ca@gmail.com';
+      or public.is_admin();
 $$;
 revoke all on function public.is_dealer() from public, anon;
 grant execute on function public.is_dealer() to authenticated;
@@ -517,7 +531,7 @@ create view public.products_dealer with (security_invoker = off) as
   from public.products p
   where p.active = true and p.type = 'spacer'
     and ( (select auth.jwt() ->> 'email') in (select email from public.dealers)
-          or lower((select auth.jwt() ->> 'email')) = 'creationaudio.ca@gmail.com' );   -- admin : aperçu du portail
+          or (select public.is_admin()) );   -- admin (2FA validée) : aperçu du portail
 grant select on public.products_dealer to authenticated;
 
 -- ------------------------------------------------------------
@@ -540,8 +554,8 @@ create table if not exists public.clients (
 alter table public.clients enable row level security;
 drop policy if exists clients_admin_all on public.clients;
 create policy clients_admin_all on public.clients for all to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 -- évite les doublons de courriel (insensible à la casse) ; les courriels vides sont permis
 create unique index if not exists clients_email_uidx on public.clients (lower(email)) where email is not null and email <> '';
 
@@ -566,7 +580,7 @@ create or replace function public.deduct_stock(p_product uuid, p_kind text, p_qt
 returns integer language plpgsql security definer set search_path = public as $$
 declare v_before integer; v_taken integer;
 begin
-  if coalesce((select auth.jwt() ->> 'email'), '') <> 'creationaudio.ca@gmail.com' then
+  if not public.is_admin() then
     raise exception 'Réservé à l''administrateur.';
   end if;
   select case when p_kind = 'refill' then coalesce(qty_2,0) else coalesce(qty,0) end
@@ -624,8 +638,8 @@ create unique index if not exists waitlist_open_uidx
 alter table public.waitlist enable row level security;
 drop policy if exists waitlist_admin_all on public.waitlist;
 create policy waitlist_admin_all on public.waitlist for all to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 -- Expiration + effacement des renseignements (Loi 25). Appelée chaque jour
 -- par pg_cron, et au passage par waitlist_subscribe (filet de sécurité).
@@ -705,7 +719,7 @@ declare
   v_taken  integer;
 begin
   -- Garde admin (voir receive_stock).
-  if coalesce((select auth.jwt() ->> 'email'), '') <> 'creationaudio.ca@gmail.com' then
+  if not public.is_admin() then
     raise exception 'Réservé à l''administrateur.';
   end if;
   select * into v_inv from public.invoices where id = p_id for update;
@@ -840,21 +854,21 @@ alter table public.dealer_order_lines enable row level security;
 
 drop policy if exists dealer_orders_admin_all on public.dealer_orders;
 create policy dealer_orders_admin_all on public.dealer_orders for all to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 drop policy if exists dealer_orders_own_read on public.dealer_orders;
 create policy dealer_orders_own_read on public.dealer_orders for select to authenticated
-  using ( lower(dealer_email) = lower((select auth.jwt()) ->> 'email') );
+  using ( lower(dealer_email) = lower((select auth.jwt()) ->> 'email') and (select public.is_dealer()) );   -- dealer retiré : plus rien
 
 drop policy if exists dealer_order_lines_admin_all on public.dealer_order_lines;
 create policy dealer_order_lines_admin_all on public.dealer_order_lines for all to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 drop policy if exists dealer_order_lines_own_read on public.dealer_order_lines;
 create policy dealer_order_lines_own_read on public.dealer_order_lines for select to authenticated
   using ( exists (select 1 from public.dealer_orders o
                    where o.id = order_id
-                     and lower(o.dealer_email) = lower((select auth.jwt()) ->> 'email')) );
+                     and lower(o.dealer_email) = lower((select auth.jwt()) ->> 'email')) and (select public.is_dealer()) );
 
 -- Prix dealer d'un spacer pour une quantité : dernier palier dont min <= qté,
 -- sinon prix de base (même règle que tierPrice() côté navigateur).
@@ -921,7 +935,7 @@ begin
   select * into v_dealer from public.dealers where lower(email) = v_email;
   if not found then
     -- l'admin peut passer une commande de test depuis le portail (visible dans l'onglet Commandes)
-    if v_email = 'creationaudio.ca@gmail.com' then
+    if public.is_admin() then
       v_dealer.email := v_email; v_dealer.name := 'Création Audio (test admin)';
     else
       raise exception 'Réservé aux comptes dealer.' using errcode = '42501';
@@ -948,6 +962,7 @@ declare
   v_email text := lower((select auth.jwt()) ->> 'email');
   v_order public.dealer_orders;
 begin
+  if not public.is_dealer() then raise exception 'Accès dealer retiré.' using errcode = '42501'; end if;
   select * into v_order from public.dealer_orders where id = p_id for update;
   if not found or lower(v_order.dealer_email) <> v_email then raise exception 'Commande introuvable.' using errcode = '42501'; end if;
   if v_order.status = 'cancelled' then raise exception 'Cette commande est annulée.' using errcode = 'P0001'; end if;
@@ -969,6 +984,7 @@ declare
   v_email text := lower((select auth.jwt()) ->> 'email');
   v_order public.dealer_orders;
 begin
+  if not public.is_dealer() then raise exception 'Accès dealer retiré.' using errcode = '42501'; end if;
   select * into v_order from public.dealer_orders where id = p_id for update;
   if not found or lower(v_order.dealer_email) <> v_email then raise exception 'Commande introuvable.' using errcode = '42501'; end if;
   if v_order.status = 'cancelled' then return v_order; end if;   -- déjà annulée : rien à faire
@@ -1003,10 +1019,137 @@ drop policy if exists admin_settings_admin_all on public.admin_settings;
 create policy admin_settings_admin_all
   on public.admin_settings for all
   to authenticated
-  using  ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' )
-  with check ( ((select auth.jwt()) ->> 'email') = 'creationaudio.ca@gmail.com' );
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
 
 revoke all on public.admin_settings from anon;
+
+-- Ancien bucket « spacers » (V1, plus utilisé par le site) : mêmes règles admin + 2FA.
+do $$ begin
+  if exists (select 1 from pg_policies where schemaname = 'storage' and policyname = 'spacers_files_admin_insert') then
+    alter policy spacers_files_admin_insert on storage.objects
+      with check (bucket_id = 'spacers' and (select public.is_admin()));
+    alter policy spacers_files_admin_update on storage.objects
+      using (bucket_id = 'spacers' and (select public.is_admin()))
+      with check (bucket_id = 'spacers' and (select public.is_admin()));
+    alter policy spacers_files_admin_delete on storage.objects
+      using (bucket_id = 'spacers' and (select public.is_admin()));
+  end if;
+end $$;
+
+-- ------------------------------------------------------------
+-- PORTAIL DEALER — retirer un dealer = couper son accès
+-- Supprimer sa ligne (onglet Dealers › Retirer) bloque son compte (banni :
+-- plus de connexion possible) et ferme ses sessions ouvertes ; ses lectures
+-- (catalogue, commandes) sont aussi gardées par is_dealer(). Le rajouter le
+-- débloque. Ses commandes restent en base (historique / facturation).
+-- ------------------------------------------------------------
+create or replace function public._dealer_revoke(p_email text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid;
+begin
+  if lower(coalesce(p_email, '')) in ('', 'creationaudio.ca@gmail.com') then return; end if;   -- jamais l'admin
+  select id into v_uid from auth.users where lower(email) = lower(p_email);
+  if v_uid is null then return; end if;
+  update auth.users set banned_until = now() + interval '100 years' where id = v_uid;
+  delete from auth.refresh_tokens where user_id = v_uid::text;
+  delete from auth.sessions where user_id = v_uid;
+end $$;
+
+create or replace function public._dealer_access_sync()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' or (tg_op = 'UPDATE' and lower(old.email) is distinct from lower(new.email)) then
+    perform public._dealer_revoke(old.email);
+  end if;
+  if tg_op in ('INSERT', 'UPDATE') then
+    update auth.users set banned_until = null
+     where lower(email) = lower(new.email) and banned_until is not null;
+  end if;
+  return null;
+end $$;
+revoke all on function public._dealer_revoke(text)  from public, anon, authenticated;
+revoke all on function public._dealer_access_sync() from public, anon, authenticated;
+
+drop trigger if exists dealers_access_sync on public.dealers;
+create trigger dealers_access_sync after insert or update or delete on public.dealers
+  for each row execute function public._dealer_access_sync();
+
+-- ------------------------------------------------------------
+-- ANTI FORCE BRUTE — connexion admin + portail dealer
+-- Les pages ne vérifient plus le mot de passe directement auprès de Supabase
+-- Auth : elles passent par l'Edge Function « auth-gate », qui compte les
+-- essais PAR COMPTE : 5 mauvais mots de passe en 15 min -> compte bloqué
+-- 15 min (même le bon mot de passe est refusé). L'essai est compté AVANT la
+-- vérification (une rafale en parallèle ne passe pas) ; une connexion réussie
+-- remet le compteur à zéro.
+-- Le mot de passe enregistré dans Supabase Auth est DÉRIVÉ de celui tapé
+-- (HMAC-SHA256 avec le secret « auth_pepper ») : attaquer l'API Supabase Auth
+-- en direct, sans passer par le portier, ne mène nulle part.
+-- Schéma « private » : jamais exposé par l'API REST ; seules les fonctions
+-- auth_gate_* (réservées au service_role = l'Edge Function) y touchent.
+-- ------------------------------------------------------------
+create schema if not exists private;
+revoke all on schema private from public, anon, authenticated;
+
+create table if not exists private.login_guard (
+  email        text primary key,
+  fails        integer not null default 0,     -- essais dans la fenêtre en cours
+  first_fail   timestamptz,                     -- début de la fenêtre de 15 min
+  locked_until timestamptz,                     -- bloqué jusqu'à…
+  updated_at   timestamptz not null default now()
+);
+create table if not exists private.secrets (
+  key   text primary key,
+  value text not null
+);
+alter table private.login_guard enable row level security;   -- aucune policy : fonctions seulement
+alter table private.secrets     enable row level security;
+insert into private.secrets (key, value)
+  values ('auth_pepper', encode(extensions.gen_random_bytes(32), 'hex'))
+  on conflict (key) do nothing;
+
+-- Avant de vérifier un mot de passe : bloqué ? sinon l'essai est compté tout de suite.
+-- -> { allowed, retry_after (s), left (essais restants après celui-ci), exists, pepper }
+create or replace function public.auth_gate_begin(p_email text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := lower(btrim(coalesce(p_email, '')));
+  g private.login_guard;
+begin
+  if random() < 0.05 then   -- ménage : vieux compteurs (courriels inventés par un robot…)
+    delete from private.login_guard
+     where updated_at < now() - interval '1 day' and (locked_until is null or locked_until < now());
+  end if;
+  insert into private.login_guard (email) values (v_email) on conflict (email) do nothing;
+  select * into g from private.login_guard where email = v_email for update;
+  if g.locked_until is not null and g.locked_until > now() then
+    return jsonb_build_object('allowed', false,
+      'retry_after', ceil(extract(epoch from (g.locked_until - now())))::int);
+  end if;
+  if g.first_fail is null or g.first_fail < now() - interval '15 minutes' then
+    g.fails := 0; g.first_fail := now();
+  end if;
+  g.fails := g.fails + 1;
+  update private.login_guard
+     set fails = g.fails, first_fail = g.first_fail, updated_at = now(),
+         locked_until = case when g.fails >= 5 then now() + interval '15 minutes' end
+   where email = v_email;
+  return jsonb_build_object('allowed', true, 'left', greatest(0, 5 - g.fails),
+    'exists', exists (select 1 from auth.users u where lower(u.email) = v_email),
+    'pepper', (select value from private.secrets where key = 'auth_pepper'));
+end $$;
+
+-- Connexion réussie : compteur effacé.
+create or replace function public.auth_gate_ok(p_email text)
+returns void language sql security definer set search_path = '' as $$
+  delete from private.login_guard where email = lower(btrim(coalesce(p_email, '')));
+$$;
+
+revoke all on function public.auth_gate_begin(text) from public, anon, authenticated;
+revoke all on function public.auth_gate_ok(text)    from public, anon, authenticated;
+grant execute on function public.auth_gate_begin(text) to service_role;
+grant execute on function public.auth_gate_ok(text)    to service_role;
 
 -- ------------------------------------------------------------
 -- Vérification

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=45">
+<link rel="stylesheet" href="assets/admin.css?v=46">
 <link rel="stylesheet" href="assets/facture.css?v=17">
 <link rel="stylesheet" href="assets/autoloop.css?v=25">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
@@ -26,24 +26,56 @@
 
 <!-- ======================= ÉCRAN DE CONNEXION ======================= -->
 <section id="login" class="login-wrap" hidden>
-  <form class="login-card" id="login-form">
+  <div class="login-card">
     <div class="login-brand">
       <img src="assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="44" height="44">
       <span><b>Création Audio</b><small>Admin</small></span>
     </div>
-    <h1>Connexion</h1>
-    <p>Espace privé. Connecte-toi avec le compte administrateur.</p>
-    <div class="field">
-      <label class="lbl" for="login-email">Courriel</label>
-      <input type="text" id="login-email" autocomplete="username" inputmode="email">
-    </div>
-    <div class="field">
-      <label class="lbl" for="login-pass">Mot de passe</label>
-      <input type="text" id="login-pass" style="-webkit-text-security:disc;text-security:disc" autocomplete="current-password">
-    </div>
-    <button class="btn btn-accent" type="submit" id="login-btn" data-ic="login">Se connecter</button>
-    <p class="status" id="login-status" style="margin-top:12px"></p>
-  </form>
+
+    <!-- 1) mot de passe (via le portier anti force brute) -->
+    <form id="login-form">
+      <h1>Connexion</h1>
+      <p>Espace privé. Connecte-toi avec le compte administrateur.</p>
+      <div class="field">
+        <label class="lbl" for="login-email">Courriel</label>
+        <input type="text" id="login-email" autocomplete="username" inputmode="email">
+      </div>
+      <div class="field">
+        <label class="lbl" for="login-pass">Mot de passe</label>
+        <input type="text" id="login-pass" style="-webkit-text-security:disc;text-security:disc" autocomplete="current-password">
+      </div>
+      <button class="btn btn-accent" type="submit" id="login-btn" data-ic="login">Se connecter</button>
+      <p class="status" id="login-status" style="margin-top:12px" aria-live="polite"></p>
+    </form>
+
+    <!-- 2) code de l'application d'authentification (2FA) -->
+    <form id="mfa-form" hidden>
+      <h1>Code de vérification</h1>
+      <p>Entre le code à 6 chiffres de ton application d'authentification.</p>
+      <div class="field">
+        <label class="lbl" for="mfa-code">Code</label>
+        <input type="text" id="mfa-code" class="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false">
+      </div>
+      <button class="btn btn-accent" type="submit" id="mfa-btn" data-ic="check">Valider</button>
+      <p class="status" id="mfa-status" style="margin-top:12px" aria-live="polite"></p>
+      <button class="login-alt" type="button" data-login-cancel>Changer de compte</button>
+    </form>
+
+    <!-- 2 bis) première connexion : activer la 2FA (code QR) -->
+    <form id="mfa-enroll-form" hidden>
+      <h1>Double authentification</h1>
+      <p>Scanne ce code dans ton application d'authentification, puis entre le code affiché.</p>
+      <div class="mfa-qr"><img id="mfa-qr" alt="Code QR à scanner" width="180" height="180"></div>
+      <p class="mfa-secret"><span>Clé</span> <code id="mfa-secret"></code></p>
+      <div class="field">
+        <label class="lbl" for="mfa-enroll-code">Code</label>
+        <input type="text" id="mfa-enroll-code" class="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false">
+      </div>
+      <button class="btn btn-accent" type="submit" id="mfa-enroll-btn" data-ic="check">Activer</button>
+      <p class="status" id="mfa-enroll-status" style="margin-top:12px" aria-live="polite"></p>
+      <button class="login-alt" type="button" data-login-cancel>Changer de compte</button>
+    </form>
+  </div>
 </section>
 
 <!-- ======================= APPLICATION ADMIN ======================= -->
@@ -81,6 +113,7 @@
 
       <p class="side-group" aria-hidden="true">Réglages</p>
       <button class="tab" type="button" data-tab="apparence" data-group="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9.5 9.5 0 0 0 0 19c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.7-1.7h2a5.5 5.5 0 0 0 5.5-5.5c0-4.3-4.3-7.7-9.8-7.7z"/><circle cx="7.5" cy="11.5" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/></svg><span>Apparence</span></button>
+      <button class="tab" type="button" data-tab="securite" data-group="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.1 8.2 7.5 9.5 4.4-1.3 7.5-4.9 7.5-9.5V5.6z"/><path d="m8.8 12 2.2 2.2 4.3-4.4"/></svg><span>Sécurité</span></button>
     </nav>
     <div class="side-foot">
       <a class="side-site" href="./" target="_blank" rel="noopener">
@@ -1622,6 +1655,32 @@
         </div>
       </div>
     </section>
+
+    <section class="tabpanel" data-panel="securite" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Sécurité</h1>
+        </div>
+      </div>
+      <div class="set-card">
+        <div class="set-head"><b>Double authentification</b> <span class="set-msg" id="sec-msg" aria-live="polite"></span></div>
+        <p class="sec-note">Ajoute un 2e appareil en secours : sans appareil, plus d'accès à l'admin.</p>
+        <div class="sec-list" id="sec-list"></div>
+        <div class="sec-add" id="sec-add" hidden>
+          <div class="mfa-qr"><img id="sec-qr" alt="Code QR à scanner" width="180" height="180"></div>
+          <p class="mfa-secret"><span>Clé</span> <code id="sec-secret"></code></p>
+          <form class="sec-add-row" id="sec-form">
+            <div class="field">
+              <label class="lbl" for="sec-code">Code affiché</label>
+              <input type="text" id="sec-code" class="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false">
+            </div>
+            <button class="btn btn-accent btn-sm" id="sec-confirm" type="submit" data-ic="check">Ajouter</button>
+            <button class="btn btn-ghost btn-sm" id="sec-cancel" type="button">Annuler</button>
+          </form>
+        </div>
+        <div class="sec-actions"><button class="btn btn-ghost btn-sm" id="sec-new" type="button" data-ic="plus">Ajouter un appareil</button></div>
+      </div>
+    </section>
   </main>
   </div><!-- /.adm-main -->
 
@@ -1633,8 +1692,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
-<script src="assets/admin-core.js?v=6"></script>
+<script src="assets/auth-gate.js?v=2"></script>
+<script src="assets/admin-core.js?v=7"></script>
 <script src="assets/admin-accent.js?v=1"></script>
+<script src="assets/cms-securite.js?v=1"></script>
 <script src="assets/cms-costing.js?v=2"></script>
 <script src="assets/cms-brands.js?v=5"></script>
 <script src="assets/cms-materials.js?v=11"></script>
@@ -1644,7 +1705,7 @@
 <script src="assets/cms-accessories.js?v=2"></script>
 <script src="assets/cms-inventory.js?v=25"></script>
 <script src="assets/cms-attente.js?v=3"></script>
-<script src="assets/cms-dealers.js?v=3"></script>
+<script src="assets/cms-dealers.js?v=4"></script>
 <script src="assets/cms-clients.js?v=2"></script>
 <script src="assets/cms-facturation.js?v=27"></script>
 <script src="assets/cms-historique.js?v=8"></script>

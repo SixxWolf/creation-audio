@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/site.css?v=1">
 <link rel="stylesheet" href="assets/boutique.css?v=27">
-<link rel="stylesheet" href="assets/dealer.css?v=3">
+<link rel="stylesheet" href="assets/dealer.css?v=4">
 </head>
 <body class="home-page shop-page dealer-page">
 
@@ -53,6 +53,21 @@
     <button class="dl-submit" type="submit" id="dl-login-btn">Se connecter</button>
     <p class="dl-status" id="dl-login-status"></p>
     <p class="dl-status"><a href="./" style="color:var(--ember-dim);text-decoration:none">← Retour au site</a></p>
+  </form>
+</section>
+
+<!-- Code de vérification (compte avec double authentification, ex. l'admin en aperçu) -->
+<section class="dl-center" id="dl-mfa" hidden>
+  <form class="dl-card" id="dl-mfa-form">
+    <h1>Code de vérification</h1>
+    <p>Entre le code à 6 chiffres de ton application d'authentification.</p>
+    <div class="field">
+      <label for="dl-mfa-code">Code</label>
+      <input type="text" id="dl-mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false">
+    </div>
+    <button class="dl-submit" type="submit" id="dl-mfa-btn">Valider</button>
+    <p class="dl-status" id="dl-mfa-status" aria-live="polite"></p>
+    <div class="dl-gate-actions"><button class="dl-logout" id="mfa-logout" type="button">Se déconnecter</button></div>
   </form>
 </section>
 
@@ -129,6 +144,7 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/spacer-catalog.js?v=1"></script>
-<script src="assets/dealer.js?v=4"></script>
+<script src="assets/auth-gate.js?v=2"></script>
+<script src="assets/dealer.js?v=5"></script>
 </body>
 </html>

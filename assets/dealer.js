@@ -30,7 +30,8 @@
   function plural(n, one, many) { return n + ' ' + (n > 1 ? many : one); }
   function errMsg(e) { return (e && e.message) ? e.message : String(e || 'Erreur inconnue'); }
 
-  var loginSec = $('#dl-login'), gateSec = $('#dl-gate'), app = $('#dl-app'),
+  var loginSec = $('#dl-login'), gateSec = $('#dl-gate'), mfaSec = $('#dl-mfa'), app = $('#dl-app'),
+      mfaForm = $('#dl-mfa-form'), mfaCode = $('#dl-mfa-code'), mfaBtn = $('#dl-mfa-btn'), mfaStatus = $('#dl-mfa-status'),
       loginForm = $('#dl-login-form'), emailI = $('#dl-login-email'), passI = $('#dl-login-pass'),
       loginBtn = $('#dl-login-btn'), loginStatus = $('#dl-login-status'),
       cartBtn = $('#cart-btn'), logoutBtn = $('#logout-btn'), hello = $('#dl-hello'),
@@ -62,6 +63,7 @@
   function show(which, email) {
     loginSec.hidden = which !== 'login';
     gateSec.hidden = which !== 'gate';
+    mfaSec.hidden = which !== 'mfa';
     app.hidden = which !== 'app';
     cartBtn.hidden = which !== 'app';
     logoutBtn.hidden = (which === 'login');
@@ -80,8 +82,16 @@
     sb.auth.getSession().then(function (res) {
       var session = res && res.data && res.data.session;
       if (!session) { show('login'); return; }
-      checkDealer(session.user && session.user.email);
+      afterLogin(session.user && session.user.email);
     }, function () { show('login'); });
+  }
+
+  // Compte protégé par la double authentification (ex. l'admin en aperçu) : code d'abord.
+  function afterLogin(email) {
+    window.CA.mfa.state().then(function (st) {
+      if (st === 'challenge') { mfaCode.value = ''; mfaStatus.textContent = ''; show('mfa'); mfaCode.focus(); return; }
+      checkDealer(email);
+    }, function () { checkDealer(email); });
   }
 
   function checkDealer(email) {
@@ -96,18 +106,39 @@
   loginForm.addEventListener('submit', function (e) {
     e.preventDefault();
     var email = (emailI.value || '').trim(), pass = passI.value || '';
-    if (!email || !pass) return;
+    if (!email || !pass || loginBtn.disabled) return;
     loginBtn.disabled = true; loginStatus.textContent = 'Connexion…';
-    sb.auth.signInWithPassword({ email: email, password: pass }).then(function (res) {
+    // via le portier : 5 essais puis 15 min de blocage ; compte retiré -> refusé
+    window.CA.signIn(email, pass).then(function (r) {
       loginBtn.disabled = false;
-      if (res.error) { loginStatus.textContent = 'Échec : ' + res.error.message; return; }
-      loginStatus.textContent = '';
-      checkDealer(res.data.session && res.data.session.user && res.data.session.user.email);
+      if (!r.ok) { loginStatus.textContent = r.message; return; }
+      loginStatus.textContent = ''; passI.value = '';
+      afterLogin(email);
     }, function (err) { loginBtn.disabled = false; loginStatus.textContent = 'Erreur : ' + errMsg(err); });
   });
+
+  window.CA.codeInput(mfaCode, mfaForm);
+  mfaForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = mfaCode.value.replace(/\D/g, '');
+    if (mfaBtn.disabled) return;
+    if (code.length !== 6) { mfaStatus.textContent = 'Le code a 6 chiffres.'; return; }
+    mfaBtn.disabled = true; mfaStatus.textContent = 'Vérification…';
+    window.CA.mfa.verify(code).then(function (r) {
+      mfaBtn.disabled = false;
+      if (!r.ok) { mfaStatus.textContent = r.message; mfaCode.select(); return; }
+      mfaStatus.textContent = '';
+      sb.auth.getSession().then(function (res) {
+        var s = res && res.data && res.data.session;
+        checkDealer(s && s.user && s.user.email);
+      });
+    }, function (err) { mfaBtn.disabled = false; mfaStatus.textContent = 'Erreur : ' + errMsg(err); });
+  });
+
   function doLogout() { sb.auth.signOut().then(function () { passI.value = ''; closeCart(); show('login'); }); }
   logoutBtn.addEventListener('click', doLogout);
   $('#gate-logout').addEventListener('click', doLogout);
+  $('#mfa-logout').addEventListener('click', doLogout);
 
   /* ---------- catalogue (prix dealer) ---------- */
   var spacers = [], byId = {}, loaded = false;

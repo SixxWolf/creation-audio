@@ -34,6 +34,9 @@ window.CA = window.CA || {};
   var loginWrap = $('#login'), app = $('#app'),
       loginForm = $('#login-form'), emailI = $('#login-email'), passI = $('#login-pass'),
       loginBtn = $('#login-btn'), loginStatus = $('#login-status'),
+      mfaForm = $('#mfa-form'), mfaCode = $('#mfa-code'), mfaBtn = $('#mfa-btn'), mfaStatus = $('#mfa-status'),
+      enrollForm = $('#mfa-enroll-form'), enrollQr = $('#mfa-qr'), enrollSecret = $('#mfa-secret'),
+      enrollCode = $('#mfa-enroll-code'), enrollBtn = $('#mfa-enroll-btn'), enrollStatus = $('#mfa-enroll-status'),
       whoEmail = $('#who-email'), logoutBtn = $('#logout-btn');
 
   var readyCbs = [], isReady = false;
@@ -43,11 +46,20 @@ window.CA = window.CA || {};
     else readyCbs.push(cb);
   };
 
-  function showLogin(msg) {
-    app.hidden = true; loginWrap.hidden = false;
-    if (msg) loginStatus.textContent = msg;
-    isReady = false;
+  // Écran de connexion en 3 étapes : 'login' (mot de passe) · 'mfa' (code) · 'enroll' (activer la 2FA)
+  function step(which) {
+    app.hidden = true; loginWrap.hidden = false; isReady = false;
+    loginForm.hidden = which !== 'login';
+    mfaForm.hidden = which !== 'mfa';
+    enrollForm.hidden = which !== 'enroll';
+    var f = which === 'mfa' ? mfaCode : which === 'enroll' ? enrollCode : (emailI.value ? passI : emailI);
+    setTimeout(function () { try { f.focus(); } catch (e) {} }, 0);
   }
+  function showLogin(msg) {
+    step('login');
+    loginStatus.textContent = msg || '';
+  }
+  function errMsg(e) { return e && e.message ? e.message : String(e || 'erreur inconnue'); }
 
   // La session peut revenir AVANT que tous les modules cms-*.js soient chargés
   // (getSession résout pendant que le navigateur télécharge encore les scripts
@@ -71,34 +83,93 @@ window.CA = window.CA || {};
 
   function showApp(session) {
     var email = session && session.user && session.user.email || '';
-    // Verrou côté client (le vrai verrou = RLS par e-mail dans schema-v2.sql).
+    // Verrou côté client (le vrai verrou = RLS is_admin() dans schema-v2.sql : e-mail + 2FA).
     if (email.toLowerCase() !== String(window.CA.adminEmail).toLowerCase()) {
       sb.auth.signOut();
       showLogin('Ce compte n\'est pas administrateur.');
       return;
     }
-    loginWrap.hidden = true; app.hidden = false;
-    whoEmail.textContent = email;
-    fireReady();
+    // 2e facteur : l'admin n'entre qu'avec une session validée par le code (aal2).
+    window.CA.mfa.state().then(function (st) {
+      if (st === 'ok') {
+        loginWrap.hidden = true; app.hidden = false;
+        whoEmail.textContent = email;
+        fireReady();
+      } else if (st === 'challenge') {
+        mfaCode.value = ''; mfaStatus.textContent = '';
+        step('mfa');
+      } else startEnroll();
+    }, function (err) { showLogin('Erreur : ' + errMsg(err)); });
+  }
+  function afterSignIn() {
+    sb.auth.getSession().then(function (res) { showApp(res && res.data && res.data.session); });
   }
 
   if (!sb) { showLogin('Configuration Supabase manquante.'); return; }
 
-  // --- Connexion ---
+  // --- 1) Connexion (mot de passe via le portier : 5 essais puis 15 min) ---
   loginForm.addEventListener('submit', function (e) {
     e.preventDefault();
     var email = (emailI.value || '').trim(), pass = passI.value || '';
-    if (!email || !pass) return;
+    if (!email || !pass || loginBtn.disabled) return;
     loginBtn.disabled = true; loginStatus.textContent = 'Connexion…';
-    sb.auth.signInWithPassword({ email: email, password: pass }).then(function (res) {
+    window.CA.signIn(email, pass).then(function (r) {
       loginBtn.disabled = false;
-      if (res.error) { loginStatus.textContent = 'Échec : ' + res.error.message; return; }
-      loginStatus.textContent = '';
-      showApp(res.data.session);
+      if (!r.ok) { loginStatus.textContent = r.message; return; }
+      loginStatus.textContent = ''; passI.value = '';
+      afterSignIn();
     }, function (err) {
       loginBtn.disabled = false;
-      loginStatus.textContent = 'Erreur : ' + (err && err.message ? err.message : err);
+      loginStatus.textContent = 'Erreur : ' + errMsg(err);
     });
+  });
+
+  // --- 2) Code de l'application d'authentification ---
+  window.CA.codeInput(mfaCode, mfaForm);
+  mfaForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = mfaCode.value.replace(/\D/g, '');
+    if (mfaBtn.disabled) return;
+    if (code.length !== 6) { mfaStatus.textContent = 'Le code a 6 chiffres.'; return; }
+    mfaBtn.disabled = true; mfaStatus.textContent = 'Vérification…';
+    window.CA.mfa.verify(code).then(function (r) {
+      mfaBtn.disabled = false;
+      if (!r.ok) { mfaStatus.textContent = r.message; mfaCode.select(); return; }
+      mfaStatus.textContent = '';
+      afterSignIn();
+    }, function (err) { mfaBtn.disabled = false; mfaStatus.textContent = 'Erreur : ' + errMsg(err); });
+  });
+
+  // --- 2 bis) Première connexion : activer la 2FA ---
+  var enrolling = null;
+  function startEnroll() {
+    enrolling = null; enrollCode.value = ''; enrollSecret.textContent = '';
+    enrollQr.removeAttribute('src'); enrollStatus.textContent = 'Préparation…';
+    step('enroll');
+    window.CA.mfa.enroll().then(function (f) {
+      enrolling = f;
+      enrollQr.src = f.qr;
+      enrollSecret.textContent = f.secret;
+      enrollStatus.textContent = '';
+    }, function (err) { enrollStatus.textContent = 'Erreur : ' + errMsg(err); });
+  }
+  window.CA.codeInput(enrollCode, enrollForm);
+  enrollForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = enrollCode.value.replace(/\D/g, '');
+    if (!enrolling || enrollBtn.disabled) return;
+    if (code.length !== 6) { enrollStatus.textContent = 'Le code a 6 chiffres.'; return; }
+    enrollBtn.disabled = true; enrollStatus.textContent = 'Vérification…';
+    window.CA.mfa.confirm(enrolling.id, code).then(function (r) {
+      enrollBtn.disabled = false;
+      if (!r.ok) { enrollStatus.textContent = r.message; enrollCode.select(); return; }
+      enrollStatus.textContent = '';
+      afterSignIn();
+    }, function (err) { enrollBtn.disabled = false; enrollStatus.textContent = 'Erreur : ' + errMsg(err); });
+  });
+
+  $$('[data-login-cancel]').forEach(function (b) {
+    b.addEventListener('click', function () { sb.auth.signOut().then(function () { showLogin(''); }); });
   });
 
   logoutBtn.addEventListener('click', function () {

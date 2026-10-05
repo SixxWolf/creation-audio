@@ -28,6 +28,13 @@ const CORS = {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }
+// Lit une revendication du JWT « Bearer … » (à n'utiliser qu'après getUser(), qui le valide).
+function jwtClaim(authHeader: string, key: string): unknown {
+  try {
+    const p = authHeader.replace(/^Bearer\s+/i, "").split(".")[1];
+    return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((p.length + 3) % 4)))[key];
+  } catch { return undefined; }
+}
 
 function slugify(s: string | null | undefined) {
   return String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "")
@@ -92,6 +99,8 @@ Deno.serve(async (req) => {
   const userClient = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
   const { data: u } = await userClient.auth.getUser();
   if (!u?.user || (u.user.email || "").toLowerCase() !== ADMIN_EMAIL) return json({ error: "Réservé à l'administrateur." }, 403);
+  // + double authentification validée (aal2), comme is_admin() en base (jeton vérifié par getUser ci-dessus)
+  if (jwtClaim(authHeader, "aal") !== "aal2") return json({ error: "Double authentification requise." }, 403);
 
   if (!resendKey) return json({ error: "Envoi non configuré : secret RESEND_API_KEY manquant dans Supabase." }, 503);
 

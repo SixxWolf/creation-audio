@@ -473,6 +473,19 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .login-card p { margin:0 0 20px; font-size:.9rem; color:var(--muted); }
 .login-card .field { margin-bottom:14px; }
 .login-card .btn { width:100%; min-height:46px; margin-top:4px; font-size:.96rem; }
+/* 2FA : code à 6 chiffres, code QR + clé manuelle (connexion et Réglages › Sécurité) */
+input.mfa-code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:1.35rem;
+  letter-spacing:.35em; text-align:center; font-variant-numeric:tabular-nums; }
+.mfa-qr { display:flex; justify-content:center; margin:0 0 12px; }
+.mfa-qr img { width:180px; height:180px; padding:8px; background:#fff; border:1px solid var(--line); border-radius:14px; }
+.mfa-qr img:not([src]) { visibility:hidden; }
+.login-card .mfa-secret, .mfa-secret { display:flex; align-items:baseline; justify-content:center; gap:8px; margin:0 0 16px;
+  font-size:.78rem; color:var(--muted); }
+.mfa-secret code { min-width:0; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.8rem;
+  color:var(--ink); word-break:break-all; user-select:all; }
+.login-alt { display:block; margin:8px auto 0; padding:6px 8px; background:none; border:0; color:var(--muted);
+  font:inherit; font-size:.85rem; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.login-alt:hover { color:var(--ink); }
 
 /* =========================================================
    RESPONSIVE (coquille + composants partagés)
@@ -958,3 +971,21 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .acc-chk { display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--ink); }
 .acc-tab { position:relative; padding:4px 2px 9px; font-weight:600; font-size:.9rem; color:var(--ink); }
 .acc-tab::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--ember); }
+
+/* =========================================================
+   RÉGLAGES › SÉCURITÉ — appareils de double authentification (cms-securite.js)
+   ========================================================= */
+.sec-note { margin:-6px 0 14px; font-size:.86rem; color:var(--muted); }
+.sec-list { display:flex; flex-direction:column; gap:8px; }
+.sec-dev { display:flex; align-items:center; gap:12px; padding:10px 12px; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+.sec-dev-ic { flex:none; display:grid; place-items:center; width:34px; height:34px; border-radius:10px;
+  background:color-mix(in srgb, var(--ember) 14%, var(--paper)); color:var(--ember-ink); }
+.sec-dev-ic svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.sec-dev-tx { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.sec-dev-tx b { font-size:.92rem; }
+.sec-dev-tx small { font-size:.8rem; color:var(--muted); }
+.sec-add { margin-top:14px; padding:16px; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+.sec-add-row { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:center; gap:10px; }
+.sec-add-row .field { margin:0; }
+.sec-add-row input.mfa-code { width:200px; min-width:200px; }
+.sec-actions { margin-top:14px; }
