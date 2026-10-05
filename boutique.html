@@ -24,7 +24,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/site.css?v=1">
-<link rel="stylesheet" href="assets/boutique.css?v=27">
+<link rel="stylesheet" href="assets/boutique.css?v=28">
 </head>
 <body class="home-page shop-page">
 <a class="skip" href="#main">Aller au contenu</a>
@@ -39,8 +39,9 @@
     <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
   </a>
   <nav class="home-nav" aria-label="Navigation principale">
-    <a href="boutique.html" class="is-active">Filaments</a>
+    <a href="boutique.html#/" class="is-active">Filaments</a>
     <a href="spacers.html">Spacers</a>
+    <a href="boutique.html#/accessoires">Accessoires</a>
     <a href="./#contact">Contact</a>
   </nav>
   <span class="spacer"></span>
@@ -93,6 +94,39 @@
     <nav class="crumbs" id="crumbs" aria-label="Fil d'Ariane"></nav>
     <div id="config"></div>
   </section>
+
+  <!-- Accessoires : catalogue par catégorie (#/accessoires ou #/accessoires/<catégorie>) -->
+  <section id="screen-accs" aria-labelledby="acc-title" hidden>
+    <header class="cat-hero">
+      <div class="cat-hero-tx">
+        <p class="eyebrow">Boutique</p>
+        <h1 id="acc-title">Accessoires</h1>
+        <p class="cat-sub">Bobines vides réutilisables et extras pour ton impression 3D. Même panier que tes filaments&nbsp;: une seule commande, ramassage à Québec. <strong>Prix finaux, aucune taxe en plus.</strong></p>
+      </div>
+      <dl class="cat-stats" aria-label="Les accessoires en chiffres">
+        <div><dt>Articles</dt><dd id="acc-st-items">—</dd></div>
+        <div><dt>En stock</dt><dd id="acc-st-stock">—</dd></div>
+        <div><dt>Catégories</dt><dd id="acc-st-cats">—</dd></div>
+      </dl>
+    </header>
+
+    <div class="cat-bar">
+      <nav class="cat-chips" id="acc-chips" aria-label="Filtrer par catégorie"></nav>
+      <label class="switch">
+        <input type="checkbox" class="js-only-stock">
+        <span class="switch-ui" aria-hidden="true"></span>
+        En stock seulement
+      </label>
+    </div>
+
+    <div class="cat-groups" id="acc-groups"></div>
+  </section>
+
+  <!-- Fiche d'un accessoire (#/a/<slug>) -->
+  <section id="screen-acc" hidden>
+    <nav class="crumbs" id="acc-crumbs" aria-label="Fil d'Ariane"></nav>
+    <div id="acc-config"></div>
+  </section>
 </main>
 
 <!-- Barre d'achat collante (mobile, fiche couleur) -->
@@ -139,7 +173,7 @@
       <h4>Boutique</h4>
       <a href="boutique.html">Filaments</a>
       <a href="spacers.html">Spacers &amp; adaptateurs</a>
-      <a href="boutique.html">Accessoires</a>
+      <a href="boutique.html#/accessoires">Accessoires</a>
     </nav>
     <nav class="foot-col" aria-label="Aide">
       <h4>Aide</h4>
@@ -172,12 +206,13 @@
   </div>
   <nav class="drawer-links" aria-label="Menu mobile">
     <a href="./">Accueil</a>
-    <a href="boutique.html" class="is-active">Filaments</a>
+    <a href="boutique.html#/" class="is-active">Filaments</a>
     <a href="spacers.html">Spacers</a>
+    <a href="boutique.html#/accessoires">Accessoires</a>
     <a href="./#contact">Contact</a>
   </nav>
   <div class="drawer-cta">
-    <a class="primary" href="boutique.html">Magasiner les filaments</a>
+    <a class="primary" href="boutique.html#/">Magasiner les filaments</a>
     <a class="secondary" href="dealer.html">Espace dealer</a>
   </div>
   <div class="drawer-foot">
@@ -191,6 +226,6 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=2"></script>
-<script src="assets/boutique.js?v=34"></script>
+<script src="assets/boutique.js?v=35"></script>
 </body>
 </html>

@@ -319,6 +319,21 @@
 .acc-add:hover { border-color:var(--ink); }
 .acc-add:disabled { color:var(--muted); background:var(--wash); border-color:var(--line); cursor:not-allowed; }
 .pdp-accs.is-flash .acc { border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.18); }
+/* en-tête du bloc : titre de la catégorie + « Tous les accessoires → » ; nom et photo = lien vers la fiche */
+.pdp-accs-head { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:4px 12px; margin-bottom:10px; }
+.home-page .pdp-accs-head h2 { margin-bottom:0; }
+.pdp-accs-all { display:inline-flex; align-items:center; gap:5px; font-size:.82rem; font-weight:700; color:var(--ink); text-decoration:none; }
+.pdp-accs-all svg { width:13px; height:13px; transition:transform .18s; }
+.pdp-accs-all:hover { color:var(--ember-ink); }
+.pdp-accs-all:hover svg { transform:translateX(3px); }
+a.acc-name { display:block; color:var(--ink); text-decoration:none; }
+a.acc-name:hover { color:var(--ember-ink); text-decoration:underline; text-underline-offset:2px; }
+.acc-prices { display:flex; flex-direction:column; align-items:flex-end; }
+.acc-tier { font-size:.74rem; font-weight:600; color:var(--ember-ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+/* Fiche accessoire : résumé sous la grille de prix ; carte sans photo */
+.pdp-lede { margin:16px 0 0; max-width:520px; font-size:.98rem; line-height:1.55; color:var(--ink-2); }
+.acard .sp-noimg svg { width:28%; height:28%; }
 
 /* Onglets : description · spécifications · galerie */
 .pdp-details { margin-top:clamp(44px, 6vw, 76px); }

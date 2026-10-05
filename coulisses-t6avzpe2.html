@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=46">
+<link rel="stylesheet" href="assets/admin.css?v=49">
 <link rel="stylesheet" href="assets/facture.css?v=18">
 <link rel="stylesheet" href="assets/autoloop.css?v=25">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
@@ -860,7 +860,7 @@
       <div class="panel-head">
         <div>
           <h1>Accessoires</h1>
-          <p class="muted">Bobines vides réutilisables et autres extras proposés en boutique (prix + stock réels). Glisse une carte pour changer l'ordre.</p>
+          <p class="muted">Rangés par catégorie. Glisse une carte pour changer l'ordre.</p>
         </div>
         <span class="grow"></span>
         <button class="btn btn-ghost btn-sm" id="ac-refresh" type="button" data-ic="refresh">Actualiser</button>
@@ -873,36 +873,33 @@
         <div class="grid">
           <div class="field">
             <label class="lbl" for="ac-name">Nom</label>
-            <input type="text" id="ac-name" placeholder="Ex. Bobine vide réutilisable" autocomplete="off">
+            <input type="text" id="ac-name" placeholder="Ex. Bobine vide Bambu 70 °C" autocomplete="off">
           </div>
           <div class="field">
-            <label class="lbl inline" style="gap:8px">
-              <input type="checkbox" id="ac-active" checked style="width:auto"> Visible en boutique
-            </label>
-            <span class="hint">Décoche pour masquer sans supprimer.</span>
+            <label class="lbl" for="ac-cat">Catégorie</label>
+            <input type="text" id="ac-cat" list="ac-cat-list" placeholder="Ex. Bobines vides" autocomplete="off">
+            <datalist id="ac-cat-list"></datalist>
           </div>
 
           <div class="field col-2">
-            <label class="lbl" for="ac-desc">Description <span class="hint">(optionnel, affichée en boutique)</span></label>
-            <textarea id="ac-desc" rows="2" placeholder="Ex. En supplément — pour vos recharges · température max 70 °C"></textarea>
+            <label class="lbl" for="ac-desc">Résumé</label>
+            <textarea id="ac-desc" rows="2" placeholder="Ex. Pour vos recharges · température max 70 °C"></textarea>
           </div>
 
-          <!-- Image -->
+          <!-- Photos (la 1re = photo principale : carte, panier, facture) -->
           <div class="field col-2">
-            <label class="lbl">Photo</label>
-            <div class="drop" id="ac-drop">
-              <img id="ac-preview" alt="" hidden>
-              <span class="drop-hint" id="ac-drop-hint">Clique pour choisir une photo (JPG/PNG).</span>
-            </div>
-            <input type="file" id="ac-file" accept="image/*" hidden>
+            <label class="lbl">Photos</label>
+            <div class="gallery-grid" id="ac-gallery"></div>
+            <div><button type="button" class="btn btn-ghost btn-sm" id="ac-gallery-add" data-ic="plus">Ajouter des photos</button></div>
+            <input type="file" id="ac-file" accept="image/*" multiple hidden>
           </div>
 
           <div class="field">
-            <label class="lbl" for="ac-price">Prix <span class="hint">(public)</span></label>
+            <label class="lbl" for="ac-price">Prix</label>
             <input type="number" id="ac-price" min="0" step="0.01" placeholder="10.00" class="money">
           </div>
           <div class="field">
-            <label class="lbl" for="ac-cost">Coût payé <span class="hint">(privé)</span></label>
+            <label class="lbl" for="ac-cost">Coût payé</label>
             <input type="number" id="ac-cost" min="0" step="0.01" placeholder="0.00" class="money">
           </div>
           <div class="field">
@@ -910,9 +907,40 @@
             <input type="number" id="ac-qty" min="0" step="1" placeholder="0" value="0" class="num">
           </div>
           <div class="field">
-            <div class="margin-box">
-              <div class="mrow"><span class="k">Marge</span><span class="v" id="ac-margin">—</span></div>
+            <label class="lbl">Marge</label>
+            <output class="margin-box ac-mbox"><span class="v" id="ac-margin">—</span></output>
+          </div>
+
+          <!-- Rabais quantité : cumulé sur la catégorie (ex. toutes les bobines vides du panier) -->
+          <div class="field col-2">
+            <label class="lbl">Rabais quantité</label>
+            <div class="tiers" id="ac-tiers"></div>
+            <div><button type="button" class="btn btn-ghost btn-sm" id="ac-tier-add" data-ic="plus">Ajouter un palier</button></div>
+          </div>
+
+          <!-- Affichage : boutique + fiche filament (marques visées ; aucune = toutes) -->
+          <div class="field col-2">
+            <label class="lbl" for="ac-onfil">Affichage</label>
+            <div class="ac-show">
+              <label class="inline"><input type="checkbox" id="ac-active" checked> Visible en boutique</label>
+              <label class="inline"><input type="checkbox" id="ac-onfil"> Sur la fiche filament</label>
             </div>
+            <div class="ac-brands" id="ac-brands" role="group" aria-label="Marques de filament" hidden></div>
+          </div>
+
+          <!-- Fiche détaillée (boutique.html#/a/<slug>) -->
+          <div class="field col-2 fiche-sep ac-fiche-head">
+            <h3 class="fiche-title">Fiche détaillée</h3>
+            <div class="sp-fiche-links" id="ac-fiche-links"></div>
+          </div>
+          <div class="field col-2">
+            <label class="lbl" for="ac-long-desc">Description</label>
+            <textarea id="ac-long-desc" rows="4" placeholder="Bobine réutilisable pour installer une recharge sans outil.&#10;&#10;Un paragraphe par ligne vide."></textarea>
+          </div>
+          <div class="field col-2">
+            <label class="lbl">Spécifications</label>
+            <div class="specs" id="ac-specs"></div>
+            <div><button type="button" class="btn btn-ghost btn-sm" id="ac-spec-add" data-ic="plus">Ajouter une spec</button></div>
           </div>
         </div>
 
@@ -924,7 +952,7 @@
       </form>
 
       <!-- Liste des accessoires -->
-      <div class="cards" id="ac-list"></div>
+      <div class="ac-list" id="ac-list"></div>
     </section>
 
     <!-- ---------------- DEALERS ---------------- -->
@@ -1685,12 +1713,12 @@
 <script src="assets/cms-filaments.js?v=14"></script>
 <script src="assets/cms-linkbuilder.js?v=2"></script>
 <script src="assets/cms-spacers.js?v=6"></script>
-<script src="assets/cms-accessories.js?v=2"></script>
+<script src="assets/cms-accessories.js?v=4"></script>
 <script src="assets/cms-inventory.js?v=25"></script>
 <script src="assets/cms-attente.js?v=3"></script>
 <script src="assets/cms-dealers.js?v=4"></script>
 <script src="assets/cms-clients.js?v=2"></script>
-<script src="assets/cms-facturation.js?v=28"></script>
+<script src="assets/cms-facturation.js?v=29"></script>
 <script src="assets/cms-historique.js?v=9"></script>
 <script src="assets/cms-commandes.js?v=2"></script>
 <script src="assets/cms-statistiques.js?v=7"></script>

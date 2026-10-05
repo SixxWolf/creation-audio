@@ -169,6 +169,12 @@
   // groupe du rabais quantité : palier cumulé par MARQUE (couleurs, matériaux et formats
   // mélangés : 1 bobine + 3 recharges Bambu = palier 4+), comme le panier de la boutique
   function filTierKey(p) { return 'fil|' + (p.brand || p.material || ''); }
+  // accessoires : palier cumulé par CATÉGORIE (ex. toutes les bobines vides), chaque
+  // modèle garde sa grille ; sans catégorie = palier de la ligne seule
+  function accTierKey(p) {
+    var c = String((p && p.attrs && p.attrs.category) || '').trim().toLowerCase();
+    return c ? 'acc|' + c : null;
+  }
 
   /* ---------- chargement ---------- */
   var prevOnTab = window.CA.onTab;
@@ -505,7 +511,8 @@
       meta = [p.brand, p.material, (kind === 'refill' ? 'Recharge' : 'Avec bobine')].filter(Boolean).join(' · ');
     } else if (c === 'accessory') {
       kind = 'unit';
-      base = p.sell_price; tiers = [];
+      base = p.sell_price; tiers = p.tiers || [];
+      tierKey = accTierKey(p);   // rabais quantité cumulé par catégorie
       // coût moyen réel (réceptions) prioritaire sur le coût catalogue
       var acI = p.attrs && p.attrs.avg_cost && p.attrs.avg_cost.item;
       cost = (acI != null && acI !== '') ? +acI : p.cost_price;
@@ -519,7 +526,7 @@
     }
     // fusion si même produit + même format et prix non modifié à la main
     var ex = lines.filter(function (l) { return l.productId === String(id) && l.kind === kind && !l.manual; })[0];
-    if (ex) { ex.qty += 1; ex.price = tierPrice(ex.base, ex.tiers, ex.qty); }
+    if (ex) { ex.qty += 1; ex.price = tierPrice(ex.base, ex.tiers, ex.qty); }   // repriceLines() refait le palier de groupe
     else {
       lines.push({ id: uid(), productId: String(id), ptype: ptype, kind: kind, label: label, meta: meta,
         hex: hex, qty: 1, base: +base || 0, tiers: tiers || [], cost: +cost || 0, tierKey: tierKey,
@@ -540,15 +547,15 @@
   // Rabais quantité : pour les FILAMENTS, le palier se calcule sur le TOTAL des
   // quantités de la même marque (couleurs, matériaux, bobines et recharges confondus),
   // puis s'applique à chaque ligne avec la grille de SON matériau et de SON format.
-  // Spacer/accessoire restent tarifés par ligne.
+  // ACCESSOIRES : même principe par catégorie (tierKey 'acc|…'). Spacers : par ligne.
   function repriceLines() {
     var totals = {};
     lines.forEach(function (l) {
-      if (l.ptype === 'filament' && l.tierKey) totals[l.tierKey] = (totals[l.tierKey] || 0) + (l.qty | 0);
+      if (l.tierKey) totals[l.tierKey] = (totals[l.tierKey] || 0) + (l.qty | 0);
     });
     lines.forEach(function (l) {
       if (l.manual) return;   // prix forcé à la main : on ne touche pas
-      if (l.ptype === 'filament' && l.tierKey) {
+      if (l.tierKey) {
         l.price = tierPrice(l.base, l.tiers, totals[l.tierKey] || (l.qty | 0));
       } else {
         l.price = tierPrice(l.base, l.tiers, l.qty);
@@ -955,7 +962,8 @@
       } else if (hit.c === 'spacer') {
         l.sp = spacerDual(p); l.base = isDealer() ? l.sp.dealer : l.sp.client; l.tiers = isDealer() ? l.sp.tiers : [];
       } else {
-        l.base = +p.sell_price || 0;
+        l.base = +p.sell_price || 0; l.tiers = p.tiers || [];
+        l.tierKey = accTierKey(p);
       }
       l.live = true;
     }

@@ -205,7 +205,11 @@ with (security_invoker = off) as
       'fitment',      p.attrs -> 'fitment',
       'specs',        p.attrs -> 'specs',
       'long_desc',    p.attrs -> 'long_desc',
-      'gallery',      p.attrs -> 'gallery'
+      'gallery',      p.attrs -> 'gallery',
+      -- accessoires : catégorie (puces + rabais cumulé), affichage sur la fiche filament (+ marques visées)
+      'category',     p.attrs -> 'category',
+      'on_filament',  p.attrs -> 'on_filament',
+      'fil_brands',   p.attrs -> 'fil_brands'
     )) as attrs,
     p.image_path,
     p.slug,                            -- slug perso de la couleur (null = auto côté boutique)
@@ -230,6 +234,18 @@ with (security_invoker = off) as
   where p.active = true;
 
 grant select on public.products_public to anon, authenticated;
+
+-- Accessoires (refonte 2026-10-04) : attrs.category (« Bobines vides »…),
+-- attrs.on_filament (affiché sur la fiche filament) et attrs.fil_brands
+-- (marques visées ; vide = toutes). Amorçage des accessoires d'avant : ils
+-- étaient tous des bobines vides affichées sur toutes les fiches filament.
+-- L'éditeur écrit toujours ces clés -> relancer ce fichier n'y retouche plus.
+update public.products
+   set attrs = coalesce(attrs, '{}'::jsonb)
+             || jsonb_build_object('on_filament', true, 'fil_brands', '[]'::jsonb)
+             || case when coalesce(attrs, '{}'::jsonb) ? 'category' then '{}'::jsonb
+                     else jsonb_build_object('category', 'Bobines vides') end
+ where type = 'accessory' and not (coalesce(attrs, '{}'::jsonb) ? 'on_filament');
 
 -- ------------------------------------------------------------
 -- RÉCEPTIONS DE COMMANDE (entrées de stock) + historique

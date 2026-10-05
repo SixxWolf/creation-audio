@@ -411,7 +411,23 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
    (mesuré : ~260 px accessoire, ~300 px palier spacer + marge pour les gros montants) ;
    min(…, 100%) : jamais plus large que l'écran sur mobile */
 #sp-list { grid-template-columns:repeat(auto-fill, minmax(min(320px, 100%), 1fr)); }
-#ac-list { grid-template-columns:repeat(auto-fill, minmax(min(290px, 100%), 1fr)); }
+.ac-cards { grid-template-columns:repeat(auto-fill, minmax(min(290px, 100%), 1fr)); }
+/* Accessoires : une rangée de cartes par catégorie */
+.ac-list { display:flex; flex-direction:column; gap:26px; }
+.ac-ghead { display:flex; align-items:baseline; gap:8px; margin:0 0 12px; font-size:.72rem; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.ac-ghead span { font-variant-numeric:tabular-nums; color:var(--ink-2); }
+.sp-mini.is-feat { color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 10%, transparent); border-color:transparent; }
+/* éditeur : affichage (2 cases) + marques visées, marge par palier, lien de fiche à droite du titre */
+.ac-show { display:flex; flex-wrap:wrap; gap:8px 22px; min-height:43px; align-items:center; }
+.ac-show label { font-size:.94rem; cursor:pointer; }
+.ac-brands { display:flex; flex-wrap:wrap; gap:6px; }
+.ac-brands[hidden] { display:none; }
+.tier-row .tier-m { min-width:118px; font-size:.84rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.tier-row .tier-m.pos { color:var(--good); } .tier-row .tier-m.neg { color:var(--bad); }
+.ac-mbox { padding:9px 12px; font-size:.94rem; line-height:1.5; }   /* même hauteur qu’un champ */
+.ac-fiche-head { flex-direction:row; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 14px; }
+.ac-fiche-head .sp-fiche-links { min-height:0; }
 .card-desc { margin:-2px 0 0; font-size:.8rem; line-height:1.45; color:var(--muted);
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 /* tableau prix : libellé + prix à gauche, marge à droite (client, dealer, paliers dealer) */

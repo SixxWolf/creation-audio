@@ -117,17 +117,64 @@
 
   /* ---------- données ---------- */
   var products = [], byId = {}, brandInfo = {}, brands = [], brandByName = {};
-  var accessories = [], accById = {};
+  var accessories = [], accById = {}, accCats = [];
   var dataReady = false;
+  // Accessoire (admin › Accessoires) : catégorie (puces + rabais cumulé), affichage sur la
+  // fiche filament (marques visées ; aucune = toutes), fiche détaillée #/a/<slug>.
   function normAcc(p) {
-    return { id: p.id, name: p.name, desc: (p.attrs && p.attrs.description) || '',
-             price: +p.sell_price || 0, img: publicUrl(p.image_path),
-             qty: (p.qty == null ? null : (p.qty | 0)) };
+    var a = p.attrs || {}, seen = {}, imgs = [];
+    [p.image_path].concat(Array.isArray(a.gallery) ? a.gallery : []).forEach(function (path) {
+      if (typeof path !== 'string' || !path || seen[path]) return;
+      seen[path] = 1; var u = publicUrl(path); if (u) imgs.push(u);
+    });
+    return { id: p.id, name: p.name, desc: a.description || '',
+             price: +p.sell_price || 0, img: imgs[0] || '', imgs: imgs,
+             qty: (p.qty == null ? null : (p.qty | 0)),
+             tiers: normalizeTiers(p.tiers).filter(function (t) { return t.min > 1; }),
+             cat: String(a.category || '').trim(),
+             onFil: a.on_filament === true,
+             filBrands: Array.isArray(a.fil_brands) ? a.fil_brands : [],
+             slug: p.slug || slugify(p.name),
+             longDesc: a.long_desc || '',
+             specs: Array.isArray(a.specs) ? a.specs.filter(function (s) { return s && (s.k || s.v); }) : [] };
   }
+  function accOut(a) { return a.qty != null && a.qty <= 0; }
+  function accCatKey(a) { return a.cat ? a.cat.toLowerCase() : ''; }
+  function accCatName(a) { return a.cat || 'Autres'; }
+  // meilleur palier (le plus bas prix atteignable en quantité), null si aucun
+  function accBestTier(a) { return a.tiers.length ? a.tiers[a.tiers.length - 1] : null; }
+  // catégories dans l'ordre de l'admin (1er accessoire de chaque) ; sans catégorie = « Autres », en dernier
+  function buildAccCats() {
+    var map = {}, order = [];
+    accessories.forEach(function (a) {
+      var k = accCatKey(a);
+      if (!map[k]) { map[k] = { key: k, name: accCatName(a), slug: slugify(accCatName(a)), items: [] }; order.push(k); }
+      map[k].items.push(a);
+    });
+    order.sort(function (x, y) { return (x === '' ? 1 : 0) - (y === '' ? 1 : 0); });
+    accCats = order.map(function (k) { return map[k]; });
+  }
+  function accCatOf(a) { var k = accCatKey(a); return accCats.filter(function (c) { return c.key === k; })[0] || null; }
 
   var screenCatalog = $('#screen-catalog'), screenProduct = $('#screen-product'),
       catGroups = $('#cat-groups'), catChips = $('#cat-chips'), catHero = $('.cat-hero'),
       crumbsEl = $('#crumbs'), configEl = $('#config');
+  var screenAccs = $('#screen-accs'), screenAcc = $('#screen-acc'),
+      accGroupsEl = $('#acc-groups'), accChipsEl = $('#acc-chips'), accCrumbsEl = $('#acc-crumbs'), accConfigEl = $('#acc-config');
+  // un seul écran visible à la fois ; l'onglet du menu suit (Filaments / Accessoires)
+  function showScreen(name) {
+    screenCatalog.hidden = name !== 'catalog';
+    screenProduct.hidden = name !== 'product';
+    screenAccs.hidden = name !== 'accs';
+    screenAcc.hidden = name !== 'acc';
+    var acc = name === 'accs' || name === 'acc';
+    $$('.home-nav a, .drawer-links a').forEach(function (a) {
+      var h = a.getAttribute('href') || '';
+      var on = acc ? /#\/accessoires$/.test(h) : /^boutique\.html(#\/)?$/.test(h);
+      a.classList.toggle('is-active', on);
+      if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
 
   // Préférence « en stock seulement » (confort par visiteur : jamais bloquant si le stockage échoue)
   var onlyStock = false;
@@ -138,6 +185,7 @@
     $$('.js-only-stock').forEach(function (i) { i.checked = onlyStock; });
     if (!screenCatalog.hidden) renderCatalog();
     if (!screenProduct.hidden && curColor) renderConfig();
+    if (!screenAccs.hidden) renderAccs();
   }
   document.addEventListener('change', function (e) {
     if (e.target && e.target.classList && e.target.classList.contains('js-only-stock')) setOnlyStock(e.target.checked);
@@ -193,8 +241,24 @@
     })[0];
     return hit ? hit.id : null;
   }
+  // Accessoires : #/accessoires · #/accessoires/<catégorie> · #/a/<accessoire> (slug perso ou auto, ou ancien id)
+  function accRouteFor(cat) { return '#/accessoires' + (cat ? '/' + cat.slug : ''); }
+  function accHref(a) { return '#/a/' + encodeURIComponent(a.slug); }
+  function resolveAccCat(seg) {
+    var dec = unslug(seg);
+    return accCats.filter(function (c) { return c.slug === seg || c.name === dec; })[0] || null;
+  }
+  function resolveAcc(seg) {
+    var dec = unslug(seg);
+    return accessories.filter(function (a) { return a.slug === dec || slugify(a.name) === seg || a.id === seg; })[0] || null;
+  }
   function currentRoute() {
     var parts = location.hash.replace(/^#\/?/, '').split('/');
+    if (parts[0] === 'accessoires') {
+      var cat = parts[1] ? resolveAccCat(parts[1]) : null;
+      return { accs: true, cat: cat, badCat: !!parts[1] && !cat };
+    }
+    if (parts[0] === 'a') return { acc: parts[1] ? resolveAcc(parts[1]) : null, accRoute: true };
     if (parts[0] !== 'm' || !parts[1]) return { brand: null };
     var brand = resolveBrand(parts[1]);
     if (!brand) return { brand: null, bad: true };
@@ -216,6 +280,8 @@
   function applyRoute() {
     if (!dataReady) return;                         // rejoué une fois les données chargées
     var r = currentRoute();
+    if (r.accs) { if (r.badCat) { replaceRoute('#/accessoires'); return; } showAccs(r.cat); return; }
+    if (r.accRoute) { if (!r.acc) { replaceRoute('#/accessoires'); return; } showAcc(r.acc); return; }
     if (r.bad) { replaceRoute('#/'); return; }
     if (r.badMat) { replaceRoute(routeFor(r.brand)); return; }
     if (r.material) { showProduct(matOf(r.brand, r.material), r.colorId); return; }
@@ -240,10 +306,13 @@
       accessories = (ac && !ac.error && ac.data ? ac.data : []).map(normAcc);
       accById = {};
       accessories.forEach(function (a) { accById[a.id] = a; });
+      // anciens paniers : ids « spool » / « spoolht » (avant l'admin) restent lisibles
       Object.keys(ACC).forEach(function (k) {
         var a = ACC[k];
-        if (!accById[a.id]) accById[a.id] = { id: a.id, name: a.name, desc: a.desc, price: a.price, img: a.img, qty: null };
+        if (!accById[a.id]) accById[a.id] = { id: a.id, name: a.name, desc: a.desc, price: a.price, img: a.img, imgs: [a.img], qty: null,
+          tiers: [], cat: '', onFil: false, filBrands: [], slug: a.id, longDesc: '', specs: [] };
       });
+      buildAccCats();
       buildCatalog();
       dataReady = true;
       applyRoute();          // honore l'URL courante (lien direct / retour navigateur)
@@ -338,7 +407,7 @@
     var fromProduct = lastScreen === 'product', sameScreen = lastScreen === 'catalog';
     catBrand = brand;
     renderCatalog();
-    screenProduct.hidden = true; screenCatalog.hidden = false;
+    showScreen('catalog');
     curMat = null; curColor = null; updateBuybar();
     document.title = brand ? 'Filaments ' + brand + ' — Création Audio' : BASE_TITLE;
     if (fromProduct && catScrollY != null) window.scrollTo(0, catScrollY);
@@ -448,7 +517,7 @@
     curType = defaultType(curColor); curQty = 1; curImg = 0; curTab = null;
     renderCrumbs();
     renderConfig();
-    screenCatalog.hidden = true; screenProduct.hidden = false;
+    showScreen('product');
     window.scrollTo(0, 0);
     lastScreen = 'product';
   }
@@ -590,19 +659,27 @@
     var featHtml = descLines.length ? '<div class="pdp-feats"><h2>En bref</h2><ul>' +
       descLines.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul></div>' : '';
 
-    // accessoires : admin (products type=accessory) si présents, sinon repli codé en dur
-    var accDisp = accessories.length ? accessories
-      : Object.keys(ACC).map(function (k) { var a = ACC[k]; return { id: a.id, name: a.name, desc: a.desc, price: a.price, img: a.img, qty: null }; });
-    var accHtml = accDisp.length ? '<div class="pdp-accs" id="pdp-accs"><h2>Bobines vides réutilisables</h2>' + accDisp.map(function (a) {
-      var o = a.qty != null && a.qty <= 0;
+    // accessoires cochés « Sur la fiche filament » dans l'admin, pour CETTE marque (aucune marque = toutes)
+    var accDisp = accessories.filter(function (a) {
+      return a.onFil && (!a.filBrands.length || a.filBrands.indexOf(m.brand) !== -1);
+    });
+    var accCatsHere = accDisp.map(accCatName).filter(function (c, i, all) { return all.indexOf(c) === i; });
+    var accTitle = accCatsHere.length === 1 ? accCatsHere[0] : 'Accessoires suggérés';
+    var accHtml = accDisp.length ? '<div class="pdp-accs" id="pdp-accs">' +
+      '<div class="pdp-accs-head"><h2>' + esc(accTitle) + '</h2>' +
+        '<a class="pdp-accs-all" href="#/accessoires">Tous les accessoires ' + IC.arrow + '</a></div>' +
+      accDisp.map(function (a) {
+      var o = accOut(a), best = accBestTier(a);
       return '<div class="acc">' +
-        '<div class="acc-thumb">' + (a.img ? '<img src="' + esc(a.img) + '" alt="" loading="lazy">' : '') + '</div>' +
-        '<div class="acc-main"><div class="acc-name">' + esc(a.name) + '</div>' + (a.desc ? '<div class="acc-desc">' + esc(a.desc) + '</div>' : '') + '</div>' +
-        '<div class="acc-right"><span class="acc-price">' + money(a.price) + '</span>' +
+        '<a class="acc-thumb" href="' + esc(accHref(a)) + '" tabindex="-1" aria-hidden="true">' + (a.img ? '<img src="' + esc(a.img) + '" alt="" loading="lazy">' : '') + '</a>' +
+        '<div class="acc-main"><a class="acc-name" href="' + esc(accHref(a)) + '">' + esc(a.name) + '</a>' + (a.desc ? '<div class="acc-desc">' + esc(a.desc) + '</div>' : '') + '</div>' +
+        '<div class="acc-right"><span class="acc-prices"><span class="acc-price">' + money(a.price) + '</span>' +
+            (best ? '<span class="acc-tier">' + best.min + '+ : ' + money(best.price) + '</span>' : '') + '</span>' +
           '<button type="button" class="acc-add" data-acc="' + esc(a.id) + '"' + (o ? ' disabled' : '') +
             ' aria-label="' + esc((o ? 'Rupture : ' : 'Ajouter au panier : ') + a.name) + '">' + (o ? 'Rupture' : '+ Ajouter') + '</button></div>' +
       '</div>';
     }).join('') + '</div>' : '';
+    var spoolHint = accDisp.some(function (a) { return /bobine/i.test(a.cat + ' ' + a.name); });
 
     configEl.innerHTML =
       '<div class="pdp">' +
@@ -621,7 +698,7 @@
           '<div class="pdp-sec">' +
             '<p class="pdp-label">Format</p>' +
             '<div class="fmt">' + fmtOpt('refill', 'Recharge') + fmtOpt('spool', 'Avec bobine') + '</div>' +
-            (curType === 'refill' && accDisp.length ? '<p class="fmt-note">' + IC.info + '<span>La recharge n\'a pas de bobine : elle s\'installe sur une bobine réutilisable. ' +
+            (curType === 'refill' && spoolHint ? '<p class="fmt-note">' + IC.info + '<span>La recharge n\'a pas de bobine : elle s\'installe sur une bobine réutilisable. ' +
               '<a href="#pdp-accs" class="js-to-accs">Ajouter une bobine vide</a></span></p>' : '') +
           '</div>' +
 
@@ -645,7 +722,7 @@
             '<button type="button" class="btn-add"' + (out ? ' disabled' : '') + '>' + IC.cart + (out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + buySumText() + '</p>' +
-          (out && offered(p, curType) ? notifyHtml(p) : '') +
+          (out && offered(p, curType) ? notifyHtml(filNotify(p)) : '') +
 
           '<ul class="pdp-assure">' +
             '<li>' + IC.pin + 'Ramassage local à Québec, sur rendez-vous</li>' +
@@ -682,25 +759,44 @@
       }).join('') + '</div>' });
     if (!tabs.length) return '';
     if (!curTab || !tabs.some(function (t) { return t.id === curTab; })) curTab = tabs[0].id;
-    return '<section class="pdp-details" aria-label="Détails du ' + esc(m.name) + '">' +
-      '<div class="tabs" role="tablist" aria-label="Détails du ' + esc(m.name) + '">' + tabs.map(function (t) {
-        var on = t.id === curTab;
-        return '<button type="button" class="tab" role="tab" id="tab-' + t.id + '" aria-controls="panel-' + t.id + '" aria-selected="' + on + '" tabindex="' + (on ? '0' : '-1') + '">' +
+    return tabsBlock(tabs, curTab, '', 'Détails du ' + m.name);
+  }
+  // onglets partagés (fiche filament : préfixe '' ; fiche accessoire : 'a') -> ids <pre>tab-x / <pre>panel-x
+  function tabsBlock(tabs, cur, pre, label) {
+    return '<section class="pdp-details" aria-label="' + esc(label) + '">' +
+      '<div class="tabs" role="tablist" aria-label="' + esc(label) + '">' + tabs.map(function (t) {
+        var on = t.id === cur;
+        return '<button type="button" class="tab" role="tab" id="' + pre + 'tab-' + t.id + '" aria-controls="' + pre + 'panel-' + t.id + '" aria-selected="' + on + '" tabindex="' + (on ? '0' : '-1') + '">' +
           esc(t.label) + (t.n ? '<span class="tab-n">' + t.n + '</span>' : '') + '</button>';
       }).join('') + '</div>' +
       tabs.map(function (t) {
-        return '<div class="tabpanel" role="tabpanel" id="panel-' + t.id + '" aria-labelledby="tab-' + t.id + '" tabindex="0"' + (t.id === curTab ? '' : ' hidden') + '>' + t.html + '</div>';
+        return '<div class="tabpanel" role="tabpanel" id="' + pre + 'panel-' + t.id + '" aria-labelledby="' + pre + 'tab-' + t.id + '" tabindex="0"' + (t.id === cur ? '' : ' hidden') + '>' + t.html + '</div>';
       }).join('') +
     '</section>';
   }
-  function selectTab(id, focus) {
-    curTab = id;
-    $$('.tab', configEl).forEach(function (t) {
-      var on = t.id === 'tab-' + id;
+  function selectTabIn(root, pre, id, focus) {
+    $$('.tab', root).forEach(function (t) {
+      var on = t.id === pre + 'tab-' + id;
       t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1;
       if (on && focus) t.focus();
     });
-    $$('.tabpanel', configEl).forEach(function (p) { p.hidden = p.id !== 'panel-' + id; });
+    $$('.tabpanel', root).forEach(function (p) { p.hidden = p.id !== pre + 'panel-' + id; });
+  }
+  // onglets au clavier (flèches gauche/droite, Début/Fin) ; onSel(id) mémorise l'onglet choisi
+  function wireTabs(root, pre, onSel) {
+    var tabs = $$('.tab', root);
+    function sel(t, focus) { var id = t.id.slice((pre + 'tab-').length); onSel(id); selectTabIn(root, pre, id, focus); }
+    tabs.forEach(function (t, i) {
+      t.addEventListener('click', function () { sel(t); });
+      t.addEventListener('keydown', function (e) {
+        var j = -1;
+        if (e.key === 'ArrowRight') j = (i + 1) % tabs.length;
+        else if (e.key === 'ArrowLeft') j = (i - 1 + tabs.length) % tabs.length;
+        else if (e.key === 'Home') j = 0; else if (e.key === 'End') j = tabs.length - 1;
+        if (j < 0) return;
+        e.preventDefault(); sel(tabs[j], true);
+      });
+    });
   }
 
   /* ---------- autres matériaux (même marque, sinon toutes) ---------- */
@@ -722,29 +818,35 @@
      anti-pourriel côté serveur). Champ piège « website » caché = honeypot.
      Loi 25 : usage annoncé au moment de la collecte + lien vers la politique. */
   var notifyDone = {};   // "id|format" -> message de confirmation (survit aux re-rendus)
-  function notifyHtml(p) {
-    var key = p.id + '|' + curType, done = notifyDone[key];
+  // o = { id, kind ('spool'|'refill'|'item'), what (produit nommé dans la mention légale),
+  //       the (« le Noir (recharge) » dans la confirmation), uid (préfixe d'id du champ) }
+  function filNotify(p) {
+    return { id: p.id, kind: curType, what: p.name + ', ' + fmtName(curType),
+             the: 'le ' + p.name + ' (' + fmtName(curType) + ')', uid: 'cfg' };
+  }
+  function notifyHtml(o) {
+    var done = notifyDone[o.id + '|' + o.kind], fid = o.uid + '-notify-email';
     return '<div class="cfg-notify">' +
       '<div class="cfg-notify-title">' + IC.bell + 'M\'aviser quand c\'est de retour</div>' +
       (done ? '<p class="cfg-notify-msg ok">' + esc(done) + '</p>' :
       '<form class="cfg-notify-form" novalidate>' +
-        '<label class="sr-only" for="cfg-notify-email">Ton courriel</label>' +
-        '<input type="email" id="cfg-notify-email" class="cfg-notify-email" required maxlength="254" autocomplete="email" placeholder="ton@courriel.com">' +
+        '<label class="sr-only" for="' + fid + '">Ton courriel</label>' +
+        '<input type="email" id="' + fid + '" class="cfg-notify-email" required maxlength="254" autocomplete="email" placeholder="ton@courriel.com">' +
         '<input type="text" name="website" class="cfg-hp" tabindex="-1" autocomplete="off" aria-hidden="true">' +
         '<button type="submit" class="cfg-notify-btn">M\'aviser</button>' +
       '</form>' +
       '<p class="cfg-notify-msg" aria-live="polite"></p>' +
       '<p class="cfg-notify-legal">On utilise ton courriel <strong>uniquement</strong> pour t\'aviser de l\'arrivée de ce produit (' +
-        esc(p.name) + ', ' + fmtName(curType) + '), puis il est supprimé. ' +
+        esc(o.what) + '), puis il est supprimé. ' +
         '<a href="confidentialite.html#liste-attente">Politique de confidentialité</a></p>') +
     '</div>';
   }
-  function wireNotify() {
-    var form = $('.cfg-notify-form', configEl); if (!form) return;
-    var p = curColor, type = curType;
+  function wireNotify(root, o, rerender) {
+    var form = $('.cfg-notify-form', root); if (!form) return;
+    var type = o.kind, p = { id: o.id };
     form.addEventListener('submit', function (e) {
       e.preventDefault();
-      var email = $('.cfg-notify-email', form), btn = $('.cfg-notify-btn', form), msg = $('.cfg-notify-msg', configEl);
+      var email = $('.cfg-notify-email', form), btn = $('.cfg-notify-btn', form), msg = $('.cfg-notify-msg', root);
       var val = (email.value || '').trim();
       function say(t, cls) { msg.textContent = t; msg.className = 'cfg-notify-msg' + (cls ? ' ' + cls : ''); }
       if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(val)) { say('Entre un courriel valide.', 'bad'); email.focus(); return; }
@@ -756,9 +858,9 @@
           var r = res && !res.error ? res.data : null;
           if (r === 'ok' || r === 'exists') {
             notifyDone[p.id + '|' + type] = r === 'ok'
-              ? '✓ C\'est noté ! On t\'écrit dès que le ' + p.name + ' (' + fmtName(type) + ') est de retour.'
+              ? '✓ C\'est noté ! On t\'écrit dès que ' + o.the + ' est de retour.'
               : 'Tu es déjà sur la liste pour ce produit — on t\'écrit dès son arrivée.';
-            if (curColor === p && curType === type) renderConfig();
+            rerender();
             return;
           }
           if (r === 'invalid') say('Ce courriel semble invalide.', 'bad');
@@ -771,7 +873,8 @@
   var swFocus = false;
   function wireConfig() {
     wireMedia();
-    wireNotify();
+    var np = curColor, nt = curType;
+    wireNotify(configEl, filNotify(np), function () { if (curColor === np && curType === nt) renderConfig(); });
     $$('.fmt-opt', configEl).forEach(function (b) {
       b.addEventListener('click', function () {
         curType = b.getAttribute('data-type'); curQty = 1; curImg = 0; renderConfig();
@@ -840,22 +943,234 @@
     var showAll = $('.js-show-all', configEl);
     if (showAll) showAll.addEventListener('click', function () { setOnlyStock(false); });
 
-    // onglets (flèches gauche/droite, Début/Fin)
-    var tabs = $$('.tab', configEl);
-    tabs.forEach(function (t, i) {
-      t.addEventListener('click', function () { selectTab(t.id.replace('tab-', '')); });
-      t.addEventListener('keydown', function (e) {
-        var j = -1;
-        if (e.key === 'ArrowRight') j = (i + 1) % tabs.length;
-        else if (e.key === 'ArrowLeft') j = (i - 1 + tabs.length) % tabs.length;
-        else if (e.key === 'Home') j = 0; else if (e.key === 'End') j = tabs.length - 1;
-        if (j < 0) return;
-        e.preventDefault(); selectTab(tabs[j].id.replace('tab-', ''), true);
-      });
-    });
+    wireTabs(configEl, '', function (id) { curTab = id; });
     var galUrls = galleryOf(curMat).map(publicUrl);
     $$('.gal-shot', configEl).forEach(function (b) {
       b.addEventListener('click', function () { openLightbox(galUrls, +b.getAttribute('data-i')); });
+    });
+  }
+
+  /* =========================================================
+     ACCESSOIRES — catalogue par catégorie (#/accessoires[/<catégorie>])
+     puis fiche (#/a/<slug>). Même panier que les filaments.
+     ========================================================= */
+  var accCat = null, accsScrollY = null, curAcc = null, accQty = 1, accImg = 0, accTab = null;
+
+  function showAccs(cat) {
+    var fromAcc = lastScreen === 'acc', same = lastScreen === 'accs';
+    accCat = cat || null;
+    renderAccs();
+    showScreen('accs');
+    curMat = null; curColor = null; curAcc = null; updateBuybar();
+    document.title = (accCat ? accCat.name + ' — ' : '') + 'Accessoires · Création Audio';
+    if (fromAcc && accsScrollY != null) window.scrollTo(0, accsScrollY);
+    else if (same) {
+      var hero = $('.cat-hero', screenAccs);
+      var y = hero.getBoundingClientRect().bottom + window.pageYOffset - topOffset();
+      if (window.pageYOffset > y) window.scrollTo(0, y);
+    } else window.scrollTo(0, 0);
+    lastScreen = 'accs';
+  }
+
+  function renderAccs() {
+    var inStock = accessories.filter(function (a) { return !accOut(a); }).length;
+    $('#acc-st-items').textContent = accessories.length;
+    $('#acc-st-stock').textContent = inStock;
+    $('#acc-st-cats').textContent = accCats.length;
+    var shown = function (items) { return onlyStock ? items.filter(function (a) { return !accOut(a); }) : items; };
+    accChipsEl.innerHTML = accCats.length < 2 ? '' :
+      '<a class="chip" href="#/accessoires"' + (!accCat ? ' aria-current="true"' : '') + '>Toutes <span class="chip-n">' + shown(accessories).length + '</span></a>' +
+      accCats.map(function (c) {
+        return '<a class="chip" href="' + esc(accRouteFor(c)) + '"' + (accCat === c ? ' aria-current="true"' : '') + '>' +
+          esc(c.name) + ' <span class="chip-n">' + shown(c.items).length + '</span></a>';
+      }).join('');
+    var list = accCat ? [accCat] : accCats;
+    var html = list.map(function (c) {
+      var items = shown(c.items);
+      if (!items.length) return '';
+      var nStock = c.items.filter(function (a) { return !accOut(a); }).length, id = 'ag-' + c.slug;
+      return '<section class="cat-group" aria-labelledby="' + id + '">' +
+        '<header class="cat-ghead">' +
+          '<h2 class="cat-gtitle" id="' + id + '">' + esc(c.name) + '</h2>' +
+          '<span class="cat-gmeta">' + plural(c.items.length, 'modèle', 'modèles') + ' · ' + nStock + ' en stock</span>' +
+          '<span class="cat-grule" aria-hidden="true"></span>' +
+        '</header>' +
+        '<div class="cat-grid">' + items.map(accCard).join('') + '</div>' +
+      '</section>';
+    }).join('');
+    if (!html) {
+      html = '<p class="empty">' + (onlyStock && accessories.length
+        ? 'Rien en stock ' + (accCat ? 'dans « ' + esc(accCat.name) + ' » ' : '') + 'pour le moment. ' +
+          '<button type="button" class="js-show-all">Voir aussi les ruptures</button>'
+        : 'Aucun accessoire pour le moment.') + '</p>';
+    }
+    accGroupsEl.innerHTML = html;
+    var sa = $('.js-show-all', accGroupsEl);
+    if (sa) sa.addEventListener('click', function () { setOnlyStock(false); });
+  }
+
+  function accCard(a) {
+    var out = accOut(a), best = accBestTier(a);
+    var tag = String(a.desc || '').split(/\r?\n/)[0].trim();
+    if (tag.length > 90) tag = tag.slice(0, 88).replace(/\s+\S*$/, '') + '…';
+    return '<a class="mcard acard' + (out ? ' is-out' : '') + '" href="' + esc(accHref(a)) + '">' +
+      '<span class="mcard-media">' + (a.img ? '<img src="' + esc(a.img) + '" alt="" loading="lazy">'
+        : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') + '</span>' +
+      '<span class="mcard-body">' +
+        '<span class="mcard-name">' + esc(a.name) + '</span>' +
+        (tag ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +
+        '<span class="mcard-foot">' +
+          '<span class="mcard-price"><b>' + money(a.price) + '</b>' +
+            (best ? '<small>' + money(best.price) + ' dès ' + best.min + '</small>' : '') + '</span>' +
+          (out ? '<span class="pill out">Rupture</span>' : '') +
+        '</span>' +
+      '</span>' +
+    '</a>';
+  }
+
+  /* ---------- fiche accessoire ---------- */
+  function showAcc(a) {
+    if (lastScreen === 'accs') accsScrollY = window.pageYOffset;
+    if (curAcc !== a) { accQty = 1; accImg = 0; accTab = null; }
+    curAcc = a; curMat = null; curColor = null;
+    renderAccCrumbs();
+    renderAcc();
+    showScreen('acc');
+    updateBuybar();
+    window.scrollTo(0, 0);
+    lastScreen = 'acc';
+  }
+  function renderAccCrumbs() {
+    var c = accCatOf(curAcc);
+    accCrumbsEl.innerHTML = '<a href="#/accessoires">Accessoires</a>' + IC.chev +
+      (c && accCats.length > 1 ? '<a href="' + esc(accRouteFor(c)) + '">' + esc(c.name) + '</a>' + IC.chev : '') +
+      '<span aria-current="page">' + esc(curAcc.name) + '</span>';
+  }
+  // palier : quantité choisie + ce qui est déjà au panier dans la même catégorie
+  function accUnitNow() { return tierPrice(curAcc.price, curAcc.tiers, accQty + accGroupQty(curAcc)); }
+  function accTierGridHtml() {
+    var a = curAcc;
+    if (!a.tiers.length) return '';
+    var rows = [{ min: 1, price: a.price }].concat(a.tiers);
+    var n = accQty + accGroupQty(a), on = 0;
+    rows.forEach(function (t, i) { if (n >= t.min) on = i; });
+    return '<div class="pdp-tiers">' +
+      '<p class="pdp-tiers-head">Prix selon la quantité' + (a.cat ? ' <span>' + esc(a.cat) + ' : modèles mélangés</span>' : '') + '</p>' +
+      '<div class="pdp-tiergrid">' + rows.map(function (t, i) {
+        return '<div class="pdp-tier' + (i === on ? ' is-on' : '') + '"' + (i === on ? ' aria-current="true"' : '') + '>' +
+          '<span class="pt-q">' + (i === 0 ? '1' : t.min + '+') + '</span><span class="pt-p">' + money(t.price) + '</span></div>';
+      }).join('') + '</div></div>';
+  }
+  function accBuySum() {
+    var u = accUnitNow();
+    if (accQty < 2 && u >= curAcc.price) return '';
+    return accQty + ' × ' + money(u) + ' = <b>' + money(u * accQty) + '</b>' + (u < curAcc.price ? ' <em>· rabais quantité</em>' : '');
+  }
+  function accMediaHtml() {
+    var a = curAcc, imgs = a.imgs || [], u = imgs[accImg];
+    var stage = u
+      ? '<button type="button" class="pdp-stage" aria-label="Agrandir la photo"><img src="' + esc(u) + '" alt="' + esc(a.name) + '">' +
+          '<span class="pdp-zoom" aria-hidden="true">' + IC.zoom + '</span></button>'
+      : '<div class="pdp-stage no-zoom"><span class="sp-noimg big" aria-hidden="true">' + IC.cart + '</span></div>';
+    var thumbs = imgs.length > 1 ? '<div class="pdp-thumbs">' + imgs.map(function (t, i) {
+      return '<button type="button" class="pdp-thumb' + (i === accImg ? ' is-active' : '') + '" data-i="' + i + '"' +
+        ' aria-label="Photo ' + (i + 1) + ' sur ' + imgs.length + '"' + (i === accImg ? ' aria-current="true"' : '') + '>' +
+        '<img src="' + esc(t) + '" alt="" loading="lazy"></button>';
+    }).join('') + '</div>' : '';
+    return stage + thumbs;
+  }
+  function accNotify(a) { return { id: a.id, kind: 'item', what: a.name, the: '« ' + a.name + ' »', uid: 'acc' }; }
+
+  function renderAcc() {
+    var a = curAcc, out = accOut(a), c = accCatOf(a);
+    if (accImg >= (a.imgs || []).length) accImg = 0;
+    var tabs = [];
+    var paras = String(a.longDesc || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    if (paras.length) tabs.push({ id: 'desc', label: 'Description',
+      html: '<div class="pdp-desc">' + paras.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>' });
+    if (a.specs.length) tabs.push({ id: 'specs', label: 'Spécifications',
+      html: '<dl class="specs">' + a.specs.map(function (s) { return '<div class="spec"><dt>' + esc(s.k) + '</dt><dd>' + esc(s.v) + '</dd></div>'; }).join('') + '</dl>' });
+    if (tabs.length && (!accTab || !tabs.some(function (t) { return t.id === accTab; }))) accTab = tabs[0].id;
+    var others = c ? c.items.filter(function (x) { return x !== a; }) : [];
+    others = others.slice().sort(function (x, y) { return (accOut(x) ? 1 : 0) - (accOut(y) ? 1 : 0); }).slice(0, 4);
+
+    accConfigEl.innerHTML =
+      '<div class="pdp">' +
+        '<div class="pdp-media">' + accMediaHtml() + '</div>' +
+        '<div class="pdp-panel">' +
+          '<p class="pdp-eyebrow">' + esc(accCatName(a)) + '</p>' +
+          '<h1 class="pdp-name">' + esc(a.name) + '</h1>' +
+          '<div class="pdp-priceline">' +
+            '<span class="pdp-price">' + money(a.price) + '<small>/ unité</small></span>' +
+            (a.qty != null ? '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? 'Rupture' : a.qty + ' en stock') + '</span>' : '') +
+          '</div>' +
+          '<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>' +
+          '<div class="js-tiers">' + accTierGridHtml() + '</div>' +
+          (a.desc ? '<p class="pdp-lede">' + esc(a.desc) + '</p>' : '') +
+          '<div class="cfg-buy">' +
+            (out ? '' :
+            '<div class="qty">' +
+              '<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>' +
+              '<input type="number" class="q-val" aria-label="Quantité" min="1"' + (a.qty != null ? ' max="' + a.qty + '"' : '') + ' value="' + accQty + '" inputmode="numeric">' +
+              '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
+            '</div>') +
+            '<button type="button" class="btn-add"' + (out ? ' disabled' : '') + '>' + IC.cart + (out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+          '</div>' +
+          '<p class="buy-sum" aria-live="polite">' + accBuySum() + '</p>' +
+          (out ? notifyHtml(accNotify(a)) : '') +
+          '<ul class="pdp-assure">' +
+            '<li>' + IC.pin + 'Ramassage local à Québec, sur rendez-vous</li>' +
+            '<li>' + IC.chat + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
+            '<li>' + IC.card + 'Aucun paiement en ligne</li>' +
+          '</ul>' +
+        '</div>' +
+      '</div>' +
+      (tabs.length ? tabsBlock(tabs, accTab, 'a', 'Détails de ' + a.name) : '') +
+      (others.length ? '<section class="pdp-related" aria-labelledby="arel-title">' +
+        '<div class="rel-head"><h2 id="arel-title">Autres ' + esc(accCatName(a).toLowerCase()) + '</h2>' +
+          '<a class="rel-link" href="' + esc(accRouteFor(c)) + '">Tout voir ' + IC.arrow + '</a></div>' +
+        '<div class="cat-grid">' + others.map(accCard).join('') + '</div>' +
+      '</section>' : '');
+
+    document.title = a.name + ' — Accessoires · Création Audio';
+    wireAcc();
+  }
+
+  function wireAcc() {
+    var a = curAcc, root = accConfigEl;
+    (function wireMediaAcc() {
+      var st = $('.pdp-stage', root);
+      if (st && st.tagName === 'BUTTON') st.addEventListener('click', function () { openLightbox(a.imgs, accImg); });
+      $$('.pdp-thumb', root).forEach(function (b) {
+        b.addEventListener('click', function () {
+          accImg = +b.getAttribute('data-i');
+          $('.pdp-media', root).innerHTML = accMediaHtml(); wireMediaAcc();
+          var t = $('.pdp-thumb[data-i="' + accImg + '"]', root); if (t) t.focus();
+        });
+      });
+    })();
+    wireNotify(root, accNotify(a), function () { if (curAcc === a) renderAcc(); });
+    wireTabs(root, 'a', function (id) { accTab = id; });
+
+    var qv = $('.q-val', root), sum = $('.buy-sum', root), tiersBox = $('.js-tiers', root);
+    function refresh() { sum.innerHTML = accBuySum(); if (tiersBox) tiersBox.innerHTML = accTierGridHtml(); }
+    onCartChange = refresh;
+    function setQ(n) {
+      if (isNaN(n) || n < 1) n = 1;
+      if (a.qty != null && a.qty > 0 && n > a.qty) { n = a.qty; toast('Maximum ' + a.qty + ' en stock.'); }
+      accQty = n; if (qv) qv.value = n; refresh();
+    }
+    if (qv) {
+      $('.q-minus', root).addEventListener('click', function () { setQ(accQty - 1); });
+      $('.q-plus', root).addEventListener('click', function () { setQ(accQty + 1); });
+      qv.addEventListener('change', function () { setQ(parseInt(this.value, 10)); });
+      qv.addEventListener('focus', function () { this.select(); });
+    }
+    var add = $('.btn-add', root);
+    if (add) add.addEventListener('click', function () {
+      if (add.disabled) return;
+      flyToCart($('.pdp-stage img', root));
+      addAccessory(a.id, accQty);
     });
   }
 
@@ -964,8 +1279,17 @@
       return s + (q && groupKey(q) === g ? it.qty : 0);
     }, 0);
   }
+  // Accessoires : palier calculé sur le TOTAL de la même catégorie dans le panier
+  // (ex. bobines Bambu 70 °C + Sunlu = une seule quantité), chaque modèle garde sa grille
+  function accGroupQty(a) {
+    var k = accCatKey(a);
+    return Object.keys(cart).reduce(function (s, key) {
+      var it = cart[key], b = it.type === 'accessory' && accById[it.id];
+      return s + (b && (b === a || (k && accCatKey(b) === k)) ? it.qty : 0);
+    }, 0);
+  }
   function unitOf(it) {
-    if (it.type === 'accessory') return accById[it.id] ? accById[it.id].price : 0;
+    if (it.type === 'accessory') { var a = accById[it.id]; return a ? tierPrice(a.price, a.tiers, accGroupQty(a)) : 0; }
     var p = byId[it.id]; if (!p) return 0;
     return tierPrice(baseOf(p, it.type), tiersOf(p, it.type), groupQty(p, it.type));
   }
@@ -983,15 +1307,19 @@
     saveCart(); renderCart();
     toast(p.name + ' — ' + fmtShort(type) + ' ajouté au panier.');
   }
-  function addAccessory(id) {
+  // qty absente = « + Ajouter » du bloc de la fiche filament (1 de plus, le panier pulse) ;
+  // qty donnée = fiche accessoire (la photo vole déjà vers le panier)
+  function addAccessory(id, qty) {
     var a = accById[id]; if (!a) return;
     var k = keyOf(id, 'accessory');
     var cur = cart[k] ? cart[k].qty : 0;
     var max = (a.qty == null ? Infinity : a.qty);
     if (cur >= max) { toast('Maximum ' + max + ' en stock.'); return; }
-    cart[k] = { id: id, type: 'accessory', qty: cur + 1 };
-    saveCart(); renderCart(); pulseCart();
-    toast(a.name + ' ajouté au panier.');
+    var next = Math.min(cur + (qty || 1), max);
+    cart[k] = { id: id, type: 'accessory', qty: next };
+    saveCart(); renderCart();
+    if (!qty) pulseCart();
+    toast(a.name + (next - cur > 1 ? ' ×' + (next - cur) : '') + ' ajouté au panier.');
   }
   function changeQty(k, delta) {
     if (!cart[k]) return;
@@ -1046,7 +1374,8 @@
             '<div class="citem-thumb">' + thumbHtml(it) + '</div>' +
             '<div class="citem-main">' +
               '<div class="citem-name">' + esc(m.name) + '</div>' +
-              '<div class="citem-type">' + (it.type === 'accessory' ? 'Accessoire' : esc((m.brand ? m.brand + ' ' : '') + (m.material || ''))) + ' · ' + typeLabel(it) +
+              '<div class="citem-type">' + (it.type === 'accessory' ? esc(m.cat || 'Accessoire')
+                : esc((m.brand ? m.brand + ' ' : '') + (m.material || '')) + ' · ' + typeLabel(it)) +
                 ' · <span class="citem-unit">' + money(unitOf(it)) + '/u</span></div>' +
               '<div class="citem-qty">' +
                 '<button type="button" class="cq-minus" aria-label="Retirer un">&minus;</button>' +
@@ -1069,7 +1398,7 @@
         });
     }
     cartTotal.textContent = money(total());
-    if (onCartChange && lastScreen === 'product') onCartChange();
+    if (onCartChange && (lastScreen === 'product' || lastScreen === 'acc')) onCartChange();
     orderBtn.classList.toggle('is-disabled', n === 0);
     if (emailBtn) emailBtn.classList.toggle('is-disabled', n === 0);
   }
@@ -1206,6 +1535,11 @@
         var st = stockOf(curColor, curType);
         if (st > 0 && curQty > st) curQty = st;
         renderConfig();
+      }
+      if (!screenAccs.hidden && !focusedIn(accGroupsEl)) renderAccs();
+      if (curAcc && !screenAcc.hidden && !focusedIn(accConfigEl)) {
+        if (curAcc.qty != null && curAcc.qty > 0 && accQty > curAcc.qty) accQty = curAcc.qty;
+        renderAcc();
       }
     }, function () { refreshing = false; });
   }
