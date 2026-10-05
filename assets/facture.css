@@ -160,6 +160,36 @@
 .inv-qty:focus, .inv-price:focus, .inv-label:focus, .inv-cat:focus { outline:none; border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.2); }
 .inv-del { border:none; background:none; color:var(--muted); cursor:pointer; font-size:1.15rem; line-height:1; padding:2px 6px; }
 .inv-del:hover { color:var(--bad); }
+/* Aperçu à l'écran seulement (l'impression garde le tableau tel quel). La règle de base des champs
+   (input[type=…]) l'emporte sur .inv-qty/.inv-price : on fixe ici Qté et Prix, la description prend
+   le reste ; si la feuille est étroite (téléphone, colonne serrée à côté du catalogue), l'en-tête
+   s'empile et chaque ligne passe sur deux rangées : description, puis qté × prix … montant. */
+@media screen {
+  #fx-invoice { container:fx-invoice / inline-size; }
+  #fx-invoice .inv-table th.num, #fx-invoice .inv-table td.num { width:1%; white-space:nowrap; }
+  #fx-invoice .inv-qty, #fx-invoice .inv-price, #fx-invoice .inv-label { padding:6px 8px; }
+  #fx-invoice .inv-qty { width:60px; }
+  #fx-invoice .inv-price { width:92px; }
+  @container fx-invoice (max-width:479px) {
+    #fx-invoice .inv-top { flex-direction:column; }
+    #fx-invoice .inv-title { text-align:left; }
+    #fx-invoice .inv-table, #fx-invoice .inv-table tbody { display:block; }
+    #fx-invoice .inv-table thead { display:none; }
+    #fx-invoice .inv-table tbody { border-top:1.5px solid var(--line); }
+    #fx-invoice .inv-table tr { display:grid; grid-template-columns:56px 96px minmax(0, 1fr) 28px;
+      grid-template-areas:"desc desc desc del" "qty price amt amt"; align-items:center; gap:8px;
+      padding:10px 0; border-bottom:1px solid var(--line); }
+    #fx-invoice .inv-table td, #fx-invoice .inv-table td.num { width:auto; padding:0; border:none; }
+    #fx-invoice .inv-table td:nth-child(1) { grid-area:desc; min-width:0; }
+    #fx-invoice .inv-table td:nth-child(2) { grid-area:qty; }
+    #fx-invoice .inv-table td:nth-child(3) { grid-area:price; display:flex; align-items:center; gap:6px; }
+    #fx-invoice .inv-table td:nth-child(3)::before { content:'×'; color:var(--muted); }
+    #fx-invoice .inv-table td:nth-child(4) { grid-area:amt; }
+    #fx-invoice .inv-table td:nth-child(5) { grid-area:del; }
+    #fx-invoice .inv-table tr:has(.inv-label) > td:nth-child(5) { align-self:start; padding-top:7px; }   /* × en face du champ */
+    #fx-invoice .inv-qty, #fx-invoice .inv-price { width:100%; min-width:0; }
+  }
+}
 
 .inv-tot { margin-left:auto; width:min(320px, 100%); }
 .inv-tot .line { display:flex; justify-content:space-between; padding:5px 0; font-variant-numeric:tabular-nums; }
