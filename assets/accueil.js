@@ -416,7 +416,7 @@
      Apparition douce des sections au défilement
      ========================================================= */
   if ('IntersectionObserver' in window && !reduceMotion) {
-    var targets = $$('.sec-head, .mat-groups, .pop-grid, .steps, .bento, .box-panel, .contact-card');
+    var targets = $$('.sec-head, .mat-groups, .pop-grid, .steps, .bento, .contact-card');
     var io = new IntersectionObserver(function (en) {
       en.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
     }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });

@@ -39,7 +39,7 @@
     if (isNaN(d)) return fmtDateFR(ts);
     try { return d.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) { return fmtDateFR(ts); }
   }
-  var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', caisson: 'Caisson', mixte: 'Mixte' };
+  var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', mixte: 'Mixte' };
 
   var DEFAULT_CO = {
     name: 'Création Audio', tagline: 'Audio automobile & impression 3D — Québec',
@@ -125,7 +125,7 @@
     });
   }
   function updateCatCounts() {
-    var counts = { all: 0, filament: 0, spacer: 0, accessory: 0, caisson: 0, mixte: 0 };
+    var counts = { all: 0, filament: 0, spacer: 0, accessory: 0, mixte: 0 };
     invoices.forEach(function (inv) {
       if (!passStatusQuery(inv)) return;
       counts.all++;

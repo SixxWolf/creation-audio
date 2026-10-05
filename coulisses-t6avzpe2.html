@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/admin.css?v=46">
-<link rel="stylesheet" href="assets/facture.css?v=17">
+<link rel="stylesheet" href="assets/facture.css?v=18">
 <link rel="stylesheet" href="assets/autoloop.css?v=25">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
@@ -1082,7 +1082,6 @@
           <button type="button" class="fx-seg-btn is-active" data-cat="filament">Filament</button>
           <button type="button" class="fx-seg-btn" data-cat="spacer">Spacer</button>
           <button type="button" class="fx-seg-btn" data-cat="accessory">Accessoire</button>
-          <button type="button" class="fx-seg-btn" data-cat="caisson">Caisson</button>
         </div>
         <label class="fx-check"><input type="checkbox" id="fx-tax"> Taxes (TPS/TVQ)</label>
         <span class="fx-scan-feedback no-print" id="fx-scan-feedback" aria-live="polite"
@@ -1209,7 +1208,7 @@
 
       <!-- Corps : catalogue (gauche) + facture (droite) -->
       <div class="fx-layout">
-        <!-- Colonne gauche : catalogue OU lignes libres (caisson) -->
+        <!-- Colonne gauche : catalogue -->
         <aside class="fx-side">
           <!-- Catalogue produits (filament / spacer) -->
           <div class="fx-picker" id="fx-picker">
@@ -1227,22 +1226,7 @@
             <div class="fx-catalog" id="fx-catalog"><p class="muted">Chargement…</p></div>
           </div>
 
-          <!-- Panneau caisson : specs + ligne libre -->
-          <div class="fx-caisson" id="fx-caisson" hidden>
-            <h3>Spécifications du caisson</h3>
-            <div class="fx-spec-grid">
-              <div class="field"><label class="lbl" for="cx-vehicle">Véhicule</label><input type="text" id="cx-vehicle" placeholder="Ex. Civic 2018" autocomplete="off"></div>
-              <div class="field"><label class="lbl" for="cx-litrage">Litrage / config</label><input type="text" id="cx-litrage" placeholder="Ex. 1 pi³ scellé" autocomplete="off"></div>
-              <div class="field"><label class="lbl" for="cx-event">Évent / accord</label><input type="text" id="cx-event" placeholder="Ex. port 32 Hz" autocomplete="off"></div>
-              <div class="field"><label class="lbl" for="cx-finition">Finition</label><input type="text" id="cx-finition" placeholder="Ex. tapis / suède" autocomplete="off"></div>
-            </div>
-            <h3 style="margin-top:16px">Ajouter une ligne</h3>
-            <p class="hint">Matériaux, main-d'œuvre, transport… Chaque ligne est libre.</p>
-            <button type="button" class="btn btn-ghost btn-sm" id="cx-add-line" data-ic="plus">Ligne libre</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="cx-add-labor" data-ic="plus">Main-d'œuvre</button>
-          </div>
-
-          <!-- Bouton ligne libre pour filament/spacer aussi -->
+          <!-- Bouton ligne libre -->
           <button type="button" class="btn btn-ghost btn-sm fx-freeline" id="fx-add-free" data-ic="plus">Ligne libre</button>
         </aside>
 
@@ -1293,7 +1277,6 @@
         <button type="button" class="hist-cbtn" data-c="filament">Filaments <span class="hist-cnt" data-cnt="filament">0</span></button>
         <button type="button" class="hist-cbtn" data-c="spacer">Spacers <span class="hist-cnt" data-cnt="spacer">0</span></button>
         <button type="button" class="hist-cbtn" data-c="accessory">Accessoires <span class="hist-cnt" data-cnt="accessory">0</span></button>
-        <button type="button" class="hist-cbtn" data-c="caisson">Caissons <span class="hist-cnt" data-cnt="caisson">0</span></button>
         <button type="button" class="hist-cbtn" data-c="mixte">Mixtes <span class="hist-cnt" data-cnt="mixte">0</span></button>
       </div>
 
@@ -1707,10 +1690,10 @@
 <script src="assets/cms-attente.js?v=3"></script>
 <script src="assets/cms-dealers.js?v=4"></script>
 <script src="assets/cms-clients.js?v=2"></script>
-<script src="assets/cms-facturation.js?v=27"></script>
-<script src="assets/cms-historique.js?v=8"></script>
+<script src="assets/cms-facturation.js?v=28"></script>
+<script src="assets/cms-historique.js?v=9"></script>
 <script src="assets/cms-commandes.js?v=2"></script>
-<script src="assets/cms-statistiques.js?v=6"></script>
+<script src="assets/cms-statistiques.js?v=7"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
 <script src="assets/cms-autoloop.js?v=38"></script>

@@ -1,10 +1,10 @@
 /* =========================================================
    Création Audio V2 — Facturation (Phase 4)
-   Trois gabarits : Filament · Spacer · Caisson (sur-mesure).
+   Gabarits : Filament · Spacer · Accessoire.
    - Catalogue cliquable lu depuis Supabase (products + materials).
    - Prix hérité du matériau (filament) ou du produit (spacer),
      paliers de rabais appliqués selon la quantité.
-   - Lignes libres (caisson : matériaux + main-d'œuvre + specs).
+   - Lignes libres (main-d'œuvre, divers…).
    - Marge privée (coût) calculée pour l'admin — jamais imprimée.
    - Enregistrement : numéro atomique (RPC), persistance
      (invoices / invoice_lines), déduction de stock (receive_stock).
@@ -87,12 +87,10 @@
       elNumber = $('#fx-number'), elDate = $('#fx-date'), elNote = $('#fx-note'),
       elSearch = $('#fx-search'), elType = $('#fx-type'), elCatalog = $('#fx-catalog'),
       elFilters = $('#fx-filters'), elBrand = $('#fx-brand'), elMaterial = $('#fx-material'),
-      elPicker = $('#fx-picker'), elCaisson = $('#fx-caisson'), elFreeBtn = $('#fx-add-free'),
+      elPicker = $('#fx-picker'), elFreeBtn = $('#fx-add-free'),
       elInvoice = $('#fx-invoice'), elMargin = $('#fx-margin'),
       elSave = $('#fx-save'), elDeduct = $('#fx-deduct'), elDeductWrap = $('#fx-deduct-wrap'),
       elPrint = $('#fx-print'), elEmail = $('#fx-email'), elCopy = $('#fx-copy'), elStatus = $('#fx-status');
-  // specs caisson
-  var cxVehicle = $('#cx-vehicle'), cxLitrage = $('#cx-litrage'), cxEvent = $('#cx-event'), cxFinition = $('#cx-finition');
   // bandeau « modification d'une facture enregistrée »
   var elEditBanner = $('#fx-edit-banner'), elEditNum = $('#fx-edit-num'), elEditCancel = $('#fx-edit-cancel');
   // bandeau « facture de la commande dealer D-0007 »
@@ -216,7 +214,6 @@
   // quiet : chargement en arrière-plan (scanner) — ne touche pas au catalogue affiché
   // s'il s'agit d'un autre gabarit que le courant
   function loadCatalog(which, quiet) {
-    if (which === 'caisson') return Promise.resolve();
     var shown = !quiet || which === cat;
     if (catalogLoaded[which]) { if (shown) buildPicker(); return Promise.resolve(); }
     if (shown) elCatalog.innerHTML = '<p class="muted">Chargement…</p>';
@@ -234,13 +231,9 @@
   function setCat(c) {
     cat = c;
     $$('.fx-seg-btn').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-cat') === c); });
-    var isCaisson = (c === 'caisson');
-    elPicker.hidden = isCaisson;
-    elCaisson.hidden = !isCaisson;
-    elFreeBtn.hidden = isCaisson;                 // le panneau caisson a ses propres boutons
     elType.hidden = (c !== 'filament');
     if (elFilters) elFilters.hidden = (c !== 'filament');
-    if (!isCaisson) loadCatalog(c);
+    loadCatalog(c);
   }
   $$('.fx-seg-btn').forEach(function (b) {
     b.addEventListener('click', function () { setCat(b.getAttribute('data-cat')); });
@@ -408,7 +401,6 @@
 
   /* ---------- catalogue cliquable ---------- */
   function buildPicker() {
-    if (cat === 'caisson') return;
     var items = catalog[cat] || [];
     var catLabel = { filament: 'filament', spacer: 'spacer', accessory: 'accessoire' }[cat] || cat;
     if (!items.length) { elCatalog.innerHTML = '<p class="empty">Aucun ' + catLabel + ' dans le catalogue.</p>'; return; }
@@ -565,20 +557,18 @@
   }
   function addFreeLine(preset) {
     preset = preset || {};
-    lines.push({ id: uid(), productId: null, ptype: (cat === 'caisson' ? 'caisson' : cat), kind: 'free',
+    lines.push({ id: uid(), productId: null, ptype: cat, kind: 'free',
       label: preset.label || '', meta: preset.meta || '', hex: null,
       qty: preset.qty != null ? preset.qty : 1, base: 0, tiers: [], cost: preset.cost != null ? preset.cost : 0,
       price: preset.price != null ? preset.price : 0, manual: true });
     afterChange();
   }
   if (elFreeBtn) elFreeBtn.addEventListener('click', function () { addFreeLine(); });
-  if ($('#cx-add-line')) $('#cx-add-line').addEventListener('click', function () { addFreeLine({ label: '' }); });
-  if ($('#cx-add-labor')) $('#cx-add-labor').addEventListener('click', function () { addFreeLine({ label: "Main-d'œuvre" }); });
 
   function afterChange() { if (saved) unlock(); render(); }
 
   // catégorie d'une ligne libre (pour les statistiques « Ventes par gabarit »)
-  var PTYPE_OPTS = [['filament', 'Filament'], ['spacer', 'Spacer'], ['accessory', 'Accessoire'], ['caisson', 'Caisson'], ['divers', 'Divers']];
+  var PTYPE_OPTS = [['filament', 'Filament'], ['spacer', 'Spacer'], ['accessory', 'Accessoire'], ['divers', 'Divers']];
   function catOptions(sel) {
     return PTYPE_OPTS.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === sel ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
   }
@@ -591,14 +581,6 @@
     var gst = taxEnabled ? sub * (co.gstRate || 0) / 100 : 0;
     var qst = taxEnabled ? sub * (co.qstRate || 0) / 100 : 0;
     return { sub: sub, gst: gst, qst: qst, total: sub + gst + qst, cost: costTotal, margin: sub - costTotal, co: co };
-  }
-  function specsText() {
-    var parts = [];
-    if (cxVehicle.value.trim()) parts.push('Véhicule : ' + cxVehicle.value.trim());
-    if (cxLitrage.value.trim()) parts.push('Litrage : ' + cxLitrage.value.trim());
-    if (cxEvent.value.trim()) parts.push('Évent : ' + cxEvent.value.trim());
-    if (cxFinition.value.trim()) parts.push('Finition : ' + cxFinition.value.trim());
-    return parts.join(' · ');
   }
 
   /* ---------- rendu de la facture ---------- */
@@ -628,9 +610,6 @@
         (cliCity ? '<div>' + esc(cliCity) + '</div>' : '') +
         (cliContact ? '<div>' + esc(cliContact) + '</div>' : '') + '</div>'
       : '';
-
-    var specs = specsText();
-    var specsBlock = specs ? '<div class="inv-specs"><span class="lbl">Caisson</span>' + esc(specs) + '</div>' : '';
 
     var rows = lines.map(function (l, i) {
       var descCell = (l.kind === 'free')
@@ -663,7 +642,7 @@
         '<div class="inv-title"><h1>FACTURE</h1><div class="inv-meta">' +
           'N° ' + esc(elNumber.value || '—') + '<br>' + fmtDateFR(elDate.value || todayISO()) + '</div></div>' +
       '</div>' +
-      billto + specsBlock +
+      billto +
       '<table class="inv-table"><thead><tr>' +
         '<th>Description</th><th class="num">Qté</th><th class="num">Prix unit.</th><th class="num">Montant</th><th class="no-print"></th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table>' +
@@ -717,7 +696,7 @@
   }
 
   // re-render sur édition des méta-champs
-  [elNote, elDate, cxVehicle, cxLitrage, cxEvent, cxFinition].forEach(function (el) {
+  [elNote, elDate].forEach(function (el) {
     if (el) el.addEventListener('input', function () { render(); });
   });
   // champs client : re-render ; le nom déclenche l'autocomplétion depuis le carnet
@@ -744,9 +723,6 @@
 
   // en-tête commun (création ET modification) — le n° et le statut sont gérés à part
   function invoiceFields(t) {
-    var specs = specsText();
-    var note = elNote.value.trim();
-    var fullNote = (specs ? ('Caisson — ' + specs) : '') + ((specs && note) ? '\n' : '') + note;
     return {
       client_name: elCliName.value.trim() || null,
       client_contact: contactStr() || null,
@@ -755,7 +731,7 @@
       client_type: clientType,
       category: currentCategory(),
       invoice_date: /^\d{4}-\d{2}-\d{2}$/.test(elDate.value) ? elDate.value : todayISO(),
-      note: fullNote || null,
+      note: elNote.value.trim() || null,
       tax_enabled: taxEnabled,
       subtotal: round2(t.sub), tax_gst: round2(t.gst), tax_qst: round2(t.qst),
       total: round2(t.total), cost_total: round2(t.cost)
@@ -769,7 +745,7 @@
   // après un enregistrement : stocks du catalogue, historique et statistiques à jour
   function refreshAfterSave() {
     catalogLoaded.filament = false; catalogLoaded.spacer = false;
-    if (cat !== 'caisson') loadCatalog(cat);
+    loadCatalog(cat);
     if (window.CA.reloadHistorique) window.CA.reloadHistorique();
     if (window.CA.reloadStatistiques) window.CA.reloadStatistiques();
   }
@@ -916,7 +892,6 @@
     setFromOrder(null);
     lines = []; saved = false; unlock();
     elNote.value = '';
-    cxVehicle.value = ''; cxLitrage.value = ''; cxEvent.value = ''; cxFinition.value = '';
     elDate.value = todayISO(); elStatus.textContent = '';
     setClientType('client');   // vide les champs client (le profil dealer reste mémorisé)
     loadNextNumberHint();
@@ -944,20 +919,6 @@
     if (elEditNum) elEditNum.textContent = ed ? (ed.number || '') : '';
     if (elNextHint) elNextHint.hidden = !!ed;
     unlock();
-  }
-  // « Caisson — Véhicule : … · Litrage : …\nnote » -> champs caisson + note (inverse d'invoiceFields).
-  // Format inattendu : la note est gardée telle quelle (rien n'est perdu).
-  var CX_KEYS = { 'Véhicule': 'vehicle', 'Litrage': 'litrage', 'Évent': 'event', 'Finition': 'finition' };
-  function splitNote(s) {
-    s = String(s == null ? '' : s);
-    var m = /^Caisson — ([^\n]*)(?:\n([\s\S]*))?$/.exec(s);
-    if (!m) return { note: s, cx: {} };
-    var cx = {}, ok = true;
-    m[1].split(' · ').forEach(function (part) {
-      var mm = /^(Véhicule|Litrage|Évent|Finition) : (.*)$/.exec(part);
-      if (mm && cx[CX_KEYS[mm[1]]] == null) cx[CX_KEYS[mm[1]]] = mm[2]; else ok = false;
-    });
-    return ok ? { note: m[2] || '', cx: cx } : { note: s, cx: {} };
   }
   // « courriel · téléphone » (contactStr) -> deux champs
   function splitContact(s) {
@@ -1020,10 +981,7 @@
       address: inv.client_address || '', city: inv.client_city || '' });
     if (elDealerSelect) { var d = dealer ? dealerByEmail(ct.email) : null; elDealerSelect.value = d ? d.email : ''; }
     if (elCliHint) elCliHint.textContent = '';
-    var n = splitNote(inv.note);
-    elNote.value = n.note;
-    cxVehicle.value = n.cx.vehicle || ''; cxLitrage.value = n.cx.litrage || '';
-    cxEvent.value = n.cx.event || ''; cxFinition.value = n.cx.finition || '';
+    elNote.value = inv.note || '';
     elNumber.value = inv.number || '';
     elDate.value = inv.invoice_date || todayISO();
     taxEnabled = !!inv.tax_enabled; if (elTax) elTax.checked = taxEnabled;
@@ -1033,8 +991,8 @@
       .map(lineFromSaved);
     settleLoadedPrices();
     var c = inv.category;
-    if (['filament', 'spacer', 'accessory', 'caisson'].indexOf(c) === -1) {
-      c = (lines[0] && ['filament', 'spacer', 'accessory', 'caisson'].indexOf(lines[0].ptype) !== -1) ? lines[0].ptype : 'filament';
+    if (['filament', 'spacer', 'accessory'].indexOf(c) === -1) {
+      c = (lines[0] && ['filament', 'spacer', 'accessory'].indexOf(lines[0].ptype) !== -1) ? lines[0].ptype : 'filament';
     }
     setCat(c);
     unlock();
@@ -1156,7 +1114,6 @@
     if (elCliAddress.value.trim()) L.push(elCliAddress.value.trim());
     if (elCliCity.value.trim()) L.push(elCliCity.value.trim());
     if (contactStr()) L.push(contactStr());
-    var specs = specsText(); if (specs) L.push('Caisson — ' + specs);
     L.push('');
     lines.forEach(function (l) { L.push(l.qty + ' × ' + (l.label || '(article)') + (l.meta ? ' (' + l.meta + ')' : '') + '  —  ' + money(l.qty * l.price)); });
     L.push('');

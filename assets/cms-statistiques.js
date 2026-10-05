@@ -21,13 +21,13 @@
   }
   function money(n) { return (Number(n) || 0).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD' }); }
   function pct(part, whole) { return whole > 0 ? Math.round(part / whole * 100) : 0; }
-  var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', caisson: 'Caisson', divers: 'Divers', mixte: 'Mixte' };
+  var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', divers: 'Divers', mixte: 'Mixte' };
 
   var loaded = false, invoices = [], linesByInv = {}, periodDays = 30, prodInfo = {};
   var bodyEl = $('#stat-body'), soldEl = $('#stat-sold'), refreshBtn = $('#stat-refresh');
 
   // Groupes de produits (Top produits + onglet « Produits vendus »).
-  // Caisson / divers / mixte -> « Autres » (affiché seulement s'il y a des ventes).
+  // Divers / mixte -> « Autres » (affiché seulement s'il y a des ventes).
   var GROUPS = [
     { key: 'filament', label: 'Filaments' },
     { key: 'accessory', label: 'Accessoires' },

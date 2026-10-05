@@ -3,7 +3,7 @@
 -- ------------------------------------------------------------
 -- Source de vérité = Supabase. L'admin écrit ; la boutique lit.
 -- Une seule table « products » générique couvre filaments,
--- spacers et caissons (colonne `type`).
+-- spacers et accessoires (colonne `type`).
 --
 -- À exécuter dans Supabase : SQL Editor -> New query -> coller -> Run.
 -- Idempotent : peut être relancé sans casser l'existant.
@@ -37,7 +37,7 @@ grant execute on function public.is_admin() to authenticated;
 -- ------------------------------------------------------------
 create table if not exists public.products (
   id            uuid primary key default gen_random_uuid(),
-  type          text    not null default 'filament',   -- 'filament' | 'spacer' | 'caisson'
+  type          text    not null default 'filament',   -- 'filament' | 'spacer' | 'accessory'
   name          text    not null,
   brand         text    not null default 'Bambu Lab',    -- marque (Bambu Lab, Elegoo, Anycubic…)
   material      text,                                    -- filament : « PLA Basic »… ; libre sinon
@@ -383,7 +383,7 @@ create table if not exists public.invoices (
   client_address text,                                       -- adresse (facture pro)
   client_city    text,                                       -- ville, code postal
   client_type    text    not null default 'client',          -- 'client' | 'dealer'
-  category       text    not null default 'filament',         -- 'filament' | 'spacer' | 'caisson' | 'mixte'
+  category       text    not null default 'filament',         -- 'filament' | 'spacer' | 'accessory' | 'mixte'
   invoice_date   date    not null default current_date,
   note           text,                                        -- conditions de paiement / mot libre
   tax_enabled    boolean not null default false,
@@ -401,7 +401,7 @@ create table if not exists public.invoices (
 create table if not exists public.invoice_lines (
   id          uuid primary key default gen_random_uuid(),
   invoice_id  uuid not null references public.invoices(id) on delete cascade,
-  product_id  uuid references public.products(id) on delete set null,  -- null = ligne libre (caisson, main-d'œuvre…)
+  product_id  uuid references public.products(id) on delete set null,  -- null = ligne libre (main-d'œuvre, divers…)
   label       text,                                          -- « Titan Gray », « Main-d'œuvre »…
   meta        text,                                          -- « Bambu Lab · PLA Basic · Recharge », specs…
   kind        text    not null default 'spool',               -- 'spool' | 'refill' | 'unit' | 'free'
@@ -564,7 +564,7 @@ alter table public.dealers add column if not exists phone   text;
 alter table public.dealers add column if not exists address text;
 alter table public.dealers add column if not exists city    text;
 
--- gabarit de CHAQUE ligne de facture (filament/spacer/accessory/caisson/divers).
+-- gabarit de CHAQUE ligne de facture (filament/spacer/accessory/divers).
 -- Permet aux statistiques de ventiler correctement, y compris les lignes libres
 -- (dont la catégorie est choisie à la main dans l'éditeur de facture).
 alter table public.invoice_lines add column if not exists ptype text;
