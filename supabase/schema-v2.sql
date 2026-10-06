@@ -206,6 +206,8 @@ with (security_invoker = off) as
       'specs',        p.attrs -> 'specs',
       'long_desc',    p.attrs -> 'long_desc',
       'gallery',      p.attrs -> 'gallery',
+      -- spacers : pièces d'origine remplacées [{brand, ref}] (« Remplace Metra 82-5606 ») ; vide = conception maison
+      'replaces',     p.attrs -> 'replaces',
       -- accessoires : catégorie (puces + rabais cumulé), affichage sur la fiche filament (+ marques visées)
       'category',     p.attrs -> 'category',
       'on_filament',  p.attrs -> 'on_filament',
@@ -538,7 +540,8 @@ create view public.products_dealer with (security_invoker = off) as
            'fitment',      p.attrs -> 'fitment',
            'specs',        p.attrs -> 'specs',
            'long_desc',    p.attrs -> 'long_desc',
-           'gallery',      p.attrs -> 'gallery'
+           'gallery',      p.attrs -> 'gallery',
+           'replaces',     p.attrs -> 'replaces'
          )) as attrs,
          p.image_path,
          coalesce(p.dealer_price, p.sell_price) as sell_price,

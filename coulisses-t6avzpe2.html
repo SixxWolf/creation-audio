@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=52">
+<link rel="stylesheet" href="assets/admin.css?v=53">
 <link rel="stylesheet" href="assets/facture.css?v=20">
 <link rel="stylesheet" href="assets/autoloop.css?v=26">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
@@ -721,12 +721,23 @@
         <div class="grid">
           <div class="field">
             <label class="lbl" for="sp-name">Nom</label>
-            <input type="text" id="sp-name" placeholder="Ex. Adaptateur 6x9 → 6.5" autocomplete="off">
+            <input type="text" id="sp-name" placeholder="Ex. CA-ADP-HYKIA-001" autocomplete="off">
           </div>
           <div class="field field-check">
             <label class="lbl inline" style="gap:8px">
               <input type="checkbox" id="sp-active" checked style="width:auto"> Visible en boutique
             </label>
+          </div>
+
+          <!-- Pièce d'origine remplacée : fabricant + n° (aucune = conception Création Audio) -->
+          <div class="field col-2">
+            <label class="lbl">Remplace</label>
+            <div class="specs" id="sp-repl"></div>
+            <div class="sp-repl-foot">
+              <button type="button" class="btn btn-ghost btn-sm" id="sp-repl-add" data-ic="plus">Ajouter une pièce</button>
+              <span class="sp-mini" id="sp-repl-own">Conception Création Audio</span>
+            </div>
+            <datalist id="sp-brand-list"></datalist>
           </div>
 
           <div class="field col-2">
@@ -1708,18 +1719,18 @@
 <script src="assets/cms-materials.js?v=12"></script>
 <script src="assets/cms-filaments.js?v=14"></script>
 <script src="assets/cms-linkbuilder.js?v=3"></script>
-<script src="assets/cms-spacers.js?v=8"></script>
+<script src="assets/cms-spacers.js?v=9"></script>
 <script src="assets/cms-accessories.js?v=5"></script>
 <script src="assets/cms-inventory.js?v=27"></script>
 <script src="assets/cms-attente.js?v=4"></script>
 <script src="assets/cms-dealers.js?v=4"></script>
 <script src="assets/cms-clients.js?v=2"></script>
-<script src="assets/cms-facturation.js?v=31"></script>
+<script src="assets/cms-facturation.js?v=32"></script>
 <script src="assets/cms-historique.js?v=10"></script>
-<script src="assets/cms-commandes.js?v=5"></script>
+<script src="assets/cms-commandes.js?v=6"></script>
 <script src="assets/cms-statistiques.js?v=7"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
-<script src="assets/cms-autoloop.js?v=38"></script>
+<script src="assets/cms-autoloop.js?v=39"></script>
 </body>
 </html>

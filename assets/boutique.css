@@ -515,6 +515,14 @@ body.has-buybar .toast { bottom:92px; }
 .fit-table td.yrs { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .fit-note { margin:12px 0 0; font-size:.86rem; color:var(--muted); }
 
+/* « Remplace PAC HKSB110 » (carte + fiche) et mention des marques citées */
+.sp-repl { margin:-4px 0 0; font-size:.84rem; font-weight:600; color:var(--ink-2); overflow-wrap:anywhere; }
+.pdp-panel .sp-repl { margin:8px 0 0; font-size:.98rem; font-weight:500; color:var(--muted); }
+.pdp-panel .sp-repl b { font-weight:700; color:var(--ink); }
+.pdp-panel .sp-repl.is-own { font-weight:600; color:var(--ember-ink); }
+.sp-legal { margin:22px 0 0; font-size:.78rem; line-height:1.5; color:var(--muted); }
+.spc-legal:empty { display:none; }
+
 /* =========================================================
    PANIER (tiroir) — partagé boutique / spacers / dealer
    ========================================================= */

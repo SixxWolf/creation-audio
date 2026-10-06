@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Page introuvable (404) — Création Audio</title>
 <meta name="robots" content="noindex">
+<script>
+  // page de spacer pas encore générée (ajout récent, renommage) -> sa fiche dans le catalogue
+  (function () {
+    var m = /^\/spacer\/([a-z0-9][a-z0-9-]*?)(?:\.html)?\/?$/i.exec(location.pathname);
+    if (m) location.replace('/spacers.html#/s/' + m[1].toLowerCase());
+  })();
+</script>
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="description" content="Cette page n'existe pas ou a été déplacée. Retour à l'accueil de Création Audio.">
 <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">

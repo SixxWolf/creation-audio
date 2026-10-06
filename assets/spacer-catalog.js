@@ -7,10 +7,13 @@
      - la fiche : photos (vignettes + visionneuse), prix, quantité,
        onglets Compatibilité / Spécifications / Description, même taille
    Le panier et l'envoi restent dans la page hôte (callbacks) ; l'hôte
-   route aussi l'URL : #/ = catalogue, #/s/<slug> = fiche.
+   route aussi l'URL : #/ = catalogue, #/s/<slug> = fiche — ou, en public,
+   les vraies pages spacer/<slug>.html (o.pageHref / o.rootHref) générées
+   par tools/build-spacer-pages.js, qui réutilise staticCatalog/staticProduct.
    Données (products_public / products_dealer) : attrs.description (résumé),
    attrs.speaker_size, attrs.fitment [{make, model, from, to, pos}],
-   attrs.specs [{k, v}], attrs.long_desc, attrs.gallery [chemins].
+   attrs.specs [{k, v}], attrs.long_desc, attrs.gallery [chemins],
+   attrs.replaces [{brand, ref}] (pièces d'origine remplacées).
    ========================================================= */
 (function () {
   'use strict';
@@ -59,6 +62,28 @@
     return s.filter(function (x) { return x && (x.k || x.v); });
   }
   function sizeOf(p) { return String(p && p.attrs && p.attrs.speaker_size || '').trim(); }
+  // pièces d'origine remplacées [{brand, ref}] (« Remplace PAC HKSB110 ») ; vide = conception Création Audio
+  function replacesOf(p) {
+    var r = p && p.attrs && Array.isArray(p.attrs.replaces) ? p.attrs.replaces : [];
+    return r.map(function (x) { return { brand: String(x && x.brand || '').trim(), ref: String(x && x.ref || '').trim() }; })
+      .filter(function (x) { return x.ref; });
+  }
+  function refLabel(x) { return (x.brand ? x.brand + ' ' : '') + x.ref; }
+  // marques citées (Metra, PAC…) : mention « marques de leurs propriétaires » sous la fiche / le catalogue
+  function refBrands(list) {
+    var seen = {}, out = [];
+    list.forEach(function (p) {
+      replacesOf(p).forEach(function (x) { var k = x.brand.toLowerCase(); if (x.brand && !seen[k]) { seen[k] = 1; out.push(x.brand); } });
+    });
+    return out.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
+  }
+  function legalHtml(brands) {
+    if (!brands.length) return '';
+    var names = brands.length > 1 ? brands.slice(0, -1).join(', ') + ' et ' + brands[brands.length - 1] : brands[0];
+    return '<p class="sp-legal">' + esc(names) + (brands.length > 1
+      ? ' sont des marques de leurs propriétaires respectifs. Création Audio n\'est affiliée à aucun de ces fabricants ; les références indiquent seulement la compatibilité.'
+      : ' est une marque de son propriétaire. Création Audio n\'est pas affiliée à ce fabricant ; la référence indique seulement la compatibilité.') + '</p>';
+  }
   // ordre des puces : 5,25" < 6,5" < 6×9 (moyenne des côtés = 7,5) < 8" ; texte (Tweeter…) à la fin
   function sizeRank(s) {
     var n = function (x) { return parseFloat(x.replace(',', '.')); };
@@ -75,7 +100,19 @@
     cart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>',
     car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 16.5h14M4.5 16.5V12l2-5h11l2 5v4.5"/><path d="M4.5 12h15"/><circle cx="8" cy="16.5" r="1.8"/><circle cx="16" cy="16.5" r="1.8"/></svg>',
     arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
-    photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m20.5 16-5-5-8 8"/></svg>'
+    photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m20.5 16-5-5-8 8"/></svg>',
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+    chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5.5h16v10H9l-5 4z"/></svg>',
+    card: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>'
+  };
+
+  // options de la boutique publique : spacers.html ET pages générées (même rendu à l'octet près)
+  var PUBLIC = {
+    addLabel: 'Ajouter au panier',
+    assureHtml: '<li>' + IC.pin + 'Ramassage local à Québec, sur rendez-vous</li>' +
+      '<li>' + IC.chat + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
+      '<li>' + IC.card + 'Aucun paiement en ligne</li>',
+    emptyHint: 'Ton véhicule n\'y est pas ? <a href="./#contact">Écris-nous</a>, on en imprime sur mesure.'
   };
 
   function create(o) {
@@ -83,9 +120,10 @@
     var isDealer = o.mode === 'dealer';
     var catalogEl = o.catalogEl, productEl = o.productEl;
     var listEl = o.listEl || catalogEl;   // où poser recherche + grille (l'en-tête de page peut rester dans le HTML)
-    var items = [], byId = {}, bySlug = {}, slugById = {};
-    var q = '', size = 'all', catScrollY = 0, screen = null;
+    var items = [], byId = {}, bySlug = {}, slugById = {}, byRef = {};
+    var q = '', size = 'all', catScrollY = 0, screen = null, shellBuilt = false, firstShow = true;
     var curP = null, curQty = 1, curImg = 0, curImgs = [], curTab = null;
+    var rootHref = o.rootHref || '#/';
 
     function publicUrl(path) {
       if (!path || !sb) return '';
@@ -96,8 +134,10 @@
     function tiersFor(p) { return isDealer ? normalizeTiers(p.tiers).filter(function (t) { return t.min > 1; }) : []; }
 
     // pastille de stock : dealer = tout commandable (« Sur commande ») ; public = rupture
+    // (rendu statique des pages générées : sans le nombre, qui bouge à chaque vente — le JS le remet)
     function stockBadge(p) {
       var st = p.qty | 0;
+      if (st > 0 && o.staticRender) return { cls: 'ok', text: 'En stock' };
       if (st > 0) return { cls: 'ok', text: isDealer ? st + ' en stock' : plural(st, 'paire en stock', 'paires en stock') };
       return isDealer ? { cls: 'order', text: 'Sur commande' } : { cls: 'out', text: 'Rupture de stock' };
     }
@@ -105,20 +145,25 @@
     /* ---------- données ---------- */
     function setItems(list) {
       items = (list || []).slice();
-      byId = {}; bySlug = {}; slugById = {};
+      byId = {}; bySlug = {}; slugById = {}; byRef = {};
       items.forEach(function (p) {
         byId[p.id] = p;
         var s = p.slug || slugify(p.name);
         if (bySlug[s]) s = s + '-' + String(p.id).slice(0, 4);
         bySlug[s] = p; slugById[p.id] = s;
+        // ancien lien « #/s/hksb110 » (nommé d'après la pièce d'origine) -> même fiche
+        replacesOf(p).forEach(function (x) { var k = slugify(x.ref); if (!byRef[k]) byRef[k] = p; });
       });
       if (curP) curP = byId[curP.id] || null;
     }
     function slugOf(p) { return slugById[p.id] || slugify(p.name); }
-    function hrefOf(p) { return '#/s/' + encodeURIComponent(slugOf(p)); }
+    function hrefOf(p) {
+      var s = slugOf(p), page = o.pageHref ? o.pageHref(s) : null;
+      return page || '#/s/' + encodeURIComponent(s);
+    }
     function findBySlug(seg) {
       var s = seg; try { s = decodeURIComponent(seg); } catch (e) {}
-      return bySlug[s] || byId[s] || null;
+      return bySlug[s] || byId[s] || byRef[s] || null;
     }
 
     /* ---------- recherche : « civic 2008 », « hsb524 », « hyundai »… ----------
@@ -129,7 +174,8 @@
        structurée, repli sur les années écrites dans le résumé (« 2006-2021 »). */
     function baseText(p) {
       var a = p.attrs || {};
-      return norm([p.name, String(p.name || '').replace(/[^a-z0-9]/gi, ''), a.description, sizeOf(p)].join(' '));
+      var refs = replacesOf(p).map(function (x) { return x.brand + ' ' + x.ref + ' ' + x.ref.replace(/[^a-z0-9]/gi, ''); });
+      return norm([p.name, String(p.name || '').replace(/[^a-z0-9]/gi, ''), a.description, sizeOf(p)].concat(refs).join(' '));
     }
     function rangesIn(txt) {
       var out = [], re = /((?:19|20)\d{2})\s*(?:-|–|à|a|to)\s*((?:19|20)\d{2})|((?:19|20)\d{2})/g, m;
@@ -187,7 +233,7 @@
     function cardHtml(p) {
       var url = publicUrl(p.image_path), sz = sizeOf(p), fit = fitmentOf(p), b = stockBadge(p);
       var desc = p.attrs && p.attrs.description ? String(p.attrs.description) : '';
-      var noAdd = !isDealer && (p.qty | 0) <= 0;
+      var noAdd = !isDealer && (p.qty | 0) <= 0, refs = replacesOf(p);
       var tags = (sz ? '<span class="sp-tag">' + esc(sz) + '</span>' : '') +
         (fit.length ? '<span class="sp-tag is-fit">' + IC.car + plural(fit.length, 'véhicule', 'véhicules') + '</span>' : '');
       return '<article class="sp-card" data-id="' + esc(p.id) + '">' +
@@ -198,6 +244,7 @@
           '<div class="sp-body">' +
             (tags ? '<div class="sp-tags">' + tags + '</div>' : '') +
             '<h3>' + esc(p.name) + '</h3>' +
+            (refs.length ? '<p class="sp-repl">Remplace ' + esc(refs.map(refLabel).join(' · ')) + '</p>' : '') +
             (desc ? '<p class="sp-desc">' + esc(desc) + '</p>' : '') +
             '<span class="sp-stock ' + b.cls + '">' + esc(b.text) + '</span>' +
           '</div>' +
@@ -221,18 +268,23 @@
       });
     }
 
-    function buildCatalogShell() {
-      listEl.innerHTML =
-        '<div class="spc-bar">' +
+    // coquille du catalogue (aussi écrite telle quelle dans spacers.html par le générateur de pages)
+    function shellHtml(chips, count, grid, legal) {
+      return '<div class="spc-bar">' +
           '<div class="spc-search">' + IC.search +
             '<label class="sr-only" for="spc-q">Chercher un véhicule ou un code</label>' +
             '<input type="search" id="spc-q" placeholder="Véhicule ou code — ex. civic 2008" autocomplete="off" enterkeyhint="search">' +
             '<button type="button" class="spc-clear" aria-label="Effacer la recherche" hidden>&times;</button>' +
           '</div>' +
-          '<div class="cat-chips spc-chips" role="group" aria-label="Taille du haut-parleur"></div>' +
+          '<div class="cat-chips spc-chips" role="group" aria-label="Taille du haut-parleur"' + (chips ? '' : ' hidden') + '>' + (chips || '') + '</div>' +
         '</div>' +
-        '<p class="spc-count" aria-live="polite"></p>' +
-        '<div class="shop-grid spc-grid"></div>';
+        '<p class="spc-count" aria-live="polite">' + (count || '') + '</p>' +
+        '<div class="shop-grid spc-grid">' + (grid || '') + '</div>' +
+        '<div class="spc-legal">' + (legal || '') + '</div>';
+    }
+    function buildCatalogShell() {
+      shellBuilt = true;
+      listEl.innerHTML = shellHtml();
       var input = $('#spc-q', catalogEl), clear = $('.spc-clear', catalogEl);
       input.value = q;
       var t;
@@ -244,29 +296,36 @@
       clear.addEventListener('click', function () { input.value = ''; q = ''; clear.hidden = true; renderGrid(); input.focus(); });
       clear.hidden = !q;
     }
-    function renderChips() {
-      var box = $('.spc-chips', catalogEl); if (!box) return;
+    function chipsHtml() {
       var list = sizes();
-      if (!list.length) { box.hidden = true; box.innerHTML = ''; return; }
+      if (!list.length) return '';
       if (size !== 'all' && !list.some(function (s) { return s.size === size; })) size = 'all';
-      box.hidden = false;
-      box.innerHTML = '<button type="button" class="chip" data-size="all" aria-current="' + (size === 'all') + '">Toutes <span class="chip-n">' + items.length + '</span></button>' +
+      return '<button type="button" class="chip" data-size="all" aria-current="' + (size === 'all') + '">Toutes <span class="chip-n">' + items.length + '</span></button>' +
         list.map(function (s) {
           return '<button type="button" class="chip" data-size="' + esc(s.size) + '" aria-current="' + (size === s.size) + '">' +
             esc(s.size) + ' <span class="chip-n">' + s.n + '</span></button>';
         }).join('');
+    }
+    function renderChips() {
+      var box = $('.spc-chips', catalogEl); if (!box) return;
+      var html = chipsHtml();
+      box.hidden = !html; box.innerHTML = html;
       $$('.chip', box).forEach(function (c) {
         c.addEventListener('click', function () { size = c.getAttribute('data-size'); renderChips(); renderGrid(); });
       });
     }
+    function countText(n) {
+      return (q || size !== 'all')
+        ? plural(n, 'spacer trouvé', 'spacers trouvés') + ' sur ' + items.length
+        : plural(items.length, 'spacer', 'spacers');
+    }
     function renderGrid() {
-      var grid = $('.spc-grid', catalogEl), cnt = $('.spc-count', catalogEl);
+      var grid = $('.spc-grid', catalogEl), cnt = $('.spc-count', catalogEl), legal = $('.spc-legal', catalogEl);
       if (!grid) return;
+      if (legal) legal.innerHTML = legalHtml(refBrands(items));
       if (!items.length) { grid.innerHTML = '<p class="empty">Aucun spacer disponible pour le moment.</p>'; if (cnt) cnt.textContent = ''; return; }
       var list = filtered();
-      if (cnt) cnt.textContent = (q || size !== 'all')
-        ? plural(list.length, 'spacer trouvé', 'spacers trouvés') + ' sur ' + items.length
-        : plural(items.length, 'spacer', 'spacers');
+      if (cnt) cnt.textContent = countText(list.length);
       if (!list.length) {
         grid.innerHTML = '<p class="empty">Aucun spacer ne correspond' + (q ? ' à « ' + esc(q) + ' »' : '') + '.<br>' +
           '<button type="button" class="spc-reset">Tout afficher</button>' + (o.emptyHint ? '<br>' + o.emptyHint : '') + '</p>';
@@ -284,14 +343,21 @@
 
     function showCatalog() {
       var fresh = screen !== 'catalog';
-      if (!$('.spc-grid', catalogEl)) buildCatalogShell();
+      if (!shellBuilt) buildCatalogShell();   // remplace aussi le catalogue pré-rendu (pages générées)
       renderChips(); renderGrid();
       productEl.hidden = true; catalogEl.hidden = false;
       if (fresh) {
         screen = 'catalog';
         if (o.onTitle) o.onTitle(null);
-        requestAnimationFrame(function () { window.scrollTo(0, catScrollY || 0); });
+        // 1er affichage : on laisse le navigateur restaurer le défilement (retour depuis une fiche)
+        if (!firstShow) requestAnimationFrame(function () { window.scrollTo(0, catScrollY || 0); });
       }
+      firstShow = false;
+    }
+    // catalogue complet en HTML, sans câblage (spacers.html pré-rendu par le générateur de pages)
+    function staticCatalog() {
+      q = ''; size = 'all';
+      return shellHtml(chipsHtml(), countText(items.length), items.map(cardHtml).join(''), legalHtml(refBrands(items)));
     }
 
     /* ---------- fiche ---------- */
@@ -415,12 +481,18 @@
       if (!pool.length) return '';
       return '<section class="pdp-related" aria-labelledby="sp-rel-title">' +
         '<div class="rel-head"><h2 id="sp-rel-title">' + (sz && pool.every(function (x) { return sizeOf(x) === sz; }) ? 'Autres spacers ' + esc(sz) : 'Autres spacers') + '</h2>' +
-          '<a class="rel-link" href="#/">Tout le catalogue ' + IC.arrow + '</a></div>' +
+          '<a class="rel-link" href="' + esc(rootHref) + '">Tout le catalogue ' + IC.arrow + '</a></div>' +
         '<div class="shop-grid">' + pool.map(cardHtml).join('') + '</div>' +
       '</section>';
     }
 
-    function renderProduct() {
+    // pièce d'origine remplacée (« Remplace PAC HKSB110 ») ou conception maison
+    function replHtml(p) {
+      var refs = replacesOf(p);
+      if (!refs.length) return '<p class="sp-repl is-own">Conception Création Audio</p>';
+      return '<p class="sp-repl">Remplace ' + refs.map(function (x) { return '<b>' + esc(refLabel(x)) + '</b>'; }).join(' · ') + '</p>';
+    }
+    function productHtml() {
       var p = curP, b = stockBadge(p), max = maxQty(p), blocked = max <= 0;
       if (curQty > max && max > 0) curQty = max;
       if (curQty < 1) curQty = 1;
@@ -428,14 +500,14 @@
       if (curImg >= curImgs.length) curImg = 0;
       var sz = sizeOf(p);
       var desc = p.attrs && p.attrs.description ? String(p.attrs.description) : '';
-      productEl.innerHTML =
-        '<nav class="crumbs" aria-label="Fil d\'Ariane"><a href="#/">' + esc(o.rootLabel || 'Spacers') + '</a>' + IC.chev +
+      return '<nav class="crumbs" aria-label="Fil d\'Ariane"><a href="' + esc(rootHref) + '">' + esc(o.rootLabel || 'Spacers') + '</a>' + IC.chev +
           '<span aria-current="page">' + esc(p.name) + '</span></nav>' +
         '<div class="pdp">' +
           '<div class="pdp-media">' + mediaHtml() + '</div>' +
           '<div class="pdp-panel">' +
             '<p class="pdp-eyebrow">Spacer' + (sz ? ' · ' + esc(sz) : '') + ' · vendu par paire</p>' +
             '<h1 class="pdp-name">' + esc(p.name) + '</h1>' +
+            replHtml(p) +
             (desc ? '<p class="sp-summary">' + esc(desc) + '</p>' : '') +
             '<div class="pdp-priceline">' +
               '<span class="pdp-price">' + money(p.sell_price) + '<small>/ paire</small></span>' +
@@ -458,8 +530,19 @@
           '</div>' +
         '</div>' +
         detailsTabs(p) +
+        legalHtml(refBrands([p])) +
         relatedHtml(p);
+    }
+    function renderProduct() {
+      productEl.innerHTML = productHtml();
       wireProduct();
+    }
+    // fiche en HTML, sans câblage (pages spacer/<slug>.html du générateur) ; null si introuvable
+    function staticProduct(seg) {
+      var p = findBySlug(seg);
+      if (!p) return null;
+      curP = p; curQty = 1; curImg = 0; curTab = null;
+      return productHtml();
     }
     function refreshBuy() {
       var p = curP;
@@ -513,17 +596,20 @@
     function showProduct(seg) {
       var p = findBySlug(seg);
       if (!p) return false;
+      var first = firstShow;   // 1er affichage (page générée, lien direct) : défilement laissé au navigateur
+      firstShow = false;
       if (screen === 'catalog') catScrollY = window.pageYOffset;
       var same = screen === 'product' && curP === p;
       if (!same) { curP = p; curQty = 1; curImg = 0; curTab = null; }
       renderProduct();
       catalogEl.hidden = true; productEl.hidden = false;
-      if (!same) window.scrollTo(0, 0);
+      if (!same && !first) window.scrollTo(0, 0);
       screen = 'product';
       if (o.onTitle) o.onTitle(p);
       return true;
     }
     function hide() {
+      firstShow = false;
       if (screen === 'catalog') catScrollY = window.pageYOffset;
       catalogEl.hidden = true; productEl.hidden = true; screen = null;
     }
@@ -587,10 +673,11 @@
       slugOf: slugOf, hrefOf: hrefOf, findBySlug: findBySlug,
       showCatalog: showCatalog, showProduct: showProduct, hide: hide, refresh: refresh,
       screen: function () { return screen; }, current: function () { return curP; },
-      matches: matches
+      matches: matches, staticCatalog: staticCatalog, staticProduct: staticProduct
     };
   }
 
   window.CASpacers = { create: create, slugify: slugify, normalizeTiers: normalizeTiers, tierPrice: tierPrice,
-    esc: esc, money: money, fitmentOf: fitmentOf, yearsText: yearsText };
+    esc: esc, money: money, fitmentOf: fitmentOf, yearsText: yearsText,
+    sizeOf: sizeOf, replacesOf: replacesOf, refLabel: refLabel, PUBLIC: PUBLIC };
 })();

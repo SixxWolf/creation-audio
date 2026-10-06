@@ -888,6 +888,8 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .fit-row { display:grid; grid-template-columns:minmax(110px, 1fr) minmax(120px, 1.2fr) 88px 88px minmax(140px, 1.3fr) 32px; align-items:center; gap:8px; }
 .fit-row input { min-width:0; }
 .sp-minis { display:flex; flex-wrap:wrap; gap:5px; }
+.sp-repl-foot { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+.sp-repl-foot .sp-mini[hidden] { display:none; }
 .sp-mini { padding:1px 8px; font-size:.7rem; font-weight:600; color:var(--ink-2); background:var(--wash); border:1px solid var(--line); border-radius:100px; }
 .sp-mini.is-warn { color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 10%, transparent); border-color:transparent; }
 @media (max-width:760px) {

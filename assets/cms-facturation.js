@@ -437,8 +437,10 @@
     } else if (cat === 'spacer') {
       elCatalog.innerHTML = '<div class="pk-grid pk-grid-cards">' + items.map(function (p) {
         var url = publicUrl(p.image_path);
+        // recherche : code + n° de la pièce d'origine remplacée (« hksb110 » trouve CA-ADP-HYKIA-001)
+        var refs = (p.attrs && Array.isArray(p.attrs.replaces) ? p.attrs.replaces : []).map(function (x) { return x && x.ref || ''; });
         return '<button type="button" class="pk-cell pk-card" data-id="' + esc(p.id) + '" data-search="' +
-          esc((p.name || '').toLowerCase()) + '">' +
+          esc([p.name || ''].concat(refs).join(' ').toLowerCase()) + '">' +
           (url ? '<img class="pk-img" src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="pk-img pk-noimg"></span>') +
           '<span class="pk-name">' + esc(p.name) + '</span>' +
           '<span class="pk-price">' + money(isDealer() ? (p.dealer_price != null ? p.dealer_price : p.sell_price) : p.sell_price) + '</span>' +
