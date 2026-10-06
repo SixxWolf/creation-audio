@@ -176,14 +176,14 @@
   function actionsFor(o) {
     var b = function (act, label, cls) {
       return '<button type="button" class="btn ' + (cls || 'btn-ghost') + ' btn-sm" data-act="' + act + '"' +
-        (act === 'invoice' ? ' data-ic="receipt"' : act === 'edit' ? ' data-ic="edit"' : '') + '>' + label + '</button>';
+        (act === 'invoice' ? ' data-ic="receipt"' : act === 'edit' ? ' data-ic="edit"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
     };
     switch (o.status) {
       case 'new': return b('preparing', 'Commencer la préparation', 'btn-accent') + b('invoice', 'Facturer') + b('edit', 'Modifier') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'preparing': return b('ready', 'Marquer prête', 'btn-accent') + b('invoice', 'Facturer') + b('edit', 'Modifier') + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'ready': return b('invoice', 'Facturer', 'btn-accent') + b('edit', 'Modifier') + b('preparing', '↩ En préparation') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'invoiced': return o.invoice_id ? b('see-invoice', 'Voir la facture') : '';
-      case 'cancelled': return b('new', 'Rouvrir');
+      case 'cancelled': return b('new', 'Rouvrir') + b('delete', 'Supprimer', 'btn-ghost co-danger');
     }
     return '';
   }
@@ -254,6 +254,17 @@
   /* ---- actions ---- */
   function act(o, what, btn) {
     if (what === 'edit') { if (fEd) openEditor(o); return; }
+    if (what === 'delete') {
+      // seulement une commande annulée (garde côté requête) ; ses lignes partent avec (on delete cascade)
+      if (!window.confirm('Supprimer définitivement la commande ' + o.number + ' ?\nElle disparaîtra aussi du portail du dealer.')) return;
+      btn.disabled = true;
+      sb.from('dealer_orders').delete().eq('id', o.id).eq('status', 'cancelled').select('id').then(function (res) {
+        if (res.error) throw res.error;
+        if (!res.data || !res.data.length) throw new Error('Refusé : seule une commande annulée peut être supprimée.');
+        load();
+      }).then(null, function (err) { btn.disabled = false; window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
+      return;
+    }
     if (what === 'invoice') {
       if (!window.CA.invoiceFromOrder) { window.alert('Facturation indisponible.'); return; }
       if (window.CA.invoiceFromOrder(o, linesOf(o)) !== false) location.hash = '#facturation';
