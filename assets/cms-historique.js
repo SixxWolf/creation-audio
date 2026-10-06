@@ -308,11 +308,14 @@
       (inv.note ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(inv.note) + '</div>' : '') +
       '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>';
   }
+  var TITLE = document.title;
   function reprint(inv, lines) {
     if (!printBox) return;
     printBox.innerHTML = buildDoc(inv, lines);
+    // le titre = nom proposé par « Enregistrer en PDF »
+    document.title = String(inv.number || '').trim().replace(/[\\/:*?"<>|]+/g, '-') || TITLE;
     document.body.classList.add('printing-hist');
     window.print();
-    setTimeout(function () { document.body.classList.remove('printing-hist'); printBox.innerHTML = ''; }, 400);
+    setTimeout(function () { document.body.classList.remove('printing-hist'); printBox.innerHTML = ''; document.title = TITLE; }, 400);
   }
 })();

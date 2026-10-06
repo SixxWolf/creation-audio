@@ -1107,11 +1107,14 @@
   };
 
   /* ---------- impression / copie ---------- */
+  var TITLE = document.title;
   if (elPrint) elPrint.addEventListener('click', function () {
     if (!lines.length) return;
+    // le titre = nom proposé par « Enregistrer en PDF »
+    document.title = (elNumber.value || '').trim().replace(/[\\/:*?"<>|]+/g, '-') || TITLE;
     document.body.classList.add('fx-printing');
     window.print();
-    setTimeout(function () { document.body.classList.remove('fx-printing'); }, 300);
+    setTimeout(function () { document.body.classList.remove('fx-printing'); document.title = TITLE; }, 300);
   });
   function invoiceText() {
     var co = readCompanyForm(), t = totals();
