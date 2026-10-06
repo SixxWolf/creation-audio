@@ -1020,6 +1020,54 @@ grant execute on function public.dealer_update_order(uuid, jsonb, text) to authe
 grant execute on function public.dealer_cancel_order(uuid)              to authenticated;
 
 -- ------------------------------------------------------------
+-- COMMANDES DEALER saisies par l'ADMIN (demande reçue par message)
+-- Onglet Commandes › « Nouvelle commande » : même numérotation (D-0001),
+-- mêmes prix que le portail (prix dealer + palier par modèle, recalculés
+-- par _dealer_fill_lines) ; la commande apparaît dans « Mes commandes »
+-- du dealer. created_by = 'admin' → le portail affiche « ajoutée par
+-- Création Audio ». L'admin peut aussi modifier une commande en cours
+-- (Nouvelle / En préparation / Prête), jamais une facturée ou annulée.
+-- ------------------------------------------------------------
+alter table public.dealer_orders add column if not exists created_by text not null default 'dealer';
+do $$ begin
+  if not exists (select 1 from pg_constraint
+                  where conname = 'dealer_orders_created_by_check' and conrelid = 'public.dealer_orders'::regclass) then
+    alter table public.dealer_orders add constraint dealer_orders_created_by_check check (created_by in ('dealer', 'admin'));
+  end if;
+end $$;
+
+-- p_id null = nouvelle commande pour le dealer p_email ; sinon modification (p_email ignoré).
+create or replace function public.admin_save_dealer_order(p_id uuid, p_email text, p_lines jsonb, p_note text default null)
+returns public.dealer_orders language plpgsql security definer set search_path = public as $$
+declare
+  v_dealer public.dealers;
+  v_order  public.dealer_orders;
+  v_note   text := nullif(left(btrim(coalesce(p_note, '')), 1000), '');
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''admin.' using errcode = '42501'; end if;
+  if p_id is null then
+    select * into v_dealer from public.dealers where lower(email) = lower(btrim(coalesce(p_email, '')));
+    if not found then raise exception 'Dealer introuvable.' using errcode = 'P0001'; end if;
+    insert into public.dealer_orders (number, dealer_email, dealer_name, note, status, created_by)
+    values ('D-' || lpad(nextval('public.dealer_order_seq')::text, 4, '0'),
+            v_dealer.email, v_dealer.name, v_note, 'new', 'admin')
+    returning * into v_order;
+  else
+    select * into v_order from public.dealer_orders where id = p_id for update;
+    if not found then raise exception 'Commande introuvable.' using errcode = 'P0001'; end if;
+    if v_order.status not in ('new', 'preparing', 'ready') then
+      raise exception 'Commande facturée ou annulée : plus modifiable.' using errcode = 'P0001';
+    end if;
+    update public.dealer_orders set note = v_note, updated_at = now() where id = p_id;
+  end if;
+  perform public._dealer_fill_lines(v_order.id, p_lines);
+  select * into v_order from public.dealer_orders where id = v_order.id;
+  return v_order;
+end $$;
+revoke all on function public.admin_save_dealer_order(uuid, text, jsonb, text) from public, anon;
+grant execute on function public.admin_save_dealer_order(uuid, text, jsonb, text) to authenticated;
+
+-- ------------------------------------------------------------
 -- TABLE admin_settings — réglages de l'admin, clé → JSON
 -- (ex. « autoloop » : valeurs par défaut d'AutoLoop enregistrées par Théo,
 -- synchronisées entre ses appareils). Admin seulement, jamais lue en public.

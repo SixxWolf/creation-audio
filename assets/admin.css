@@ -921,7 +921,7 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .co-print-item small { font-size:.74rem; color:var(--muted); }
 
 .co-list { display:grid; gap:14px; }
-.co-card { padding:16px 18px; background:var(--paper); border:1px solid var(--line); border-radius:16px; }
+.co-card { min-width:0; padding:16px 18px; background:var(--paper); border:1px solid var(--line); border-radius:16px; }
 .co-card.is-new { border-color:color-mix(in srgb, var(--ember) 55%, var(--line)); box-shadow:0 0 0 3px color-mix(in srgb, var(--ember) 10%, transparent); }
 .co-card.is-cancelled, .co-card.is-invoiced { opacity:.78; }
 .co-head { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; }
@@ -962,6 +962,25 @@ td.num input, .catalog-table input.catcost { text-align:right; }
   .co-actions { width:100%; }
   .co-actions .btn { flex:1 1 auto; }
 }
+.co-src { font-size:.8rem; font-weight:600; color:var(--muted); }
+.co-card.is-flash { animation:co-flash 1.8s ease-out; }
+@keyframes co-flash { from { box-shadow:0 0 0 6px color-mix(in srgb, var(--ember) 40%, transparent); } }
+@media (prefers-reduced-motion:reduce) { .co-card.is-flash { animation:none; } }
+
+/* saisie manuelle d'une commande (Nouvelle commande / Modifier) */
+.cof-lines { margin-top:16px; }
+.cof-lines .co-table-wrap { margin-top:0; }
+.cof-empty { margin:0; padding:16px; font-size:.9rem; color:var(--muted); text-align:center; border:1px dashed var(--line-2); border-radius:12px; }
+.cof-table td { padding-top:6px; padding-bottom:6px; }
+.cof-table .cof-qty { width:80px; min-width:80px; padding:6px 10px; text-align:right; }
+.cof-table .cof-del:hover { color:var(--bad); border-color:color-mix(in srgb, var(--bad) 70%, var(--line-2)); background:var(--bad-wash); }
+.cof-sum { display:flex; justify-content:flex-end; margin-top:10px; }
+@media (max-width:640px) {   /* téléphone : Spacer · Qté · Total · Retirer, sans défilement */
+  .cof-table .cof-opt, .cof-table .co-prod img, .cof-table .co-noimg { display:none; }
+  .cof-table th, .cof-table td { padding-left:8px; padding-right:8px; }
+  .cof-table .cof-qty { width:64px; min-width:64px; }
+}
+.cof-note { margin-top:16px; }
 
 /* =========================================================
    RÉGLAGES › APPARENCE — couleur des accents (admin-accent.js)

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=51">
+<link rel="stylesheet" href="assets/admin.css?v=52">
 <link rel="stylesheet" href="assets/facture.css?v=20">
 <link rel="stylesheet" href="assets/autoloop.css?v=26">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
@@ -1029,7 +1029,7 @@
       <div class="panel-head">
         <div>
           <h1>Commandes dealer</h1>
-          <p class="muted">Envoyées depuis le portail dealer.</p>
+          <p class="muted">Envoyées depuis le portail ou saisies ici.</p>
         </div>
         <span class="grow"></span>
         <div class="fx-seg" role="group" aria-label="Filtre des commandes">
@@ -1037,7 +1037,37 @@
           <button type="button" class="fx-seg-btn co-filter" data-f="all">Toutes</button>
         </div>
         <button class="btn btn-ghost btn-sm" id="co-refresh" type="button" data-ic="refresh">Actualiser</button>
+        <button class="btn btn-accent" id="co-new" type="button" data-ic="plus">Nouvelle commande</button>
       </div>
+
+      <!-- Saisie manuelle (demande reçue par message) : visible dans « Mes commandes » du dealer -->
+      <form class="editor" id="cof-editor" hidden>
+        <h2 id="cof-title">Nouvelle commande</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="cof-dealer">Dealer</label>
+            <select id="cof-dealer"></select>
+          </div>
+          <div class="field">
+            <label class="lbl" for="cof-search">Ajouter un spacer</label>
+            <div class="fx-combo">
+              <input type="search" id="cof-search" placeholder="Code ou véhicule…" autocomplete="off">
+              <div class="fx-combo-list" id="cof-results" hidden></div>
+            </div>
+          </div>
+        </div>
+        <div class="cof-lines" id="cof-lines"></div>
+        <div class="field cof-note">
+          <label class="lbl" for="cof-note">Note</label>
+          <textarea id="cof-note" class="fx-oneline" rows="1" maxlength="1000" placeholder="Ex. demandé par Messenger" autocomplete="off"></textarea>
+        </div>
+        <div class="editor-actions">
+          <button class="btn btn-accent" type="submit" id="cof-save" data-ic="save">Enregistrer la commande</button>
+          <button class="btn btn-ghost" type="button" id="cof-cancel">Annuler</button>
+          <span class="status" id="cof-status"></span>
+        </div>
+      </form>
+
       <div id="co-print"></div>
       <div class="co-list" id="co-list"><p class="muted">Chargement…</p></div>
     </section>
@@ -1686,7 +1716,7 @@
 <script src="assets/cms-clients.js?v=2"></script>
 <script src="assets/cms-facturation.js?v=31"></script>
 <script src="assets/cms-historique.js?v=10"></script>
-<script src="assets/cms-commandes.js?v=3"></script>
+<script src="assets/cms-commandes.js?v=4"></script>
 <script src="assets/cms-statistiques.js?v=7"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>

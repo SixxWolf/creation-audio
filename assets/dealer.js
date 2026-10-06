@@ -400,7 +400,8 @@
       var isNew = o.status === 'new';
       return '<article class="dl-order is-' + esc(o.status) + (flash && flash.id === o.id ? ' is-flash' : '') + '" data-id="' + esc(o.id) + '">' +
         '<header class="dl-order-head">' +
-          '<div class="dl-order-id"><b>' + esc(o.number) + '</b><span>' + esc(fmtDate(o.created_at)) + (o.edited_at ? ' · modifiée' : '') + '</span></div>' +
+          '<div class="dl-order-id"><b>' + esc(o.number) + '</b><span>' + esc(fmtDate(o.created_at)) +
+            (o.created_by === 'admin' ? ' · ajoutée par Création Audio' : '') + (o.edited_at ? ' · modifiée' : '') + '</span></div>' +
           '<span class="dl-status is-' + esc(o.status) + '">' + esc(st.label) + '</span>' +
         '</header>' +
         (st.hint ? '<p class="dl-order-hint">' + esc(st.hint) + '</p>' : '') +
@@ -412,7 +413,7 @@
             '<span class="dl-ol-u">' + money(l.unit_price) + '</span>' +
             '<span class="dl-ol-t">' + money(l.line_total) + '</span></div>';
         }).join('') + '</div>' +
-        (o.note ? '<p class="dl-order-note"><b>Ta note :</b> ' + esc(o.note) + '</p>' : '') +
+        (o.note ? '<p class="dl-order-note"><b>' + (o.created_by === 'admin' ? 'Note' : 'Ta note') + ' :</b> ' + esc(o.note) + '</p>' : '') +
         '<footer class="dl-order-foot">' +
           '<span class="dl-order-total">' + plural(pairs, 'paire', 'paires') + ' · <b>' + money(o.total) + '</b> <small>hors taxes</small></span>' +
           (isNew ? '<span class="dl-order-actions">' +
