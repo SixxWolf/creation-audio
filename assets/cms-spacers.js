@@ -8,6 +8,8 @@
    véhicules, description, specs.
    attrs : description · speaker_size · fitment [{make, model, from, to, pos}]
            · specs [{k, v}] · long_desc · gallery [photos après la 1re]
+           · replaces [{brand, ref}] (pièce d'origine ; vide = conception maison)
+           · speakers [{model, fit}] (haut-parleurs testés : 'ok' = Confirmé, 'partial' = Compatible*)
    (les autres clés d'attrs — avg_cost, barcodes… — sont conservées)
    ========================================================= */
 (function () {
@@ -22,6 +24,7 @@
   var TYPE = 'spacer';
   var BRAND = 'Création Audio';   // marque interne (les spacers ne sont pas des filaments de marque)
   var SITE = 'https://creationaudio.ca/';
+  var PART_BRANDS = ['Metra', 'PAC', 'Scosche'];   // fabricants de pièces d'origine proposés (saisie libre aussi)
   var MAKES = ['Acura', 'Audi', 'BMW', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge', 'Fiat', 'Ford', 'GMC', 'Genesis',
     'Honda', 'Hyundai', 'Infiniti', 'Jeep', 'Kia', 'Lexus', 'Lincoln', 'Mazda', 'Mercedes-Benz', 'Mini', 'Mitsubishi', 'Nissan',
     'Pontiac', 'Ram', 'Subaru', 'Toyota', 'Volkswagen', 'Volvo'];
@@ -78,13 +81,15 @@
 
   var editor = $('#sp-editor'), editorTitle = $('#sp-editor-title'),
       fileInput = $('#sp-file'), galleryEl = $('#sp-gallery'), galleryAdd = $('#sp-gallery-add'),
-      nameI = $('#sp-name'), descI = $('#sp-desc'), priceI = $('#sp-price'), costI = $('#sp-cost'),
+      nameI = $('#sp-name'), priceI = $('#sp-price'), costI = $('#sp-cost'),
       dealerPriceI = $('#sp-dealer-price'), marginEl = $('#sp-margin'), marginDealerEl = $('#sp-margin-dealer'),
       qtyI = $('#sp-qty'), activeI = $('#sp-active'),
       tiersEl = $('#sp-tiers'), tierAdd = $('#sp-tier-add'),
       sizeI = $('#sp-size'), linksEl = $('#sp-fiche-links'), linksField = $('#sp-fiche-field'),
       fitEl = $('#sp-fit'), fitAdd = $('#sp-fit-add'), makeList = $('#sp-make-list'),
       longDescI = $('#sp-long-desc'), specsEl = $('#sp-specs'), specAdd = $('#sp-spec-add'),
+      replEl = $('#sp-repl'), replAdd = $('#sp-repl-add'), replOwnEl = $('#sp-repl-own'), brandList = $('#sp-brand-list'),
+      spkEl = $('#sp-spk'), spkAdd = $('#sp-spk-add'),
       statusEl = $('#sp-status'), listEl = $('#sp-list'),
       newBtn = $('#sp-new'), refreshBtn = $('#sp-refresh'),
       saveBtn = $('#sp-save'), cancelBtn = $('#sp-cancel');
@@ -237,6 +242,67 @@
       .map(function (m) { return '<option value="' + esc(m) + '">'; }).join('');
   }
 
+  /* ---- pièce d'origine remplacée : fabricant + n° (« Remplace PAC HKSB110 ») ---- */
+  if (replAdd) replAdd.addEventListener('click', function () { $('.repl-brand', addReplRow()).focus(); });
+  function addReplRow(x) {
+    x = x || {};
+    var row = document.createElement('div');
+    row.className = 'spec-row repl-row';
+    row.innerHTML =
+      '<input type="text" class="spec-k repl-brand" list="sp-brand-list" placeholder="Fabricant" aria-label="Fabricant" autocomplete="off">' +
+      '<input type="text" class="spec-v repl-ref" placeholder="N° de pièce" aria-label="Numéro de la pièce remplacée" autocomplete="off">' +
+      '<button type="button" class="spec-del" aria-label="Retirer cette pièce">✕</button>';
+    $('.repl-brand', row).value = x.brand || '';
+    $('.repl-ref', row).value = x.ref || '';
+    $('.spec-del', row).addEventListener('click', function () { row.remove(); replOwn(); });
+    replEl.appendChild(row);
+    replOwn();
+    return row;
+  }
+  function replOwn() { if (replOwnEl) replOwnEl.hidden = !!$('.repl-row', replEl); }
+  function collectReplaces() {
+    return $$('.repl-row', replEl).map(function (row) {
+      return { brand: $('.repl-brand', row).value.trim(), ref: $('.repl-ref', row).value.trim() };
+    }).filter(function (x) { return x.ref; });
+  }
+  function buildBrandList() {
+    if (!brandList) return;
+    var seen = {}, out = [];
+    PART_BRANDS.concat.apply(PART_BRANDS, cache.map(function (r) { return (attrsOf(r).replaces || []).map(function (x) { return x && x.brand; }); }))
+      .forEach(function (b) { b = String(b || '').trim(); if (b && !seen[b.toLowerCase()]) { seen[b.toLowerCase()] = 1; out.push(b); } });
+    brandList.innerHTML = out.map(function (b) { return '<option value="' + esc(b) + '">'; }).join('');
+  }
+  function replacesLabel(r) {
+    return (attrsOf(r).replaces || []).filter(function (x) { return x && x.ref; })
+      .map(function (x) { return (x.brand ? x.brand + ' ' : '') + x.ref; }).join(' · ');
+  }
+
+  /* ---- haut-parleurs testés : modèle + Confirmé (parfait) / Compatible* (fonctionne, pas parfait) ---- */
+  if (spkAdd) spkAdd.addEventListener('click', function () { $('.spk-model', addSpkRow()).focus(); });
+  function addSpkRow(x) {
+    x = x || {};
+    var row = document.createElement('div');
+    row.className = 'spk-row';
+    row.innerHTML =
+      '<input type="text" class="spk-model" placeholder="Marque et modèle" aria-label="Haut-parleur (marque et modèle)" autocomplete="off">' +
+      '<select class="spk-ok" aria-label="Ajustement"><option value="ok">Confirmé</option><option value="partial">Compatible* (pas parfait)</option></select>' +
+      '<button type="button" class="spec-del" aria-label="Retirer ce haut-parleur">✕</button>';
+    $('.spk-model', row).value = x.model || '';
+    $('.spk-ok', row).value = x.fit === 'partial' || x.ok === false ? 'partial' : 'ok';   // ok:false = ancien « à confirmer »
+    $('.spec-del', row).addEventListener('click', function () { row.remove(); });
+    spkEl.appendChild(row);
+    return row;
+  }
+  function collectSpeakers() {
+    return $$('.spk-row', spkEl).map(function (row) {
+      return { model: $('.spk-model', row).value.trim(), fit: $('.spk-ok', row).value };
+    }).filter(function (x) { return x.model; });
+  }
+  function speakersCount(r) {
+    var s = (attrsOf(r).speakers || []).filter(function (x) { return x && x.model; });
+    return s.length;
+  }
+
   /* ---- specs libres ---- */
   if (specAdd) specAdd.addEventListener('click', function () { $('.spec-k', addSpecRow()).focus(); });
   function addSpecRow(k, v) {
@@ -267,7 +333,8 @@
     // le slug suit le nom ENREGISTRÉ (un nom modifié non enregistré n'a pas encore de fiche)
     var s = encodeURIComponent((editingRow && editingRow.slug) || slugify(editingRow ? editingRow.name : name));
     linksEl.innerHTML =
-      '<a class="btn btn-ghost btn-sm" href="' + SITE + 'spacers.html#/s/' + s + '" target="_blank" rel="noopener">Site public ↗</a>' +
+      // vraie page (générée aux 6 h) ; pas encore publiée -> la 404 renvoie vers spacers.html#/s/<slug>
+      '<a class="btn btn-ghost btn-sm" href="' + SITE + 'spacer/' + s + '.html" target="_blank" rel="noopener">Site public ↗</a>' +
       '<a class="btn btn-ghost btn-sm" href="' + SITE + 'dealer.html#/s/' + s + '" target="_blank" rel="noopener">Portail dealer ↗</a>' +
       (activeI.checked ? '' : '<span class="hint">Masqué en boutique</span>');
   }
@@ -279,7 +346,6 @@
     var a = attrsOf(row);
     editorTitle.textContent = row ? 'Modifier le spacer' : 'Nouveau spacer';
     nameI.value = row ? (row.name || '') : '';
-    descI.value = a.description || '';
     priceI.value = row && row.sell_price != null ? row.sell_price : '';
     dealerPriceI.value = row && row.dealer_price != null ? row.dealer_price : '';
     costI.value = row && row.cost_price != null ? row.cost_price : '';
@@ -296,6 +362,12 @@
     longDescI.value = a.long_desc || '';
     specsEl.innerHTML = '';
     (Array.isArray(a.specs) ? a.specs : []).forEach(function (s) { if (s && (s.k || s.v)) addSpecRow(s.k, s.v); });
+    spkEl.innerHTML = '';
+    (Array.isArray(a.speakers) ? a.speakers : []).forEach(function (x) { if (x && x.model) addSpkRow(x); });
+    replEl.innerHTML = '';
+    (Array.isArray(a.replaces) ? a.replaces : []).forEach(function (x) { if (x && (x.brand || x.ref)) addReplRow(x); });
+    replOwn();
+    buildBrandList();
     renderLinks();
     updateMargin();
     statusEl.textContent = '';
@@ -310,16 +382,21 @@
     var name = nameI.value.trim();
     if (!name) { nameI.focus(); return; }
     // attrs : on repart des attrs existants (avg_cost, barcodes… sont conservés)
+    // (l'ancien « Résumé » — attrs.description — a été retiré : la fiche détaillée suffit)
     var attrs = Object.assign({}, attrsOf(editingRow), {
-      description: descI.value.trim() || null,
+      description: null,
       speaker_size: sizeI.value.trim() || null,
       fitment: collectFitment(),
       specs: collectSpecs(),
-      long_desc: longDescI.value.trim() || null
+      long_desc: longDescI.value.trim() || null,
+      replaces: collectReplaces(),
+      speakers: collectSpeakers()
     });
     ['description', 'speaker_size', 'long_desc'].forEach(function (k) { if (attrs[k] == null) delete attrs[k]; });
     if (!attrs.fitment.length) delete attrs.fitment;
     if (!attrs.specs.length) delete attrs.specs;
+    if (!attrs.replaces.length) delete attrs.replaces;
+    if (!attrs.speakers.length) delete attrs.speakers;
     var patch = {
       type: TYPE, brand: BRAND, material: null,
       name: name,
@@ -386,10 +463,12 @@
     }
     listEl.innerHTML = cache.map(function (r) {
       var url = publicUrl(r.image_path), out = (r.qty | 0) <= 0, a = attrsOf(r);
-      var nPhotos = photosOf(r).length, nFit = Array.isArray(a.fitment) ? a.fitment.length : 0;
-      var tags = (a.speaker_size ? '<span class="sp-mini">' + esc(a.speaker_size) + '</span>' : '') +
+      var nPhotos = photosOf(r).length, nFit = Array.isArray(a.fitment) ? a.fitment.length : 0, repl = replacesLabel(r), nSpk = speakersCount(r);
+      var tags = '<span class="sp-mini">' + (repl ? 'Remplace ' + esc(repl) : 'Création Audio') + '</span>' +
+        (a.speaker_size ? '<span class="sp-mini">' + esc(a.speaker_size) + '</span>' : '') +
         (nFit ? '<span class="sp-mini">' + nFit + ' véhicule' + (nFit > 1 ? 's' : '') + '</span>'
-              : '<span class="sp-mini is-warn" title="Ajoute la compatibilité pour la recherche « civic 2008 »">Sans compatibilité</span>') +
+              : nSpk ? '' : '<span class="sp-mini is-warn" title="Ajoute la compatibilité pour la recherche « civic 2008 »">Sans compatibilité</span>') +
+        (nSpk ? '<span class="sp-mini">' + nSpk + ' haut-parleur' + (nSpk > 1 ? 's' : '') + '</span>' : '') +
         (nPhotos > 1 ? '<span class="sp-mini">' + nPhotos + ' photos</span>' : '');
       return '<article class="card' + (r.active ? '' : ' is-hidden') + '" data-id="' + esc(r.id) + '" draggable="true">' +
         '<div class="card-thumb">' +

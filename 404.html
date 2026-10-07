@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Page introuvable (404) — Création Audio</title>
 <meta name="robots" content="noindex">
+<script>
+  // page de spacer pas encore générée (ajout récent, renommage) -> sa fiche dans le catalogue
+  (function () {
+    var m = /^\/spacer\/([a-z0-9][a-z0-9-]*?)(?:\.html)?\/?$/i.exec(location.pathname);
+    if (m) location.replace('/spacers.html#/s/' + m[1].toLowerCase());
+  })();
+</script>
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="description" content="Cette page n'existe pas ou a été déplacée. Retour à l'accueil de Création Audio.">
 <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
@@ -15,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/tokens.css?v=3">
-<link rel="stylesheet" href="/assets/site.css?v=1">
+<link rel="stylesheet" href="/assets/site.css?v=2">
 <style>
   /* Écran 404 — reprend la direction « atelier / fiche technique » de l'accueil */
   .err {
@@ -31,8 +38,8 @@
   .err p { color:var(--ink-soft, var(--muted)); margin:16px auto 32px; max-width:34em; line-height:1.6; font-size:1.05rem; }
   .err-actions { display:flex; gap:13px; flex-wrap:wrap; justify-content:center; }
   .err-links { margin-top:34px; display:flex; gap:8px 20px; flex-wrap:wrap; justify-content:center; font-size:.92rem; }
-  .err-links a { color:var(--ink-soft, var(--muted)); text-decoration:none; }
-  .err-links a:hover { color:var(--ember-dim); }
+  .err-links a:not(.ask) { color:var(--ink-soft, var(--muted)); text-decoration:none; }
+  .err-links a:not(.ask):hover { color:var(--ember-dim); }
 </style>
 </head>
 <body class="home-page">
@@ -75,7 +82,7 @@
     </div>
     <nav class="err-links" aria-label="Liens utiles">
       <a href="/spacers.html">Spacers &amp; adaptateurs</a>
-      <a href="mailto:contact@creationaudio.ca">Nous écrire</a>
+      <a class="ask" href="https://m.me/61591945465745" target="_blank" rel="noopener">Nous écrire</a>
     </nav>
   </div>
 </main>

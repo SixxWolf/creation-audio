@@ -237,3 +237,13 @@
 @media (prefers-reduced-motion:reduce) {
   .nav-drawer, .home-top, .home-cta svg, .drawer-links a::after { transition:none; }
 }
+
+/* « Écris-nous… » partout sur le site : lien bien visible (souligné, fond teinté, sans animation)
+   qui ouvre Messenger, suivi au besoin de « ou par courriel » (mailto pré-rempli) */
+a.ask { padding:1px 8px; border-radius:100px; font-weight:700; color:var(--ember-ink);
+  text-decoration:underline; text-underline-offset:3px; background:color-mix(in srgb, var(--ember) 10%, transparent);
+  -webkit-box-decoration-break:clone; box-decoration-break:clone; transition:background .15s, color .15s; }
+a.ask:hover, a.ask:focus-visible { color:var(--ink); background:color-mix(in srgb, var(--ember) 20%, transparent); }
+a.ask:focus-visible { outline:2px solid var(--ember-ink); outline-offset:2px; }
+.ask-alt a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
+.ask-alt a:hover { color:var(--ember-ink); }

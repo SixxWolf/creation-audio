@@ -1030,7 +1030,9 @@
   // Théo nomme ses fichiers comme le spacer (« HKSB110 1.1.gcode.3mf ») : on retrouve
   // le spacer par son nom exact en début de fichier — casse, accents, espaces, tirets,
   // version et « AutoLoop xN » ignorés ; « AP 5 / SRX52V » répond aussi à « AP 5 » ou
-  // « SRX52V » (un « / » est interdit dans un nom de fichier). Son prix client remplace
+  // « SRX52V » (un « / » est interdit dans un nom de fichier), et un spacer renommé
+  // (CA-ADP-HYKIA-001) répond encore au n° de la pièce qu'il remplace (attrs.replaces :
+  // « HKSB110 1.1.gcode.3mf »). Son prix client remplace
   // le prix de vente ; le menu « Tarif » passe au prix dealer ou à un palier.
   // Prix des spacers = par paire (cf. cms-spacers.js).
   var spacer = null, spacerLvl = -1, spacerFile = '', spacerReq = 0;
@@ -1049,7 +1051,8 @@
     var best = null, bestLen = 0;
     (rows || []).forEach(function (r) {
       var name = String(r.name || '');
-      [name].concat(name.indexOf('/') !== -1 ? name.split('/') : []).forEach(function (alias) {
+      var refs = (r.attrs && Array.isArray(r.attrs.replaces) ? r.attrs.replaces : []).map(function (x) { return x && x.ref; });
+      [name].concat(name.indexOf('/') !== -1 ? name.split('/') : [], refs).forEach(function (alias) {
         var key = nameTokens(alias).join('');
         if (!key || !ends[key.length] || flat.lastIndexOf(key, 0) !== 0) return;
         if (key.length > bestLen || (key.length === bestLen && r.active && !best.active)) { best = r; bestLen = key.length; }
@@ -1072,7 +1075,7 @@
     var sb = window.CA && window.CA.sb;
     if (!sb || (spacer && name === spacerFile)) return;   // autre plateau du même fichier : on garde le tarif choisi
     var req = ++spacerReq;
-    sb.from('products').select('name,sell_price,dealer_price,tiers,active').eq('type', 'spacer').then(function (res) {
+    sb.from('products').select('name,sell_price,dealer_price,tiers,active,attrs').eq('type', 'spacer').then(function (res) {
       if (req !== spacerReq || res.error) return;
       var r = matchSpacer(name, res.data), had = !!spacer;
       spacer = r ? { name: r.name, levels: spacerLevels(r) } : null;

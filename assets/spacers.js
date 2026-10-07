@@ -2,7 +2,10 @@
    Création Audio V2 — page publique Spacers
    Lit products_public (type='spacer'). Catalogue (recherche véhicule +
    puces de taille) et fiche détaillée : voir spacer-catalog.js.
-   Adresses : #/ (catalogue) · #/s/<slug> (fiche).
+   Adresses : spacers.html (catalogue) · spacer/<slug>.html (vraie page par
+   spacer, générée par tools/build-spacer-pages.js : <body data-spacer>,
+   window.CA_SPACER_PAGES = slugs publiés) · repli spacers.html#/s/<slug>
+   pour un spacer dont la page n'est pas encore générée.
    Panier -> commande par Messenger / courriel (aucun paiement en ligne),
    plafonné au stock (le public ne commande pas sur demande).
    ========================================================= */
@@ -10,8 +13,8 @@
   'use strict';
 
   var sb = window.CA && window.CA.sb;
-  var FB = 'https://m.me/61591945465745';
-  var EMAIL = 'contact@creationaudio.ca';
+  var FB = window.CASpacers.CONTACT.messenger;
+  var EMAIL = window.CASpacers.CONTACT.email;
   var BUCKET = 'products';
   var CART_KEY = 'ca_v2_cart_spacers';
   var TITLE = document.title;
@@ -20,22 +23,28 @@
   var esc = window.CASpacers.esc, money = window.CASpacers.money;
   function publicUrl(path) { if (!path || !sb) return ''; try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; } catch (e) { return ''; } }
 
-  var PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>';
-  var CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5.5h16v10H9l-5 4z"/></svg>';
-  var CARD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>';
+  // page générée d'un spacer (spacer/<slug>.html) ou catalogue (spacers.html)
+  var PAGE = document.body.getAttribute('data-spacer') || '';
+  var PAGES = {};
+  (window.CA_SPACER_PAGES || []).forEach(function (s) { PAGES[s] = 1; });
+  var JUMP = 'ca_sp_jump';   // anti-boucle : page annoncée mais absente (404 -> spacers.html#/s/…)
+  if (PAGE) { try { sessionStorage.removeItem(JUMP); } catch (e) {} }
+  // lien d'une fiche : sa vraie page si publiée ; sinon la fiche du catalogue (même règle dans le générateur)
+  function pageHref(s) {
+    if (PAGES[s]) return (PAGE ? '' : 'spacer/') + s + '.html';
+    return PAGE ? '../spacers.html#/s/' + encodeURIComponent(s) : null;
+  }
 
-  var catalogEl = $('#sp-catalog'), productEl = $('#sp-product');
+  var catalogEl = $('#sp-catalog'), productEl = $('#sp-product'), PUB = window.CASpacers.PUBLIC;
   var sc = window.CASpacers.create({
     sb: sb, mode: 'public',
     catalogEl: catalogEl, listEl: $('#sp-list'), productEl: productEl,
-    addLabel: 'Ajouter au panier',
+    pageHref: pageHref, rootHref: PAGE ? '../spacers.html' : '#/',
+    addLabel: PUB.addLabel, assureHtml: PUB.assureHtml, emptyHint: PUB.emptyHint,
     maxQty: function (p) { return p.qty | 0; },
     onAdd: function (p, qty, src) { addToCart(p.id, qty, src); },
-    onTitle: function (p) { document.title = p ? p.name + ' — Spacers · Création Audio' : TITLE; },
-    assureHtml: '<li>' + PIN + 'Ramassage local à Québec, sur rendez-vous</li>' +
-      '<li>' + CHAT + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
-      '<li>' + CARD + 'Aucun paiement en ligne</li>',
-    emptyHint: 'Ton véhicule n\'y est pas ? <a href="./#contact">Écris-nous</a>, on en imprime sur mesure.'
+    // page générée : on garde son titre (référencement) ; catalogue : titre de la fiche ouverte
+    onTitle: function (p) { if (!PAGE) document.title = p ? p.name + ' — Spacers · Création Audio' : TITLE; }
   });
 
   var spacers = [], byId = {}, loaded = false;
@@ -53,15 +62,32 @@
       }, function () { $('#sp-list').innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
 
-  /* ---- routage : #/ catalogue · #/s/<slug> fiche ---- */
+  /* ---- routage : #/ catalogue · #/s/<slug> fiche (ou sa vraie page) ---- */
   function applyRoute() {
     if (!loaded) return;
+    if (PAGE) {
+      if (!sc.showProduct(PAGE)) location.replace('../spacers.html');   // spacer retiré ou masqué depuis
+      return;
+    }
     var m = /^#\/s\/([^/?#]+)/.exec(location.hash || '');
+    var p = m ? sc.findBySlug(m[1]) : null;
+    if (p && jumpToPage(sc.slugOf(p))) return;
     if (m && sc.showProduct(m[1])) return;
     if (m) history.replaceState(null, '', '#/');   // fiche introuvable (retiré, renommé) -> catalogue
     sc.showCatalog();
   }
-  window.addEventListener('hashchange', applyRoute);
+  // ancien lien #/s/<slug> (ou n° de la pièce d'origine) -> vraie page, une seule fois par slug
+  function jumpToPage(s) {
+    if (!PAGES[s]) return false;
+    var href = 'spacer/' + s + '.html';
+    try {
+      if (sessionStorage.getItem(JUMP) === s) { sessionStorage.removeItem(JUMP); return false; }
+      sessionStorage.setItem(JUMP, s);
+    } catch (e) {}
+    location.replace(href);
+    return true;
+  }
+  if (!PAGE) window.addEventListener('hashchange', applyRoute);
 
   /* ---- panier ---- */
   var cart = loadCart();
