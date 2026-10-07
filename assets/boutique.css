@@ -518,6 +518,21 @@ body.has-buybar .toast { bottom:92px; }
 .spk-legend .pill { justify-self:start; margin-top:1px; }
 .spk-legend .spk-legend-more { display:block; padding-top:10px; border-top:1px dashed var(--line-2); color:var(--muted); }
 @media (max-width:560px) { .spk-legend p { grid-template-columns:minmax(0, 1fr); gap:6px; } }
+/* « Écris-nous… » : lien souligné avec un halo qui pulse doucement -> Messenger (ou courriel) */
+.sp-ask { padding:2px 9px; margin-left:1px; border-radius:100px; font-weight:700; color:var(--ember-ink);
+  text-decoration:underline; text-underline-offset:3px; background:color-mix(in srgb, var(--ember) 10%, transparent);
+  -webkit-box-decoration-break:clone; box-decoration-break:clone; animation:sp-ask-halo 2.6s ease-in-out infinite;
+  transition:background .15s, color .15s; }
+.sp-ask:hover, .sp-ask:focus-visible { color:var(--ink); background:color-mix(in srgb, var(--ember) 20%, transparent); animation-play-state:paused; }
+.sp-ask:focus-visible { outline:2px solid var(--ember-ink); outline-offset:2px; }
+@keyframes sp-ask-halo {
+  0%, 100% { box-shadow:0 0 0 0 color-mix(in srgb, var(--ember) 0%, transparent); }
+  50% { box-shadow:0 0 0 6px color-mix(in srgb, var(--ember) 16%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .sp-ask { animation:none; } }
+.sp-ask-alt { white-space:nowrap; }
+.sp-ask-alt a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
+.sp-ask-alt a:hover { color:var(--ember-ink); }
 .spc-legal:empty { display:none; }
 
 /* =========================================================

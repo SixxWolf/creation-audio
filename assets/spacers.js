@@ -13,8 +13,8 @@
   'use strict';
 
   var sb = window.CA && window.CA.sb;
-  var FB = 'https://m.me/61591945465745';
-  var EMAIL = 'contact@creationaudio.ca';
+  var FB = window.CASpacers.CONTACT.messenger;
+  var EMAIL = window.CASpacers.CONTACT.email;
   var BUCKET = 'products';
   var CART_KEY = 'ca_v2_cart_spacers';
   var TITLE = document.title;

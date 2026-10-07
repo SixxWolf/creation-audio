@@ -123,6 +123,9 @@
     card: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>'
   };
 
+  // nous joindre en un clic depuis la fiche (« Écris-nous… ») : Messenger, ou courriel pré-rempli
+  var CONTACT = { messenger: 'https://m.me/61591945465745', email: 'contact@creationaudio.ca' };
+
   // options de la boutique publique : spacers.html ET pages générées (même rendu à l'octet près)
   var PUBLIC = {
     addLabel: 'Ajouter au panier',
@@ -444,12 +447,20 @@
     }
     var SPK = { ok: { cls: 'ok', label: 'Confirmé' }, partial: { cls: 'order', label: 'Compatible*' } };
     function spkPill(fit) { var s = SPK[fit] || SPK.ok; return '<span class="pill ' + s.cls + '">' + s.label + '</span>'; }
+    // « Écris-nous… » cliquable (halo) : Messenger, ou courriel pré-rempli avec le nom du spacer
+    function askHtml(p, label, question, field) {
+      var body = 'Bonjour,\n\nEst-ce que le spacer ' + p.name + ' ' + question + ' ?\n' + field + ' : \n\nMerci !';
+      var mail = 'mailto:' + CONTACT.email + '?subject=' + encodeURIComponent('Compatibilité — ' + p.name) + '&body=' + encodeURIComponent(body);
+      return '<a class="sp-ask" href="' + esc(CONTACT.messenger) + '" target="_blank" rel="noopener">' + esc(label) + '</a>' +
+        '<span class="sp-ask-alt"> ou <a href="' + esc(mail) + '">par courriel</a></span>';
+    }
     // ce que veut dire chaque ajustement (sous le tableau de l'onglet Haut-parleurs)
-    function spkLegend() {
+    function spkLegend(p) {
       return '<div class="spk-legend">' +
-        '<p>' + spkPill('ok') + '<span>Testé par Création Audio : le haut-parleur s\'installe parfaitement et reste à fleur avec l\'adaptateur. 100 % compatible.</span></p>' +
-        '<p>' + spkPill('partial') + '<span>Testé : le haut-parleur s\'installe et fonctionne, mais l\'ajustement n\'est pas parfait (par exemple, pas tout à fait à fleur avec l\'adaptateur).</span></p>' +
-        '<p class="spk-legend-more">Ton haut-parleur n\'est pas dans la liste ? Écris-nous le modèle avant de commander.</p>' +
+        '<p>' + spkPill('ok') + '<span>Testé par Création Audio : le haut-parleur s\'installe parfaitement et arrive au même niveau que l\'adaptateur. 100 % compatible.</span></p>' +
+        '<p>' + spkPill('partial') + '<span>Testé : le haut-parleur s\'installe et fonctionne bien, mais l\'ajustement n\'est pas parfait. Par exemple, il n\'arrive pas tout à fait au même niveau que l\'adaptateur.</span></p>' +
+        '<p class="spk-legend-more">Ton haut-parleur n\'est pas dans la liste ? ' +
+          askHtml(p, 'Écris-nous le modèle avant de commander', 'convient à mon haut-parleur', 'Marque et modèle du haut-parleur') + '</p>' +
       '</div>';
     }
 
@@ -465,12 +476,13 @@
               return '<tr><td>' + esc(r.make) + '</td><td>' + esc(r.model) + '</td><td class="yrs">' + esc(yearsText(r) || '—') + '</td>' +
                 (anyPos ? '<td>' + esc(r.pos || '—') + '</td>' : '') + '</tr>';
             }).join('') + '</tbody></table></div>' +
-            '<p class="fit-note">Vérifie toujours la taille et la profondeur de ton haut-parleur. Un doute ? Écris-nous avant de commander.</p>' });
+            '<p class="fit-note">Vérifie toujours la taille et la profondeur de ton haut-parleur. Un doute ? ' +
+              askHtml(p, 'Écris-nous avant de commander', 'convient à mon véhicule', 'Véhicule (marque, modèle, année)') + '</p>' });
       }
       if (spk.length) tabs.push({ id: 'spk', label: 'Haut-parleurs', n: spk.length,
         html: '<div class="fit-wrap"><table class="fit-table spk-table"><thead><tr><th>Haut-parleur</th><th>Ajustement</th></tr></thead><tbody>' +
           spk.map(function (x) { return '<tr><td>' + esc(x.model) + '</td><td>' + spkPill(x.fit) + '</td></tr>'; }).join('') +
-          '</tbody></table></div>' + spkLegend() });
+          '</tbody></table></div>' + spkLegend(p) });
       if (specs.length) tabs.push({ id: 'specs', label: 'Spécifications',
         html: '<dl class="specs">' + specs.map(function (s) { return '<div class="spec"><dt>' + esc(s.k) + '</dt><dd>' + esc(s.v) + '</dd></div>'; }).join('') + '</dl>' });
       if (paras.length) tabs.push({ id: 'desc', label: 'Description',
@@ -697,5 +709,5 @@
 
   window.CASpacers = { create: create, slugify: slugify, normalizeTiers: normalizeTiers, tierPrice: tierPrice,
     esc: esc, money: money, fitmentOf: fitmentOf, yearsText: yearsText,
-    sizeOf: sizeOf, replacesOf: replacesOf, refLabel: refLabel, speakersOf: speakersOf, PUBLIC: PUBLIC };
+    sizeOf: sizeOf, replacesOf: replacesOf, refLabel: refLabel, speakersOf: speakersOf, PUBLIC: PUBLIC, CONTACT: CONTACT };
 })();
