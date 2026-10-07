@@ -452,6 +452,14 @@
       return st > 0 ? st + ' en stock · ' + plural(extra, 'paire sera imprimée', 'paires seront imprimées') + ' sur commande'
         : 'Imprimé sur commande — on te confirme le délai.';
     }
+    // spécifications à droite, sous le bouton d'achat (plus d'onglet : visibles d'un coup d'œil)
+    function specsPanel(p) {
+      var specs = specsOf(p);
+      if (!specs.length) return '';
+      return '<section class="sp-specs" aria-label="Spécifications"><p class="sp-specs-t">Spécifications</p><dl>' +
+        specs.map(function (s) { return '<div><dt>' + esc(s.k) + '</dt><dd>' + esc(s.v) + '</dd></div>'; }).join('') + '</dl></section>';
+    }
+
     var SPK = { ok: { cls: 'ok', label: 'Confirmé' }, partial: { cls: 'order', label: 'Compatible*' } };
     function spkPill(fit) { var s = SPK[fit] || SPK.ok; return '<span class="pill ' + s.cls + '">' + s.label + '</span>'; }
     // « Écris-nous… » de la fiche : courriel pré-rempli avec le nom du spacer
@@ -470,7 +478,7 @@
     }
 
     function detailsTabs(p) {
-      var tabs = [], fit = fitmentOf(p), specs = specsOf(p), spk = speakersOf(p);
+      var tabs = [], fit = fitmentOf(p), spk = speakersOf(p);
       var paras = String((p.attrs && p.attrs.long_desc) || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
       if (fit.length) {
         var sorted = fit.slice().sort(function (a, b) { return a.make.localeCompare(b.make, 'fr') || a.model.localeCompare(b.model, 'fr') || (a.from || 0) - (b.from || 0); });
@@ -488,8 +496,6 @@
         html: '<div class="fit-wrap"><table class="fit-table spk-table"><thead><tr><th>Haut-parleur</th><th>Ajustement</th></tr></thead><tbody>' +
           spk.map(function (x) { return '<tr><td>' + esc(x.model) + '</td><td>' + spkPill(x.fit) + '</td></tr>'; }).join('') +
           '</tbody></table></div>' + spkLegend(p) });
-      if (specs.length) tabs.push({ id: 'specs', label: 'Spécifications',
-        html: '<dl class="specs">' + specs.map(function (s) { return '<div class="spec"><dt>' + esc(s.k) + '</dt><dd>' + esc(s.v) + '</dd></div>'; }).join('') + '</dl>' });
       if (paras.length) tabs.push({ id: 'desc', label: 'Description',
         html: '<div class="pdp-desc">' + paras.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>' });
       if (!tabs.length) return '';
@@ -567,6 +573,7 @@
             '<p class="buy-sum" aria-live="polite">' + buySumText(p) + '</p>' +
             '<p class="sp-made" aria-live="polite">' + esc(madeNote(p)) + '</p>' +
             (o.assureHtml ? '<ul class="pdp-assure">' + o.assureHtml + '</ul>' : '') +
+            specsPanel(p) +
           '</div>' +
         '</div>' +
         detailsTabs(p) +

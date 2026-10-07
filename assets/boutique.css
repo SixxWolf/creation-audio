@@ -505,6 +505,14 @@ body.has-buybar .toast { bottom:92px; }
 .fit-table td.yrs { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .fit-note { margin:12px 0 0; font-size:.86rem; color:var(--muted); }
 
+/* Spécifications du spacer : dans le panneau d'achat, sous la rassurance (plus d'onglet) */
+.sp-specs { margin-top:20px; padding-top:18px; border-top:1px solid var(--line); }
+.sp-specs-t { margin:0 0 10px; font-size:.72rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.sp-specs dl { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin:0; }
+.sp-specs dl > div { min-width:0; padding:10px 12px; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+.sp-specs dt { font-size:.66rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+.sp-specs dd { margin:3px 0 0; font-size:.95rem; font-weight:600; line-height:1.35; color:var(--ink); overflow-wrap:anywhere; }
+
 /* « Remplace PAC HKSB110 » (carte + fiche) et mention des marques citées */
 .sp-repl { margin:-4px 0 0; font-size:.84rem; font-weight:600; color:var(--ink-2); overflow-wrap:anywhere; }
 .pdp-panel .sp-repl { margin:8px 0 0; font-size:.98rem; font-weight:500; color:var(--muted); }
