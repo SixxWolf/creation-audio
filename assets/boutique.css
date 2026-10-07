@@ -505,6 +505,16 @@ body.has-buybar .toast { bottom:92px; }
 .fit-table td.yrs { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .fit-note { margin:12px 0 0; font-size:.86rem; color:var(--muted); }
 
+/* Bas de fiche spacer : sections qui défilent (Description, Compatibilité, Haut-parleurs) */
+.sp-sec + .sp-sec { margin-top:clamp(36px, 5vw, 56px); }
+.sp-sec-t { margin:0 0 16px; font-size:clamp(1.3rem, 2.2vw, 1.6rem); line-height:1.15; letter-spacing:-.02em; }
+.sp-sec-n { margin-left:8px; font-family:var(--font); font-size:.82rem; font-weight:700; letter-spacing:0; color:var(--muted); }
+.fit-wrap.is-collapsed .fit-x { display:none; }
+.fit-wrap.is-collapsed .fit-cut td { border-bottom:none; }
+.fit-more { margin-top:12px; padding:0; font:inherit; font-weight:700; font-size:.92rem; color:var(--ink); cursor:pointer;
+  background:none; border:none; text-decoration:underline; text-decoration-color:var(--ember); text-underline-offset:4px; }
+.fit-more:hover { color:var(--ember-ink); }
+
 /* Spécifications du spacer : dans le panneau d'achat, sous la rassurance (plus d'onglet) */
 .sp-specs { margin-top:20px; padding-top:18px; border-top:1px solid var(--line); }
 .sp-specs-t { margin:0 0 10px; font-size:.72rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }

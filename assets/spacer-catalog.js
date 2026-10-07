@@ -4,8 +4,8 @@
    dealer.html (portail : prix dealer + rabais quantité, tout est
    commandable même à stock 0). Rend :
      - le catalogue : recherche « véhicule ou code » + puces de taille + grille
-     - la fiche : photos (vignettes + visionneuse), prix, quantité,
-       onglets Compatibilité / Spécifications / Description, même taille
+     - la fiche : photos (vignettes + visionneuse), prix, quantité, spécifications,
+       puis sections Description / Compatibilité / Haut-parleurs (sans onglets), même taille
    Le panier et l'envoi restent dans la page hôte (callbacks) ; l'hôte
    route aussi l'URL : #/ = catalogue, #/s/<slug> = fiche — ou, en public,
    les vraies pages spacer/<slug>.html (o.pageHref / o.rootHref) générées
@@ -149,7 +149,7 @@
     var listEl = o.listEl || catalogEl;   // où poser recherche + grille (l'en-tête de page peut rester dans le HTML)
     var items = [], byId = {}, bySlug = {}, slugById = {}, byRef = {};
     var q = '', size = 'all', catScrollY = 0, screen = null, shellBuilt = false, firstShow = true;
-    var curP = null, curQty = 1, curImg = 0, curImgs = [], curTab = null;
+    var curP = null, curQty = 1, curImg = 0, curImgs = [], fitOpen = false;
     var rootHref = o.rootHref || '#/';
 
     function publicUrl(path) {
@@ -467,7 +467,7 @@
       return askLink(label, 'Compatibilité — ' + p.name,
         'Bonjour,\n\nEst-ce que le spacer ' + p.name + ' ' + question + ' ?\n' + field + ' : \n\nMerci !');
     }
-    // ce que veut dire chaque ajustement (sous le tableau de l'onglet Haut-parleurs)
+    // ce que veut dire chaque ajustement (sous le tableau de la section Haut-parleurs)
     function spkLegend(p) {
       return '<div class="spk-legend">' +
         '<p>' + spkPill('ok') + '<span>Testé par Création Audio : le haut-parleur s\'installe parfaitement et arrive au même niveau que l\'adaptateur. 100 % compatible.</span></p>' +
@@ -477,48 +477,39 @@
       '</div>';
     }
 
-    function detailsTabs(p) {
-      var tabs = [], fit = fitmentOf(p), spk = speakersOf(p);
+    // Bas de fiche en une seule page qui défile (plus d'onglets) : Description, puis Compatibilité
+    // (FIT_SHOW premiers véhicules + « Voir les N véhicules »), puis Haut-parleurs.
+    var FIT_SHOW = 10;
+    function secHtml(id, title, n, html) {
+      return '<section class="sp-sec" aria-labelledby="sp-sec-' + id + '">' +
+        '<h2 class="sp-sec-t" id="sp-sec-' + id + '">' + esc(title) + (n ? '<span class="sp-sec-n">' + n + '</span>' : '') + '</h2>' +
+        html + '</section>';
+    }
+    function detailsHtml(p) {
+      var secs = [], fit = fitmentOf(p), spk = speakersOf(p);
       var paras = String((p.attrs && p.attrs.long_desc) || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+      if (paras.length) secs.push(secHtml('desc', 'Description', 0,
+        '<div class="pdp-desc">' + paras.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>'));
       if (fit.length) {
         var sorted = fit.slice().sort(function (a, b) { return a.make.localeCompare(b.make, 'fr') || a.model.localeCompare(b.model, 'fr') || (a.from || 0) - (b.from || 0); });
-        var anyPos = sorted.some(function (r) { return r.pos; });
-        tabs.push({ id: 'compat', label: 'Compatibilité', n: fit.length,
-          html: '<div class="fit-wrap"><table class="fit-table"><thead><tr><th>Marque</th><th>Modèle</th><th>Années</th>' + (anyPos ? '<th>Emplacement</th>' : '') + '</tr></thead><tbody>' +
-            sorted.map(function (r) {
-              return '<tr><td>' + esc(r.make) + '</td><td>' + esc(r.model) + '</td><td class="yrs">' + esc(yearsText(r) || '—') + '</td>' +
+        var anyPos = sorted.some(function (r) { return r.pos; }), more = sorted.length > FIT_SHOW;
+        secs.push(secHtml('compat', 'Compatibilité', fit.length,
+          '<div class="fit-wrap' + (more && !fitOpen ? ' is-collapsed' : '') + '"><table class="fit-table"><thead><tr><th>Marque</th><th>Modèle</th><th>Années</th>' + (anyPos ? '<th>Emplacement</th>' : '') + '</tr></thead><tbody>' +
+            sorted.map(function (r, i) {
+              var cls = i >= FIT_SHOW ? ' class="fit-x"' : (i === FIT_SHOW - 1 && more ? ' class="fit-cut"' : '');
+              return '<tr' + cls + '><td>' + esc(r.make) + '</td><td>' + esc(r.model) + '</td><td class="yrs">' + esc(yearsText(r) || '—') + '</td>' +
                 (anyPos ? '<td>' + esc(r.pos || '—') + '</td>' : '') + '</tr>';
             }).join('') + '</tbody></table></div>' +
-            '<p class="fit-note">Vérifie toujours la taille et la profondeur de ton haut-parleur. Un doute ? ' +
-              askHtml(p, 'Écris-nous avant de commander', 'convient à mon véhicule', 'Véhicule (marque, modèle, année)') + '</p>' });
+          (more ? '<button type="button" class="fit-more" data-n="' + sorted.length + '" aria-expanded="' + !!fitOpen + '">' +
+            (fitOpen ? 'Voir moins' : 'Voir les ' + sorted.length + ' véhicules') + '</button>' : '') +
+          '<p class="fit-note">Vérifie toujours la taille et la profondeur de ton haut-parleur. Un doute ? ' +
+            askHtml(p, 'Écris-nous avant de commander', 'convient à mon véhicule', 'Véhicule (marque, modèle, année)') + '</p>'));
       }
-      if (spk.length) tabs.push({ id: 'spk', label: 'Haut-parleurs', n: spk.length,
-        html: '<div class="fit-wrap"><table class="fit-table spk-table"><thead><tr><th>Haut-parleur</th><th>Ajustement</th></tr></thead><tbody>' +
+      if (spk.length) secs.push(secHtml('spk', 'Haut-parleurs', spk.length,
+        '<div class="fit-wrap"><table class="fit-table spk-table"><thead><tr><th>Haut-parleur</th><th>Ajustement</th></tr></thead><tbody>' +
           spk.map(function (x) { return '<tr><td>' + esc(x.model) + '</td><td>' + spkPill(x.fit) + '</td></tr>'; }).join('') +
-          '</tbody></table></div>' + spkLegend(p) });
-      if (paras.length) tabs.push({ id: 'desc', label: 'Description',
-        html: '<div class="pdp-desc">' + paras.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>' });
-      if (!tabs.length) return '';
-      if (!curTab || !tabs.some(function (t) { return t.id === curTab; })) curTab = tabs[0].id;
-      return '<section class="pdp-details" id="sp-details" aria-label="Détails">' +
-        '<div class="tabs" role="tablist" aria-label="Détails du spacer">' + tabs.map(function (t) {
-          var on = t.id === curTab;
-          return '<button type="button" class="tab" role="tab" id="tab-' + t.id + '" aria-controls="panel-' + t.id + '" aria-selected="' + on + '" tabindex="' + (on ? '0' : '-1') + '">' +
-            esc(t.label) + (t.n ? '<span class="tab-n">' + t.n + '</span>' : '') + '</button>';
-        }).join('') + '</div>' +
-        tabs.map(function (t) {
-          return '<div class="tabpanel" role="tabpanel" id="panel-' + t.id + '" aria-labelledby="tab-' + t.id + '" tabindex="0"' + (t.id === curTab ? '' : ' hidden') + '>' + t.html + '</div>';
-        }).join('') +
-      '</section>';
-    }
-    function selectTab(id, focus) {
-      curTab = id;
-      $$('.pdp-details .tab', productEl).forEach(function (t) {
-        var on = t.id === 'tab-' + id;
-        t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1;
-        if (on && focus) t.focus();
-      });
-      $$('.pdp-details .tabpanel', productEl).forEach(function (pn) { pn.hidden = pn.id !== 'panel-' + id; });
+          '</tbody></table></div>' + spkLegend(p)));
+      return secs.length ? '<div class="pdp-details sp-details" id="sp-details">' + secs.join('') + '</div>' : '';
     }
     function relatedHtml(p) {
       var sz = sizeOf(p);
@@ -576,7 +567,7 @@
             specsPanel(p) +
           '</div>' +
         '</div>' +
-        detailsTabs(p) +
+        detailsHtml(p) +
         legalHtml(refBrands([p]), speakersOf(p).length > 0) +
         relatedHtml(p);
     }
@@ -588,7 +579,7 @@
     function staticProduct(seg) {
       var p = findBySlug(seg);
       if (!p) return null;
-      curP = p; curQty = 1; curImg = 0; curTab = null;
+      curP = p; curQty = 1; curImg = 0; fitOpen = false;
       return productHtml();
     }
     function refreshBuy() {
@@ -623,14 +614,15 @@
         var src = $('.pdp-stage img', productEl) || $('.pdp-stage', productEl);
         if (o.onAdd) o.onAdd(p, curQty, src);
       });
-      var tabs = $$('.pdp-details .tab', productEl);
-      tabs.forEach(function (t, i) {
-        t.addEventListener('click', function () { selectTab(t.id.replace('tab-', '')); });
-        t.addEventListener('keydown', function (e) {
-          var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-          if (!d) return; e.preventDefault();
-          var n = tabs[(i + d + tabs.length) % tabs.length]; selectTab(n.id.replace('tab-', ''), true);
-        });
+      // « Voir les N véhicules » / « Voir moins » (l'état survit au rafraîchissement du stock)
+      var fm = $('.fit-more', productEl);
+      if (fm) fm.addEventListener('click', function () {
+        fitOpen = !fitOpen;
+        var wrap = fm.previousElementSibling;
+        if (wrap) wrap.classList.toggle('is-collapsed', !fitOpen);
+        fm.setAttribute('aria-expanded', String(fitOpen));
+        fm.textContent = fitOpen ? 'Voir moins' : 'Voir les ' + fm.getAttribute('data-n') + ' véhicules';
+        if (!fitOpen && wrap && wrap.getBoundingClientRect().top < 0) wrap.scrollIntoView({ block: 'start' });
       });
       var rel = $('.pdp-related', productEl); if (rel) wireAdds(rel);
     }
@@ -642,7 +634,7 @@
       firstShow = false;
       if (screen === 'catalog') catScrollY = window.pageYOffset;
       var same = screen === 'product' && curP === p;
-      if (!same) { curP = p; curQty = 1; curImg = 0; curTab = null; }
+      if (!same) { curP = p; curQty = 1; curImg = 0; fitOpen = false; }
       renderProduct();
       catalogEl.hidden = true; productEl.hidden = false;
       if (!same && !first) window.scrollTo(0, 0);
