@@ -13,7 +13,8 @@
    Données (products_public / products_dealer) : attrs.description (résumé),
    attrs.speaker_size, attrs.fitment [{make, model, from, to, pos}],
    attrs.specs [{k, v}], attrs.long_desc, attrs.gallery [chemins],
-   attrs.replaces [{brand, ref}] (pièces d'origine remplacées).
+   attrs.replaces [{brand, ref}] (pièces d'origine remplacées),
+   attrs.speakers [{model, ok}] (haut-parleurs essayés : confirmé / à confirmer).
    ========================================================= */
 (function () {
   'use strict';
@@ -69,6 +70,13 @@
       .filter(function (x) { return x.ref; });
   }
   function refLabel(x) { return (x.brand ? x.brand + ' ' : '') + x.ref; }
+  // haut-parleurs essayés [{model, ok}] : ok = ajustement confirmé ; sinon à confirmer
+  function speakersOf(p) {
+    var s = p && p.attrs && Array.isArray(p.attrs.speakers) ? p.attrs.speakers : [];
+    return s.map(function (x) { return { model: String(x && x.model || '').trim(), ok: !!(x && x.ok) }; })
+      .filter(function (x) { return x.model; })
+      .sort(function (a, b) { return (b.ok - a.ok) || a.model.localeCompare(b.model, 'fr'); });
+  }
   // marques citées (Metra, PAC…) : mention « marques de leurs propriétaires » sous la fiche / le catalogue
   function refBrands(list) {
     var seen = {}, out = [];
@@ -77,13 +85,19 @@
     });
     return out.sort(function (a, b) { return a.localeCompare(b, 'fr'); });
   }
-  function legalHtml(brands) {
-    if (!brands.length) return '';
+  // spk = des marques de haut-parleurs sont aussi citées (liste « Haut-parleurs »)
+  function legalHtml(brands, spk) {
+    if (!brands.length && !spk) return '';
     var names = brands.length > 1 ? brands.slice(0, -1).join(', ') + ' et ' + brands[brands.length - 1] : brands[0];
-    return '<p class="sp-legal">' + esc(names) + (brands.length > 1
-      ? ' sont des marques de leurs propriétaires respectifs. Création Audio n\'est affiliée à aucun de ces fabricants ; les références indiquent seulement la compatibilité.'
-      : ' est une marque de son propriétaire. Création Audio n\'est pas affiliée à ce fabricant ; la référence indique seulement la compatibilité.') + '</p>';
+    var txt = !brands.length
+      ? 'Les marques de haut-parleurs citées appartiennent à leurs propriétaires respectifs. Création Audio n\'est affiliée à aucun de ces fabricants ; elles indiquent seulement la compatibilité.'
+      : brands.length > 1 || spk
+        ? (spk ? brands.join(', ') + ' et les marques de haut-parleurs citées' : names) +
+          ' sont des marques de leurs propriétaires respectifs. Création Audio n\'est affiliée à aucun de ces fabricants ; les références indiquent seulement la compatibilité.'
+        : names + ' est une marque de son propriétaire. Création Audio n\'est pas affiliée à ce fabricant ; la référence indique seulement la compatibilité.';
+    return '<p class="sp-legal">' + esc(txt) + '</p>';
   }
+  function hasSpeakers(list) { return list.some(function (p) { return speakersOf(p).length > 0; }); }
   // ordre des puces : 5,25" < 6,5" < 6×9 (moyenne des côtés = 7,5) < 8" ; texte (Tweeter…) à la fin
   function sizeRank(s) {
     var n = function (x) { return parseFloat(x.replace(',', '.')); };
@@ -99,6 +113,7 @@
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>',
     cart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>',
     car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 16.5h14M4.5 16.5V12l2-5h11l2 5v4.5"/><path d="M4.5 12h15"/><circle cx="8" cy="16.5" r="1.8"/><circle cx="16" cy="16.5" r="1.8"/></svg>',
+    spk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.2"/></svg>',
     arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
     photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m20.5 16-5-5-8 8"/></svg>',
     pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
@@ -175,7 +190,8 @@
     function baseText(p) {
       var a = p.attrs || {};
       var refs = replacesOf(p).map(function (x) { return x.brand + ' ' + x.ref + ' ' + x.ref.replace(/[^a-z0-9]/gi, ''); });
-      return norm([p.name, String(p.name || '').replace(/[^a-z0-9]/gi, ''), a.description, sizeOf(p)].concat(refs).join(' '));
+      var spk = speakersOf(p).map(function (x) { return x.model + ' ' + x.model.replace(/[^a-z0-9]/gi, ''); });
+      return norm([p.name, String(p.name || '').replace(/[^a-z0-9]/gi, ''), a.description, sizeOf(p)].concat(refs, spk).join(' '));
     }
     function rangesIn(txt) {
       var out = [], re = /((?:19|20)\d{2})\s*(?:-|–|à|a|to)\s*((?:19|20)\d{2})|((?:19|20)\d{2})/g, m;
@@ -233,9 +249,10 @@
     function cardHtml(p) {
       var url = publicUrl(p.image_path), sz = sizeOf(p), fit = fitmentOf(p), b = stockBadge(p);
       var desc = p.attrs && p.attrs.description ? String(p.attrs.description) : '';
-      var noAdd = !isDealer && (p.qty | 0) <= 0, refs = replacesOf(p);
+      var noAdd = !isDealer && (p.qty | 0) <= 0, refs = replacesOf(p), spk = speakersOf(p);
       var tags = (sz ? '<span class="sp-tag">' + esc(sz) + '</span>' : '') +
-        (fit.length ? '<span class="sp-tag is-fit">' + IC.car + plural(fit.length, 'véhicule', 'véhicules') + '</span>' : '');
+        (fit.length ? '<span class="sp-tag is-fit">' + IC.car + plural(fit.length, 'véhicule', 'véhicules') + '</span>' : '') +
+        (spk.length ? '<span class="sp-tag is-fit">' + IC.spk + plural(spk.length, 'haut-parleur', 'haut-parleurs') + '</span>' : '');
       return '<article class="sp-card" data-id="' + esc(p.id) + '">' +
         '<a class="sp-card-link" href="' + esc(hrefOf(p)) + '">' +
           '<div class="mat-media">' +
@@ -322,7 +339,7 @@
     function renderGrid() {
       var grid = $('.spc-grid', catalogEl), cnt = $('.spc-count', catalogEl), legal = $('.spc-legal', catalogEl);
       if (!grid) return;
-      if (legal) legal.innerHTML = legalHtml(refBrands(items));
+      if (legal) legal.innerHTML = legalHtml(refBrands(items), hasSpeakers(items));
       if (!items.length) { grid.innerHTML = '<p class="empty">Aucun spacer disponible pour le moment.</p>'; if (cnt) cnt.textContent = ''; return; }
       var list = filtered();
       if (cnt) cnt.textContent = countText(list.length);
@@ -357,7 +374,7 @@
     // catalogue complet en HTML, sans câblage (spacers.html pré-rendu par le générateur de pages)
     function staticCatalog() {
       q = ''; size = 'all';
-      return shellHtml(chipsHtml(), countText(items.length), items.map(cardHtml).join(''), legalHtml(refBrands(items)));
+      return shellHtml(chipsHtml(), countText(items.length), items.map(cardHtml).join(''), legalHtml(refBrands(items), hasSpeakers(items)));
     }
 
     /* ---------- fiche ---------- */
@@ -433,8 +450,20 @@
         (fit.length > 3 ? '<button type="button" class="sp-fitmore">Voir les ' + fit.length + ' véhicules</button>' : '') + '</div>';
     }
 
+    function spkPill(x) {
+      return '<span class="pill ' + (x.ok ? 'ok' : 'order') + '">' + (x.ok ? 'Confirmé' : 'À confirmer') + '</span>';
+    }
+    // haut-parleurs essayés : les 3 premiers (confirmés d'abord) + lien vers l'onglet
+    function spkSummary(p) {
+      var spk = speakersOf(p);
+      if (!spk.length) return '';
+      return '<div class="sp-fitsum sp-spksum"><p class="sp-fitsum-t">' + IC.spk + 'Haut-parleurs</p><ul>' +
+        spk.slice(0, 3).map(function (x) { return '<li>' + esc(x.model) + spkPill(x) + '</li>'; }).join('') + '</ul>' +
+        (spk.length > 3 ? '<button type="button" class="sp-fitmore sp-spkmore">Voir les ' + spk.length + ' haut-parleurs</button>' : '') + '</div>';
+    }
+
     function detailsTabs(p) {
-      var tabs = [], fit = fitmentOf(p), specs = specsOf(p);
+      var tabs = [], fit = fitmentOf(p), specs = specsOf(p), spk = speakersOf(p);
       var paras = String((p.attrs && p.attrs.long_desc) || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
       if (fit.length) {
         var sorted = fit.slice().sort(function (a, b) { return a.make.localeCompare(b.make, 'fr') || a.model.localeCompare(b.model, 'fr') || (a.from || 0) - (b.from || 0); });
@@ -447,6 +476,11 @@
             }).join('') + '</tbody></table></div>' +
             '<p class="fit-note">Vérifie toujours la taille et la profondeur de ton haut-parleur. Un doute ? Écris-nous avant de commander.</p>' });
       }
+      if (spk.length) tabs.push({ id: 'spk', label: 'Haut-parleurs', n: spk.length,
+        html: '<div class="fit-wrap"><table class="fit-table spk-table"><thead><tr><th>Haut-parleur</th><th>Ajustement</th></tr></thead><tbody>' +
+          spk.map(function (x) { return '<tr><td>' + esc(x.model) + '</td><td>' + spkPill(x) + '</td></tr>'; }).join('') +
+          '</tbody></table></div>' +
+          '<p class="fit-note">Ton haut-parleur n\'est pas dans la liste ? L\'ajustement reste à confirmer : écris-nous le modèle avant de commander.</p>' });
       if (specs.length) tabs.push({ id: 'specs', label: 'Spécifications',
         html: '<dl class="specs">' + specs.map(function (s) { return '<div class="spec"><dt>' + esc(s.k) + '</dt><dd>' + esc(s.v) + '</dd></div>'; }).join('') + '</dl>' });
       if (paras.length) tabs.push({ id: 'desc', label: 'Description',
@@ -514,7 +548,7 @@
               '<span class="pill ' + (b.cls === 'ok' ? 'ok' : b.cls === 'order' ? 'order' : 'bad') + '">' + esc(b.text) + '</span>' +
             '</div>' +
             '<div class="sp-tiers-box">' + tierTableHtml(p) + '</div>' +
-            fitSummary(p) +
+            fitSummary(p) + spkSummary(p) +
             '<div class="cfg-buy">' +
               (blocked ? '' :
               '<div class="qty">' +
@@ -530,7 +564,7 @@
           '</div>' +
         '</div>' +
         detailsTabs(p) +
-        legalHtml(refBrands([p])) +
+        legalHtml(refBrands([p]), speakersOf(p).length > 0) +
         relatedHtml(p);
     }
     function renderProduct() {
@@ -576,10 +610,11 @@
         var src = $('.pdp-stage img', productEl) || $('.pdp-stage', productEl);
         if (o.onAdd) o.onAdd(p, curQty, src);
       });
-      var more = $('.sp-fitmore', productEl);
-      if (more) more.addEventListener('click', function () {
-        selectTab('compat');
-        var d = $('#sp-details', productEl); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      $$('.sp-fitmore', productEl).forEach(function (more) {
+        more.addEventListener('click', function () {
+          selectTab(more.classList.contains('sp-spkmore') ? 'spk' : 'compat');
+          var d = $('#sp-details', productEl); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
       });
       var tabs = $$('.pdp-details .tab', productEl);
       tabs.forEach(function (t, i) {
@@ -679,5 +714,5 @@
 
   window.CASpacers = { create: create, slugify: slugify, normalizeTiers: normalizeTiers, tierPrice: tierPrice,
     esc: esc, money: money, fitmentOf: fitmentOf, yearsText: yearsText,
-    sizeOf: sizeOf, replacesOf: replacesOf, refLabel: refLabel, PUBLIC: PUBLIC };
+    sizeOf: sizeOf, replacesOf: replacesOf, refLabel: refLabel, speakersOf: speakersOf, PUBLIC: PUBLIC };
 })();

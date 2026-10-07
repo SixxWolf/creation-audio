@@ -97,14 +97,19 @@ const flat = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 function seoTexts(CAS, p) {
   const size = CAS.sizeOf(p), makes = makesOf(CAS, p), refs = CAS.replacesOf(p).map(CAS.refLabel);
   const makeNames = makes.slice(0, 3).map((m) => m.make);
-  const head = 'Spacer' + (size ? ' ' + size : '') + (makeNames.length ? ' ' + makeNames.join(' / ') : '');
+  // spacer fait pour un haut-parleur (AP 5, APX 4…) : on nomme les haut-parleurs confirmés
+  const spk = CAS.speakersOf(p).filter((x) => x.ok).map((x) => x.model);
+  const head = 'Spacer' + (size ? ' ' + size : '') +
+    (makeNames.length ? ' ' + makeNames.join(' / ') : (spk.length ? ' pour ' + spk.slice(0, 2).join(' / ') : ''));
   // le code n'est répété que s'il diffère de la pièce remplacée (spacer pas encore renommé)
   const codeIsRef = CAS.replacesOf(p).some((x) => flat(x.ref) === flat(p.name));
   const title = head + (refs.length ? ' – remplace ' + refs.join(', ') : '') + (codeIsRef ? '' : ' | ' + p.name) + ' · Création Audio';
   const vehicles = makes.slice(0, 3).map((m) => m.make + (m.models.length ? ' (' + m.models.slice(0, 3).join(', ') + (m.models.length > 3 ? '…' : '') + ')' : ''));
   const summary = String((p.attrs && p.attrs.description) || '').replace(/\s+/g, ' ').trim();
   let desc = 'Spacer de haut-parleur' + (size ? ' ' + size : '') + ' imprimé 3D' +
-    (vehicles.length ? ' pour ' + vehicles.join(', ') : (summary ? ' — ' + summary : '')) + '.' +
+    (vehicles.length ? ' pour ' + vehicles.join(', ')
+      : spk.length ? ', ajustement confirmé avec ' + spk.join(', ')
+      : (summary ? ' — ' + summary : '')) + '.' +
     (refs.length ? ' Remplace la pièce ' + refs.join(', ') + '.' : ' Conception Création Audio.') +
     ' Vendu par paire, ramassage à Québec.';
   if (desc.length > 300) desc = desc.slice(0, 297).replace(/\s+\S*$/, '') + '…';

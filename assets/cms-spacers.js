@@ -9,6 +9,7 @@
    attrs : description · speaker_size · fitment [{make, model, from, to, pos}]
            · specs [{k, v}] · long_desc · gallery [photos après la 1re]
            · replaces [{brand, ref}] (pièce d'origine ; vide = conception maison)
+           · speakers [{model, ok}] (haut-parleurs essayés : ok = confirmé, sinon à confirmer)
    (les autres clés d'attrs — avg_cost, barcodes… — sont conservées)
    ========================================================= */
 (function () {
@@ -88,6 +89,7 @@
       fitEl = $('#sp-fit'), fitAdd = $('#sp-fit-add'), makeList = $('#sp-make-list'),
       longDescI = $('#sp-long-desc'), specsEl = $('#sp-specs'), specAdd = $('#sp-spec-add'),
       replEl = $('#sp-repl'), replAdd = $('#sp-repl-add'), replOwnEl = $('#sp-repl-own'), brandList = $('#sp-brand-list'),
+      spkEl = $('#sp-spk'), spkAdd = $('#sp-spk-add'),
       statusEl = $('#sp-status'), listEl = $('#sp-list'),
       newBtn = $('#sp-new'), refreshBtn = $('#sp-refresh'),
       saveBtn = $('#sp-save'), cancelBtn = $('#sp-cancel');
@@ -275,6 +277,32 @@
       .map(function (x) { return (x.brand ? x.brand + ' ' : '') + x.ref; }).join(' · ');
   }
 
+  /* ---- haut-parleurs essayés : modèle + Confirmé / À confirmer ---- */
+  if (spkAdd) spkAdd.addEventListener('click', function () { $('.spk-model', addSpkRow()).focus(); });
+  function addSpkRow(x) {
+    x = x || { ok: true };
+    var row = document.createElement('div');
+    row.className = 'spk-row';
+    row.innerHTML =
+      '<input type="text" class="spk-model" placeholder="Marque et modèle" aria-label="Haut-parleur (marque et modèle)" autocomplete="off">' +
+      '<select class="spk-ok" aria-label="Ajustement"><option value="1">Confirmé</option><option value="0">À confirmer</option></select>' +
+      '<button type="button" class="spec-del" aria-label="Retirer ce haut-parleur">✕</button>';
+    $('.spk-model', row).value = x.model || '';
+    $('.spk-ok', row).value = x.ok ? '1' : '0';
+    $('.spec-del', row).addEventListener('click', function () { row.remove(); });
+    spkEl.appendChild(row);
+    return row;
+  }
+  function collectSpeakers() {
+    return $$('.spk-row', spkEl).map(function (row) {
+      return { model: $('.spk-model', row).value.trim(), ok: $('.spk-ok', row).value === '1' };
+    }).filter(function (x) { return x.model; });
+  }
+  function speakersCount(r) {
+    var s = (attrsOf(r).speakers || []).filter(function (x) { return x && x.model; });
+    return s.length;
+  }
+
   /* ---- specs libres ---- */
   if (specAdd) specAdd.addEventListener('click', function () { $('.spec-k', addSpecRow()).focus(); });
   function addSpecRow(k, v) {
@@ -335,6 +363,8 @@
     longDescI.value = a.long_desc || '';
     specsEl.innerHTML = '';
     (Array.isArray(a.specs) ? a.specs : []).forEach(function (s) { if (s && (s.k || s.v)) addSpecRow(s.k, s.v); });
+    spkEl.innerHTML = '';
+    (Array.isArray(a.speakers) ? a.speakers : []).forEach(function (x) { if (x && x.model) addSpkRow(x); });
     replEl.innerHTML = '';
     (Array.isArray(a.replaces) ? a.replaces : []).forEach(function (x) { if (x && (x.brand || x.ref)) addReplRow(x); });
     replOwn();
@@ -359,12 +389,14 @@
       fitment: collectFitment(),
       specs: collectSpecs(),
       long_desc: longDescI.value.trim() || null,
-      replaces: collectReplaces()
+      replaces: collectReplaces(),
+      speakers: collectSpeakers()
     });
     ['description', 'speaker_size', 'long_desc'].forEach(function (k) { if (attrs[k] == null) delete attrs[k]; });
     if (!attrs.fitment.length) delete attrs.fitment;
     if (!attrs.specs.length) delete attrs.specs;
     if (!attrs.replaces.length) delete attrs.replaces;
+    if (!attrs.speakers.length) delete attrs.speakers;
     var patch = {
       type: TYPE, brand: BRAND, material: null,
       name: name,
@@ -431,11 +463,12 @@
     }
     listEl.innerHTML = cache.map(function (r) {
       var url = publicUrl(r.image_path), out = (r.qty | 0) <= 0, a = attrsOf(r);
-      var nPhotos = photosOf(r).length, nFit = Array.isArray(a.fitment) ? a.fitment.length : 0, repl = replacesLabel(r);
+      var nPhotos = photosOf(r).length, nFit = Array.isArray(a.fitment) ? a.fitment.length : 0, repl = replacesLabel(r), nSpk = speakersCount(r);
       var tags = '<span class="sp-mini">' + (repl ? 'Remplace ' + esc(repl) : 'Création Audio') + '</span>' +
         (a.speaker_size ? '<span class="sp-mini">' + esc(a.speaker_size) + '</span>' : '') +
         (nFit ? '<span class="sp-mini">' + nFit + ' véhicule' + (nFit > 1 ? 's' : '') + '</span>'
-              : '<span class="sp-mini is-warn" title="Ajoute la compatibilité pour la recherche « civic 2008 »">Sans compatibilité</span>') +
+              : nSpk ? '' : '<span class="sp-mini is-warn" title="Ajoute la compatibilité pour la recherche « civic 2008 »">Sans compatibilité</span>') +
+        (nSpk ? '<span class="sp-mini">' + nSpk + ' haut-parleur' + (nSpk > 1 ? 's' : '') + '</span>' : '') +
         (nPhotos > 1 ? '<span class="sp-mini">' + nPhotos + ' photos</span>' : '');
       return '<article class="card' + (r.active ? '' : ' is-hidden') + '" data-id="' + esc(r.id) + '" draggable="true">' +
         '<div class="card-thumb">' +

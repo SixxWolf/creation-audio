@@ -521,6 +521,10 @@ body.has-buybar .toast { bottom:92px; }
 .pdp-panel .sp-repl b { font-weight:700; color:var(--ink); }
 .pdp-panel .sp-repl.is-own { font-weight:600; color:var(--ember-ink); }
 .sp-legal { margin:22px 0 0; font-size:.78rem; line-height:1.5; color:var(--muted); }
+/* Haut-parleurs essayés (Confirmé / À confirmer) : encadré de la fiche + onglet */
+.sp-fitsum + .sp-fitsum { margin-top:10px; }
+.sp-spksum li { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; overflow-wrap:anywhere; }
+.sp-spksum .pill, .spk-table .pill { font-size:.72rem; font-weight:700; }
 .spc-legal:empty { display:none; }
 
 /* =========================================================
