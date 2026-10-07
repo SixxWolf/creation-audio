@@ -22,7 +22,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/tokens.css?v=3">
-<link rel="stylesheet" href="/assets/site.css?v=1">
+<link rel="stylesheet" href="/assets/site.css?v=2">
 <style>
   /* Écran 404 — reprend la direction « atelier / fiche technique » de l'accueil */
   .err {
@@ -38,8 +38,8 @@
   .err p { color:var(--ink-soft, var(--muted)); margin:16px auto 32px; max-width:34em; line-height:1.6; font-size:1.05rem; }
   .err-actions { display:flex; gap:13px; flex-wrap:wrap; justify-content:center; }
   .err-links { margin-top:34px; display:flex; gap:8px 20px; flex-wrap:wrap; justify-content:center; font-size:.92rem; }
-  .err-links a { color:var(--ink-soft, var(--muted)); text-decoration:none; }
-  .err-links a:hover { color:var(--ember-dim); }
+  .err-links a:not(.ask) { color:var(--ink-soft, var(--muted)); text-decoration:none; }
+  .err-links a:not(.ask):hover { color:var(--ember-dim); }
 </style>
 </head>
 <body class="home-page">
@@ -82,7 +82,7 @@
     </div>
     <nav class="err-links" aria-label="Liens utiles">
       <a href="/spacers.html">Spacers &amp; adaptateurs</a>
-      <a href="mailto:contact@creationaudio.ca">Nous écrire</a>
+      <a class="ask" href="https://m.me/61591945465745" target="_blank" rel="noopener">Nous écrire</a>
     </nav>
   </div>
 </main>

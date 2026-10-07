@@ -125,6 +125,12 @@
 
   // nous joindre en un clic depuis la fiche (« Écris-nous… ») : Messenger, ou courriel pré-rempli
   var CONTACT = { messenger: 'https://m.me/61591945465745', email: 'contact@creationaudio.ca' };
+  // lien « Écris-nous… » (classe .ask de site.css) -> Messenger, + « ou par courriel » pré-rempli
+  function askLink(label, subject, body) {
+    var mail = 'mailto:' + CONTACT.email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    return '<a class="ask" href="' + esc(CONTACT.messenger) + '" target="_blank" rel="noopener">' + esc(label) + '</a>' +
+      '<span class="ask-alt"> ou <a href="' + esc(mail) + '">par courriel</a></span>';
+  }
 
   // options de la boutique publique : spacers.html ET pages générées (même rendu à l'octet près)
   var PUBLIC = {
@@ -132,7 +138,8 @@
     assureHtml: '<li>' + IC.pin + 'Ramassage local à Québec, sur rendez-vous</li>' +
       '<li>' + IC.chat + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
       '<li>' + IC.card + 'Aucun paiement en ligne</li>',
-    emptyHint: 'Ton véhicule n\'y est pas ? <a href="./#contact">Écris-nous</a>, on en imprime sur mesure.'
+    emptyHint: 'Ton véhicule n\'y est pas ? On en imprime sur mesure : ' +
+      askLink('écris-nous', 'Spacer sur mesure', 'Bonjour,\n\nJe cherche un spacer pour mon véhicule.\nVéhicule (marque, modèle, année) : \nTaille du haut-parleur : \n\nMerci !') + '.'
   };
 
   function create(o) {
@@ -447,12 +454,10 @@
     }
     var SPK = { ok: { cls: 'ok', label: 'Confirmé' }, partial: { cls: 'order', label: 'Compatible*' } };
     function spkPill(fit) { var s = SPK[fit] || SPK.ok; return '<span class="pill ' + s.cls + '">' + s.label + '</span>'; }
-    // « Écris-nous… » cliquable (halo) : Messenger, ou courriel pré-rempli avec le nom du spacer
+    // « Écris-nous… » de la fiche : courriel pré-rempli avec le nom du spacer
     function askHtml(p, label, question, field) {
-      var body = 'Bonjour,\n\nEst-ce que le spacer ' + p.name + ' ' + question + ' ?\n' + field + ' : \n\nMerci !';
-      var mail = 'mailto:' + CONTACT.email + '?subject=' + encodeURIComponent('Compatibilité — ' + p.name) + '&body=' + encodeURIComponent(body);
-      return '<a class="sp-ask" href="' + esc(CONTACT.messenger) + '" target="_blank" rel="noopener">' + esc(label) + '</a>' +
-        '<span class="sp-ask-alt"> ou <a href="' + esc(mail) + '">par courriel</a></span>';
+      return askLink(label, 'Compatibilité — ' + p.name,
+        'Bonjour,\n\nEst-ce que le spacer ' + p.name + ' ' + question + ' ?\n' + field + ' : \n\nMerci !');
     }
     // ce que veut dire chaque ajustement (sous le tableau de l'onglet Haut-parleurs)
     function spkLegend(p) {

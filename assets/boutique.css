@@ -139,7 +139,7 @@
 @keyframes skel { to { background-position:-220% 0; } }
 .empty { grid-column:1 / -1; margin:0; padding:40px 20px; text-align:center; color:var(--muted); line-height:1.6;
   background:#fff; border:1px dashed var(--line-2); border-radius:18px; }
-.empty button, .empty a { font:inherit; font-weight:700; color:var(--ink); background:none; border:none; padding:0;
+.empty button, .empty a:not(.ask) { font:inherit; font-weight:700; color:var(--ink); background:none; border:none; padding:0;
   cursor:pointer; text-decoration:underline; text-decoration-color:var(--ember); text-underline-offset:3px; }
 
 /* =========================================================
@@ -454,7 +454,7 @@ body.has-buybar .toast { bottom:92px; }
 .spc-count { margin:4px 0 14px; font-size:.86rem; font-weight:600; color:var(--muted); }
 .spc-count:empty { display:none; }
 .spc-grid .empty .spc-reset { cursor:pointer; }
-.spc-grid .empty a { text-decoration:underline; text-underline-offset:3px; }
+.spc-grid .empty a:not(.ask) { text-decoration:underline; text-underline-offset:3px; }
 
 /* Carte spacer : zone cliquable (photo + infos) -> fiche ; prix + bouton à part */
 .sp-card { transition:transform .25s cubic-bezier(.2,.7,.2,1), border-color .25s, box-shadow .25s; }
@@ -518,21 +518,6 @@ body.has-buybar .toast { bottom:92px; }
 .spk-legend .pill { justify-self:start; margin-top:1px; }
 .spk-legend .spk-legend-more { display:block; padding-top:10px; border-top:1px dashed var(--line-2); color:var(--muted); }
 @media (max-width:560px) { .spk-legend p { grid-template-columns:minmax(0, 1fr); gap:6px; } }
-/* « Écris-nous… » : lien souligné avec un halo qui pulse doucement -> Messenger (ou courriel) */
-.sp-ask { padding:2px 9px; margin-left:1px; border-radius:100px; font-weight:700; color:var(--ember-ink);
-  text-decoration:underline; text-underline-offset:3px; background:color-mix(in srgb, var(--ember) 10%, transparent);
-  -webkit-box-decoration-break:clone; box-decoration-break:clone; animation:sp-ask-halo 2.6s ease-in-out infinite;
-  transition:background .15s, color .15s; }
-.sp-ask:hover, .sp-ask:focus-visible { color:var(--ink); background:color-mix(in srgb, var(--ember) 20%, transparent); animation-play-state:paused; }
-.sp-ask:focus-visible { outline:2px solid var(--ember-ink); outline-offset:2px; }
-@keyframes sp-ask-halo {
-  0%, 100% { box-shadow:0 0 0 0 color-mix(in srgb, var(--ember) 0%, transparent); }
-  50% { box-shadow:0 0 0 6px color-mix(in srgb, var(--ember) 16%, transparent); }
-}
-@media (prefers-reduced-motion: reduce) { .sp-ask { animation:none; } }
-.sp-ask-alt { white-space:nowrap; }
-.sp-ask-alt a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
-.sp-ask-alt a:hover { color:var(--ember-ink); }
 .spc-legal:empty { display:none; }
 
 /* =========================================================
