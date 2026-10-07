@@ -397,6 +397,14 @@
     if (!attrs.specs.length) delete attrs.specs;
     if (!attrs.replaces.length) delete attrs.replaces;
     if (!attrs.speakers.length) delete attrs.speakers;
+    // renommé (ex. « AP 5 / SRX52V » -> CA-ADP-525-001) : l'ancien nom est gardé pour les anciens liens,
+    // la recherche et les fichiers AutoLoop qui le portent encore
+    var oldName = editingRow && String(editingRow.name || '').trim();
+    if (oldName && oldName !== name) {
+      var al = (Array.isArray(attrs.aliases) ? attrs.aliases : []).filter(function (x) { return x && x !== name; });
+      if (al.indexOf(oldName) === -1) al.push(oldName);
+      attrs.aliases = al;
+    }
     var patch = {
       type: TYPE, brand: BRAND, material: null,
       name: name,

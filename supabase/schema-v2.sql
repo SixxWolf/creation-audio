@@ -210,6 +210,8 @@ with (security_invoker = off) as
       'replaces',     p.attrs -> 'replaces',
       -- spacers : haut-parleurs essayés [{model, ok}] (ok = ajustement confirmé, sinon à confirmer)
       'speakers',     p.attrs -> 'speakers',
+      -- spacers : anciens noms (renommés en code maison) -> anciens liens, recherche, fichiers AutoLoop
+      'aliases',      p.attrs -> 'aliases',
       -- accessoires : catégorie (puces + rabais cumulé), affichage sur la fiche filament (+ marques visées)
       'category',     p.attrs -> 'category',
       'on_filament',  p.attrs -> 'on_filament',
@@ -544,7 +546,8 @@ create view public.products_dealer with (security_invoker = off) as
            'long_desc',    p.attrs -> 'long_desc',
            'gallery',      p.attrs -> 'gallery',
            'replaces',     p.attrs -> 'replaces',
-           'speakers',     p.attrs -> 'speakers'
+           'speakers',     p.attrs -> 'speakers',
+           'aliases',      p.attrs -> 'aliases'
          )) as attrs,
          p.image_path,
          coalesce(p.dealer_price, p.sell_price) as sell_price,
