@@ -439,7 +439,8 @@
         var url = publicUrl(p.image_path);
         // recherche : code + n° de la pièce d'origine remplacée (« hksb110 » trouve CA-ADP-HYKIA-001)
         var refs = (p.attrs && Array.isArray(p.attrs.replaces) ? p.attrs.replaces : []).map(function (x) { return x && x.ref || ''; })
-          .concat((p.attrs && Array.isArray(p.attrs.speakers) ? p.attrs.speakers : []).map(function (x) { return x && x.model || ''; }));
+          .concat((p.attrs && Array.isArray(p.attrs.speakers) ? p.attrs.speakers : []).map(function (x) { return x && x.model || ''; }))
+          .concat(p.attrs && Array.isArray(p.attrs.aliases) ? p.attrs.aliases : []);   // anciens noms
         return '<button type="button" class="pk-cell pk-card" data-id="' + esc(p.id) + '" data-search="' +
           esc([p.name || ''].concat(refs).join(' ').toLowerCase()) + '">' +
           (url ? '<img class="pk-img" src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="pk-img pk-noimg"></span>') +

@@ -101,8 +101,10 @@ function seoTexts(CAS, p) {
   const spkAll = CAS.speakersOf(p), spk = spkAll.map((x) => x.model);
   const spkOk = spkAll.filter((x) => x.fit === 'ok').map((x) => x.model);
   const spkPartial = spkAll.filter((x) => x.fit === 'partial').map((x) => x.model);
+  // ni véhicule ni haut-parleur : « universel » si la description le dit (ex. CA-ADP-8-001)
+  const universal = !makeNames.length && !spk.length && /universel/i.test(String((p.attrs && p.attrs.long_desc) || ''));
   const head = 'Spacer' + (size ? ' ' + size : '') +
-    (makeNames.length ? ' ' + makeNames.join(' / ') : (spk.length ? ' pour ' + spk.slice(0, 2).join(' / ') : ''));
+    (makeNames.length ? ' ' + makeNames.join(' / ') : (spk.length ? ' pour ' + spk.slice(0, 2).join(' / ') : (universal ? ' universel' : '')));
   // le code n'est répété que s'il diffère de la pièce remplacée (spacer pas encore renommé)
   const codeIsRef = CAS.replacesOf(p).some((x) => flat(x.ref) === flat(p.name));
   const title = head + (refs.length ? ' – remplace ' + refs.join(', ') : '') + (codeIsRef ? '' : ' | ' + p.name) + ' · Création Audio';

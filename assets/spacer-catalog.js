@@ -14,7 +14,8 @@
    attrs.speaker_size, attrs.fitment [{make, model, from, to, pos}],
    attrs.specs [{k, v}], attrs.long_desc, attrs.gallery [chemins],
    attrs.replaces [{brand, ref}] (pièces d'origine remplacées),
-   attrs.speakers [{model, fit}] (haut-parleurs testés : 'ok' Confirmé / 'partial' Compatible*).
+   attrs.speakers [{model, fit}] (haut-parleurs testés : 'ok' Confirmé / 'partial' Compatible*),
+   attrs.aliases [anciens noms] (mémorisés au renommage : anciens liens, recherche).
    ========================================================= */
 (function () {
   'use strict';
@@ -70,6 +71,16 @@
       .filter(function (x) { return x.ref; });
   }
   function refLabel(x) { return (x.brand ? x.brand + ' ' : '') + x.ref; }
+  // anciens noms (« AP 5 / SRX52V » avant CA-ADP-525-001) : anciens liens + recherche ; « A / B » compte pour A et B
+  function aliasesOf(p) {
+    var a = p && p.attrs && Array.isArray(p.attrs.aliases) ? p.attrs.aliases : [], out = [];
+    a.forEach(function (s) {
+      s = String(s || '').trim(); if (!s) return;
+      out.push(s);
+      if (s.indexOf('/') !== -1) s.split('/').forEach(function (x) { x = x.trim(); if (x) out.push(x); });
+    });
+    return out;
+  }
   // haut-parleurs testés [{model, fit}] : fit 'ok' = Confirmé (100 % compatible, à fleur) ;
   // 'partial' = Compatible* (s'installe et fonctionne, ajustement imparfait)
   function speakersOf(p) {
@@ -178,8 +189,9 @@
         var s = p.slug || slugify(p.name);
         if (bySlug[s]) s = s + '-' + String(p.id).slice(0, 4);
         bySlug[s] = p; slugById[p.id] = s;
-        // ancien lien « #/s/hksb110 » (nommé d'après la pièce d'origine) -> même fiche
+        // ancien lien « #/s/hksb110 » (pièce d'origine) ou « #/s/ap-5-srx52v » (ancien nom) -> même fiche
         replacesOf(p).forEach(function (x) { var k = slugify(x.ref); if (!byRef[k]) byRef[k] = p; });
+        aliasesOf(p).forEach(function (x) { var k = slugify(x); if (!byRef[k]) byRef[k] = p; });
       });
       if (curP) curP = byId[curP.id] || null;
     }
@@ -203,7 +215,8 @@
       var a = p.attrs || {};
       var refs = replacesOf(p).map(function (x) { return x.brand + ' ' + x.ref + ' ' + x.ref.replace(/[^a-z0-9]/gi, ''); });
       var spk = speakersOf(p).map(function (x) { return x.model + ' ' + x.model.replace(/[^a-z0-9]/gi, ''); });
-      return norm([p.name, String(p.name || '').replace(/[^a-z0-9]/gi, ''), a.description, sizeOf(p)].concat(refs, spk).join(' '));
+      var old = aliasesOf(p).map(function (x) { return x + ' ' + x.replace(/[^a-z0-9]/gi, ''); });
+      return norm([p.name, String(p.name || '').replace(/[^a-z0-9]/gi, ''), a.description, sizeOf(p)].concat(refs, spk, old).join(' '));
     }
     function rangesIn(txt) {
       var out = [], re = /((?:19|20)\d{2})\s*(?:-|–|à|a|to)\s*((?:19|20)\d{2})|((?:19|20)\d{2})/g, m;

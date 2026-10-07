@@ -108,7 +108,7 @@
     if (!loaded) listEl.innerHTML = '<p class="muted">Chargement…</p>';
     pending = Promise.all([
       sb.from('dealer_orders').select('*, dealer_order_lines(*)').order('created_at', { ascending: false }).limit(200),
-      sb.from('products').select('id,name,qty,image_path,active,sort_order,slug,dealer_price,sell_price,tiers,fitment:attrs->fitment,replaces:attrs->replaces,speakers:attrs->speakers').eq('type', 'spacer')
+      sb.from('products').select('id,name,qty,image_path,active,sort_order,slug,dealer_price,sell_price,tiers,fitment:attrs->fitment,replaces:attrs->replaces,speakers:attrs->speakers,aliases:attrs->aliases').eq('type', 'spacer')
     ]).then(function (r) {
       var ro = r[0], rp = r[1];
       if (ro.error) {
@@ -327,7 +327,8 @@
       if (!toks.length) return true;
       var fit = fitOf(p);
       var refs = (Array.isArray(p.replaces) ? p.replaces : []).map(function (x) { return x && x.ref || ''; })
-        .concat((Array.isArray(p.speakers) ? p.speakers : []).map(function (x) { return x && x.model || ''; }));
+        .concat((Array.isArray(p.speakers) ? p.speakers : []).map(function (x) { return x && x.model || ''; }))
+        .concat(Array.isArray(p.aliases) ? p.aliases : []);   // anciens noms
       var hay = norm([p.name, p.slug].concat(refs, fit.map(function (r) { return [r.make, r.model, r.pos].join(' '); })).join(' '));
       return toks.every(function (t) {
         if (hay.indexOf(t) !== -1) return true;

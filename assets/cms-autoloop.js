@@ -1032,7 +1032,7 @@
   // version et « AutoLoop xN » ignorés ; « AP 5 / SRX52V » répond aussi à « AP 5 » ou
   // « SRX52V » (un « / » est interdit dans un nom de fichier), et un spacer renommé
   // (CA-ADP-HYKIA-001) répond encore au n° de la pièce qu'il remplace (attrs.replaces :
-  // « HKSB110 1.1.gcode.3mf »). Son prix client remplace
+  // « HKSB110 1.1.gcode.3mf ») et à ses anciens noms (attrs.aliases). Son prix client remplace
   // le prix de vente ; le menu « Tarif » passe au prix dealer ou à un palier.
   // Prix des spacers = par paire (cf. cms-spacers.js).
   var spacer = null, spacerLvl = -1, spacerFile = '', spacerReq = 0;
@@ -1052,7 +1052,12 @@
     (rows || []).forEach(function (r) {
       var name = String(r.name || '');
       var refs = (r.attrs && Array.isArray(r.attrs.replaces) ? r.attrs.replaces : []).map(function (x) { return x && x.ref; });
-      [name].concat(name.indexOf('/') !== -1 ? name.split('/') : [], refs).forEach(function (alias) {
+      // anciens noms (« AP 5 / SRX52V » avant CA-ADP-525-001) : les fichiers gardent souvent l'ancien nom
+      var olds = [];
+      (r.attrs && Array.isArray(r.attrs.aliases) ? r.attrs.aliases : []).forEach(function (a) {
+        a = String(a || ''); olds.push(a); if (a.indexOf('/') !== -1) olds = olds.concat(a.split('/'));
+      });
+      [name].concat(name.indexOf('/') !== -1 ? name.split('/') : [], refs, olds).forEach(function (alias) {
         var key = nameTokens(alias).join('');
         if (!key || !ends[key.length] || flat.lastIndexOf(key, 0) !== 0) return;
         if (key.length > bestLen || (key.length === bestLen && r.active && !best.active)) { best = r; bestLen = key.length; }
