@@ -1,7 +1,8 @@
 /* =========================================================
    Création Audio V2 — Statistiques (Phase 5)
    Sur les factures NON annulées, filtrées par période
-   (1s / 1m / 3m / 6m / 1an / Tout) : chiffre d'affaires,
+   (1s / 1m / 3m / 6m / 1an / Tout) ou par mois précis
+   (liste déroulante) : chiffre d'affaires,
    marge (ventes − coûts, hors taxes), nb factures, panier
    moyen, répartition par gabarit et top produits.
    ========================================================= */
@@ -23,8 +24,8 @@
   function pct(part, whole) { return whole > 0 ? Math.round(part / whole * 100) : 0; }
   var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', divers: 'Divers', mixte: 'Mixte' };
 
-  var loaded = false, invoices = [], linesByInv = {}, periodDays = 30, prodInfo = {};
-  var bodyEl = $('#stat-body'), soldEl = $('#stat-sold'), refreshBtn = $('#stat-refresh');
+  var loaded = false, invoices = [], linesByInv = {}, periodDays = 30, periodMonth = '', prodInfo = {};
+  var bodyEl = $('#stat-body'), soldEl = $('#stat-sold'), refreshBtn = $('#stat-refresh'), monthSel = $('#stat-month');
 
   // Groupes de produits (Top produits + onglet « Produits vendus »).
   // Divers / mixte -> « Autres » (affiché seulement s'il y a des ventes).
@@ -86,10 +87,52 @@
   $$('.stat-pbtn').forEach(function (b) {
     b.addEventListener('click', function () {
       periodDays = parseInt(b.getAttribute('data-days'), 10) || 0;
+      periodMonth = '';
       $$('.stat-pbtn').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+      syncMonthSel();
       render();
     });
   });
+
+  // Liste des mois (janvier → décembre) groupés par année : année en cours +
+  // toute année qui a des factures. Mois à venir grisés. Choisir un mois
+  // remplace la période ; cliquer une période vide le mois.
+  var MONTHS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+  function ymNow() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+  function buildMonths() {
+    if (!monthSel) return;
+    var nowYm = ymNow(), years = {};
+    years[nowYm.slice(0, 4)] = 1;
+    invoices.forEach(function (inv) { var y = (inv.invoice_date || '').slice(0, 4); if (/^\d{4}$/.test(y)) years[y] = 1; });
+    var html = '<option value="" disabled hidden>Mois</option>';
+    Object.keys(years).sort().reverse().forEach(function (y) {
+      html += '<optgroup label="' + y + '">' + MONTHS.map(function (m, i) {
+        var v = y + '-' + String(i + 1).padStart(2, '0');
+        return '<option value="' + v + '"' + (v > nowYm ? ' disabled' : '') + '>' + m + '</option>';
+      }).join('') + '</optgroup>';
+    });
+    monthSel.innerHTML = html;
+    syncMonthSel();
+  }
+  // affiche « Septembre 2026 » dans le champ fermé (l'année n'est sinon que dans le groupe)
+  function syncMonthSel() {
+    if (!monthSel) return;
+    $$('option', monthSel).forEach(function (o) {
+      if (o.value) o.textContent = MONTHS[+o.value.slice(5) - 1] + (o.value === periodMonth ? ' ' + o.value.slice(0, 4) : '');
+    });
+    if (periodMonth) monthSel.value = periodMonth; else monthSel.selectedIndex = 0;
+    monthSel.classList.toggle('is-active', !!periodMonth);
+  }
+  if (monthSel) {
+    monthSel.addEventListener('change', function () {
+      periodMonth = monthSel.value || '';
+      if (!periodMonth) return;
+      $$('.stat-pbtn').forEach(function (x) { x.classList.remove('is-active'); });
+      syncMonthSel();
+      render();
+    });
+    buildMonths();
+  }
 
   function load() {
     bodyEl.innerHTML = '<p class="muted">Chargement…</p>';
@@ -106,6 +149,7 @@
       if (res.error) { bodyEl.innerHTML = '<p class="empty">Impossible de charger.<br>As-tu relancé <strong>schema-v2.sql</strong> ?</p>'; return; }
       invoices = res.data || [];
       linesByInv = {};
+      buildMonths();
       if (!invoices.length) { render(); return; }
       var ids = invoices.map(function (r) { return r.id; });
       sb.from('invoice_lines').select('*').in('invoice_id', ids).then(function (r2) {
@@ -125,6 +169,7 @@
     var cut = cutoffISO();
     return invoices.filter(function (inv) {
       if (inv.status === 'cancelled') return false;
+      if (periodMonth) return (inv.invoice_date || '').slice(0, 7) === periodMonth;
       if (cut && (inv.invoice_date || '') < cut) return false;
       return true;
     });
