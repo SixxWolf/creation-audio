@@ -97,8 +97,10 @@ const flat = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 function seoTexts(CAS, p) {
   const size = CAS.sizeOf(p), makes = makesOf(CAS, p), refs = CAS.replacesOf(p).map(CAS.refLabel);
   const makeNames = makes.slice(0, 3).map((m) => m.make);
-  // spacer fait pour un haut-parleur (AP 5, APX 4…) : on nomme les haut-parleurs confirmés
-  const spk = CAS.speakersOf(p).filter((x) => x.ok).map((x) => x.model);
+  // spacer fait pour un haut-parleur (AP 5, APX 4…) : on nomme les haut-parleurs testés (Confirmé d'abord)
+  const spkAll = CAS.speakersOf(p), spk = spkAll.map((x) => x.model);
+  const spkOk = spkAll.filter((x) => x.fit === 'ok').map((x) => x.model);
+  const spkPartial = spkAll.filter((x) => x.fit === 'partial').map((x) => x.model);
   const head = 'Spacer' + (size ? ' ' + size : '') +
     (makeNames.length ? ' ' + makeNames.join(' / ') : (spk.length ? ' pour ' + spk.slice(0, 2).join(' / ') : ''));
   // le code n'est répété que s'il diffère de la pièce remplacée (spacer pas encore renommé)
@@ -108,7 +110,8 @@ function seoTexts(CAS, p) {
   const summary = String((p.attrs && p.attrs.description) || '').replace(/\s+/g, ' ').trim();
   let desc = 'Spacer de haut-parleur' + (size ? ' ' + size : '') + ' imprimé 3D' +
     (vehicles.length ? ' pour ' + vehicles.join(', ')
-      : spk.length ? ', ajustement confirmé avec ' + spk.join(', ')
+      : spk.length ? [spkOk.length ? ', testé et confirmé avec ' + spkOk.join(', ') : '',
+          spkPartial.length ? (spkOk.length ? ' ; ' : ', ') + 'compatible avec ' + spkPartial.join(', ') + ' (ajustement imparfait)' : ''].join('')
       : (summary ? ' — ' + summary : '')) + '.' +
     (refs.length ? ' Remplace la pièce ' + refs.join(', ') + '.' : ' Conception Création Audio.') +
     ' Vendu par paire, ramassage à Québec.';

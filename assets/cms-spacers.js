@@ -9,7 +9,7 @@
    attrs : description · speaker_size · fitment [{make, model, from, to, pos}]
            · specs [{k, v}] · long_desc · gallery [photos après la 1re]
            · replaces [{brand, ref}] (pièce d'origine ; vide = conception maison)
-           · speakers [{model, ok}] (haut-parleurs essayés : ok = confirmé, sinon à confirmer)
+           · speakers [{model, fit}] (haut-parleurs testés : 'ok' = Confirmé, 'partial' = Compatible*)
    (les autres clés d'attrs — avg_cost, barcodes… — sont conservées)
    ========================================================= */
 (function () {
@@ -81,7 +81,7 @@
 
   var editor = $('#sp-editor'), editorTitle = $('#sp-editor-title'),
       fileInput = $('#sp-file'), galleryEl = $('#sp-gallery'), galleryAdd = $('#sp-gallery-add'),
-      nameI = $('#sp-name'), descI = $('#sp-desc'), priceI = $('#sp-price'), costI = $('#sp-cost'),
+      nameI = $('#sp-name'), priceI = $('#sp-price'), costI = $('#sp-cost'),
       dealerPriceI = $('#sp-dealer-price'), marginEl = $('#sp-margin'), marginDealerEl = $('#sp-margin-dealer'),
       qtyI = $('#sp-qty'), activeI = $('#sp-active'),
       tiersEl = $('#sp-tiers'), tierAdd = $('#sp-tier-add'),
@@ -277,25 +277,25 @@
       .map(function (x) { return (x.brand ? x.brand + ' ' : '') + x.ref; }).join(' · ');
   }
 
-  /* ---- haut-parleurs essayés : modèle + Confirmé / À confirmer ---- */
+  /* ---- haut-parleurs testés : modèle + Confirmé (parfait) / Compatible* (fonctionne, pas parfait) ---- */
   if (spkAdd) spkAdd.addEventListener('click', function () { $('.spk-model', addSpkRow()).focus(); });
   function addSpkRow(x) {
-    x = x || { ok: true };
+    x = x || {};
     var row = document.createElement('div');
     row.className = 'spk-row';
     row.innerHTML =
       '<input type="text" class="spk-model" placeholder="Marque et modèle" aria-label="Haut-parleur (marque et modèle)" autocomplete="off">' +
-      '<select class="spk-ok" aria-label="Ajustement"><option value="1">Confirmé</option><option value="0">À confirmer</option></select>' +
+      '<select class="spk-ok" aria-label="Ajustement"><option value="ok">Confirmé</option><option value="partial">Compatible* (pas parfait)</option></select>' +
       '<button type="button" class="spec-del" aria-label="Retirer ce haut-parleur">✕</button>';
     $('.spk-model', row).value = x.model || '';
-    $('.spk-ok', row).value = x.ok ? '1' : '0';
+    $('.spk-ok', row).value = x.fit === 'partial' || x.ok === false ? 'partial' : 'ok';   // ok:false = ancien « à confirmer »
     $('.spec-del', row).addEventListener('click', function () { row.remove(); });
     spkEl.appendChild(row);
     return row;
   }
   function collectSpeakers() {
     return $$('.spk-row', spkEl).map(function (row) {
-      return { model: $('.spk-model', row).value.trim(), ok: $('.spk-ok', row).value === '1' };
+      return { model: $('.spk-model', row).value.trim(), fit: $('.spk-ok', row).value };
     }).filter(function (x) { return x.model; });
   }
   function speakersCount(r) {
@@ -346,7 +346,6 @@
     var a = attrsOf(row);
     editorTitle.textContent = row ? 'Modifier le spacer' : 'Nouveau spacer';
     nameI.value = row ? (row.name || '') : '';
-    descI.value = a.description || '';
     priceI.value = row && row.sell_price != null ? row.sell_price : '';
     dealerPriceI.value = row && row.dealer_price != null ? row.dealer_price : '';
     costI.value = row && row.cost_price != null ? row.cost_price : '';
@@ -383,8 +382,9 @@
     var name = nameI.value.trim();
     if (!name) { nameI.focus(); return; }
     // attrs : on repart des attrs existants (avg_cost, barcodes… sont conservés)
+    // (l'ancien « Résumé » — attrs.description — a été retiré : la fiche détaillée suffit)
     var attrs = Object.assign({}, attrsOf(editingRow), {
-      description: descI.value.trim() || null,
+      description: null,
       speaker_size: sizeI.value.trim() || null,
       fitment: collectFitment(),
       specs: collectSpecs(),

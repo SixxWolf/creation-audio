@@ -490,16 +490,6 @@ body.has-buybar .toast { bottom:92px; }
 .sp-tr-p { font-weight:700; color:var(--ink); white-space:nowrap; }
 .sp-tr-p em { margin-left:4px; font-style:normal; font-size:.8rem; font-weight:700; color:#16794A; }
 .sp-tr.is-active { color:var(--ink); background:#FFF3EC; box-shadow:inset 3px 0 0 var(--ember); }
-.sp-fitsum { margin-top:18px; padding:14px 16px; background:var(--wash); border:1px solid var(--line); border-radius:14px; }
-.sp-fitsum-t { display:flex; align-items:center; gap:8px; margin:0 0 8px; font-size:.72rem; font-weight:700; letter-spacing:.12em;
-  text-transform:uppercase; color:var(--muted); }
-.sp-fitsum-t svg { width:17px; height:17px; flex:none; color:var(--ember-ink); }
-.sp-fitsum ul { display:grid; gap:4px; margin:0; padding:0; list-style:none; }
-.sp-fitsum li { font-weight:600; font-size:.94rem; }
-.sp-fitsum li span { margin-left:4px; font-weight:500; color:var(--muted); font-variant-numeric:tabular-nums; }
-.sp-fitmore { margin-top:8px; padding:0; font:inherit; font-weight:700; font-size:.88rem; color:var(--ink); cursor:pointer;
-  background:none; border:none; text-decoration:underline; text-underline-offset:3px; }
-.sp-fitmore:hover { color:var(--ember-ink); }
 .sp-made { margin:6px 0 0; font-size:.86rem; font-weight:600; color:var(--ember-ink); }
 .sp-made:empty { display:none; }
 .qty button:disabled { opacity:.35; cursor:not-allowed; background:none; }
@@ -521,10 +511,13 @@ body.has-buybar .toast { bottom:92px; }
 .pdp-panel .sp-repl b { font-weight:700; color:var(--ink); }
 .pdp-panel .sp-repl.is-own { font-weight:600; color:var(--ember-ink); }
 .sp-legal { margin:22px 0 0; font-size:.78rem; line-height:1.5; color:var(--muted); }
-/* Haut-parleurs essayés (Confirmé / À confirmer) : encadré de la fiche + onglet */
-.sp-fitsum + .sp-fitsum { margin-top:10px; }
-.sp-spksum li { display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; overflow-wrap:anywhere; }
-.sp-spksum .pill, .spk-table .pill { font-size:.72rem; font-weight:700; }
+/* Onglet Haut-parleurs : Confirmé / Compatible* + légende détaillée */
+.spk-table .pill, .spk-legend .pill { font-size:.72rem; font-weight:700; }
+.spk-legend { display:grid; gap:10px; margin-top:14px; padding:14px 16px; background:var(--wash); border:1px solid var(--line); border-radius:14px; }
+.spk-legend p { display:grid; grid-template-columns:118px minmax(0, 1fr); align-items:start; gap:12px; margin:0; font-size:.9rem; line-height:1.5; color:var(--ink-2); }
+.spk-legend .pill { justify-self:start; margin-top:1px; }
+.spk-legend .spk-legend-more { display:block; padding-top:10px; border-top:1px dashed var(--line-2); color:var(--muted); }
+@media (max-width:560px) { .spk-legend p { grid-template-columns:minmax(0, 1fr); gap:6px; } }
 .spc-legal:empty { display:none; }
 
 /* =========================================================

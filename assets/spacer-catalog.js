@@ -14,7 +14,7 @@
    attrs.speaker_size, attrs.fitment [{make, model, from, to, pos}],
    attrs.specs [{k, v}], attrs.long_desc, attrs.gallery [chemins],
    attrs.replaces [{brand, ref}] (pièces d'origine remplacées),
-   attrs.speakers [{model, ok}] (haut-parleurs essayés : confirmé / à confirmer).
+   attrs.speakers [{model, fit}] (haut-parleurs testés : 'ok' Confirmé / 'partial' Compatible*).
    ========================================================= */
 (function () {
   'use strict';
@@ -70,12 +70,14 @@
       .filter(function (x) { return x.ref; });
   }
   function refLabel(x) { return (x.brand ? x.brand + ' ' : '') + x.ref; }
-  // haut-parleurs essayés [{model, ok}] : ok = ajustement confirmé ; sinon à confirmer
+  // haut-parleurs testés [{model, fit}] : fit 'ok' = Confirmé (100 % compatible, à fleur) ;
+  // 'partial' = Compatible* (s'installe et fonctionne, ajustement imparfait)
   function speakersOf(p) {
     var s = p && p.attrs && Array.isArray(p.attrs.speakers) ? p.attrs.speakers : [];
-    return s.map(function (x) { return { model: String(x && x.model || '').trim(), ok: !!(x && x.ok) }; })
-      .filter(function (x) { return x.model; })
-      .sort(function (a, b) { return (b.ok - a.ok) || a.model.localeCompare(b.model, 'fr'); });
+    return s.map(function (x) {
+      return { model: String(x && x.model || '').trim(), fit: x && (x.fit === 'partial' || x.ok === false) ? 'partial' : 'ok' };
+    }).filter(function (x) { return x.model; })
+      .sort(function (a, b) { return ((a.fit === 'ok' ? 0 : 1) - (b.fit === 'ok' ? 0 : 1)) || a.model.localeCompare(b.model, 'fr'); });
   }
   // marques citées (Metra, PAC…) : mention « marques de leurs propriétaires » sous la fiche / le catalogue
   function refBrands(list) {
@@ -440,26 +442,15 @@
       return st > 0 ? st + ' en stock · ' + plural(extra, 'paire sera imprimée', 'paires seront imprimées') + ' sur commande'
         : 'Imprimé sur commande — on te confirme le délai.';
     }
-    function fitSummary(p) {
-      var fit = fitmentOf(p);
-      if (!fit.length) return '';
-      var shown = fit.slice(0, 3).map(function (r) {
-        return '<li>' + esc([r.make, r.model].filter(Boolean).join(' ')) + (yearsText(r) ? ' <span>' + esc(yearsText(r)) + '</span>' : '') + '</li>';
-      }).join('');
-      return '<div class="sp-fitsum"><p class="sp-fitsum-t">' + IC.car + 'Compatible avec</p><ul>' + shown + '</ul>' +
-        (fit.length > 3 ? '<button type="button" class="sp-fitmore">Voir les ' + fit.length + ' véhicules</button>' : '') + '</div>';
-    }
-
-    function spkPill(x) {
-      return '<span class="pill ' + (x.ok ? 'ok' : 'order') + '">' + (x.ok ? 'Confirmé' : 'À confirmer') + '</span>';
-    }
-    // haut-parleurs essayés : les 3 premiers (confirmés d'abord) + lien vers l'onglet
-    function spkSummary(p) {
-      var spk = speakersOf(p);
-      if (!spk.length) return '';
-      return '<div class="sp-fitsum sp-spksum"><p class="sp-fitsum-t">' + IC.spk + 'Haut-parleurs</p><ul>' +
-        spk.slice(0, 3).map(function (x) { return '<li>' + esc(x.model) + spkPill(x) + '</li>'; }).join('') + '</ul>' +
-        (spk.length > 3 ? '<button type="button" class="sp-fitmore sp-spkmore">Voir les ' + spk.length + ' haut-parleurs</button>' : '') + '</div>';
+    var SPK = { ok: { cls: 'ok', label: 'Confirmé' }, partial: { cls: 'order', label: 'Compatible*' } };
+    function spkPill(fit) { var s = SPK[fit] || SPK.ok; return '<span class="pill ' + s.cls + '">' + s.label + '</span>'; }
+    // ce que veut dire chaque ajustement (sous le tableau de l'onglet Haut-parleurs)
+    function spkLegend() {
+      return '<div class="spk-legend">' +
+        '<p>' + spkPill('ok') + '<span>Testé par Création Audio : le haut-parleur s\'installe parfaitement et reste à fleur avec l\'adaptateur. 100 % compatible.</span></p>' +
+        '<p>' + spkPill('partial') + '<span>Testé : le haut-parleur s\'installe et fonctionne, mais l\'ajustement n\'est pas parfait (par exemple, pas tout à fait à fleur avec l\'adaptateur).</span></p>' +
+        '<p class="spk-legend-more">Ton haut-parleur n\'est pas dans la liste ? Écris-nous le modèle avant de commander.</p>' +
+      '</div>';
     }
 
     function detailsTabs(p) {
@@ -478,9 +469,8 @@
       }
       if (spk.length) tabs.push({ id: 'spk', label: 'Haut-parleurs', n: spk.length,
         html: '<div class="fit-wrap"><table class="fit-table spk-table"><thead><tr><th>Haut-parleur</th><th>Ajustement</th></tr></thead><tbody>' +
-          spk.map(function (x) { return '<tr><td>' + esc(x.model) + '</td><td>' + spkPill(x) + '</td></tr>'; }).join('') +
-          '</tbody></table></div>' +
-          '<p class="fit-note">Ton haut-parleur n\'est pas dans la liste ? L\'ajustement reste à confirmer : écris-nous le modèle avant de commander.</p>' });
+          spk.map(function (x) { return '<tr><td>' + esc(x.model) + '</td><td>' + spkPill(x.fit) + '</td></tr>'; }).join('') +
+          '</tbody></table></div>' + spkLegend() });
       if (specs.length) tabs.push({ id: 'specs', label: 'Spécifications',
         html: '<dl class="specs">' + specs.map(function (s) { return '<div class="spec"><dt>' + esc(s.k) + '</dt><dd>' + esc(s.v) + '</dd></div>'; }).join('') + '</dl>' });
       if (paras.length) tabs.push({ id: 'desc', label: 'Description',
@@ -548,7 +538,6 @@
               '<span class="pill ' + (b.cls === 'ok' ? 'ok' : b.cls === 'order' ? 'order' : 'bad') + '">' + esc(b.text) + '</span>' +
             '</div>' +
             '<div class="sp-tiers-box">' + tierTableHtml(p) + '</div>' +
-            fitSummary(p) + spkSummary(p) +
             '<div class="cfg-buy">' +
               (blocked ? '' :
               '<div class="qty">' +
@@ -609,12 +598,6 @@
         if (inp) setQ(inp.value);
         var src = $('.pdp-stage img', productEl) || $('.pdp-stage', productEl);
         if (o.onAdd) o.onAdd(p, curQty, src);
-      });
-      $$('.sp-fitmore', productEl).forEach(function (more) {
-        more.addEventListener('click', function () {
-          selectTab(more.classList.contains('sp-spkmore') ? 'spk' : 'compat');
-          var d = $('#sp-details', productEl); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
       });
       var tabs = $$('.pdp-details .tab', productEl);
       tabs.forEach(function (t, i) {

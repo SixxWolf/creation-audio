@@ -889,8 +889,8 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .fit-row input { min-width:0; }
 .sp-minis { display:flex; flex-wrap:wrap; gap:5px; }
 .sp-repl-foot { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
-/* Haut-parleurs essayés : modèle · Confirmé / À confirmer · ✕ */
-.spk-row { display:grid; grid-template-columns:minmax(0, 1fr) 160px 32px; align-items:center; gap:8px; }
+/* Haut-parleurs testés : modèle · Confirmé / Compatible* · ✕ */
+.spk-row { display:grid; grid-template-columns:minmax(0, 1fr) 230px 32px; align-items:center; gap:8px; }
 .spk-row input, .spk-row select { min-width:0; }
 @media (max-width:560px) {
   .spk-row { grid-template-columns:minmax(0, 1fr) 32px; padding-bottom:8px; border-bottom:1px dashed var(--line-2); }
