@@ -369,6 +369,7 @@
     feedback('✓ ' + scanLabel(hit.f, hit.kind) + '  (×' + qty + ')', 'ok');
     bumpCount();
     if (window.CA.waitlist) window.CA.waitlist.onScan(hit.f.id, hit.kind);   // quelqu'un l'attend ?
+    if (window.CA.reserved) window.CA.reserved.onScan(hit.f.id, hit.kind);   // réservé pour un client ?
     focusScan();
   }
 
@@ -445,6 +446,7 @@
         feedback('✓ Associé & compté : ' + scanLabel(f, kind) + '  (×' + qty + ')', 'ok');
         bumpCount();
         if (window.CA.waitlist) window.CA.waitlist.onScan(f.id, kind);
+        if (window.CA.reserved) window.CA.reserved.onScan(f.id, kind);
         focusScan();
       }, function (err) {
         scanLearnSave.disabled = false;
@@ -572,7 +574,9 @@
       confirmBtn.disabled = false;
       statusEl.textContent = editingReceiptId ? '✓ Réception modifiée, stock et coût moyen ajustés.' : '✓ Réception enregistrée, stock et coût moyen mis à jour.';
       // liste d'attente : alerte pour TOUT ce qui vient d'entrer (y compris lignes saisies à la main)
-      if (window.CA.waitlist) window.CA.waitlist.onReceived(valid.map(function (r) { return { productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind) }; }));
+      var recv = valid.map(function (r) { return { productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind) }; });
+      if (window.CA.waitlist) window.CA.waitlist.onReceived(recv);
+      if (window.CA.reserved) window.CA.reserved.onReceived(recv);   // réservé pour un client (facture « à venir »)
       resetForm();
       Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
       loadHistory();
@@ -779,8 +783,10 @@
   function missOf(f, kind) {
     var offers = kind === 'refill' ? offersRefill(f) : offersSpool(f);
     if (!offers) return 0;
-    return Math.max(0, parOf(f, kind) - stockOf(f, kind));
+    // les articles promis à un client (facture « à venir ») s'ajoutent à la cible
+    return Math.max(0, parOf(f, kind) + reservedOf(f, kind) - stockOf(f, kind));
   }
+  function reservedOf(f, kind) { return window.CA.reserved ? window.CA.reserved.count(f.id, kind) : 0; }
 
   // enregistre une cible dans attrs.par_spool / attrs.par_refill
   function saveTarget(f, kind, value, cell) {
@@ -820,8 +826,15 @@
     var n = window.CA.waitlist ? window.CA.waitlist.count(f.id) : 0;
     return n ? ' <span class="ro-wait" title="Personnes en liste d\'attente pour cette couleur">⏳ ' + n + ' en attente</span>' : '';
   }
+  // pastille « N réservés » : facturés à un client, pas encore remis (cms-reserves.js)
+  function resBadge(f) {
+    var n = reservedOf(f, 'spool') + reservedOf(f, 'refill');
+    if (!n) return '';
+    return ' <span class="ro-res" title="' + esc('Réservé : ' + window.CA.reserved.who(f.id).join(', ')) + '">📦 ' + n + ' réservé' + (n > 1 ? 's' : '') + '</span>';
+  }
   // la liste d'attente se charge en parallèle -> on rafraîchit les pastilles à son arrivée
   document.addEventListener('ca:waitlist', function () { if (loaded && reorderBody && subCommander && !subCommander.hidden) renderReorder(); });
+  document.addEventListener('ca:reserved', function () { if (loaded && reorderBody && subCommander && !subCommander.hidden) renderReorder(); });
 
   function renderReorder() {
     if (!reorderBody) return;
@@ -885,7 +898,7 @@
           '<td class="l"><div class="reorder-fil">' +
             '<span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
             '<span><span class="ro-name">' + esc(f.name || '(sans nom)') + '</span>' +
-            (f.code ? ' <span class="ro-code">' + esc(f.code) + '</span>' : '') + waitBadge(f) + '</span>' +
+            (f.code ? ' <span class="ro-code">' + esc(f.code) + '</span>' : '') + waitBadge(f) + resBadge(f) + '</span>' +
           '</div></td>' +
           fmtCells('spool', hasS, anyS) +
           fmtCells('refill', hasR, anyR) +

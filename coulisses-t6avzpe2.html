@@ -15,8 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/admin.css?v=55">
-<link rel="stylesheet" href="assets/facture.css?v=22">
+<link rel="stylesheet" href="assets/admin.css?v=56">
+<link rel="stylesheet" href="assets/facture.css?v=23">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
@@ -512,6 +512,8 @@
 
         <!-- Alerte liste d'attente : quelqu'un attend un article qu'on vient de scanner / recevoir -->
         <div class="wl-alert" id="wl-alert" hidden aria-live="polite"></div>
+        <!-- Alerte réservés : article facturé « à venir » à un client (cms-reserves.js) -->
+        <div class="wl-alert" id="res-alert" hidden aria-live="polite"></div>
 
         <!-- Réception (n° + date + tableau) -->
         <form class="editor" id="r-editor">
@@ -1303,6 +1305,7 @@
         <input type="search" id="hist-search" placeholder="Rechercher (n°, client…)" autocomplete="off">
         <div class="fx-seg fx-seg-sm" id="hist-filter" role="group" aria-label="Statut">
           <button type="button" class="hist-fbtn is-active" data-f="active">Actives</button>
+          <button type="button" class="hist-fbtn" data-f="pending">À remettre <span class="hist-pcnt" id="hist-pend-cnt" hidden></span></button>
           <button type="button" class="hist-fbtn" data-f="cancelled">Annulées</button>
           <button type="button" class="hist-fbtn" data-f="all">Toutes</button>
         </div>
@@ -1722,12 +1725,13 @@
 <script src="assets/cms-linkbuilder.js?v=3"></script>
 <script src="assets/cms-spacers.js?v=12"></script>
 <script src="assets/cms-accessories.js?v=5"></script>
-<script src="assets/cms-inventory.js?v=27"></script>
+<script src="assets/cms-inventory.js?v=28"></script>
 <script src="assets/cms-attente.js?v=4"></script>
+<script src="assets/cms-reserves.js?v=1"></script>
 <script src="assets/cms-dealers.js?v=4"></script>
 <script src="assets/cms-clients.js?v=2"></script>
-<script src="assets/cms-facturation.js?v=35"></script>
-<script src="assets/cms-historique.js?v=10"></script>
+<script src="assets/cms-facturation.js?v=36"></script>
+<script src="assets/cms-historique.js?v=11"></script>
 <script src="assets/cms-commandes.js?v=8"></script>
 <script src="assets/cms-statistiques.js?v=8"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
