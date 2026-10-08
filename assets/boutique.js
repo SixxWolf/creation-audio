@@ -66,19 +66,23 @@
 
   /* ---------- couleurs ----------
      Pastille : dégradé à parts égales si le filament est multi-colore
-     (attrs.colors = 2+ couleurs), sinon couleur pleine (hex). Repli : #ccc. */
+     (attrs.colors = 2+ couleurs), sinon couleur pleine (hex). Repli : #ccc.
+     Matériau pailleté (Sparkle, Galaxy…) : calque var(--sparkle) par-dessus. */
   function isHex(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v); }
   function colorsOf(p) {
     var cs = p && p.attrs && Array.isArray(p.attrs.colors) ? p.attrs.colors.filter(isHex) : [];
     if (cs.length) return cs;
     return [p && isHex(p.hex) ? p.hex : '#cccccc'];
   }
+  function isSparkle(p) { return /sparkle|galaxy|glitter|paillet/i.test((p && p.material) || ''); }
   function swatchBg(p) {
-    var cs = colorsOf(p);
-    if (cs.length < 2) return cs[0];
-    var n = cs.length, parts = [];
-    for (var i = 0; i < n; i++) parts.push(cs[i] + ' ' + (100 * i / n) + '%', cs[i] + ' ' + (100 * (i + 1) / n) + '%');
-    return 'linear-gradient(90deg,' + parts.join(',') + ')';
+    var cs = colorsOf(p), bg = cs[0];
+    if (cs.length > 1) {
+      var n = cs.length, parts = [];
+      for (var i = 0; i < n; i++) parts.push(cs[i] + ' ' + (100 * i / n) + '%', cs[i] + ' ' + (100 * (i + 1) / n) + '%');
+      bg = 'linear-gradient(90deg,' + parts.join(',') + ')';
+    }
+    return isSparkle(p) ? 'var(--sparkle), ' + bg : bg;
   }
   function hslOf(h) {
     var c = [1, 3, 5].map(function (i) { return parseInt(h.substr(i, 2), 16) / 255; });
