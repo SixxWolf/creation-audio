@@ -999,10 +999,19 @@
     var listHtml = Object.keys(byBrand).map(function (brand) {
       var lis = byBrand[brand].map(function (it) {
         var sw = swatchBg(it.f.hex, colorsOf(it.f));
-        return '<li><span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
-          '<span>' + esc((it.f.material ? it.f.material + ' · ' : '') + (it.f.name || '')) +
-          ' <span class="ro-code">' + kindLabel(it.kind) + (it.f.code ? ' · ' + esc(it.f.code) : '') + '</span></span>' +
-          '<span class="ro-q">×' + it.qty + '</span></li>';
+        var name = '<span>' + esc((it.f.material ? it.f.material + ' · ' : '') + (it.f.name || '')) +
+          ' <span class="ro-code">' + kindLabel(it.kind) + (it.f.code ? ' · ' + esc(it.f.code) : '') + '</span></span>';
+        // commandé (en tout ou en partie) pour un client : étiquette cliquable -> sa facture
+        var res = window.CA.reserved ? window.CA.reserved.detail(it.f.id, it.kind) : [];
+        if (res.length) {
+          var resQty = res.reduce(function (s, d) { return s + d.qty; }, 0);
+          name = '<span class="ro-main">' + name + '<span class="ro-fors">' + res.map(function (d) {
+            return '<button type="button" class="ro-for" data-inv="' + esc(d.invoiceId) + '" title="Ouvrir la facture">📦 ' +
+              (resQty >= it.qty && res.length === 1 ? 'Pour ' : d.qty + ' pour ') + esc(d.client) + ' · ' + esc(d.number) + '</button>';
+          }).join('') + '</span></span>';
+        }
+        return '<li' + (res.length ? ' class="is-res"' : '') + '><span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
+          name + '<span class="ro-q">×' + it.qty + '</span></li>';
       }).join('');
       return '<div class="reorder-brandgroup"><h3 style="font-size:.9rem;margin:12px 0 4px">' + esc(brand) +
           (multiBrand && estByBrand[brand] ? '<span class="ro-brand-est">≈ ' + money(estByBrand[brand]) + '</span>' : '') + '</h3>' +
@@ -1018,6 +1027,12 @@
         '<button class="btn btn-ghost btn-sm" id="reorder-copy" type="button" data-ic="copy">Copier la liste</button>' +
       '</div>' + noteHtml + listHtml + '</div>';
 
+    $$('.ro-for', reorderSummary).forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (window.CA.focusInvoice) window.CA.focusInvoice(b.getAttribute('data-inv'));
+        location.hash = '#historique';
+      });
+    });
     var toCat = $('#reorder-to-catalog');
     if (toCat) toCat.addEventListener('click', function () {
       if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub('catalogue'); else showSub('catalogue');

@@ -130,6 +130,16 @@
     who: function (pid, kind) {
       return matchFor(pid, kind).map(function (x) { return (x.inv.client_name || 'Sans nom') + ' (' + (x.inv.number || '') + ')'; });
     },
+    // détail par facture (Liste à commander) : [{ invoiceId, number, client, qty }]
+    detail: function (pid, kind) {
+      var by = {}, out = [];
+      matchFor(pid, kind).forEach(function (x) {
+        var d = by[x.inv.id];
+        if (!d) { d = by[x.inv.id] = { invoiceId: x.inv.id, number: x.inv.number || '', client: x.inv.client_name || 'Sans nom', qty: 0 }; out.push(d); }
+        d.qty += (+x.line.qty_pending) || 0;
+      });
+      return out;
+    },
     reload: load
   };
 })();
