@@ -106,11 +106,17 @@
   }
 
   function catOf(inv) { return inv.category || 'mixte'; }
+  // articles facturés « À venir », pas encore remis au client (0 pour une facture annulée)
+  function pendingOf(inv) {
+    if (inv.status === 'cancelled') return 0;
+    return (linesByInv[inv.id] || []).reduce(function (s, l) { return s + ((+l.qty_pending) || 0); }, 0);
+  }
   // filtre statut + recherche (indépendant de la catégorie -> sert aussi aux compteurs)
   function passStatusQuery(inv) {
     var cancelled = inv.status === 'cancelled';
     if (filter === 'active' && cancelled) return false;
     if (filter === 'cancelled' && !cancelled) return false;
+    if (filter === 'pending' && !pendingOf(inv)) return false;
     if (query) {
       var hay = ((inv.number || '') + ' ' + (inv.client_name || '') + ' ' + (inv.client_contact || '')).toLowerCase();
       if (hay.indexOf(query) === -1) return false;
@@ -132,6 +138,9 @@
       var c = catOf(inv); if (counts[c] != null) counts[c]++;
     });
     $$('.hist-cnt').forEach(function (el) { el.textContent = counts[el.getAttribute('data-cnt')] || 0; });
+    // nombre de factures avec des articles à remettre (bouton « À remettre »)
+    var np = invoices.filter(function (inv) { return pendingOf(inv) > 0; }).length;
+    var pc = $('#hist-pend-cnt'); if (pc) { pc.textContent = np; pc.hidden = !np; }
   }
 
   function render() {
@@ -145,10 +154,12 @@
       var cancelled = inv.status === 'cancelled';
       var badge = '<span class="hist-cat">' + esc(CAT_LABEL[inv.category] || inv.category || '—') + '</span>';
       var dealer = inv.client_type === 'dealer' ? '<span class="hist-dealer">Dealer</span>' : '';
+      var pend = pendingOf(inv);
       return '<div class="hist-row' + (cancelled ? ' is-cancelled' : '') + '" data-id="' + esc(inv.id) + '">' +
         '<div class="hist-head">' +
           '<span class="hist-id"><span class="hist-num">' + esc(inv.number || '—') + '</span>' + badge +
-          (cancelled ? '<span class="hist-annul">Annulée</span>' : '') + '</span>' +
+          (cancelled ? '<span class="hist-annul">Annulée</span>' : '') +
+          (pend ? '<span class="hist-pend">' + pend + ' à remettre</span>' : '') + '</span>' +
           '<span class="hist-client">' + esc(inv.client_name || 'Sans client') + ' ' + dealer + '</span>' +
           '<span class="grow"></span>' +
           '<span class="hist-date">' + esc(fmtDateFR(inv.invoice_date)) + '</span>' +
@@ -185,9 +196,16 @@
     el.classList.add('open');
     var lines = linesByInv[inv.id] || [];
     var cancelled = inv.status === 'cancelled';
+    var pend = pendingOf(inv);
     var linesHtml = lines.map(function (l) {
-      return '<tr><td>' + esc(l.label || '(ligne)') + (l.meta ? ' <span class="hd-meta">' + esc(l.meta) + '</span>' : '') + '</td>' +
-        '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num">' + money(l.line_total) + '</td></tr>';
+      var lp = cancelled ? 0 : (+l.qty_pending || 0);
+      var art = esc(l.label || '(ligne)') + (l.meta ? ' <span class="hd-meta">' + esc(l.meta) + '</span>' : '');
+      // ligne « à venir » : pastille + bouton « Remis » dans la cellule (pas de colonne en plus : tient sur téléphone)
+      if (lp) art = '<div class="hd-art"><span>' + art + ' <span class="hd-pend">' + (lp < +l.qty ? lp + ' à venir' : 'À venir') + '</span></span>' +
+        '<button class="btn btn-ghost btn-sm hd-give" type="button" data-line="' + esc(l.id) + '">Remis</button></div>';
+      return '<tr' + (lp ? ' class="is-pending"' : '') + '><td>' + art + '</td>' +
+        '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num">' + money(l.line_total) + '</td>' +
+      '</tr>';
     }).join('');
     var stockNote = inv.stock_deducted ? '<span class="hd-stock">stock déduit</span>' : (cancelled ? '<span class="hd-stock ok">stock remis</span>' : '');
     if (inv.updated_at) stockNote += '<span class="hd-stock">modifiée le ' + esc(fmtStampFR(inv.updated_at)) + '</span>';
@@ -199,6 +217,7 @@
         '<span class="hd-sum">Sous-total ' + money(inv.subtotal) + (inv.tax_enabled ? ' · taxes ' + money((+inv.tax_gst) + (+inv.tax_qst)) : '') + ' · <b>Total ' + money(inv.total) + '</b></span>' +
         stockNote +
         '<span class="grow"></span>' +
+        (pend ? '<button class="btn btn-accent btn-sm hd-give-all" type="button" data-ic="check">Tout remis</button>' : '') +
         (cancelled ? '' : '<button class="btn btn-ghost btn-sm hd-edit" type="button">Modifier</button>') +
         '<button class="btn btn-ghost btn-sm hd-print" type="button">Réimprimer</button>' +
         (cancelled ? '' : '<button class="btn btn-ghost btn-sm hd-cancel" type="button">Annuler</button>') +
@@ -208,6 +227,27 @@
     $('.hd-print', box).addEventListener('click', function (e) { e.stopPropagation(); reprint(inv, lines); });
     var cb = $('.hd-cancel', box); if (cb) cb.addEventListener('click', function (e) { e.stopPropagation(); cancelInvoice(inv, lines); });
     $('.hd-del', box).addEventListener('click', function (e) { e.stopPropagation(); delInvoice(inv, lines); });
+    $$('.hd-give', box).forEach(function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation(); deliver(inv, b.getAttribute('data-line'), b); });
+    });
+    var ga = $('.hd-give-all', box); if (ga) ga.addEventListener('click', function (e) { e.stopPropagation(); deliver(inv, null, ga); });
+  }
+
+  /* ---------- remettre les articles « à venir » (stock déduit à ce moment-là si la facture déduit) ---------- */
+  function deliver(inv, lineId, btn) {
+    if (btn) btn.disabled = true;
+    sb.rpc('deliver_invoice', { p_invoice: inv.id, p_line: lineId || null, p_qty: null }).then(function (res) {
+      if (res.error) throw res.error;
+      focusId = inv.id;   // la facture reste ouverte après le rechargement
+      load();
+      if (window.CA.reserved) window.CA.reserved.reload();
+      if (window.CA.refreshFacturationStock && inv.stock_deducted) window.CA.refreshFacturationStock();
+    }).then(null, function (err) {
+      if (btn) btn.disabled = false;
+      var msg = (err && err.message) ? err.message : String(err);
+      if (/PGRST202|could not find the function/i.test(((err && err.code) || '') + ' ' + msg)) msg = 'Fonction deliver_invoice absente : relance schema-v2.sql dans Supabase.';
+      window.alert('Erreur : ' + msg);
+    });
   }
 
   /* ---------- modifier : la facture est rechargée dans l'éditeur de Facturation ---------- */

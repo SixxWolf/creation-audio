@@ -578,6 +578,13 @@
 
   function afterChange() { if (saved) unlock(); render(); }
 
+  // sablier du bouton « À venir » (ligne facturée, pas encore remise)
+  var PEND_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M6 3h12M6 21h12M7 3v3a5 5 0 0 0 10 0V3M7 21v-3a5 5 0 0 1 10 0v3"/></svg>';
+  function pendingCount() {
+    return lines.reduce(function (s, l) { return s + (l.qty > 0 ? Math.min(l.pending || 0, l.qty) : 0); }, 0);
+  }
+
   // catégorie d'une ligne libre (pour les statistiques « Ventes par gabarit »)
   var PTYPE_OPTS = [['filament', 'Filament'], ['spacer', 'Spacer'], ['accessory', 'Accessoire'], ['divers', 'Divers']];
   function catOptions(sel) {
@@ -623,21 +630,32 @@
       : '';
 
     var rows = lines.map(function (l, i) {
+      var pend = Math.min(l.pending || 0, l.qty);
+      // pastille « À venir » (écran seulement) ; quantité réglable si une partie seulement est remise
+      var pendPill = pend > 0
+        ? '<span class="inv-pend-pill no-print">À venir' + (l.qty > 1
+            ? ' <input class="inv-pend-qty" type="number" min="0" max="' + l.qty + '" step="1" value="' + pend + '" data-i="' + i + '" aria-label="Quantité à venir">'
+            : '') + '</span>'
+        : '';
       var descCell = (l.kind === 'free')
         ? '<input class="inv-label" type="text" value="' + esc(l.label) + '" data-i="' + i + '" placeholder="Description">' +
-          '<div class="inv-sub no-print">' +
+          '<div class="inv-sub no-print">' + pendPill +
             '<select class="inv-cat" data-i="' + i + '" title="Catégorie (pour les statistiques)">' + catOptions(l.ptype || 'divers') + '</select>' +
             // coût unitaire (privé) : seulement quand la marge est affichée ; vide = 0 $ (marge 100 %)
             (marginShown ? '<span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
               (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span>' : '') +
           '</div>'
-        : swatchSVG(l.hex) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(l.meta) + '</span>' : '');
-      return '<tr data-i="' + i + '">' +
+        : swatchSVG(l.hex) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(l.meta) + '</span>' : '') + pendPill;
+      return '<tr data-i="' + i + '"' + (pend > 0 ? ' class="is-pending"' : '') + '>' +
         '<td>' + descCell + '</td>' +
         '<td class="num"><input class="inv-qty" type="number" min="0" step="1" value="' + l.qty + '" data-i="' + i + '"></td>' +
         '<td class="num"><input class="inv-price" type="number" min="0" step="0.01" value="' + l.price + '" data-i="' + i + '"></td>' +
         '<td class="num">' + money(l.qty * l.price) + '</td>' +
-        '<td class="num no-print"><button class="inv-del" data-i="' + i + '" title="Retirer">&times;</button></td>' +
+        '<td class="num no-print"><div class="inv-acts">' +
+          '<button type="button" class="inv-pend" data-i="' + i + '" aria-pressed="' + (pend > 0) + '" title="' +
+            (pend > 0 ? 'Marquer remis' : 'À venir (pas encore remis)') + '">' + PEND_SVG + '</button>' +
+          '<button type="button" class="inv-del" data-i="' + i + '" title="Retirer">&times;</button>' +
+        '</div></td>' +
       '</tr>';
     }).join('');
 
@@ -674,8 +692,25 @@
     $$('.inv-qty', elInvoice).forEach(function (inp) {
       inp.addEventListener('change', function () {
         var l = lines[+this.getAttribute('data-i')]; if (!l) return;
+        var allPending = l.pending > 0 && l.pending >= l.qty;   // ligne entièrement « à venir » : le reste
         l.qty = Math.max(0, parseInt(this.value, 10) || 0);
+        l.pending = allPending ? l.qty : Math.min(l.pending || 0, l.qty);
         afterChange();   // render() -> repriceLines() applique le palier (cumulé par marque)
+      });
+    });
+    // « À venir » : article facturé mais pas encore remis (commandé chez le fournisseur)
+    $$('.inv-pend', elInvoice).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var l = lines[+this.getAttribute('data-i')]; if (!l) return;
+        l.pending = l.pending > 0 ? 0 : l.qty;
+        afterChange();
+      });
+    });
+    $$('.inv-pend-qty', elInvoice).forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var l = lines[+this.getAttribute('data-i')]; if (!l) return;
+        l.pending = Math.max(0, Math.min(l.qty, parseInt(this.value, 10) || 0));
+        afterChange();
       });
     });
     $$('.inv-price', elInvoice).forEach(function (inp) {
@@ -763,15 +798,17 @@
   function lineRow(l, i) {
     return { product_id: l.productId, label: l.label || null, meta: l.meta || null,
       kind: l.kind, ptype: l.ptype || null, qty: l.qty, unit_price: round2(l.price), unit_cost: round2(l.cost),
-      line_total: round2(l.qty * l.price), sort_order: i };
+      line_total: round2(l.qty * l.price), sort_order: i, qty_pending: Math.max(0, Math.min(l.pending || 0, l.qty)) };
   }
   // après un enregistrement : stocks du catalogue, historique et statistiques à jour
   function refreshAfterSave() {
-    catalogLoaded.filament = false; catalogLoaded.spacer = false;
-    loadCatalog(cat);
+    refreshStock();
     if (window.CA.reloadHistorique) window.CA.reloadHistorique();
     if (window.CA.reloadStatistiques) window.CA.reloadStatistiques();
+    if (window.CA.reserved) window.CA.reserved.reload();   // « réservés » (À commander, alerte au scan)
   }
+  function refreshStock() { catalogLoaded.filament = false; catalogLoaded.spacer = false; loadCatalog(cat); }
+  window.CA.refreshFacturationStock = refreshStock;   // appelé par l'Historique après une remise
   function statusButton(label, onClick) {
     var b = document.createElement('button');
     b.type = 'button'; b.className = 'btn btn-ghost btn-sm';
@@ -827,10 +864,11 @@
       if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value)) {
         window.CA.rememberClient(clientFields());
       }
-      var deducted = !!elDeduct.checked;
+      var deducted = !!elDeduct.checked, pend = pendingCount();
       // la vente est enregistrée : on repart d'une facture vierge (réimpression possible ci-dessous ou dans l'Historique)
       resetInvoice();
-      elStatus.textContent = '✓ Facture ' + inv.number + ' enregistrée' + (deducted ? ', stock déduit' : '') + '. Nouvelle facture prête. ';
+      elStatus.textContent = '✓ Facture ' + inv.number + ' enregistrée' + (deducted ? ', stock déduit' : '') +
+        (pend ? ' · ' + pend + ' à remettre' : '') + '. Nouvelle facture prête. ';
       if (window.CA.printInvoice) statusButton('Imprimer ' + inv.number, function () { window.CA.printInvoice(inv, savedRows); });
       if (order) linkOrder(order, inv);
       refreshAfterSave();
@@ -854,7 +892,7 @@
     var fields = invoiceFields(totals());
     fields.number = norm(elNumber.value) || ed.number;
     var lineRows = valid.map(lineRow);
-    var deduct = !!elDeduct.checked;
+    var deduct = !!elDeduct.checked, pend = pendingCount();
     sb.rpc('update_invoice', { p_id: ed.id, p_invoice: fields, p_lines: lineRows, p_deduct: deduct }).then(function (res) {
       if (res.error) throw res.error;
       var inv = Array.isArray(res.data) ? res.data[0] : res.data;
@@ -865,7 +903,8 @@
         window.CA.rememberClient(clientFields());
       }
       resetInvoice();
-      elStatus.textContent = '✓ Facture ' + inv.number + ' mise à jour' + (deduct ? ', stock ajusté' : '') + '. ';
+      elStatus.textContent = '✓ Facture ' + inv.number + ' mise à jour' + (deduct ? ', stock ajusté' : '') +
+        (pend ? ' · ' + pend + ' à remettre' : '') + '. ';
       if (window.CA.printInvoice) statusButton('Imprimer ' + inv.number, function () { window.CA.printInvoice(inv, lineRows); });
       statusButton('Voir dans l\'historique', function () {
         if (window.CA.focusInvoice) window.CA.focusInvoice(inv.id);
@@ -890,7 +929,14 @@
     savedLines.forEach(function (r) { idBySort[r.sort_order] = r.id; });
     var calls = valid.map(function (l, i) {
       if (!l.productId || !(l.qty > 0)) return null;
-      var args = { p_product: l.productId, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: Math.abs(l.qty) };
+      // seule la partie REMISE sort du stock ; le « à venir » se déduit à la remise (deliver_invoice)
+      var give = Math.abs(l.qty) - Math.max(0, Math.min(l.pending || 0, l.qty));
+      if (give <= 0) {   // rien de remis : qty_deducted = 0 (sinon une annulation remettrait qty)
+        if (idBySort[i] == null) return null;
+        return sb.from('invoice_lines').update({ qty_deducted: 0 }).eq('id', idBySort[i])
+          .then(function (r3) { if (r3 && r3.error) throw r3.error; });
+      }
+      var args = { p_product: l.productId, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: give };
       return sb.rpc('deduct_stock', args).then(function (res) {
         if (res && res.error) {
           if (!/PGRST202|could not find the function/i.test((res.error.code || '') + ' ' + (res.error.message || ''))) throw res.error;
@@ -969,7 +1015,8 @@
       : 'divers');
     var l = { id: uid(), productId: s.product_id ? String(s.product_id) : null, ptype: ptype, kind: kind,
       label: s.label || '', meta: s.meta || '', hex: null, qty: +s.qty || 0, base: +s.unit_price || 0, tiers: [],
-      cost: +s.unit_cost || 0, tierKey: null, price: +s.unit_price || 0, manual: true, sp: null, live: false };
+      cost: +s.unit_cost || 0, tierKey: null, price: +s.unit_price || 0, manual: true, sp: null, live: false,
+      pending: Math.max(0, Math.min(+s.qty_pending || 0, +s.qty || 0)) };
     if (hit) {
       var p = hit.p;
       if (hit.c === 'filament') {

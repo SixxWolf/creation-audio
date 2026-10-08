@@ -167,6 +167,21 @@
 .inv-qty:focus, .inv-price:focus, .inv-label:focus, .inv-cat:focus, #fx-invoice .inv-cost:focus { outline:none; border-color:var(--ember); box-shadow:0 0 0 3px rgba(255,106,43,.2); }
 .inv-del { border:none; background:none; color:var(--muted); cursor:pointer; font-size:1.15rem; line-height:1; padding:2px 6px; }
 .inv-del:hover { color:var(--bad); }
+/* « À venir » : sablier par ligne (écran seulement) + pastille sur la ligne marquée */
+.inv-acts { display:flex; align-items:center; justify-content:flex-end; gap:2px; }
+.inv-pend { display:inline-grid; place-items:center; width:28px; height:28px; padding:0; color:var(--muted); cursor:pointer;
+  background:none; border:none; border-radius:7px; opacity:.6; transition:opacity .15s, color .15s, background .15s; }
+.inv-pend:hover { opacity:1; color:var(--ink); background:var(--wash); }
+.inv-pend[aria-pressed="true"] { opacity:1; color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 15%, transparent); }
+.inv-pend:focus-visible { outline:2px solid var(--ember); outline-offset:1px; opacity:1; }
+.inv-pend-pill { display:inline-flex; align-items:center; gap:5px; margin-left:6px; padding:2px 9px; vertical-align:1px;
+  font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap;
+  color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 14%, transparent); border-radius:100px; }
+.inv-sub .inv-pend-pill { margin-left:0; vertical-align:baseline; }
+#fx-invoice .inv-pend-qty { width:44px; padding:1px 4px; font:inherit; font-size:.74rem; font-weight:700; text-align:center;
+  color:var(--ember-ink); background:var(--paper); border:1px solid color-mix(in srgb, var(--ember) 45%, transparent); border-radius:6px;
+  box-shadow:none; text-transform:none; letter-spacing:0; }
+#fx-invoice .inv-pend-qty:focus { outline:none; border-color:var(--ember); box-shadow:0 0 0 2px rgba(255,106,43,.2); }
 /* Aperçu à l'écran seulement (l'impression garde le tableau tel quel). La règle de base des champs
    (input[type=…]) l'emporte sur .inv-qty/.inv-price : on fixe ici Qté et Prix, la description prend
    le reste ; si la feuille est étroite (téléphone, colonne serrée à côté du catalogue), l'en-tête
@@ -177,13 +192,18 @@
   #fx-invoice .inv-qty, #fx-invoice .inv-price, #fx-invoice .inv-label { padding:6px 8px; }
   #fx-invoice .inv-qty { width:60px; }
   #fx-invoice .inv-price { width:92px; }
+  /* colonne sablier + × : serrée, pour laisser la place à la description */
+  #fx-invoice .inv-table td:last-child { padding-left:0; padding-right:2px; }
+  #fx-invoice .inv-acts { gap:0; }
+  #fx-invoice .inv-pend { width:24px; }
+  #fx-invoice .inv-del { padding:2px 4px; }
   @container fx-invoice (max-width:479px) {
     #fx-invoice .inv-top { flex-direction:column; }
     #fx-invoice .inv-title { text-align:left; }
     #fx-invoice .inv-table, #fx-invoice .inv-table tbody { display:block; }
     #fx-invoice .inv-table thead { display:none; }
     #fx-invoice .inv-table tbody { border-top:1.5px solid var(--line); }
-    #fx-invoice .inv-table tr { display:grid; grid-template-columns:56px 96px minmax(0, 1fr) 28px;
+    #fx-invoice .inv-table tr { display:grid; grid-template-columns:56px 96px minmax(0, 1fr) auto;
       grid-template-areas:"desc desc desc del" "qty price amt amt"; align-items:center; gap:8px;
       padding:10px 0; border-bottom:1px solid var(--line); }
     #fx-invoice .inv-table td, #fx-invoice .inv-table td.num { width:auto; padding:0; border:none; }
@@ -275,8 +295,8 @@
   .inv-qty, .inv-price, .inv-label {
     border:none !important; box-shadow:none !important; background:transparent !important;
     padding:0 !important; -webkit-appearance:none; appearance:none; }
-  /* catégorie + coût (outils internes) disparaissent complètement à l'impression */
-  .inv-sub { display:none !important; }
+  /* catégorie + coût + « à venir » (outils internes) disparaissent complètement à l'impression */
+  .inv-sub, .inv-pend-pill { display:none !important; }
 }
 
 /* =========================================================
@@ -323,6 +343,17 @@
   background:var(--ember); border-radius:100px; }
 .hist-annul { padding:2px 9px; font-size:.64rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#fff;
   background:var(--bad); border-radius:100px; }
+/* articles facturés « à venir » (pas encore remis) */
+.hist-pend { padding:2px 9px; font-size:.64rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap;
+  color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 15%, transparent); border-radius:100px; }
+.hist-pcnt { display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; margin-left:4px; padding:0 5px;
+  font-size:.68rem; font-weight:700; font-variant-numeric:tabular-nums; color:var(--on-ember); background:var(--ember); border-radius:100px; }
+.hist-pcnt[hidden] { display:none; }
+.hd-pend { display:inline-block; margin-left:4px; padding:1px 8px; font-size:.7rem; font-weight:700; white-space:nowrap;
+  color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 14%, transparent); border-radius:100px; }
+.hist-lines tr.is-pending td { background:color-mix(in srgb, var(--ember) 5%, transparent); }
+.hd-art { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px 12px; }
+.hd-art .hd-give { flex:none; }
 .hist-client { font-size:.9rem; color:var(--ink-2); }
 .hist-head .grow { flex:1; }
 .hist-date { font-size:.84rem; color:var(--muted); font-variant-numeric:tabular-nums; }

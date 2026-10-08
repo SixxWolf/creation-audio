@@ -369,6 +369,7 @@
     feedback('✓ ' + scanLabel(hit.f, hit.kind) + '  (×' + qty + ')', 'ok');
     bumpCount();
     if (window.CA.waitlist) window.CA.waitlist.onScan(hit.f.id, hit.kind);   // quelqu'un l'attend ?
+    if (window.CA.reserved) window.CA.reserved.onScan(hit.f.id, hit.kind);   // réservé pour un client ?
     focusScan();
   }
 
@@ -445,6 +446,7 @@
         feedback('✓ Associé & compté : ' + scanLabel(f, kind) + '  (×' + qty + ')', 'ok');
         bumpCount();
         if (window.CA.waitlist) window.CA.waitlist.onScan(f.id, kind);
+        if (window.CA.reserved) window.CA.reserved.onScan(f.id, kind);
         focusScan();
       }, function (err) {
         scanLearnSave.disabled = false;
@@ -572,7 +574,9 @@
       confirmBtn.disabled = false;
       statusEl.textContent = editingReceiptId ? '✓ Réception modifiée, stock et coût moyen ajustés.' : '✓ Réception enregistrée, stock et coût moyen mis à jour.';
       // liste d'attente : alerte pour TOUT ce qui vient d'entrer (y compris lignes saisies à la main)
-      if (window.CA.waitlist) window.CA.waitlist.onReceived(valid.map(function (r) { return { productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind) }; }));
+      var recv = valid.map(function (r) { return { productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind) }; });
+      if (window.CA.waitlist) window.CA.waitlist.onReceived(recv);
+      if (window.CA.reserved) window.CA.reserved.onReceived(recv);   // réservé pour un client (facture « à venir »)
       resetForm();
       Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
       loadHistory();
@@ -779,8 +783,10 @@
   function missOf(f, kind) {
     var offers = kind === 'refill' ? offersRefill(f) : offersSpool(f);
     if (!offers) return 0;
-    return Math.max(0, parOf(f, kind) - stockOf(f, kind));
+    // les articles promis à un client (facture « à venir ») s'ajoutent à la cible
+    return Math.max(0, parOf(f, kind) + reservedOf(f, kind) - stockOf(f, kind));
   }
+  function reservedOf(f, kind) { return window.CA.reserved ? window.CA.reserved.count(f.id, kind) : 0; }
 
   // enregistre une cible dans attrs.par_spool / attrs.par_refill
   function saveTarget(f, kind, value, cell) {
@@ -820,8 +826,15 @@
     var n = window.CA.waitlist ? window.CA.waitlist.count(f.id) : 0;
     return n ? ' <span class="ro-wait" title="Personnes en liste d\'attente pour cette couleur">⏳ ' + n + ' en attente</span>' : '';
   }
+  // pastille « N réservés » : facturés à un client, pas encore remis (cms-reserves.js)
+  function resBadge(f) {
+    var n = reservedOf(f, 'spool') + reservedOf(f, 'refill');
+    if (!n) return '';
+    return ' <span class="ro-res" title="' + esc('Réservé : ' + window.CA.reserved.who(f.id).join(', ')) + '">📦 ' + n + ' réservé' + (n > 1 ? 's' : '') + '</span>';
+  }
   // la liste d'attente se charge en parallèle -> on rafraîchit les pastilles à son arrivée
   document.addEventListener('ca:waitlist', function () { if (loaded && reorderBody && subCommander && !subCommander.hidden) renderReorder(); });
+  document.addEventListener('ca:reserved', function () { if (loaded && reorderBody && subCommander && !subCommander.hidden) renderReorder(); });
 
   function renderReorder() {
     if (!reorderBody) return;
@@ -885,7 +898,7 @@
           '<td class="l"><div class="reorder-fil">' +
             '<span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
             '<span><span class="ro-name">' + esc(f.name || '(sans nom)') + '</span>' +
-            (f.code ? ' <span class="ro-code">' + esc(f.code) + '</span>' : '') + waitBadge(f) + '</span>' +
+            (f.code ? ' <span class="ro-code">' + esc(f.code) + '</span>' : '') + waitBadge(f) + resBadge(f) + '</span>' +
           '</div></td>' +
           fmtCells('spool', hasS, anyS) +
           fmtCells('refill', hasR, anyR) +
@@ -986,10 +999,19 @@
     var listHtml = Object.keys(byBrand).map(function (brand) {
       var lis = byBrand[brand].map(function (it) {
         var sw = swatchBg(it.f.hex, colorsOf(it.f));
-        return '<li><span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
-          '<span>' + esc((it.f.material ? it.f.material + ' · ' : '') + (it.f.name || '')) +
-          ' <span class="ro-code">' + kindLabel(it.kind) + (it.f.code ? ' · ' + esc(it.f.code) : '') + '</span></span>' +
-          '<span class="ro-q">×' + it.qty + '</span></li>';
+        var name = '<span>' + esc((it.f.material ? it.f.material + ' · ' : '') + (it.f.name || '')) +
+          ' <span class="ro-code">' + kindLabel(it.kind) + (it.f.code ? ' · ' + esc(it.f.code) : '') + '</span></span>';
+        // commandé (en tout ou en partie) pour un client : étiquette cliquable -> sa facture
+        var res = window.CA.reserved ? window.CA.reserved.detail(it.f.id, it.kind) : [];
+        if (res.length) {
+          var resQty = res.reduce(function (s, d) { return s + d.qty; }, 0);
+          name = '<span class="ro-main">' + name + '<span class="ro-fors">' + res.map(function (d) {
+            return '<button type="button" class="ro-for" data-inv="' + esc(d.invoiceId) + '" title="Ouvrir la facture">📦 ' +
+              (resQty >= it.qty && res.length === 1 ? 'Pour ' : d.qty + ' pour ') + esc(d.client) + ' · ' + esc(d.number) + '</button>';
+          }).join('') + '</span></span>';
+        }
+        return '<li' + (res.length ? ' class="is-res"' : '') + '><span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
+          name + '<span class="ro-q">×' + it.qty + '</span></li>';
       }).join('');
       return '<div class="reorder-brandgroup"><h3 style="font-size:.9rem;margin:12px 0 4px">' + esc(brand) +
           (multiBrand && estByBrand[brand] ? '<span class="ro-brand-est">≈ ' + money(estByBrand[brand]) + '</span>' : '') + '</h3>' +
@@ -1005,6 +1027,12 @@
         '<button class="btn btn-ghost btn-sm" id="reorder-copy" type="button" data-ic="copy">Copier la liste</button>' +
       '</div>' + noteHtml + listHtml + '</div>';
 
+    $$('.ro-for', reorderSummary).forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (window.CA.focusInvoice) window.CA.focusInvoice(b.getAttribute('data-inv'));
+        location.hash = '#historique';
+      });
+    });
     var toCat = $('#reorder-to-catalog');
     if (toCat) toCat.addEventListener('click', function () {
       if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub('catalogue'); else showSub('catalogue');

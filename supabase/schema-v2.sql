@@ -600,6 +600,12 @@ alter table public.invoice_lines add column if not exists ptype text;
 -- fantôme). NULL = ancienne facture (avant ce suivi) -> on remet qty.
 alter table public.invoice_lines add column if not exists qty_deducted integer;
 
+-- Quantité ENCORE À REMETTRE au client (commande remise en deux fois : une
+-- partie ce soir, le reste commandé chez le fournisseur). 0 = tout remis.
+-- À la création, le stock n'est déduit que pour (qty − qty_pending) ; le
+-- reste se déduit à la remise (RPC deliver_invoice, plus bas).
+alter table public.invoice_lines add column if not exists qty_pending integer not null default 0 check (qty_pending >= 0);
+
 -- Déduction de stock bornée à 0 qui RENVOIE la quantité effectivement retirée.
 create or replace function public.deduct_stock(p_product uuid, p_kind text, p_qty integer)
 returns integer language plpgsql security definer set search_path = public as $$
@@ -740,6 +746,7 @@ declare
   v_prod   uuid;
   v_kind   text;
   v_qty    numeric;
+  v_pend   integer;
   v_before integer;
   v_taken  integer;
 begin
@@ -775,12 +782,14 @@ begin
     v_prod  := nullif(v_line ->> 'product_id', '')::uuid;
     v_kind  := coalesce(nullif(v_line ->> 'kind', ''), 'spool');
     v_qty   := coalesce((v_line ->> 'qty')::numeric, 0);
+    -- « à venir » : borné à la quantité ; seule la partie remise sort du stock
+    v_pend  := greatest(0, least(coalesce((v_line ->> 'qty_pending')::integer, 0), abs(v_qty)::integer));
     v_taken := null;
     if p_deduct and v_prod is not null and v_qty > 0 then
       select case when v_kind = 'refill' then coalesce(qty_2,0) else coalesce(qty,0) end
         into v_before from public.products where id = v_prod for update;
       if found then
-        v_taken := least(v_before, abs(v_qty)::integer);
+        v_taken := least(v_before, abs(v_qty)::integer - v_pend);
         update public.products
            set qty   = case when v_kind <> 'refill' then coalesce(qty,0)   - v_taken else qty   end,
                qty_2 = case when v_kind =  'refill' then coalesce(qty_2,0) - v_taken else qty_2 end,
@@ -791,11 +800,11 @@ begin
       end if;
     end if;
     insert into public.invoice_lines
-      (invoice_id, product_id, label, meta, kind, ptype, qty, unit_price, unit_cost, line_total, sort_order, qty_deducted)
+      (invoice_id, product_id, label, meta, kind, ptype, qty, unit_price, unit_cost, line_total, sort_order, qty_deducted, qty_pending)
     values
       (p_id, v_prod, v_line ->> 'label', v_line ->> 'meta', v_kind, v_line ->> 'ptype', v_qty,
        coalesce((v_line ->> 'unit_price')::numeric, 0), coalesce((v_line ->> 'unit_cost')::numeric, 0),
-       coalesce((v_line ->> 'line_total')::numeric, 0), v_i, v_taken);
+       coalesce((v_line ->> 'line_total')::numeric, 0), v_i, v_taken, v_pend);
     v_i := v_i + 1;
   end loop;
 
@@ -824,6 +833,61 @@ begin
 end $$;
 revoke all on function public.update_invoice(uuid, jsonb, jsonb, boolean) from public, anon;
 grant execute on function public.update_invoice(uuid, jsonb, jsonb, boolean) to authenticated;
+
+-- ============================================================
+-- REMETTRE LES ARTICLES « À VENIR » (Historique -> « Remis » / « Tout remis »)
+-- p_line null = toutes les lignes de la facture ; p_qty null = tout ce qui
+-- reste sur la ligne. Si la facture a déduit son stock, la partie remise est
+-- déduite maintenant (bornée à 0, ajoutée à qty_deducted pour qu'une
+-- annulation ne remette que ce qui a vraiment été retiré).
+-- Renvoie le nombre d'articles remis.
+-- ------------------------------------------------------------
+create or replace function public.deliver_invoice(p_invoice uuid, p_line uuid default null, p_qty integer default null)
+returns integer language plpgsql security definer set search_path = public as $$
+declare
+  v_inv    public.invoices;
+  r        record;
+  v_n      integer;
+  v_before integer;
+  v_taken  integer;
+  v_total  integer := 0;
+begin
+  if not public.is_admin() then
+    raise exception 'Réservé à l''administrateur.';
+  end if;
+  select * into v_inv from public.invoices where id = p_invoice for update;
+  if not found then raise exception 'Facture introuvable.'; end if;
+  if v_inv.status = 'cancelled' then raise exception 'Une facture annulée ne peut pas être remise.'; end if;
+
+  for r in select id, product_id, kind, qty_pending from public.invoice_lines
+            where invoice_id = p_invoice and qty_pending > 0 and (p_line is null or id = p_line)
+            order by sort_order for update loop
+    v_n := case when p_qty is null then r.qty_pending else least(r.qty_pending, greatest(p_qty, 0)) end;
+    continue when v_n <= 0;
+    v_taken := 0;
+    if v_inv.stock_deducted and r.product_id is not null then
+      select case when r.kind = 'refill' then coalesce(qty_2,0) else coalesce(qty,0) end
+        into v_before from public.products where id = r.product_id for update;
+      if found then
+        v_taken := least(v_before, v_n);
+        update public.products
+           set qty   = case when r.kind <> 'refill' then coalesce(qty,0)   - v_taken else qty   end,
+               qty_2 = case when r.kind =  'refill' then coalesce(qty_2,0) - v_taken else qty_2 end,
+               updated_at = now()
+         where id = r.product_id;
+      end if;
+    end if;
+    update public.invoice_lines
+       set qty_pending  = qty_pending - v_n,
+           qty_deducted = case when v_inv.stock_deducted and r.product_id is not null
+                               then coalesce(qty_deducted, 0) + v_taken else qty_deducted end
+     where id = r.id;
+    v_total := v_total + v_n;
+  end loop;
+  return v_total;
+end $$;
+revoke all on function public.deliver_invoice(uuid, uuid, integer) from public, anon;
+grant execute on function public.deliver_invoice(uuid, uuid, integer) to authenticated;
 
 -- ============================================================
 -- COMMANDES DEALER (portail dealer -> onglet admin « Commandes »)
