@@ -625,7 +625,12 @@
     var rows = lines.map(function (l, i) {
       var descCell = (l.kind === 'free')
         ? '<input class="inv-label" type="text" value="' + esc(l.label) + '" data-i="' + i + '" placeholder="Description">' +
-          '<select class="inv-cat no-print" data-i="' + i + '" title="Catégorie (pour les statistiques)">' + catOptions(l.ptype || 'divers') + '</select>'
+          '<div class="inv-sub no-print">' +
+            '<select class="inv-cat" data-i="' + i + '" title="Catégorie (pour les statistiques)">' + catOptions(l.ptype || 'divers') + '</select>' +
+            // coût unitaire (privé) : seulement quand la marge est affichée ; vide = 0 $ (marge 100 %)
+            (marginShown ? '<span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
+              (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span>' : '') +
+          '</div>'
         : swatchSVG(l.hex) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(l.meta) + '</span>' : '');
       return '<tr data-i="' + i + '">' +
         '<td>' + descCell + '</td>' +
@@ -677,6 +682,13 @@
       inp.addEventListener('change', function () {
         var l = lines[+this.getAttribute('data-i')]; if (!l) return;
         l.price = Math.max(0, num(this.value) || 0); l.manual = true;
+        afterChange();
+      });
+    });
+    $$('.inv-cost', elInvoice).forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var l = lines[+this.getAttribute('data-i')]; if (!l) return;
+        l.cost = Math.max(0, num(this.value) || 0);
         afterChange();
       });
     });
