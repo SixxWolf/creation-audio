@@ -136,11 +136,18 @@
 
   // nous joindre en un clic depuis la fiche (« Écris-nous… ») : Messenger, ou courriel pré-rempli
   var CONTACT = { messenger: 'https://m.me/61591945465745', email: 'contact@creationaudio.ca' };
-  // lien « Écris-nous… » (classe .ask de site.css) -> Messenger, + « ou par courriel » pré-rempli
-  function askLink(label, subject, body) {
+  // lien « Écris-nous… » (classe .ask de site.css) -> panneau Messagerie (nav.js, sujet Spacers + code du
+  // spacer), + « ou par Messenger · courriel » pré-rempli. Sans nav.js (portail dealer) : Messenger, comme avant.
+  function askLink(label, subject, body, ref) {
     var mail = 'mailto:' + CONTACT.email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    return '<a class="ask" href="' + esc(CONTACT.messenger) + '" target="_blank" rel="noopener">' + esc(label) + '</a>' +
-      '<span class="ask-alt"> ou <a href="' + esc(mail) + '">par courriel</a></span>';
+    if (!(window.CA && window.CA.loadMsg)) {
+      return '<a class="ask" href="' + esc(CONTACT.messenger) + '" target="_blank" rel="noopener">' + esc(label) + '</a>' +
+        '<span class="ask-alt"> ou <a href="' + esc(mail) + '">par courriel</a></span>';
+    }
+    return '<a class="ask" href="/compte.html#/messages" data-msg="spacers" data-msg-ref="' +
+        esc(ref || '') + '" data-msg-body="' + esc(body) + '">' + esc(label) + '</a>' +
+      '<span class="ask-alt"> ou par <a href="' + esc(CONTACT.messenger) + '" target="_blank" rel="noopener">Messenger</a> · <a href="' +
+        esc(mail) + '">courriel</a></span>';
   }
 
   // options de la boutique publique : spacers.html ET pages générées (même rendu à l'octet près)
@@ -480,7 +487,7 @@
     // « Écris-nous… » de la fiche : courriel pré-rempli avec le nom du spacer
     function askHtml(p, label, question, field) {
       return askLink(label, 'Compatibilité — ' + p.name,
-        'Bonjour,\n\nEst-ce que le spacer ' + p.name + ' ' + question + ' ?\n' + field + ' : \n\nMerci !');
+        'Bonjour,\n\nEst-ce que le spacer ' + p.name + ' ' + question + ' ?\n' + field + ' : \n\nMerci !', p.name);
     }
     // ce que veut dire chaque ajustement (sous le tableau de la section Haut-parleurs)
     function spkLegend(p) {

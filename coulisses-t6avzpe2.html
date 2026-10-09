@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=61">
+<link rel="stylesheet" href="assets/admin.css?v=62">
 <link rel="stylesheet" href="assets/facture.css?v=25">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
@@ -105,6 +105,7 @@
       <button class="tab" type="button" data-tab="statistiques" data-group="Ventes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20.5h16"/><rect x="5.5" y="11" width="3" height="7" rx="1"/><rect x="10.5" y="6" width="3" height="12" rx="1"/><rect x="15.5" y="13.5" width="3" height="4.5" rx="1"/></svg><span>Statistiques</span></button>
 
       <p class="side-group" aria-hidden="true">Contacts</p>
+      <button class="tab" type="button" data-tab="messages" data-group="Contacts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10.5H9.5L4 19.5z"/><path d="M8 9.5h8M8 12.5h5"/></svg><span>Messages</span><b class="nav-count" id="nav-msgs-n" hidden>0</b></button>
       <button class="tab" type="button" data-tab="clients" data-group="Contacts"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.5 3.5 0 0 1 0 6.6M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></svg><span>Clients</span><b class="nav-count" id="nav-clients-n" hidden>0</b></button>
       <button class="tab" type="button" data-tab="dealers" data-group="Contacts"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M8.5 7.5V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2M3 13h18"/></svg><span>Dealers</span></button>
 
@@ -992,6 +993,27 @@
       <div id="dl-list" class="mat-rows"><p class="muted">Chargement…</p></div>
     </section>
 
+    <!-- ---------------- MESSAGES (messagerie du site public) : cms-messages.js ---------------- -->
+    <section class="tabpanel" data-panel="messages" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Messages</h1>
+          <p class="muted">Questions envoyées depuis le site.</p>
+        </div>
+        <span class="grow"></span>
+        <div class="fx-seg" role="group" aria-label="Filtre des conversations">
+          <button type="button" class="fx-seg-btn ms-filter is-active" data-f="open">Ouvertes</button>
+          <button type="button" class="fx-seg-btn ms-filter" data-f="closed">Réglées</button>
+          <button type="button" class="fx-seg-btn ms-filter" data-f="all">Toutes</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="ms-refresh" type="button" data-ic="refresh">Actualiser</button>
+      </div>
+      <div class="ms-wrap" id="ms-wrap">
+        <div class="ms-list" id="ms-list"><p class="muted">Chargement…</p></div>
+        <div class="ms-thread" id="ms-thread"><p class="ms-none">Choisis une conversation.</p></div>
+      </div>
+    </section>
+
     <!-- ---------------- CLIENTS (carnet de facturation) ---------------- -->
     <section class="tabpanel" data-panel="clients" role="tabpanel" hidden>
       <div class="panel-head">
@@ -1755,6 +1777,7 @@
 <script src="assets/cms-reserves.js?v=1"></script>
 <script src="assets/cms-dealers.js?v=4"></script>
 <script src="assets/cms-clients.js?v=6"></script>
+<script src="assets/cms-messages.js?v=1"></script>
 <script src="assets/cms-facturation.js?v=39"></script>
 <script src="assets/cms-historique.js?v=12"></script>
 <script src="assets/cms-commandes-clients.js?v=2"></script>
