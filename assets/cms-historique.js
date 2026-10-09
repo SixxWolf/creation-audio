@@ -117,6 +117,7 @@
     if (filter === 'active' && cancelled) return false;
     if (filter === 'cancelled' && !cancelled) return false;
     if (filter === 'pending' && !pendingOf(inv)) return false;
+    if (filter === 'internal' && inv.client_type !== 'internal') return false;   // ce que Théo a pris dans son stock
     if (query) {
       var hay = ((inv.number || '') + ' ' + (inv.client_name || '') + ' ' + (inv.client_contact || '')).toLowerCase();
       if (hay.indexOf(query) === -1) return false;
@@ -153,8 +154,13 @@
     listEl.innerHTML = rows.map(function (inv) {
       var cancelled = inv.status === 'cancelled';
       var badge = '<span class="hist-cat">' + esc(CAT_LABEL[inv.category] || inv.category || '—') + '</span>';
-      var dealer = inv.client_type === 'dealer' ? '<span class="hist-dealer">Dealer</span>' : '';
+      var internal = inv.client_type === 'internal';
+      var dealer = inv.client_type === 'dealer' ? '<span class="hist-dealer">Dealer</span>'
+        : internal ? '<span class="hist-dealer hist-int">Interne</span>' : '';
       var pend = pendingOf(inv);
+      // usage interne : 0 $ -> on montre plutôt le nombre d'articles pris
+      var nItems = (linesByInv[inv.id] || []).reduce(function (s, l) { return s + ((+l.qty) || 0); }, 0);
+      var totalTx = internal ? nItems + ' article' + (nItems > 1 ? 's' : '') : money(inv.total);
       return '<div class="hist-row' + (cancelled ? ' is-cancelled' : '') + '" data-id="' + esc(inv.id) + '">' +
         '<div class="hist-head">' +
           '<span class="hist-id"><span class="hist-num">' + esc(inv.number || '—') + '</span>' + badge +
@@ -163,7 +169,7 @@
           '<span class="hist-client">' + esc(inv.client_name || 'Sans client') + ' ' + dealer + '</span>' +
           '<span class="grow"></span>' +
           '<span class="hist-date">' + esc(fmtDateFR(inv.invoice_date)) + '</span>' +
-          '<span class="hist-total">' + money(inv.total) + '</span>' +
+          '<span class="hist-total">' + totalTx + '</span>' +
         '</div>' +
         '<div class="hist-detail"></div>' +
       '</div>';
@@ -311,7 +317,8 @@
     if (co.phone) meta.push(co.phone);
 
     var dealer = inv.client_type === 'dealer' ? ' <span class="inv-cli-tag">Dealer</span>' : '';
-    var billto = (inv.client_name || inv.client_contact || inv.client_address || inv.client_city)
+    var internal = inv.client_type === 'internal';   // usage interne : pas de « Facturé à », titre propre
+    var billto = !internal && (inv.client_name || inv.client_contact || inv.client_address || inv.client_city)
       ? '<div class="inv-billto"><div class="lbl">Facturé à</div>' +
         (inv.client_name ? '<div class="who">' + esc(inv.client_name) + dealer + '</div>' : '') +
         (inv.client_address ? '<div>' + esc(inv.client_address) + '</div>' : '') +
@@ -337,7 +344,7 @@
           '<div class="inv-co-name">' + esc(co.name) + '</div>' +
           (co.tagline ? '<div class="inv-co-tag">' + esc(co.tagline) + '</div>' : '') +
           (meta.length ? '<div class="inv-co-meta">' + esc(meta.join('\n')) + '</div>' : '') + '</div>' +
-        '<div class="inv-title"><h1>FACTURE</h1><div class="inv-meta">N° ' + esc(inv.number || '—') + '<br>' + esc(fmtDateFR(inv.invoice_date)) + '</div></div>' +
+        '<div class="inv-title"><h1>' + (internal ? 'USAGE INTERNE' : 'FACTURE') + '</h1><div class="inv-meta">N° ' + esc(inv.number || '—') + '<br>' + esc(fmtDateFR(inv.invoice_date)) + '</div></div>' +
       '</div>' + cancelled + billto +
       '<table class="inv-table"><thead><tr><th>Description</th><th class="num">Qté</th><th class="num">Prix unit.</th><th class="num">Montant</th></tr></thead>' +
         '<tbody>' + rows + '</tbody></table>' +
@@ -346,7 +353,7 @@
         '<div class="line grand"><span>Total</span><span>' + money(inv.total) + '</span></div>' +
       '</div>' +
       (inv.note ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(inv.note) + '</div>' : '') +
-      '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>';
+      (internal ? '' : '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
   }
   var TITLE = document.title;
   function reprint(inv, lines) {

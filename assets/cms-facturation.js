@@ -11,6 +11,9 @@
    - Modification d'une facture enregistrée (CA.editInvoice, appelé par
      l'Historique) : rechargée dans l'éditeur, puis RPC update_invoice.
    - Impression PDF + copie texte.
+   - Client · Dealer · Interne : « Interne » = ce que Théo prend dans son stock
+     (client_type 'internal', prix forcés à 0 $, coût gardé, n° INT- via RPC
+     next_internal_number) ; exclu des ventes dans les Statistiques.
    ========================================================= */
 (function () {
   'use strict';
@@ -61,7 +64,8 @@
   /* ---------- état ---------- */
   var loaded = false;
   var cat = 'filament';          // gabarit courant (pilote la colonne gauche)
-  var clientType = 'client';     // 'client' | 'dealer'
+  var clientType = 'client';     // 'client' | 'dealer' | 'internal' (usage interne : prix 0 $, n° INT-)
+  var INTERNAL_NAME = 'Usage interne';
   var taxEnabled = false;
   var pickerKind = 'spool';      // filament : bobine | recharge
   var brandFilter = 'all';       // filtre marque (catalogue filament)
@@ -226,15 +230,17 @@
 
   function loadNextNumberHint() {
     var year = new Date().getFullYear();
-    sb.from('invoices').select('number').like('number', 'F-' + year + '-%')
+    var prefix = isInternal() ? 'INT-' : 'F-';   // usage interne : série à part (les F- restent sans trou)
+    sb.from('invoices').select('number').like('number', prefix + year + '-%')
       .order('number', { ascending: false }).limit(1)
       .then(function (res) {
+        if (prefix !== (isInternal() ? 'INT-' : 'F-')) return;   // type changé entre-temps
         var seq = 1;
         if (!res.error && res.data && res.data.length) {
           var m = /-(\d+)$/.exec(res.data[0].number || '');
           if (m) seq = parseInt(m[1], 10) + 1;
         }
-        var next = 'F-' + year + '-' + ('000' + seq).slice(-3);
+        var next = prefix + year + '-' + ('000' + seq).slice(-3);
         lastAutoNumber = next;
         if (!saved && !editing) elNumber.value = next;   // en modification : on garde le n° de la facture
         elNextHint.textContent = 'Prochaine : ' + next;
@@ -374,24 +380,27 @@
   });
 
   function setClientType(type, keepFields) {
-    clientType = type === 'dealer' ? 'dealer' : 'client';
+    var prevType = clientType;
+    clientType = type === 'dealer' ? 'dealer' : type === 'internal' ? 'internal' : 'client';
     $$('.fx-cli-btn').forEach(function (x) {
       var v = x.getAttribute('data-cli');
       x.classList.toggle('is-active', v === clientType);
     });
-    var isDlr = clientType === 'dealer';
+    var isDlr = clientType === 'dealer', isInt = clientType === 'internal';
     if (elDealerField) elDealerField.hidden = !isDlr;
-    if (elClientField) elClientField.hidden = isDlr;
+    if (elClientField) elClientField.hidden = isDlr || isInt;
     if (elClientSearch) elClientSearch.value = '';
     hideClientResults();
     if (!keepFields) {
-      setClientFields({});
+      setClientFields(isInt ? { name: INTERNAL_NAME } : {});
       if (elDealerSelect) elDealerSelect.value = '';
       if (elCliHint) elCliHint.textContent = isDlr ? 'Choisis un dealer — ses coordonnées et les prix dealer s\'appliquent.' : '';
     }
+    if (elCliName) elCliName.readOnly = isInt;   // usage interne : nom fixe
     repriceSpacers();                       // bascule prix client <-> dealer sur les lignes spacer
     if (cat === 'spacer') buildPicker();    // rafraîchit les prix affichés dans le catalogue
-    if (saved) unlock();
+    unlock();                               // déverrouille + libellé du bouton (facture / sortie)
+    if (!editing && (prevType === 'internal') !== isInt) loadNextNumberHint();   // série F- <-> INT-
     render();
   }
   $$('.fx-type-btn').forEach(function (b) {
@@ -522,6 +531,7 @@
   function prodById(id) { var arr = catalog[cat] || []; return arr.filter(function (p) { return String(p.id) === String(id); })[0] || null; }
 
   function isDealer() { return clientType === 'dealer'; }
+  function isInternal() { return clientType === 'internal'; }
   // spacer : prix client (à plat) OU prix dealer (+ rabais quantité) selon le type de client
   function spacerDual(p) { return { client: +p.sell_price || 0, dealer: +(p.dealer_price != null ? p.dealer_price : p.sell_price) || 0, tiers: p.tiers || [] }; }
 
@@ -577,6 +587,13 @@
   // puis s'applique à chaque ligne avec la grille de SON matériau et de SON format.
   // ACCESSOIRES : même principe par catégorie (tierKey 'acc|…'). Spacers : par ligne.
   function repriceLines() {
+    // Usage interne : tout à 0 $ (le coût reste = valeur au coûtant). Un prix tapé à la main
+    // est mis de côté et revient si on repasse en Client / Dealer.
+    if (isInternal()) {
+      lines.forEach(function (l) { if (l.manual && l.keepPrice == null) l.keepPrice = l.price; l.price = 0; });
+      return;
+    }
+    lines.forEach(function (l) { if (l.keepPrice != null) { l.price = l.keepPrice; l.keepPrice = null; } });
     var totals = {};
     lines.forEach(function (l) {
       if (l.tierKey) totals[l.tierKey] = (totals[l.tierKey] || 0) + (l.qty | 0);
@@ -645,7 +662,8 @@
     var cliName = elCliName.value.trim(), cliContact = contactStr(),
         cliAddress = elCliAddress.value.trim(), cliCity = elCliCity.value.trim();
     var cliTag = clientType === 'dealer' ? ' <span class="inv-cli-tag">Dealer</span>' : '';
-    var billto = (cliName || cliContact || cliAddress || cliCity)
+    var internal = isInternal();
+    var billto = !internal && (cliName || cliContact || cliAddress || cliCity)
       ? '<div class="inv-billto"><div class="lbl">Facturé à</div>' +
         (cliName ? '<div class="who">' + esc(cliName) + cliTag + '</div>' : '') +
         (cliAddress ? '<div>' + esc(cliAddress) + '</div>' : '') +
@@ -673,7 +691,8 @@
       return '<tr data-i="' + i + '"' + (pend > 0 ? ' class="is-pending"' : '') + '>' +
         '<td>' + descCell + '</td>' +
         '<td class="num"><input class="inv-qty" type="number" min="0" step="1" value="' + l.qty + '" data-i="' + i + '"></td>' +
-        '<td class="num"><input class="inv-price" type="number" min="0" step="0.01" value="' + l.price + '" data-i="' + i + '"></td>' +
+        '<td class="num"><input class="inv-price" type="number" min="0" step="0.01" value="' + l.price + '" data-i="' + i + '"' +
+          (internal ? ' disabled title="Usage interne : 0 $"' : '') + '></td>' +
         '<td class="num">' + money(l.qty * l.price) + '</td>' +
         '<td class="num no-print"><div class="inv-acts">' +
           '<button type="button" class="inv-pend" data-i="' + i + '" aria-pressed="' + (pend > 0) + '" title="' +
@@ -697,7 +716,7 @@
           '<div class="inv-co-name">' + esc(co.name || 'Entreprise') + '</div>' +
           (co.tagline ? '<div class="inv-co-tag">' + esc(co.tagline) + '</div>' : '') +
           (meta.length ? '<div class="inv-co-meta">' + esc(meta.join('\n')) + '</div>' : '') + '</div>' +
-        '<div class="inv-title"><h1>FACTURE</h1><div class="inv-meta">' +
+        '<div class="inv-title"><h1>' + (internal ? 'USAGE INTERNE' : 'FACTURE') + '</h1><div class="inv-meta">' +
           'N° ' + esc(elNumber.value || '—') + '<br>' + fmtDateFR(elDate.value || todayISO()) + '</div></div>' +
       '</div>' +
       billto +
@@ -710,7 +729,7 @@
         '<div class="line grand"><span>Total</span><span>' + money(t.total) + '</span></div>' +
       '</div>' +
       (noteVal ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(noteVal) + '</div>' : '') +
-      '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>';
+      (internal ? '' : '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
 
     // écouteurs des champs éditables
     $$('.inv-qty', elInvoice).forEach(function (inp) {
@@ -765,6 +784,13 @@
     var mcls = t.margin >= 0 ? 'pos' : 'neg';
     var pct = t.sub > 0 ? Math.round(t.margin / t.sub * 100) : 0;
     elMargin.hidden = false;
+    if (internal) {   // usage interne : pas de marge, juste ce que vaut ce qu'on prend (au coûtant)
+      elMargin.classList.remove('is-masked');
+      elMargin.innerHTML = '<span class="fx-margin-k">Valeur au coûtant</span>' +
+        '<span class="fx-margin-v">' + money(t.cost) + '</span>';
+      refreshPickerBadges();
+      return;
+    }
     elMargin.classList.toggle('is-masked', !marginShown);
     elMargin.innerHTML = '<span class="fx-margin-k">Marge (privé)</span>' +
       (marginShown
@@ -800,7 +826,7 @@
   }
   function unlock() {
     saved = false; elSave.disabled = false;
-    elSave.textContent = editing ? 'Enregistrer les modifications' : 'Enregistrer la facture';
+    elSave.textContent = editing ? 'Enregistrer les modifications' : isInternal() ? 'Enregistrer la sortie' : 'Enregistrer la facture';
   }
 
   // en-tête commun (création ET modification) — le n° et le statut sont gérés à part
@@ -855,9 +881,10 @@
     // E2 : n° manuel si l'admin a modifié le champ ; sinon numéro auto atomique.
     var manual = (elNumber.value || '').trim();
     var useManual = manual && manual !== lastAutoNumber;
+    var internal = isInternal();
     var numberP = useManual
       ? Promise.resolve(manual)
-      : sb.rpc('next_invoice_number').then(function (res) {
+      : sb.rpc(internal ? 'next_internal_number' : 'next_invoice_number').then(function (res) {
           if (res.error || !res.data) throw (res.error || new Error('Numéro indisponible.'));
           return res.data;
         });
@@ -891,7 +918,7 @@
       var deducted = !!elDeduct.checked, pend = pendingCount();
       // la vente est enregistrée : on repart d'une facture vierge (réimpression possible ci-dessous ou dans l'Historique)
       resetInvoice();
-      elStatus.textContent = '✓ Facture ' + inv.number + ' enregistrée' + (deducted ? ', stock déduit' : '') +
+      elStatus.textContent = '✓ ' + (internal ? 'Sortie ' : 'Facture ') + inv.number + ' enregistrée' + (deducted ? ', stock déduit' : '') +
         (pend ? ' · ' + pend + ' à remettre' : '') + '. Nouvelle facture prête. ';
       if (window.CA.printInvoice) statusButton('Imprimer ' + inv.number, function () { window.CA.printInvoice(inv, savedRows); });
       if (order) linkOrder(order, inv);
@@ -1070,7 +1097,7 @@
   }
   function fillFromInvoice(inv, savedLines) {
     var dealer = inv.client_type === 'dealer';
-    setClientType(dealer ? 'dealer' : 'client', true);
+    setClientType(inv.client_type === 'internal' ? 'internal' : dealer ? 'dealer' : 'client', true);
     var ct = splitContact(inv.client_contact);
     setClientFields({ name: inv.client_name || '', email: ct.email, phone: ct.phone,
       address: inv.client_address || '', city: inv.client_city || '' });
@@ -1207,8 +1234,8 @@
     var co = readCompanyForm(), t = totals();
     var L = [];
     L.push(co.name); if (co.tagline) L.push(co.tagline);
-    L.push('FACTURE ' + (elNumber.value || '') + '   ' + fmtDateFR(elDate.value || todayISO()));
-    var cli = elCliName.value.trim(); if (cli) L.push('Facturé à : ' + cli + (clientType === 'dealer' ? ' (dealer)' : ''));
+    L.push((isInternal() ? 'USAGE INTERNE ' : 'FACTURE ') + (elNumber.value || '') + '   ' + fmtDateFR(elDate.value || todayISO()));
+    var cli = isInternal() ? '' : elCliName.value.trim(); if (cli) L.push('Facturé à : ' + cli + (clientType === 'dealer' ? ' (dealer)' : ''));
     if (elCliAddress.value.trim()) L.push(elCliAddress.value.trim());
     if (elCliCity.value.trim()) L.push(elCliCity.value.trim());
     if (contactStr()) L.push(contactStr());
