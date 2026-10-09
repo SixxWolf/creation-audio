@@ -82,6 +82,8 @@
 
   /* ---- pastille « Nouvelle » (barre latérale) ---- */
   function setBadge(n) {
+    // pastille commune avec les commandes clients en ligne (cms-commandes-clients.js)
+    if (window.CA.paintOrdersBadge) { window.CA.ordersCount.dealer = n; window.CA.paintOrdersBadge(); return; }
     if (!navN) return;
     navN.textContent = n; navN.hidden = !n;
     var tab = navN.closest('.tab');

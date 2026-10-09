@@ -1608,6 +1608,258 @@ end $$;
 revoke all on function public.next_internal_number() from public, anon;
 grant execute on function public.next_internal_number() to authenticated;
 
+-- ============================================================
+-- COMMANDES EN LIGNE (comptes clients, étape 2)
+-- Un client connecté (compte.html) envoie son panier depuis la boutique ou la
+-- page spacers : RPC customer_submit_order (prix recalculés ICI, même règle que
+-- le panier). Un article en rupture se commande quand même : qty_to_order = la
+-- part au-delà du stock (délai annoncé au client). Cueillette seulement, aucun
+-- paiement en ligne. Numéros C-0001 (séquence). Modifiable / annulable par le
+-- client tant que « Nouvelle ». L'admin les voit dans Commandes › Clients ;
+-- « Facturer » -> admin_invoice_customer_order (Facturée + compte relié à sa fiche).
+-- Courriels : Edge Function « customer-order-notify » (client + Création Audio).
+-- ------------------------------------------------------------
+create sequence if not exists public.customer_order_seq;
+create table if not exists public.customer_orders (
+  id            uuid primary key default gen_random_uuid(),
+  number        text not null unique,                       -- C-0001
+  customer_id   uuid references public.customers(id) on delete set null,
+  email         text not null,                              -- figés à l'envoi (dossier de la commande)
+  name          text,
+  phone         text,
+  status        text not null default 'new' check (status in ('new','preparing','ready','invoiced','cancelled')),
+  note          text,
+  total         numeric(10,2) not null default 0,
+  has_backorder boolean not null default false,             -- au moins un article à commander
+  invoice_id    uuid references public.invoices(id) on delete set null,
+  cancelled_by  text,                                        -- 'client' | 'admin'
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  edited_at     timestamptz,
+  notified_at   timestamptz
+);
+create index if not exists customer_orders_customer_idx on public.customer_orders (customer_id, created_at desc);
+create index if not exists customer_orders_status_idx on public.customer_orders (status);
+create table if not exists public.customer_order_lines (
+  id           uuid primary key default gen_random_uuid(),
+  order_id     uuid not null references public.customer_orders(id) on delete cascade,
+  product_id   uuid references public.products(id) on delete set null,
+  ptype        text,                                         -- filament | accessory | spacer
+  kind         text,                                         -- spool | refill | unit
+  name         text not null,
+  meta         text,
+  qty          integer not null check (qty > 0),
+  unit_price   numeric(10,2) not null default 0,
+  line_total   numeric(10,2) not null default 0,
+  qty_to_order integer not null default 0,                   -- au-delà du stock à l'envoi
+  sort_order   integer not null default 0
+);
+create index if not exists customer_order_lines_order_idx on public.customer_order_lines (order_id);
+alter table public.customer_orders enable row level security;
+alter table public.customer_order_lines enable row level security;
+drop policy if exists customer_orders_admin_all on public.customer_orders;
+create policy customer_orders_admin_all on public.customer_orders for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists customer_order_lines_admin_all on public.customer_order_lines;
+create policy customer_order_lines_admin_all on public.customer_order_lines for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+
+-- Prix au palier (même règle que la boutique : le plus haut palier atteint, sinon le prix de base).
+create or replace function public._tier_price(p_base numeric, p_tiers jsonb, p_qty integer)
+returns numeric language sql immutable set search_path = '' as $$
+  select coalesce((
+    select (t ->> 'price')::numeric
+      from jsonb_array_elements(case when jsonb_typeof(p_tiers) = 'array' then p_tiers else '[]'::jsonb end) t
+     where (t ->> 'min') ~ '^\d+$' and (t ->> 'min')::int >= 1 and (t ->> 'min')::int <= p_qty
+       and (t ->> 'price') ~ '^\d+(\.\d+)?$'
+     order by (t ->> 'min')::int desc limit 1), p_base, 0);
+$$;
+
+-- Lignes d'une commande client, prix recalculés côté serveur : filaments = palier sur le
+-- TOTAL de la marque (bobines + recharges) ; accessoires = palier sur le total de la catégorie ;
+-- spacers = prix client à plat. Doublons fusionnés. -> jsonb [{product_id, ptype, kind, name,
+-- meta, qty, unit_price, line_total, qty_to_order, sort_order}]
+create or replace function public._customer_fill_lines(p_lines jsonb)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare v_in int; v_ok int; v_out jsonb;
+begin
+  if jsonb_typeof(p_lines) is distinct from 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'Ton panier est vide.';
+  end if;
+  if jsonb_array_length(p_lines) > 60 then raise exception 'Trop d''articles dans une seule commande.'; end if;
+  with l as (
+    select (x ->> 'product_id')::uuid as pid,
+           case when x ->> 'kind' in ('spool', 'refill') then x ->> 'kind' else 'unit' end as kind,
+           sum(least((x ->> 'qty')::int, 999))::int as qty
+      from jsonb_array_elements(p_lines) x
+     where (x ->> 'product_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+       and coalesce(x ->> 'qty', '') ~ '^\d{1,4}$' and (x ->> 'qty')::int > 0
+     group by 1, 2
+  ), j as (
+    select l.pid, l.kind, l.qty, pp.type, pp.name, pp.brand, pp.material, pp.sort_order,
+           case when pp.type = 'filament' and l.kind = 'refill' then pp.sell_price_2 else pp.sell_price end as base,
+           case when pp.type = 'filament' and l.kind = 'refill' then pp.tiers_2
+                when pp.type = 'spacer' then '[]'::jsonb else pp.tiers end as tiers,
+           case when pp.type = 'filament' then 'fil|' || coalesce(nullif(pp.brand, ''), nullif(pp.material, ''), '')
+                when pp.type = 'accessory' and coalesce(btrim(pp.attrs ->> 'category'), '') <> ''
+                  then 'acc|' || lower(btrim(pp.attrs ->> 'category'))
+                else 'one|' || l.pid::text || '|' || l.kind end as gkey,
+           case when l.kind = 'refill' then coalesce(pp.qty_2, 0) else pp.qty end as stock
+      from l
+      join public.products_public pp on pp.id = l.pid
+     where (pp.type = 'filament' and l.kind in ('spool', 'refill'))
+        or (pp.type in ('accessory', 'spacer') and l.kind = 'unit')
+  ), g as (select gkey, sum(qty)::int as gq from j group by gkey),
+  priced as (
+    select j.*, round(public._tier_price(j.base, j.tiers, g.gq), 2) as unit
+      from j join g using (gkey)
+     where j.base is not null
+  ), s as (
+    select priced.*, row_number() over (order by case type when 'filament' then 0 when 'accessory' then 1 else 2 end,
+             brand nulls last, material nulls last, sort_order, name, kind) - 1 as rn
+      from priced
+  )
+  select (select count(*) from l), count(*), coalesce(jsonb_agg(jsonb_build_object(
+           'product_id', pid, 'ptype', type, 'kind', kind, 'name', name,
+           'meta', case when type = 'filament'
+                        then concat_ws(' · ', nullif(brand, ''), nullif(material, ''), case when kind = 'refill' then 'Recharge' else 'Avec bobine' end)
+                        when type = 'accessory' then 'Accessoire' else 'Spacer · paire' end,
+           'qty', qty, 'unit_price', unit, 'line_total', round(unit * qty, 2),
+           'qty_to_order', case when stock is null then 0 else greatest(0, qty - greatest(stock, 0)) end,
+           'sort_order', rn) order by rn), '[]'::jsonb)
+    into v_in, v_ok, v_out
+    from s;
+  if v_in = 0 then raise exception 'Ton panier est vide.'; end if;
+  if v_ok <> v_in then
+    raise exception 'Un article de ton panier n''est plus offert. Recharge la page puis réessaie.';
+  end if;
+  return v_out;
+end $$;
+revoke all on function public._customer_fill_lines(jsonb) from public, anon, authenticated;
+
+-- Envoi d'une commande par le client connecté. -> { id, number, total, has_backorder }
+create or replace function public.customer_submit_order(p_lines jsonb, p_note text default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); c public.customers; v_lines jsonb; v_id uuid; v_num text;
+        v_total numeric; v_bo boolean;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  select * into c from public.customers where id = v_uid;
+  if not found then raise exception 'Compte introuvable. Reconnecte-toi.' using errcode = '42501'; end if;
+  if (select count(*) from public.customer_orders where customer_id = v_uid and created_at > now() - interval '1 hour') >= 10 then
+    raise exception 'Trop de commandes envoyées en peu de temps. Réessaie plus tard.';
+  end if;
+  v_lines := public._customer_fill_lines(p_lines);
+  select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
+    into v_total, v_bo from jsonb_array_elements(v_lines) x;
+  v_num := 'C-' || lpad(nextval('public.customer_order_seq')::text, 4, '0');
+  insert into public.customer_orders (number, customer_id, email, name, phone, note, total, has_backorder)
+  values (v_num, v_uid, c.email, c.name, c.phone, nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_bo)
+  returning id into v_id;
+  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
+  select v_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int
+    from jsonb_array_elements(v_lines) x;
+  return jsonb_build_object('id', v_id, 'number', v_num, 'total', v_total, 'has_backorder', v_bo);
+end $$;
+
+-- Modification par le client (seulement tant que « Nouvelle »).
+create or replace function public.customer_update_order(p_id uuid, p_lines jsonb, p_note text default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); o public.customer_orders; v_lines jsonb; v_total numeric; v_bo boolean;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  select * into o from public.customer_orders where id = p_id and customer_id = v_uid for update;
+  if not found then raise exception 'Commande introuvable.'; end if;
+  if o.status <> 'new' then raise exception 'Cette commande est déjà en préparation : écris-nous pour la changer.'; end if;
+  v_lines := public._customer_fill_lines(p_lines);
+  select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
+    into v_total, v_bo from jsonb_array_elements(v_lines) x;
+  delete from public.customer_order_lines where order_id = p_id;
+  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
+  select p_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int
+    from jsonb_array_elements(v_lines) x;
+  update public.customer_orders
+     set total = v_total, has_backorder = v_bo, note = nullif(left(btrim(coalesce(p_note, '')), 500), ''),
+         edited_at = now(), updated_at = now()
+   where id = p_id;
+  return jsonb_build_object('id', p_id, 'number', o.number, 'total', v_total, 'has_backorder', v_bo);
+end $$;
+
+-- Annulation par le client (seulement tant que « Nouvelle »).
+create or replace function public.customer_cancel_order(p_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); o public.customer_orders;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  select * into o from public.customer_orders where id = p_id and customer_id = v_uid for update;
+  if not found then raise exception 'Commande introuvable.'; end if;
+  if o.status <> 'new' then raise exception 'Cette commande est déjà en préparation : écris-nous pour l''annuler.'; end if;
+  update public.customer_orders set status = 'cancelled', cancelled_by = 'client', updated_at = now() where id = p_id;
+  return jsonb_build_object('id', p_id, 'number', o.number);
+end $$;
+
+-- Ses commandes (Mon compte › Commandes).
+create or replace function public.me_orders()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'id', o.id, 'number', o.number, 'status', o.status, 'created_at', o.created_at, 'edited_at', o.edited_at,
+      'note', o.note, 'total', o.total, 'has_backorder', o.has_backorder, 'cancelled_by', o.cancelled_by,
+      'invoice_number', (select i.number from public.invoices i where i.id = o.invoice_id),
+      'lines', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'product_id', l.product_id, 'ptype', l.ptype, 'kind', l.kind, 'name', l.name, 'meta', l.meta, 'qty', l.qty,
+          'unit_price', l.unit_price, 'line_total', l.line_total, 'qty_to_order', l.qty_to_order,
+          'hex', (select p.hex from public.products p where p.id = l.product_id)) order by l.sort_order)
+        from public.customer_order_lines l where l.order_id = o.id), '[]'::jsonb)
+    ) order by o.created_at desc), '[]'::jsonb)
+  from (select * from public.customer_orders where customer_id = (select auth.uid())
+        order by created_at desc limit 50) o;
+$$;
+
+-- Admin : commande facturée -> « Facturée » + facture rattachée à la fiche du client
+-- (fiche du compte, sinon celle qui a son courriel, sinon nouvelle fiche) ; le compte est
+-- relié à cette fiche s'il ne l'était pas : la facture apparaît dans Mon compte.
+create or replace function public.admin_invoice_customer_order(p_order uuid, p_invoice uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare o public.customer_orders; c public.customers; v_cid uuid;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into o from public.customer_orders where id = p_order for update;
+  if not found then raise exception 'Commande introuvable.'; end if;
+  update public.customer_orders set status = 'invoiced', invoice_id = p_invoice, updated_at = now() where id = p_order;
+  if o.customer_id is not null then
+    select * into c from public.customers where id = o.customer_id;
+    v_cid := c.client_id;
+    if v_cid is null then
+      select id into v_cid from public.clients where lower(email) = lower(o.email) limit 1;
+      if v_cid is null then
+        insert into public.clients (name, email, phone)
+        values (coalesce(nullif(btrim(o.name), ''), o.email), lower(o.email), o.phone) returning id into v_cid;
+      end if;
+      if exists (select 1 from public.customers x where x.client_id = v_cid and x.id <> c.id) then
+        v_cid := null;   -- fiche déjà reliée à un autre compte : on ne touche à rien
+      else
+        update public.customers set client_id = v_cid, linked_at = now() where id = c.id;
+      end if;
+    end if;
+    if v_cid is not null then update public.invoices set client_id = v_cid where id = p_invoice; end if;
+  end if;
+  return jsonb_build_object('client_id', v_cid);
+end $$;
+
+revoke all on function public.customer_submit_order(jsonb, text)       from public, anon;
+revoke all on function public.customer_update_order(uuid, jsonb, text) from public, anon;
+revoke all on function public.customer_cancel_order(uuid)              from public, anon;
+revoke all on function public.me_orders()                               from public, anon;
+revoke all on function public.admin_invoice_customer_order(uuid, uuid)  from public, anon;
+grant execute on function public.customer_submit_order(jsonb, text)       to authenticated;
+grant execute on function public.customer_update_order(uuid, jsonb, text) to authenticated;
+grant execute on function public.customer_cancel_order(uuid)              to authenticated;
+grant execute on function public.me_orders()                               to authenticated;
+grant execute on function public.admin_invoice_customer_order(uuid, uuid)  to authenticated;
+
 -- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------

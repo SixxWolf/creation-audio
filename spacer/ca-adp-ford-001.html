@@ -24,7 +24,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/tokens.css?v=3">
 <link rel="stylesheet" href="../assets/site.css?v=6">
-<link rel="stylesheet" href="../assets/boutique.css?v=36">
+<link rel="stylesheet" href="../assets/boutique.css?v=39">
 <!-- spacers:head — généré par tools/build-spacer-pages.js (ne pas éditer à la main) -->
 <script>window.CA_SPACER_PAGES=["ca-adp-hykia-001","ca-adp-honda-001","ca-adp-ford-001","ca-adp-gm-001","ca-adp-mitsu-001","ca-adp-8-001","ca-adp-ford-002","ca-adp-525-001","ca-adp-4-001"];</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Product","name":"Spacer 6,5\" Ford – remplace PAC FSB1502 | CA-ADP-FORD-001","sku":"CA-ADP-FORD-001","mpn":"CA-ADP-FORD-001","brand":{"@type":"Brand","name":"Création Audio"},"category":"Adaptateur de haut-parleur","url":"https://creationaudio.ca/spacer/ca-adp-ford-001.html","description":"Adaptateur pour installer une paire de haut-parleurs de 6,5 po dans plusieurs Ford de 2015 à 2018 : F-150, Super Duty F-250 et F-350, Edge, Fusion, Mustang et Transit. Selon le modèle, il va dans les portes avant, arrière ou les deux : l'emplacement est indiqué dans le tableau de compatibilité. Imprimé en 3D au Québec en ABS, un plastique qui supporte la chaleur d'un habitacle en plein été et l'humidité des portières. Vendu par paire.","image":["https://cqfmvdknppscazfynoiy.supabase.co/storage/v1/object/public/products/spacer/1787498290057-uovmwz.jpg"],"offers":{"@type":"Offer","url":"https://creationaudio.ca/spacer/ca-adp-ford-001.html","priceCurrency":"CAD","price":"24.99","availability":"https://schema.org/InStock","itemCondition":"https://schema.org/NewCondition","seller":{"@type":"Organization","name":"Création Audio"}}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Accueil","item":"https://creationaudio.ca/"},{"@type":"ListItem","position":2,"name":"Spacers","item":"https://creationaudio.ca/spacers.html"},{"@type":"ListItem","position":3,"name":"CA-ADP-FORD-001","item":"https://creationaudio.ca/spacer/ca-adp-ford-001.html"}]}]}</script>
@@ -82,11 +82,17 @@
   <div class="cart-items" id="cart-items"></div>
   <div class="cart-foot">
     <div class="cart-line cart-line-total"><span>Total estimé</span><span id="cart-total">0,00 $</span></div>
+    <div class="cart-acct" id="cart-acct" hidden>
+      <p class="cart-editbar" id="cart-editbar" hidden>Modification de <b id="cart-edit-num"></b> <button type="button" id="cart-edit-cancel">Annuler</button></p>
+      <textarea id="cart-note-in" class="cart-note-in" rows="2" maxlength="500" aria-label="Note pour Création Audio" placeholder="Note (facultatif) : tes disponibilités pour la cueillette…"></textarea>
+      <button type="button" class="cart-order cart-send" id="cart-send">Envoyer ma commande</button>
+    </div>
     <button type="button" class="cart-order" id="cart-order">Copier ma liste &amp; écrire sur Messenger</button>
     <button type="button" class="cart-order cart-email" id="cart-email">Écrire par courriel</button>
     <p class="cart-msg" id="cart-msg" role="status"></p>
     <button type="button" class="cart-clear" id="cart-clear">Vider le panier</button>
     <p class="cart-note">Aucun paiement en ligne — on confirme la dispo et un ramassage à Québec.</p>
+    <p class="cart-login" id="cart-login">Commander en ligne&nbsp;? <a href="../compte.html">Connecte-toi</a></p>
   </div>
 </aside>
 
@@ -164,7 +170,8 @@
 <script src="../assets/supabase-config.js?v=1"></script>
 <script src="../assets/supabase-client.js?v=1"></script>
 <script src="../assets/nav.js?v=3"></script>
-<script src="../assets/spacer-catalog.js?v=9"></script>
-<script src="../assets/spacers.js?v=12"></script>
+<script src="../assets/commande-client.js?v=1"></script>
+<script src="../assets/spacer-catalog.js?v=10"></script>
+<script src="../assets/spacers.js?v=13"></script>
 </body>
 </html>

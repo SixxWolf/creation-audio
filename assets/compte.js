@@ -276,15 +276,89 @@
   });
 
   /* ---- Mes commandes ---- */
-  var ordersEl = $('#acct-orders');
+  // onglet Commandes = commandes en ligne (#acct-cmds) puis factures (#acct-invs)
+  var tabEl = $('#acct-orders'), cmdEl = null, ordersEl = null, myOrders = [];
   function loadOrders() {
-    ordersEl.innerHTML = '<p class="acct-empty">Chargement…</p>';
-    if (!acct.linked) { renderOrders(); return; }
-    sb.rpc('me_invoices').then(function (res) {
-      if (res.error) { ordersEl.innerHTML = '<p class="acct-empty">Impossible de charger tes factures. Réessaie plus tard.</p>'; return; }
-      invoices = res.data || [];
-      renderOrders();
-    }, function () { ordersEl.innerHTML = '<p class="acct-empty">Erreur réseau — réessaie.</p>'; });
+    tabEl.innerHTML = '<div id="acct-cmds"></div><div id="acct-invs"><p class="acct-empty">Chargement…</p></div>';
+    cmdEl = $('#acct-cmds'); ordersEl = $('#acct-invs');
+    sb.rpc('me_orders').then(function (res) {
+      myOrders = (!res.error && res.data) || [];
+      renderCmds();
+      if (!acct.linked) { renderOrders(); return; }
+      return sb.rpc('me_invoices').then(function (r2) {
+        if (r2.error) { ordersEl.innerHTML = '<p class="acct-empty">Impossible de charger tes factures. Réessaie plus tard.</p>'; return; }
+        invoices = r2.data || [];
+        renderOrders();
+      });
+    }).then(null, function () { ordersEl.innerHTML = '<p class="acct-empty">Erreur réseau — réessaie.</p>'; });
+  }
+
+  /* ---- commandes en ligne (envoyées depuis la boutique / la page spacers) ---- */
+  var ORD_ST = { 'new': 'Reçue', preparing: 'En préparation', ready: 'Prête', invoiced: 'Facturée', cancelled: 'Annulée' };
+  function renderCmds() {
+    if (!myOrders.length) { cmdEl.innerHTML = ''; return; }
+    cmdEl.innerHTML = '<h2 class="acct-h">Commandes en ligne</h2><div class="ord-list">' + myOrders.map(function (o) {
+      var open = o.status !== 'invoiced' && o.status !== 'cancelled';
+      var pill = '<span class="ord-pill st-' + esc(o.status) + '">' + esc(ORD_ST[o.status] || o.status) +
+        (o.status === 'invoiced' && o.invoice_number ? ' · ' + esc(o.invoice_number) : '') + '</span>';
+      var lines = (o.lines || []).map(function (l) {
+        var bo = open ? (+l.qty_to_order || 0) : 0;
+        return '<li>' + swatch(l.hex, (l.name || '') + ' ' + (l.meta || '')) +
+          '<span class="ol-tx"><b>' + esc(l.name || '') + '</b>' + (l.meta ? '<small>' + esc(l.meta) + '</small>' : '') +
+            (bo ? '<em class="ol-pend">' + bo + ' à commander · délai</em>' : '') + '</span>' +
+          '<span class="ol-q">' + (+l.qty) + ' × ' + money(l.unit_price) + '</span>' +
+          '<span class="ol-t">' + money(l.line_total) + '</span></li>';
+      }).join('');
+      return '<details class="ord' + (o.status === 'cancelled' ? ' is-off' : '') + '" data-oid="' + esc(o.id) + '"' + (o.status === 'new' ? ' open' : '') + '>' +
+        '<summary>' +
+          '<span class="ord-main"><b class="ord-no">' + esc(o.number) + '</b>' +
+            '<span class="ord-meta">' + esc(fmtDate(o.created_at)) + ' · ' + plural(itemsOf(o), 'article', 'articles') + '</span></span>' +
+          pill + '<span class="ord-total">' + money(o.total) + '</span><span class="ord-chev" aria-hidden="true"></span>' +
+        '</summary>' +
+        '<div class="ord-body">' +
+          '<ul class="ord-lines">' + lines + '</ul>' +
+          '<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>' + money(o.total) + '</span></div></div>' +
+          (o.note ? '<p class="ord-note"><span>Note</span>' + esc(o.note) + '</p>' : '') +
+          (o.status === 'new' ? '<div class="ord-acts"><button class="acct-btn ord-edit" type="button">Modifier</button>' +
+            '<button class="acct-btn acct-btn-danger ord-cancel" type="button">Annuler la commande</button></div>' : '') +
+        '</div>' +
+      '</details>';
+    }).join('') + '</div>' + (invoices.length || acct.linked ? '<h2 class="acct-h">Factures</h2>' : '');
+    $$('.ord', cmdEl).forEach(function (el) {
+      var o = myOrders.filter(function (x) { return String(x.id) === el.getAttribute('data-oid'); })[0];
+      var ed = $('.ord-edit', el), ca = $('.ord-cancel', el);
+      if (ed) ed.addEventListener('click', function () { editOrder(o); });
+      if (ca) ca.addEventListener('click', function () { cancelOrder(o, ca); });
+    });
+  }
+  // « Modifier » : la commande repart dans le panier (boutique ou spacers) ; l'envoi la met à jour
+  function editOrder(o) {
+    var lines = (o.lines || []).filter(function (l) { return l.product_id; });
+    var spacersOnly = lines.length && lines.every(function (l) { return l.ptype === 'spacer'; });
+    var key = spacersOnly ? 'ca_v2_cart_spacers' : 'ca_v2_cart', cur = {};
+    try { cur = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) {}
+    if (Object.keys(cur).length && !window.confirm('Ton panier actuel sera remplacé par la commande ' + o.number + '. Continuer ?')) return;
+    var cart = {};
+    lines.forEach(function (l) {
+      if (spacersOnly) { cart[l.product_id] = { id: l.product_id, qty: +l.qty }; return; }
+      if (l.ptype === 'spacer') return;
+      var t = l.kind === 'unit' ? 'accessory' : l.kind;
+      cart[l.product_id + '|' + t] = { id: l.product_id, type: t, qty: +l.qty };
+    });
+    try {
+      localStorage.setItem(key, JSON.stringify(cart));
+      localStorage.setItem('ca_v2_order_edit', JSON.stringify({ id: o.id, number: o.number, at: Date.now() }));
+    } catch (e) {}
+    location.href = spacersOnly ? 'spacers.html' : 'boutique.html#/';
+  }
+  function cancelOrder(o, btn) {
+    if (!window.confirm('Annuler la commande ' + o.number + ' ?')) return;
+    btn.disabled = true;
+    sb.rpc('customer_cancel_order', { p_id: o.id }).then(function (res) {
+      if (res.error) { btn.disabled = false; window.alert(res.error.message || 'Annulation impossible.'); return; }
+      if (sb.functions) sb.functions.invoke('customer-order-notify', { body: { order_id: o.id, event: 'cancelled' } }).then(null, function () {});
+      loadOrders();
+    }, function () { btn.disabled = false; });
   }
   function pendingOf(inv) {
     return (inv.lines || []).reduce(function (s, l) { return s + (+l.qty_pending || 0); }, 0);
@@ -294,6 +368,8 @@
   }
   function renderOrders() {
     if (!acct.linked) {
+      // déjà une commande en ligne : la facture viendra avec (compte relié à la facturation)
+      if (myOrders.length) { ordersEl.innerHTML = ''; return; }
       ordersEl.innerHTML = '<div class="acct-empty"><p>Tes factures apparaîtront ici dès qu\'on aura relié ton compte. Déjà client&nbsp;? ' +
         askHtml('Relier mon compte', 'Bonjour,\n\nJ\'ai créé mon compte sur creationaudio.ca avec le courriel ' + (acct.email || '') +
           '. Pouvez-vous le relier à mes achats ?\n\nMerci !') + '</p></div>';

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=60">
+<link rel="stylesheet" href="assets/admin.css?v=61">
 <link rel="stylesheet" href="assets/facture.css?v=25">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
@@ -1049,17 +1049,24 @@
     <section class="tabpanel" data-panel="commandes" role="tabpanel" hidden>
       <div class="panel-head">
         <div>
-          <h1>Commandes dealer</h1>
-          <p class="muted">Envoyées depuis le portail ou saisies ici.</p>
+          <h1>Commandes</h1>
+          <p class="muted">Portail dealer et commandes en ligne des clients.</p>
         </div>
         <span class="grow"></span>
-        <div class="fx-seg" role="group" aria-label="Filtre des commandes">
+        <div class="fx-seg" role="group" aria-label="Filtre des commandes" data-co-dealer>
           <button type="button" class="fx-seg-btn co-filter is-active" data-f="open">En cours <span class="co-filter-n" id="co-open-n"></span></button>
           <button type="button" class="fx-seg-btn co-filter" data-f="all">Toutes</button>
         </div>
         <button class="btn btn-ghost btn-sm" id="co-refresh" type="button" data-ic="refresh">Actualiser</button>
-        <button class="btn btn-accent" id="co-new" type="button" data-ic="plus">Nouvelle commande</button>
+        <button class="btn btn-accent" id="co-new" type="button" data-ic="plus" data-co-dealer>Nouvelle commande</button>
       </div>
+
+      <div class="inv-subtabs" role="tablist" aria-label="Commandes">
+        <button type="button" class="inv-subtab is-active" role="tab" data-cosub="dealers">Dealers</button>
+        <button type="button" class="inv-subtab" role="tab" data-cosub="clients">Clients en ligne <b class="nav-count cc-n" id="cc-new-n" hidden>0</b></button>
+      </div>
+
+      <div id="co-dealers">
 
       <!-- Saisie manuelle (demande reçue par message) : visible dans « Mes commandes » du dealer -->
       <form class="editor" id="cof-editor" hidden>
@@ -1091,6 +1098,16 @@
 
       <div id="co-print"></div>
       <div class="co-list" id="co-list"><p class="muted">Chargement…</p></div>
+      </div>
+
+      <!-- Commandes en ligne des clients (compte.html -> boutique / spacers) : cms-commandes-clients.js -->
+      <div id="cc-wrap" hidden>
+        <div class="cc-bar"><div class="fx-seg" role="group" aria-label="Filtre des commandes clients">
+          <button type="button" class="fx-seg-btn cc-filter is-active" data-f="open">En cours</button>
+          <button type="button" class="fx-seg-btn cc-filter" data-f="all">Toutes</button>
+        </div></div>
+        <div class="co-list" id="cc-list"><p class="muted">Chargement…</p></div>
+      </div>
     </section>
 
     <section class="tabpanel" data-panel="facturation" role="tabpanel" hidden>
@@ -1118,7 +1135,7 @@
       <div class="fx-edit-banner fx-order-banner no-print" id="fx-order-banner" role="status" hidden>
         <span class="fx-edit-ic" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3.5h6v3H9z"/><path d="M9 5H5.5v15.5h13V5H15"/><path d="M8.5 11.5h7M8.5 15.5h4.5"/></svg></span>
         <div class="fx-edit-txt">
-          <b>Facture de la commande dealer <span id="fx-order-num"></span></b>
+          <b>Facture de la commande <span id="fx-order-num"></span></b>
           <span>Prix de la commande conservés. À l'enregistrement, la commande passe à « Facturée ».</span>
         </div>
         <button class="btn btn-ghost btn-sm" id="fx-order-detach" type="button">Détacher</button>
@@ -1738,9 +1755,10 @@
 <script src="assets/cms-reserves.js?v=1"></script>
 <script src="assets/cms-dealers.js?v=4"></script>
 <script src="assets/cms-clients.js?v=6"></script>
-<script src="assets/cms-facturation.js?v=38"></script>
+<script src="assets/cms-facturation.js?v=39"></script>
 <script src="assets/cms-historique.js?v=12"></script>
-<script src="assets/cms-commandes.js?v=8"></script>
+<script src="assets/cms-commandes-clients.js?v=2"></script>
+<script src="assets/cms-commandes.js?v=9"></script>
 <script src="assets/cms-statistiques.js?v=9"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>

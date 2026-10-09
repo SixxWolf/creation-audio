@@ -111,6 +111,14 @@
   function hasSpool(p) { return p.sell_price != null; }
   function hasRefill(p) { return p.sell_price_2 != null; }
   function offered(p, type) { return type === 'refill' ? hasRefill(p) : hasSpool(p); }
+  // client connecté (Mon compte, commande-client.js) : il peut commander au-delà du stock
+  // (la part en trop est « à commander » : délai annoncé dans la confirmation)
+  var BO_MAX = 99;
+  function canBackorder() { return !!(window.CA && window.CA.custOrder && window.CA.custOrder.signedIn()); }
+  function boNote(stock, qty) {
+    var n = canBackorder() && stock != null ? qty - Math.max(0, stock | 0) : 0;
+    return n > 0 ? '<span class="buy-bo">' + n + ' à commander · délai à prévoir</span>' : '';
+  }
   function stockOf(p, type) { return type === 'refill' ? (p.qty_2 | 0) : (p.qty | 0); }
   function baseOf(p, type) { return type === 'refill' ? p.sell_price_2 : p.sell_price; }
   function tiersOf(p, type) { return type === 'refill' ? p.tiers_2 : p.tiers; }
@@ -321,6 +329,7 @@
       dataReady = true;
       applyRoute();          // honore l'URL courante (lien direct / retour navigateur)
       renderCart();
+      if (canBackorder() && window.CA.custOrder.editing()) openCart();
     }, function () { failCatalog('Erreur réseau — recharge la page.'); });
   }
   function failCatalog(msg) {
@@ -631,14 +640,16 @@
       }).join('') + '</div></div>';
   }
   function buySumText() {
-    if (curQty < 2 && unitNow() >= (+baseOf(curColor, curType) || 0)) return '';
+    var bo = boNote(stockOf(curColor, curType), curQty);
+    if (curQty < 2 && unitNow() >= (+baseOf(curColor, curType) || 0)) return bo;
     var base = +baseOf(curColor, curType) || 0, u = unitNow();
-    return curQty + ' × ' + money(u) + ' = <b>' + money(u * curQty) + '</b>' + (u < base ? ' <em>· rabais quantité</em>' : '');
+    return curQty + ' × ' + money(u) + ' = <b>' + money(u * curQty) + '</b>' + (u < base ? ' <em>· rabais quantité</em>' : '') + bo;
   }
 
   function renderConfig() {
     var p = curColor, m = curMat;
     var stock = stockOf(p, curType), out = !offered(p, curType) || stock <= 0;
+    var bo = out && offered(p, curType) && canBackorder();   // rupture, mais commandable (client connecté)
     var price = baseOf(p, curType);
     curImgs = imagesFor(p);
     if (curImg >= curImgs.length) curImg = 0;
@@ -717,16 +728,16 @@
           '</div>' +
 
           '<div class="cfg-buy">' +
-            (out ? '' :
+            (out && !bo ? '' :
             '<div class="qty">' +
               '<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>' +
-              '<input type="number" class="q-val" aria-label="Quantité" min="1" max="' + stock + '" value="' + curQty + '" inputmode="numeric">' +
+              '<input type="number" class="q-val" aria-label="Quantité" min="1" max="' + (canBackorder() ? BO_MAX : stock) + '" value="' + curQty + '" inputmode="numeric">' +
               '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
             '</div>') +
-            '<button type="button" class="btn-add"' + (out ? ' disabled' : '') + '>' + IC.cart + (out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? 'Commander · délai' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + buySumText() + '</p>' +
-          (out && offered(p, curType) ? notifyHtml(filNotify(p)) : '') +
+          (out && !bo && offered(p, curType) ? notifyHtml(filNotify(p)) : '') +
 
           '<ul class="pdp-assure">' +
             '<li>' + IC.pin + 'Ramassage local à Québec, sur rendez-vous</li>' +
@@ -918,7 +929,7 @@
     if (swFocus) { swFocus = false; var act = $('.sw.is-active', configEl); if (act) act.focus(); }
 
     var qv = $('.q-val', configEl), sum = $('.buy-sum', configEl), tiersBox = $('.js-tiers', configEl);
-    var maxStock = stockOf(curColor, curType);
+    var maxStock = canBackorder() ? BO_MAX : stockOf(curColor, curType);
     function refreshBuy() { sum.innerHTML = buySumText(); if (tiersBox) tiersBox.innerHTML = tierGridHtml(); updateBuybar(); }
     onCartChange = refreshBuy;   // le panier change (ajout, quantité, retrait) -> palier de la fiche à jour
     function setQ(n) {
@@ -1071,9 +1082,9 @@
       }).join('') + '</div></div>';
   }
   function accBuySum() {
-    var u = accUnitNow();
-    if (accQty < 2 && u >= curAcc.price) return '';
-    return accQty + ' × ' + money(u) + ' = <b>' + money(u * accQty) + '</b>' + (u < curAcc.price ? ' <em>· rabais quantité</em>' : '');
+    var u = accUnitNow(), bo = boNote(curAcc.qty, accQty);
+    if (accQty < 2 && u >= curAcc.price) return bo;
+    return accQty + ' × ' + money(u) + ' = <b>' + money(u * accQty) + '</b>' + (u < curAcc.price ? ' <em>· rabais quantité</em>' : '') + bo;
   }
   function accMediaHtml() {
     var a = curAcc, imgs = a.imgs || [], u = imgs[accImg];
@@ -1091,7 +1102,7 @@
   function accNotify(a) { return { id: a.id, kind: 'item', what: a.name, the: '« ' + a.name + ' »', uid: 'acc' }; }
 
   function renderAcc() {
-    var a = curAcc, out = accOut(a), c = accCatOf(a);
+    var a = curAcc, out = accOut(a), c = accCatOf(a), bo = out && canBackorder();
     if (accImg >= (a.imgs || []).length) accImg = 0;
     var tabs = [];
     var paras = String(a.longDesc || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -1117,16 +1128,16 @@
           '<div class="js-tiers">' + accTierGridHtml() + '</div>' +
           (a.desc ? '<p class="pdp-lede">' + esc(a.desc) + '</p>' : '') +
           '<div class="cfg-buy">' +
-            (out ? '' :
+            (out && !bo ? '' :
             '<div class="qty">' +
               '<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>' +
-              '<input type="number" class="q-val" aria-label="Quantité" min="1"' + (a.qty != null ? ' max="' + a.qty + '"' : '') + ' value="' + accQty + '" inputmode="numeric">' +
+              '<input type="number" class="q-val" aria-label="Quantité" min="1"' + (a.qty != null && !canBackorder() ? ' max="' + a.qty + '"' : '') + ' value="' + accQty + '" inputmode="numeric">' +
               '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
             '</div>') +
-            '<button type="button" class="btn-add"' + (out ? ' disabled' : '') + '>' + IC.cart + (out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? 'Commander · délai' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + accBuySum() + '</p>' +
-          (out ? notifyHtml(accNotify(a)) : '') +
+          (out && !bo ? notifyHtml(accNotify(a)) : '') +
           '<ul class="pdp-assure">' +
             '<li>' + IC.pin + 'Ramassage local à Québec, sur rendez-vous</li>' +
             '<li>' + IC.chat + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
@@ -1166,7 +1177,7 @@
     onCartChange = refresh;
     function setQ(n) {
       if (isNaN(n) || n < 1) n = 1;
-      if (a.qty != null && a.qty > 0 && n > a.qty) { n = a.qty; toast('Maximum ' + a.qty + ' en stock.'); }
+      if (!canBackorder() && a.qty != null && a.qty > 0 && n > a.qty) { n = a.qty; toast('Maximum ' + a.qty + ' en stock.'); }
       accQty = n; if (qv) qv.value = n; refresh();
     }
     if (qv) {
@@ -1200,11 +1211,12 @@
     var show = !!curColor && !screenProduct.hidden && narrow.matches && !buyInView;
     if (curColor) {
       var out = !offered(curColor, curType) || stockOf(curColor, curType) <= 0;
+      var bo = out && offered(curColor, curType) && canBackorder();
       bbSw.style.background = swatchBg(curColor);
       bbName.textContent = curColor.name;
       bbMeta.textContent = money(unitNow()) + (curQty > 1 ? ' × ' + curQty : '') + ' · ' + fmtName(curType) + ' · ' + curMat.name;
-      bbBtn.textContent = out ? 'M\'aviser' : 'Ajouter';
-      bbBtn.classList.toggle('is-notify', out);
+      bbBtn.textContent = bo ? 'Commander' : out ? 'M\'aviser' : 'Ajouter';
+      bbBtn.classList.toggle('is-notify', out && !bo);
     }
     buybar.hidden = !show;
     document.body.classList.toggle('has-buybar', show);
@@ -1303,13 +1315,14 @@
     return tierPrice(baseOf(p, it.type), tiersOf(p, it.type), groupQty(p, it.type));
   }
   function maxOf(it) {
+    if (canBackorder()) return BO_MAX;
     if (it.type === 'accessory') { var a = accById[it.id]; return a && a.qty != null ? a.qty : Infinity; }
     var p = byId[it.id]; return p ? stockOf(p, it.type) : it.qty;
   }
 
   function addToCart(id, type, qty) {
     var p = byId[id]; if (!p) return;
-    var max = stockOf(p, type), k = keyOf(id, type), cur = cart[k] ? cart[k].qty : 0;
+    var max = canBackorder() ? BO_MAX : stockOf(p, type), k = keyOf(id, type), cur = cart[k] ? cart[k].qty : 0;
     if (cur >= max) { toast('Maximum ' + max + ' en stock.'); return; }
     var next = Math.min(cur + (qty || 1), max);
     cart[k] = { id: id, type: type, qty: next };
@@ -1322,7 +1335,7 @@
     var a = accById[id]; if (!a) return;
     var k = keyOf(id, 'accessory');
     var cur = cart[k] ? cart[k].qty : 0;
-    var max = (a.qty == null ? Infinity : a.qty);
+    var max = canBackorder() ? BO_MAX : (a.qty == null ? Infinity : a.qty);
     if (cur >= max) { toast('Maximum ' + max + ' en stock.'); return; }
     var next = Math.min(cur + (qty || 1), max);
     cart[k] = { id: id, type: 'accessory', qty: next };
@@ -1364,6 +1377,14 @@
     return url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:' + esc(swatchBg(m)) + '"></span>';
   }
 
+  // ligne au-delà du stock (client connecté) : « N à commander »
+  function boTag(it) {
+    if (!canBackorder()) return '';
+    var m = metaOf(it); if (!m) return '';
+    var st = it.type === 'accessory' ? m.qty : stockOf(m, it.type);
+    var n = st == null ? 0 : it.qty - Math.max(0, st | 0);
+    return n > 0 ? ' · <span class="citem-bo">' + n + ' à commander</span>' : '';
+  }
   function renderCart() {
     var n = count();
     cartCount.textContent = n;
@@ -1385,7 +1406,7 @@
               '<div class="citem-name">' + esc(m.name) + '</div>' +
               '<div class="citem-type">' + (it.type === 'accessory' ? esc(m.cat || 'Accessoire')
                 : esc((m.brand ? m.brand + ' ' : '') + (m.material || '')) + ' · ' + typeLabel(it)) +
-                ' · <span class="citem-unit">' + money(unitOf(it)) + '/u</span></div>' +
+                ' · <span class="citem-unit">' + money(unitOf(it)) + '/u</span>' + boTag(it) + '</div>' +
               '<div class="citem-qty">' +
                 '<button type="button" class="cq-minus" aria-label="Retirer un">&minus;</button>' +
                 '<input type="number" class="cq-val" aria-label="Quantité" min="0" ' + (isFinite(max) ? 'max="' + max + '" ' : '') + 'value="' + it.qty + '" inputmode="numeric">' +
@@ -1410,6 +1431,7 @@
     if (onCartChange && (lastScreen === 'product' || lastScreen === 'acc')) onCartChange();
     orderBtn.classList.toggle('is-disabled', n === 0);
     if (emailBtn) emailBtn.classList.toggle('is-disabled', n === 0);
+    refreshAcctUi();
   }
 
   /* ---- animation « vol vers le panier » ---- */
@@ -1491,6 +1513,41 @@
     cartMsg.textContent = 'Ton logiciel de courriel s\'ouvre avec ta liste.';
   });
 
+  /* ---------- commande en ligne (client connecté — assets/commande-client.js) ----------
+     Prix recalculés par le serveur (même règle que ce panier). Les articles au-delà du
+     stock partent « à commander ». Confirmation par courriel (customer-order-notify). */
+  var acctBox = $('#cart-acct'), sendBtn = $('#cart-send'), noteIn = $('#cart-note-in'),
+      editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login');
+  function refreshAcctUi() {
+    var on = canBackorder(), ed = on ? window.CA.custOrder.editing() : null;
+    if (acctBox) acctBox.hidden = !on;
+    if (loginP) loginP.hidden = on;
+    orderBtn.classList.toggle('cart-email', on);   // Messenger passe en secondaire
+    if (editBar) { editBar.hidden = !ed; if (ed && editNum) editNum.textContent = ed.number; }
+    if (sendBtn) {
+      sendBtn.textContent = ed ? 'Enregistrer les modifications' : 'Envoyer ma commande';
+      sendBtn.classList.toggle('is-disabled', count() === 0);
+    }
+  }
+  if (sendBtn) sendBtn.addEventListener('click', function () {
+    if (!count() || sendBtn.disabled) return;
+    var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
+    sendBtn.disabled = true; cartMsg.textContent = 'Envoi…';
+    window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
+      sendBtn.disabled = false;
+      cart = {}; saveCart(); if (noteIn) noteIn.value = '';
+      renderCart();
+      cartMsg.innerHTML = '✓ Commande <b>' + esc(r.number) + '</b> ' + (r.updated ? 'modifiée' : 'envoyée') +
+        (r.has_backorder ? ' · certains articles sont à commander (délai).' : '.') +
+        ' Confirmation par courriel. <a href="compte.html#/commandes">Mes commandes</a>';
+    }, function (err) { sendBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Envoi impossible. Réessaie.'; });
+  });
+  if (editCancel) editCancel.addEventListener('click', function () {
+    window.CA.custOrder.cancelEdit();
+    cart = {}; saveCart(); renderCart();
+    cartMsg.textContent = 'Modification annulée : ta commande reste telle quelle.';
+  });
+
   /* ---------- toast ---------- */
   var toastEl = $('#toast'), toastT;
   function toast(msg) {
@@ -1526,7 +1583,7 @@
       if (!changed) return;
       // panier : ramène chaque ligne au stock réellement disponible
       var trimmed = [];
-      Object.keys(cart).forEach(function (k) {
+      if (!canBackorder()) Object.keys(cart).forEach(function (k) {
         var it = cart[k], max = maxOf(it);
         if (it.qty > max) {
           var m = metaOf(it); trimmed.push(m ? m.name : '');

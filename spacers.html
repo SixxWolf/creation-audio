@@ -24,7 +24,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
 <link rel="stylesheet" href="assets/site.css?v=6">
-<link rel="stylesheet" href="assets/boutique.css?v=36">
+<link rel="stylesheet" href="assets/boutique.css?v=39">
 <!-- spacers:head — généré par tools/build-spacer-pages.js (ne pas éditer à la main) -->
 <script>window.CA_SPACER_PAGES=["ca-adp-hykia-001","ca-adp-honda-001","ca-adp-ford-001","ca-adp-gm-001","ca-adp-mitsu-001","ca-adp-8-001","ca-adp-ford-002","ca-adp-525-001","ca-adp-4-001"];</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"ItemList","name":"Spacers et adaptateurs de haut-parleurs — Création Audio","itemListElement":[{"@type":"ListItem","position":1,"url":"https://creationaudio.ca/spacer/ca-adp-hykia-001.html","name":"CA-ADP-HYKIA-001"},{"@type":"ListItem","position":2,"url":"https://creationaudio.ca/spacer/ca-adp-honda-001.html","name":"CA-ADP-HONDA-001"},{"@type":"ListItem","position":3,"url":"https://creationaudio.ca/spacer/ca-adp-ford-001.html","name":"CA-ADP-FORD-001"},{"@type":"ListItem","position":4,"url":"https://creationaudio.ca/spacer/ca-adp-gm-001.html","name":"CA-ADP-GM-001"},{"@type":"ListItem","position":5,"url":"https://creationaudio.ca/spacer/ca-adp-mitsu-001.html","name":"CA-ADP-MITSU-001"},{"@type":"ListItem","position":6,"url":"https://creationaudio.ca/spacer/ca-adp-8-001.html","name":"CA-ADP-8-001"},{"@type":"ListItem","position":7,"url":"https://creationaudio.ca/spacer/ca-adp-ford-002.html","name":"CA-ADP-FORD-002"},{"@type":"ListItem","position":8,"url":"https://creationaudio.ca/spacer/ca-adp-525-001.html","name":"CA-ADP-525-001"},{"@type":"ListItem","position":9,"url":"https://creationaudio.ca/spacer/ca-adp-4-001.html","name":"CA-ADP-4-001"}]}</script>
@@ -92,11 +92,17 @@
   <div class="cart-items" id="cart-items"></div>
   <div class="cart-foot">
     <div class="cart-line cart-line-total"><span>Total estimé</span><span id="cart-total">0,00 $</span></div>
+    <div class="cart-acct" id="cart-acct" hidden>
+      <p class="cart-editbar" id="cart-editbar" hidden>Modification de <b id="cart-edit-num"></b> <button type="button" id="cart-edit-cancel">Annuler</button></p>
+      <textarea id="cart-note-in" class="cart-note-in" rows="2" maxlength="500" aria-label="Note pour Création Audio" placeholder="Note (facultatif) : tes disponibilités pour la cueillette…"></textarea>
+      <button type="button" class="cart-order cart-send" id="cart-send">Envoyer ma commande</button>
+    </div>
     <button type="button" class="cart-order" id="cart-order">Copier ma liste &amp; écrire sur Messenger</button>
     <button type="button" class="cart-order cart-email" id="cart-email">Écrire par courriel</button>
     <p class="cart-msg" id="cart-msg" role="status"></p>
     <button type="button" class="cart-clear" id="cart-clear">Vider le panier</button>
     <p class="cart-note">Aucun paiement en ligne — on confirme la dispo et un ramassage à Québec.</p>
+    <p class="cart-login" id="cart-login">Commander en ligne&nbsp;? <a href="compte.html">Connecte-toi</a></p>
   </div>
 </aside>
 
@@ -174,7 +180,8 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=3"></script>
-<script src="assets/spacer-catalog.js?v=9"></script>
-<script src="assets/spacers.js?v=12"></script>
+<script src="assets/commande-client.js?v=1"></script>
+<script src="assets/spacer-catalog.js?v=10"></script>
+<script src="assets/spacers.js?v=13"></script>
 </body>
 </html>
