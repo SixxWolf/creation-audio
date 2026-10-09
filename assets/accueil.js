@@ -76,11 +76,12 @@
     if (cs.length === 2) return [cs[0], mix(cs[0], cs[1]), cs[1]];
     return cs;
   }
-  // fond d'une pastille : uni, ou moitié/moitié pour les bicolores (Silk)
-  function swatchBg(cs) {
-    if (cs.length === 1) return cs[0];
-    if (cs.length === 2) return 'linear-gradient(135deg,' + cs[0] + ' 50%,' + cs[1] + ' 50%)';
-    return 'conic-gradient(' + cs[0] + ' 0 33.3%,' + cs[1] + ' 0 66.6%,' + cs[2] + ' 0)';
+  // fond d'une pastille : uni, ou moitié/moitié pour les bicolores (Silk) ; paillettes par-dessus (Sparkle)
+  function swatchBg(p) {
+    var cs = p._cs, bg = cs.length === 1 ? cs[0]
+      : cs.length === 2 ? 'linear-gradient(135deg,' + cs[0] + ' 50%,' + cs[1] + ' 50%)'
+      : 'conic-gradient(' + cs[0] + ' 0 33.3%,' + cs[1] + ' 0 66.6%,' + cs[2] + ' 0)';
+    return finishOf(p.material) === 'sparkle' ? 'var(--sparkle), ' + bg : bg;
   }
   // tri « spectre » : teintes vives d'abord (rouge → violet), puis neutres du clair au foncé
   function hueSort(a, b) {
@@ -93,6 +94,7 @@
   }
   function finishOf(material) {
     var m = String(material || '').toLowerCase();
+    if (/sparkle|galaxy|glitter|paillet/.test(m)) return 'sparkle';
     if (/silk|soie/.test(m)) return 'silk';
     if (/matte|mat\b/.test(m)) return 'matte';
     if (/translucent|transparent|clear/.test(m)) return 'trans';
@@ -185,7 +187,7 @@
     if (!rail || !items.length) return;
     rail.innerHTML = items.map(function (p) {
       var label = p.name + (p.material ? ' — ' + p.material : '');
-      return '<button type="button" class="sw" tabindex="-1" aria-pressed="false" style="--sw:' + esc(swatchBg(p._cs)) +
+      return '<button type="button" class="sw" tabindex="-1" aria-pressed="false" style="--sw:' + esc(swatchBg(p)) +
         '" aria-label="' + esc(label) + '" title="' + esc(label) + '"></button>';
     }).join('');
     select(Math.max(0, Math.min(startIdx || 0, items.length - 1)), false);
@@ -284,7 +286,7 @@
 
   function matCard(g) {
     var band = g.stock.slice().sort(hueSort).slice(0, 28).map(function (p, i) {
-      return '<i style="--s:' + esc(swatchBg(p._cs)) + ';--i:' + i + '"></i>';
+      return '<i style="--s:' + esc(swatchBg(p)) + ';--i:' + i + '"></i>';
     }).join('');
     var mins = g.stock.map(fromPrice).filter(function (v) { return v != null; });
     var min = mins.length ? Math.min.apply(null, mins) : null;
@@ -323,11 +325,11 @@
       var url = publicUrl(p.image_path), fp = fromPrice(p), ok = inStock(p);
       var media = url
         ? '<img src="' + esc(url) + '" alt="' + esc(p.name + (p.material ? ' — ' + p.material : '')) + '" loading="lazy">'
-        : '<span class="swatch" style="background:' + esc(swatchBg(p._cs)) + '"></span>';
+        : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
       return '<a class="pop-card" href="' + esc(filUrl(p)) + '">' +
         '<span class="pop-media">' + media + '</span>' +
         '<span class="pop-body">' +
-          '<span class="pop-meta"><i class="pop-dot" style="background:' + esc(swatchBg(p._cs)) + '"></i><span>' + esc(p.material || 'Filament') + '</span>' +
+          '<span class="pop-meta"><i class="pop-dot" style="background:' + esc(swatchBg(p)) + '"></i><span>' + esc(p.material || 'Filament') + '</span>' +
             (ranked ? '<b class="pop-rank" aria-label="Rang ' + (i + 1) + '">#' + (i + 1) + '</b>' : '') + '</span>' +
           '<span class="pop-name">' + esc(p.name) + '</span>' +
           '<span class="pop-foot">' + (fp != null ? '<span>dès <b>' + money(fp) + '</b></span>' : '<span></span>') +

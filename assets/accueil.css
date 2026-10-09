@@ -91,6 +91,9 @@ main section[id] { scroll-margin-top:calc(var(--top-h) + 8px); }
 .hero[data-finish="silk"]  { --spec:.52; }
 .hero[data-finish="matte"] { --spec:.05; }
 .hero[data-finish="trans"] .spool .fil { fill-opacity:.72; }
+.spool .glit { opacity:0; transition:opacity .4s; }
+.hero[data-finish="sparkle"] .spool .glit { opacity:1; }
+.hero[data-finish="sparkle"] .sw-dot { background:var(--sparkle), linear-gradient(135deg, var(--c1), var(--c2) 50%, var(--c3)); }
 .spool .spin { transform-box:fill-box; transform-origin:center; transition:transform 1.2s cubic-bezier(.25,.8,.25,1); }
 .spool .callout text { font-family:var(--display); font-size:13px; font-weight:600; fill:#6C727C; letter-spacing:.02em; }
 

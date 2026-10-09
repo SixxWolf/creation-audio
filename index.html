@@ -26,9 +26,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/tokens.css?v=3">
+<link rel="stylesheet" href="assets/tokens.css?v=4">
 <link rel="stylesheet" href="assets/site.css?v=2">
-<link rel="stylesheet" href="assets/accueil.css?v=13">
+<link rel="stylesheet" href="assets/accueil.css?v=14">
 </head>
 <body class="home-page">
 <a class="skip" href="#main">Aller au contenu</a>
@@ -117,6 +117,8 @@
             </radialGradient>
             <clipPath id="body-clip"><path d="M175 73H337V377H175A66.9 152 0 0 1 175 73Z"/></clipPath>
             <filter id="soft" x="-20%" y="-200%" width="140%" height="500%"><feGaussianBlur stdDeviation="9"/></filter>
+            <!-- paillettes (filaments Sparkle) : même motif que --sparkle dans tokens.css -->
+            <pattern id="glit" width="40" height="40" patternUnits="userSpaceOnUse"><g fill="#fff"><circle cx="10.4" cy="11.7" r=".8" fill-opacity=".85"/><circle cx="14.5" cy="4.3" r=".8" fill-opacity=".85"/><circle cx="28" cy="32.8" r=".8" fill-opacity=".85"/><circle cx="4.6" cy="28.1" r=".33" fill-opacity=".27"/><circle cx="30.6" cy="11.5" r=".41" fill-opacity=".32"/><circle cx="20.7" cy="25.2" r=".42" fill-opacity=".37"/><circle cx="26.2" cy="16.3" r=".34" fill-opacity=".46"/><circle cx="30.1" cy="2.8" r=".39" fill-opacity=".24"/><circle cx="22.8" cy="3.4" r=".41" fill-opacity=".52"/><circle cx="31.3" cy="28.5" r=".59" fill-opacity=".22"/><circle cx="14.9" cy="30.2" r=".31" fill-opacity=".28"/><circle cx="12" cy="33.7" r=".53" fill-opacity=".53"/><circle cx="28.3" cy="7.2" r=".44" fill-opacity=".41"/><circle cx="10.9" cy="24.3" r=".44" fill-opacity=".22"/><circle cx="16.3" cy="23.1" r=".38" fill-opacity=".55"/><circle cx="6.8" cy="7.6" r=".31" fill-opacity=".38"/><circle cx="28.6" cy="20.4" r=".36" fill-opacity=".39"/><circle cx="37.8" cy="2.5" r=".38" fill-opacity=".33"/><circle cx="7.5" cy="15.8" r=".57" fill-opacity=".37"/><circle cx="37" cy="24.3" r=".57" fill-opacity=".28"/><circle cx="17.5" cy="14.8" r=".32" fill-opacity=".2"/><circle cx="23" cy="35.5" r=".43" fill-opacity=".33"/><circle cx="35.8" cy="17" r=".57" fill-opacity=".47"/><circle cx="24.9" cy="23.6" r=".38" fill-opacity=".37"/><circle cx="21.9" cy="12.9" r=".51" fill-opacity=".23"/><circle cx="32.9" cy="6.6" r=".52" fill-opacity=".54"/><circle cx="37.8" cy="32.9" r=".37" fill-opacity=".34"/><circle cx="6.5" cy="20.2" r=".35" fill-opacity=".43"/><circle cx="3.6" cy="1.8" r=".6" fill-opacity=".39"/><circle cx="2.2" cy="7.1" r=".47" fill-opacity=".25"/><circle cx="19.3" cy="8.1" r=".4" fill-opacity=".44"/><circle cx="11.7" cy="18.5" r=".6" fill-opacity=".29"/><circle cx="18.8" cy="38.1" r=".59" fill-opacity=".28"/><circle cx="5.9" cy="36" r=".54" fill-opacity=".34"/></g></pattern>
             <path id="win" d="M-95.1-113.4A148 148 0 0 1 95.1-113.4L51.4-61.3A80 80 0 0 0-51.4-61.3Z"/>
           </defs>
 
@@ -135,6 +137,7 @@
             <path id="windings" class="windings" d="" fill="none"/>
             <path id="windings-l" class="windings-l" d="" fill="none" transform="translate(2 0)"/>
             <rect x="100" y="73" width="240" height="304" fill="url(#body-shade)"/>
+            <rect class="glit" x="100" y="73" width="240" height="304" fill="url(#glit)"/>
             <rect class="spec" x="100" y="96" width="240" height="16" fill="#fff"/>
             <rect class="spec spec-2" x="100" y="124" width="240" height="5" fill="#fff"/>
           </g>
@@ -427,6 +430,6 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=2"></script>
-<script src="assets/accueil.js?v=11"></script>
+<script src="assets/accueil.js?v=12"></script>
 </body>
 </html>

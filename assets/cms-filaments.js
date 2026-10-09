@@ -424,7 +424,11 @@
     return '<article class="card' + (r.active ? '' : ' is-hidden') + '" data-id="' + esc(r.id) + '" draggable="true">' +
       '<div class="card-thumb">' +
         (url ? '<img src="' + esc(url) + '" alt="' + esc(r.name) + '" loading="lazy">' : '<span class="card-noimg">Pas d\'image</span>') +
-        (function () { var bg = swatchBg(r.hex, colorsOf(r)); return bg ? '<span class="card-pastille" style="background:' + esc(bg) + '"></span>' : ''; })() +
+        (function () {
+          var bg = swatchBg(r.hex, colorsOf(r));
+          if (bg && /sparkle|galaxy|glitter|paillet/i.test(r.material || '')) bg = 'var(--sparkle), ' + bg;   // paillettes, comme en boutique
+          return bg ? '<span class="card-pastille" style="background:' + esc(bg) + '"></span>' : '';
+        })() +
         (outAll ? '<span class="badge badge-out">Rupture</span>' : '') +
         (r.active ? '' : '<span class="badge badge-hidden">Masqué</span>') +
         '<span class="drag-handle" title="Glisser pour réordonner (même matériau)">⠿</span>' +

@@ -66,19 +66,23 @@
 
   /* ---------- couleurs ----------
      Pastille : dégradé à parts égales si le filament est multi-colore
-     (attrs.colors = 2+ couleurs), sinon couleur pleine (hex). Repli : #ccc. */
+     (attrs.colors = 2+ couleurs), sinon couleur pleine (hex). Repli : #ccc.
+     Matériau pailleté (Sparkle, Galaxy…) : calque var(--sparkle) par-dessus. */
   function isHex(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v); }
   function colorsOf(p) {
     var cs = p && p.attrs && Array.isArray(p.attrs.colors) ? p.attrs.colors.filter(isHex) : [];
     if (cs.length) return cs;
     return [p && isHex(p.hex) ? p.hex : '#cccccc'];
   }
+  function isSparkle(p) { return /sparkle|galaxy|glitter|paillet/i.test((p && p.material) || ''); }
   function swatchBg(p) {
-    var cs = colorsOf(p);
-    if (cs.length < 2) return cs[0];
-    var n = cs.length, parts = [];
-    for (var i = 0; i < n; i++) parts.push(cs[i] + ' ' + (100 * i / n) + '%', cs[i] + ' ' + (100 * (i + 1) / n) + '%');
-    return 'linear-gradient(90deg,' + parts.join(',') + ')';
+    var cs = colorsOf(p), bg = cs[0];
+    if (cs.length > 1) {
+      var n = cs.length, parts = [];
+      for (var i = 0; i < n; i++) parts.push(cs[i] + ' ' + (100 * i / n) + '%', cs[i] + ' ' + (100 * (i + 1) / n) + '%');
+      bg = 'linear-gradient(90deg,' + parts.join(',') + ')';
+    }
+    return isSparkle(p) ? 'var(--sparkle), ' + bg : bg;
   }
   function hslOf(h) {
     var c = [1, 3, 5].map(function (i) { return parseInt(h.substr(i, 2), 16) / 255; });
@@ -702,9 +706,9 @@
               '<a href="#pdp-accs" class="js-to-accs">Ajouter une bobine vide</a></span></p>' : '') +
           '</div>' +
 
-          '<div class="pdp-sec">' +
-            '<div class="pdp-label">' +
-              '<span>Couleur · <b class="js-sw-name">' + esc(p.name) + '</b> <span class="lbl-sub js-sw-sub">— ' + esc(swStockText(p)) + '</span></span>' +
+          '<div class="pdp-sec sw-sec">' +
+            '<div class="pdp-label sw-head">' +
+              '<span class="sw-head-tx"><span>Couleur · <b class="js-sw-name">' + esc(p.name) + '</b></span><span class="lbl-sub js-sw-sub">' + esc(swStockText(p)) + '</span></span>' +
               '<label class="switch"><input type="checkbox" class="js-only-stock"' + (onlyStock ? ' checked' : '') + '><span class="switch-ui" aria-hidden="true"></span>En stock seulement</label>' +
             '</div>' +
             '<div class="sws" role="group" aria-label="Couleurs ' + esc(m.name) + '">' + swatches + '</div>' +
@@ -885,7 +889,7 @@
     // pastilles : chaque couleur = sa propre entrée d'historique ; flèches du clavier
     // pour se déplacer (un seul arrêt de tabulation) ; survol = aperçu du nom.
     var sws = $$('.sw', configEl), nameEl = $('.js-sw-name', configEl), subEl = $('.js-sw-sub', configEl);
-    function preview(p) { nameEl.textContent = p.name; subEl.textContent = '— ' + swStockText(p); }
+    function preview(p) { nameEl.textContent = p.name; subEl.textContent = swStockText(p); }
     sws.forEach(function (b, i) {
       var p = byId[b.getAttribute('data-id')];
       b.addEventListener('click', function () {
