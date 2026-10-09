@@ -24,7 +24,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
 <link rel="stylesheet" href="assets/site.css?v=6">
-<link rel="stylesheet" href="assets/boutique.css?v=38">
+<link rel="stylesheet" href="assets/boutique.css?v=39">
 </head>
 <body class="home-page shop-page">
 <a class="skip" href="#main">Aller au contenu</a>
@@ -149,11 +149,17 @@
   <div class="cart-items" id="cart-items"></div>
   <div class="cart-foot">
     <div class="cart-line cart-line-total"><span>Total estimé</span><span id="cart-total">0,00 $</span></div>
+    <div class="cart-acct" id="cart-acct" hidden>
+      <p class="cart-editbar" id="cart-editbar" hidden>Modification de <b id="cart-edit-num"></b> <button type="button" id="cart-edit-cancel">Annuler</button></p>
+      <textarea id="cart-note-in" class="cart-note-in" rows="2" maxlength="500" aria-label="Note pour Création Audio" placeholder="Note (facultatif) : tes disponibilités pour la cueillette…"></textarea>
+      <button type="button" class="cart-order cart-send" id="cart-send">Envoyer ma commande</button>
+    </div>
     <button type="button" class="cart-order" id="cart-order">Copier ma liste &amp; écrire sur Messenger</button>
     <button type="button" class="cart-order cart-email" id="cart-email">Écrire par courriel</button>
     <p class="cart-msg" id="cart-msg" role="status"></p>
     <button type="button" class="cart-clear" id="cart-clear">Vider le panier</button>
     <p class="cart-note">Aucun paiement en ligne — on confirme la dispo et un ramassage à Québec.</p>
+    <p class="cart-login" id="cart-login">Commander en ligne&nbsp;? <a href="compte.html">Connecte-toi</a></p>
   </div>
 </aside>
 
@@ -231,6 +237,7 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=3"></script>
-<script src="assets/boutique.js?v=39"></script>
+<script src="assets/commande-client.js?v=1"></script>
+<script src="assets/boutique.js?v=40"></script>
 </body>
 </html>

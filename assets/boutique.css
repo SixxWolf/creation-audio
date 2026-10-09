@@ -614,6 +614,21 @@ body.has-buybar .toast { bottom:92px; }
   cursor:pointer; background:none; border:none; border-radius:8px; }
 .cart-clear:hover { color:var(--bad); }
 .cart-note { margin:0; text-align:center; font-size:.78rem; line-height:1.5; color:var(--muted); }
+/* commande en ligne (client connecté — commande-client.js) */
+.cart-acct { display:flex; flex-direction:column; gap:10px; }
+.cart-acct[hidden], .cart-login[hidden], .cart-editbar[hidden] { display:none; }
+.cart-note-in { width:100%; min-height:56px; padding:9px 11px; font:inherit; font-size:.88rem; color:var(--ink); resize:vertical;
+  background:#fff; border:1.5px solid var(--line); border-radius:10px; }
+.cart-note-in:focus { outline:none; border-color:var(--ember); }
+.cart-editbar { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; margin:0; padding:9px 12px; font-size:.85rem;
+  color:#9A4A0E; background:#FFF3EC; border-radius:10px; }
+.cart-editbar button { margin-left:auto; padding:4px 10px; font:inherit; font-weight:700; font-size:.82rem; color:var(--ink); cursor:pointer;
+  background:#fff; border:1px solid var(--line-2); border-radius:8px; }
+.cart-login { margin:0; text-align:center; font-size:.84rem; color:var(--ink-2); }
+.cart-login a { font-weight:700; color:var(--ember-ink); }
+.cart-msg a { font-weight:700; color:var(--ember-ink); }
+.citem-bo, .buy-bo { font-weight:700; color:#9A4A0E; }
+.buy-bo { display:block; margin-top:4px; }
 body.cart-lock { overflow:hidden; }
 
 /* ---- Toast ---- */

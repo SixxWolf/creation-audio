@@ -168,6 +168,8 @@
       try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; } catch (e) { return ''; }
     }
     function maxQty(p) { return o.maxQty ? o.maxQty(p) : (p.qty | 0); }
+    // public + client connecté (o.backorder) : rupture commandable, comme le portail dealer
+    function bo() { return !isDealer && !!(o.backorder && o.backorder()); }
     function unit(p, qty) { return isDealer ? tierPrice(p.sell_price, p.tiers, qty) : (+p.sell_price || 0); }
     function tiersFor(p) { return isDealer ? normalizeTiers(p.tiers).filter(function (t) { return t.min > 1; }) : []; }
 
@@ -177,7 +179,7 @@
       var st = p.qty | 0;
       if (st > 0 && o.staticRender) return { cls: 'ok', text: 'En stock' };
       if (st > 0) return { cls: 'ok', text: isDealer ? st + ' en stock' : plural(st, 'paire en stock', 'paires en stock') };
-      return isDealer ? { cls: 'order', text: 'Sur commande' } : { cls: 'out', text: 'Rupture de stock' };
+      return isDealer || bo() ? { cls: 'order', text: 'Sur commande' } : { cls: 'out', text: 'Rupture de stock' };
     }
 
     /* ---------- données ---------- */
@@ -274,7 +276,7 @@
     function cardHtml(p) {
       var url = publicUrl(p.image_path), sz = sizeOf(p), fit = fitmentOf(p), b = stockBadge(p);
       var desc = p.attrs && p.attrs.description ? String(p.attrs.description) : '';
-      var noAdd = !isDealer && (p.qty | 0) <= 0, refs = replacesOf(p), spk = speakersOf(p);
+      var noAdd = !isDealer && !bo() && (p.qty | 0) <= 0, refs = replacesOf(p), spk = speakersOf(p);
       var tags = (sz ? '<span class="sp-tag">' + esc(sz) + '</span>' : '') +
         (fit.length ? '<span class="sp-tag is-fit">' + IC.car + plural(fit.length, 'véhicule', 'véhicules') + '</span>' : '') +
         (spk.length ? '<span class="sp-tag is-fit">' + IC.spk + plural(spk.length, 'haut-parleur', 'haut-parleurs') + '</span>' : '');
@@ -459,7 +461,7 @@
       return curQty + ' × ' + money(u) + ' = <b>' + money(u * curQty) + '</b>' + (u < base ? ' <em>· rabais quantité</em>' : '');
     }
     function madeNote(p) {
-      if (!isDealer) return '';
+      if (!isDealer && !bo()) return '';
       var st = p.qty | 0, extra = curQty - st;
       if (extra <= 0) return '';
       return st > 0 ? st + ' en stock · ' + plural(extra, 'paire sera imprimée', 'paires seront imprimées') + ' sur commande'

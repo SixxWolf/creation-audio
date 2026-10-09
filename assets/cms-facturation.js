@@ -912,7 +912,7 @@
       });
     }).then(function (inv) {
       // auto-mémorisation du client (mode client seulement ; les dealers = onglet Dealers)
-      if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value)) {
+      if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value) && !(order && order.kind === 'client')) {
         window.CA.rememberClient(clientFields());
       }
       var deducted = !!elDeduct.checked, pend = pendingCount();
@@ -1151,7 +1151,7 @@
      « Commande dealer D-0007 — … ». Rien n'est enregistré avant « Enregistrer » ;
      alors la commande passe « Facturée » (invoice_id) — voir linkOrder(). */
   function setFromOrder(o) {
-    fromOrder = o ? { id: o.id, number: o.number } : null;
+    fromOrder = o ? { id: o.id, number: o.number, kind: o.kind || 'dealer' } : null;
     if (elOrderBanner) elOrderBanner.hidden = !fromOrder;
     if (elOrderNum) elOrderNum.textContent = fromOrder ? fromOrder.number : '';
   }
@@ -1174,6 +1174,15 @@
     return ln;
   }
   function linkOrder(order, inv) {
+    if (order.kind === 'client') {   // commande en ligne : Facturée + compte du client relié à sa fiche (RPC)
+      sb.rpc('admin_invoice_customer_order', { p_order: order.id, p_invoice: inv.id }).then(function (res) {
+        if (res.error) { elStatus.appendChild(document.createTextNode(' ⚠ Commande ' + order.number + ' non marquée « Facturée » — fais-le dans l\'onglet Commandes. ')); return; }
+        elStatus.insertBefore(document.createTextNode('Commande ' + order.number + ' → Facturée. '), elStatus.firstChild ? elStatus.firstChild.nextSibling : null);
+        if (window.CA.reloadCustomerOrders) window.CA.reloadCustomerOrders();
+        if (window.CA.loadAccounts) window.CA.loadAccounts().then(null, function () {});
+      }, function () {});
+      return;
+    }
     sb.from('dealer_orders').update({ status: 'invoiced', invoice_id: inv.id, updated_at: new Date().toISOString() })
       .eq('id', order.id).select('id').then(function (res) {
         if (res.error || !res.data || !res.data.length) {
@@ -1197,6 +1206,35 @@
     var token = {}; editToken = token;
     elInvoice.innerHTML = '<p class="inv-empty">Chargement de la commande ' + esc(order.number) + '…</p>';
     elSave.disabled = true;   // réactivé une fois la facture remplie
+    if (order.kind === 'client') {   // commande en ligne d'un client (cms-commandes-clients.js)
+      Promise.all([loadCatalog('filament', true), loadCatalog('accessory', true), loadCatalog('spacer', true)])
+        .then(null, function () {}).then(function () {
+          if (editToken !== token) return;
+          editToken = null;
+          setClientType('client');
+          setClientFields({ name: order.name || order.email || '', email: order.email || '', phone: order.phone || '' });
+          lines = (olines || []).filter(function (l) { return (l.qty | 0) > 0; }).map(function (l) {
+            var hit = l.product_id ? findProduct(l.product_id) : null;
+            var st = hit ? (l.kind === 'refill' ? hit.p.qty_2 : hit.p.qty) : null;
+            var ln = lineFromSaved({ product_id: l.product_id, kind: l.kind, ptype: l.ptype, label: l.name, meta: l.meta,
+              qty: l.qty, unit_price: l.unit_price, unit_cost: 0,
+              // ce qui manque encore en stock part « À venir » (remis plus tard, Historique › Remis)
+              qty_pending: st == null ? (l.qty_to_order | 0) : Math.max(0, (l.qty | 0) - (st | 0)) });
+            if (hit) ln.cost = hit.c === 'filament' ? (+filCost(hit.p, l.kind) || 0)
+              : hit.c === 'accessory' ? (+((hit.p.attrs && hit.p.attrs.avg_cost && hit.p.attrs.avg_cost.item) || hit.p.cost_price) || 0)
+              : (+hit.p.cost_price || 0);
+            return ln;
+          });
+          settleLoadedPrices();
+          elNote.value = 'Commande en ligne ' + order.number + (order.note ? ' — ' + order.note : '');
+          var c0 = lines[0] && ['filament', 'spacer', 'accessory'].indexOf(lines[0].ptype) !== -1 ? lines[0].ptype : 'filament';
+          setCat(c0);
+          unlock();
+          elStatus.textContent = '';
+          render();
+        });
+      return true;
+    }
     Promise.all([
       window.CA.loadDealers ? window.CA.loadDealers() : null,
       loadCatalog('spacer', true)
