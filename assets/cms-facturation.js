@@ -130,7 +130,31 @@
     var wrap = $('#co-logo-preview');
     if (logoData) { $('#co-logo-img').src = logoData; wrap.hidden = false; } else { wrap.hidden = true; }
   }
-  function writeCompany() { try { localStorage.setItem(LS_CO, JSON.stringify(readCompanyForm())); } catch (e) {} }
+  // Copie dans admin_settings « entreprise » : la page Mon compte réimprime les factures avec les
+  // mêmes coordonnées (RPC company_public) ; sert aussi de synchro entre appareils (la plus récente gagne).
+  var CO_KEY = 'entreprise';
+  function pushCompany(co) {
+    sb.from('admin_settings').upsert({ key: CO_KEY, value: co, updated_at: co.at }).then(function () {}, function () {});
+  }
+  function writeCompany() {
+    var co = readCompanyForm(); co.at = new Date().toISOString();
+    try { localStorage.setItem(LS_CO, JSON.stringify(co)); } catch (e) {}
+    pushCompany(co);
+  }
+  if (window.CA.onAdminReady) window.CA.onAdminReady(function () {
+    sb.from('admin_settings').select('value').eq('key', CO_KEY).maybeSingle().then(function (res) {
+      if (res.error) return;
+      var db = res.data && res.data.value, ls = null;
+      try { ls = JSON.parse(localStorage.getItem(LS_CO) || 'null'); } catch (e) {}
+      if (db && (!ls || String(db.at || '') > String(ls.at || ''))) {
+        try { localStorage.setItem(LS_CO, JSON.stringify(db)); } catch (e) {}
+        fillCompanyForm(loadCompany()); render();
+      } else if (ls && (!db || String(ls.at || '') > String(db.at || ''))) {
+        if (!ls.at) { ls.at = new Date().toISOString(); try { localStorage.setItem(LS_CO, JSON.stringify(ls)); } catch (e) {} }
+        pushCompany(ls);
+      }
+    }, function () {});
+  });
   function handleLogoFile(file) {
     if (!file) return;
     var reader = new FileReader();

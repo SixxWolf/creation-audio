@@ -476,6 +476,32 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 /* carnet de clients : 2 colonnes sur grand écran (l'éditeur ouvert prend toute la largeur) */
 #cl-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap:10px; }
 #cl-list > .empty, #cl-list > .muted { grid-column:1 / -1; }
+/* comptes en ligne (compte.html) au-dessus du carnet : même grille, « à relier » d'abord */
+.cl-accounts { margin-bottom:24px; }
+.cl-sec { display:flex; align-items:center; gap:8px; margin:4px 0 10px; font-family:var(--display); font-size:1.02rem; letter-spacing:-.01em; }
+.cl-sec-n { min-width:22px; height:22px; padding:0 7px; display:inline-flex; align-items:center; justify-content:center;
+  font-family:var(--font); font-size:.72rem; font-weight:700; color:var(--on-ember); background:var(--ember); border-radius:100px; }
+#cl-acc-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap:10px; }
+.pm-link::before { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1'/%3E%3Cpath d='M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1'/%3E%3C/svg%3E"); }
+.pm-date::before { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15' rx='2'/%3E%3Cpath d='M3.5 10h17M8 3v4M16 3v4'/%3E%3C/svg%3E"); }
+.cpt-res { gap:7px; font-size:.86rem; font-weight:600; white-space:nowrap; cursor:pointer; }
+.cpt-res input { width:auto; }
+.cpt-linker .cpt-fiche-f { max-width:440px; margin-bottom:16px; }
+.cpt-invs-h { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.cpt-inv-list { display:flex; flex-direction:column; margin-top:6px; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+.cpt-inv { display:flex; align-items:center; gap:12px; padding:10px 14px; font-size:.9rem; cursor:pointer; border-bottom:1px solid var(--line); }
+.cpt-inv:last-child { border-bottom:none; }
+.cpt-inv:hover { background:var(--wash); }
+.cpt-inv input { width:auto; flex:none; }
+.cpt-inv b { flex:none; font-variant-numeric:tabular-nums; }
+.cpt-inv span { color:var(--muted); white-space:nowrap; }
+.cpt-inv .cpt-inv-who { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.cpt-inv .cpt-inv-off { color:var(--bad); font-weight:600; }
+.cpt-inv .cpt-inv-tot { color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums; }
+@media (max-width:640px) {
+  .cpt-inv { flex-wrap:wrap; gap:4px 10px; }
+  .cpt-inv .cpt-inv-who { flex-basis:100%; order:5; padding-left:26px; }
+}
 @media (max-width:640px) {
   .mat-row.person { flex-direction:row; flex-wrap:wrap; align-items:flex-start; gap:10px 12px; }
   .mat-row.person .mat-main { flex:1 1 calc(100% - 60px); }

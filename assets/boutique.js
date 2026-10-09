@@ -822,6 +822,11 @@
      anti-pourriel côté serveur). Champ piège « website » caché = honeypot.
      Loi 25 : usage annoncé au moment de la collecte + lien vers la politique. */
   var notifyDone = {};   // "id|format" -> message de confirmation (survit aux re-rendus)
+  // client connecté (compte.html, session « ca-compte-auth ») : son courriel est pré-rempli
+  function acctEmail() {
+    try { var s = JSON.parse(localStorage.getItem('ca-compte-auth') || 'null'); return (s && s.user && s.user.email) || ''; }
+    catch (e) { return ''; }
+  }
   // o = { id, kind ('spool'|'refill'|'item'), what (produit nommé dans la mention légale),
   //       the (« le Noir (recharge) » dans la confirmation), uid (préfixe d'id du champ) }
   function filNotify(p) {
@@ -835,7 +840,7 @@
       (done ? '<p class="cfg-notify-msg ok">' + esc(done) + '</p>' :
       '<form class="cfg-notify-form" novalidate>' +
         '<label class="sr-only" for="' + fid + '">Ton courriel</label>' +
-        '<input type="email" id="' + fid + '" class="cfg-notify-email" required maxlength="254" autocomplete="email" placeholder="ton@courriel.com">' +
+        '<input type="email" id="' + fid + '" class="cfg-notify-email" required maxlength="254" autocomplete="email" placeholder="ton@courriel.com" value="' + esc(acctEmail()) + '">' +
         '<input type="text" name="website" class="cfg-hp" tabindex="-1" autocomplete="off" aria-hidden="true">' +
         '<button type="submit" class="cfg-notify-btn">M\'aviser</button>' +
       '</form>' +
