@@ -205,6 +205,18 @@
 .pdp-label b { font-size:.95rem; letter-spacing:0; text-transform:none; color:var(--ink); }
 .pdp-label .lbl-sub { font-size:.86rem; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted); }
 .pdp-label .switch { font-size:.84rem; letter-spacing:0; text-transform:none; }
+/* Couleur · nom (ligne 1) + stock (ligne 2) à gauche, « En stock seulement » à droite : hauteur fixe quel que
+   soit le nom survolé (sinon l'interrupteur passe à la ligne, les pastilles descendent sous la souris → va-et-vient sans fin) */
+.sw-head { flex-wrap:nowrap; }
+.sw-head-tx { flex:1 1 auto; min-width:0; }
+.sw-head-tx > span { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.sw-head .lbl-sub { margin-top:2px; }
+.sw-head .lbl-sub::first-letter { text-transform:uppercase; }
+.sw-sec { container-type:inline-size; }
+@container (max-width:460px) {      /* colonne étroite (mobile, 2 colonnes serrées) : interrupteur toujours sur sa propre ligne */
+  .sw-head { flex-wrap:wrap; }
+  .sw-head-tx { flex-basis:100%; }
+}
 
 /* Format : recharge / avec bobine */
 .fmt { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }

@@ -706,9 +706,9 @@
               '<a href="#pdp-accs" class="js-to-accs">Ajouter une bobine vide</a></span></p>' : '') +
           '</div>' +
 
-          '<div class="pdp-sec">' +
-            '<div class="pdp-label">' +
-              '<span>Couleur · <b class="js-sw-name">' + esc(p.name) + '</b> <span class="lbl-sub js-sw-sub">— ' + esc(swStockText(p)) + '</span></span>' +
+          '<div class="pdp-sec sw-sec">' +
+            '<div class="pdp-label sw-head">' +
+              '<span class="sw-head-tx"><span>Couleur · <b class="js-sw-name">' + esc(p.name) + '</b></span><span class="lbl-sub js-sw-sub">' + esc(swStockText(p)) + '</span></span>' +
               '<label class="switch"><input type="checkbox" class="js-only-stock"' + (onlyStock ? ' checked' : '') + '><span class="switch-ui" aria-hidden="true"></span>En stock seulement</label>' +
             '</div>' +
             '<div class="sws" role="group" aria-label="Couleurs ' + esc(m.name) + '">' + swatches + '</div>' +
@@ -889,7 +889,7 @@
     // pastilles : chaque couleur = sa propre entrée d'historique ; flèches du clavier
     // pour se déplacer (un seul arrêt de tabulation) ; survol = aperçu du nom.
     var sws = $$('.sw', configEl), nameEl = $('.js-sw-name', configEl), subEl = $('.js-sw-sub', configEl);
-    function preview(p) { nameEl.textContent = p.name; subEl.textContent = '— ' + swStockText(p); }
+    function preview(p) { nameEl.textContent = p.name; subEl.textContent = swStockText(p); }
     sws.forEach(function (b, i) {
       var p = byId[b.getAttribute('data-id')];
       b.addEventListener('click', function () {
