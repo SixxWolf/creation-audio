@@ -303,6 +303,7 @@
    Historique (admin v3)
    ========================================================= */
 .hist-bar { display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; margin-bottom:14px; }
+#hist-filter { flex-wrap:wrap; max-width:100%; }   /* 5 filtres (dont Usage interne) : 2 rangées sur petit écran */
 .hist-bar input[type=search] { flex:1; min-width:220px; padding-left:38px;
   background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='m20 20-4.2-4.2'/%3E%3C/svg%3E") 12px center / 17px no-repeat; }
 /* statut : contrôle segmenté (même look que la facturation) */
@@ -341,6 +342,7 @@
   background:var(--wash); border:1px solid var(--line); border-radius:100px; }
 .hist-dealer { padding:2px 9px; font-size:.64rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--on-ember);
   background:var(--ember); border-radius:100px; }
+.hist-dealer.hist-int { color:var(--ink); background:var(--wash-2); border:1px solid var(--line-2); }   /* usage interne */
 .hist-annul { padding:2px 9px; font-size:.64rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#fff;
   background:var(--bad); border-radius:100px; }
 /* articles facturés « à venir » (pas encore remis) */

@@ -190,7 +190,15 @@
   }
 
   function render() {
-    var rows = inScope();
+    var all = inScope();
+    // usage interne (ce que Théo prend dans son stock, à 0 $) : jamais compté comme une vente
+    var rows = all.filter(function (inv) { return inv.client_type !== 'internal'; });
+    var intInv = all.filter(function (inv) { return inv.client_type === 'internal'; });
+    var intQty = 0, intCost = 0;
+    intInv.forEach(function (inv) {
+      intCost += (+inv.cost_total) || 0;
+      (linesByInv[inv.id] || []).forEach(function (l) { intQty += (+l.qty) || 0; });
+    });
     var n = rows.length;
     var ca = 0, cost = 0, collected = 0;
     var byCat = {}, prod = {};
@@ -217,7 +225,7 @@
     });
     var margin = ca - cost, avg = n ? ca / n : 0;
 
-    if (!n) {
+    if (!n && !intInv.length) {
       var emptyHtml = '<div class="empty">Aucune facture sur cette période' +
         (invoices.length ? '.' : ' — commence par créer des factures.') + '</div>';
       bodyEl.innerHTML = emptyHtml;
@@ -229,9 +237,10 @@
     var kpis =
       card('Chiffre d\'affaires', money(ca), 'hors taxes') +
       card('Marge', money(margin) + ' <span class="stat-pct ' + (margin >= 0 ? 'pos' : 'neg') + '">' + pct(margin, ca) + '%</span>', 'coût ' + money(cost)) +
-      card('Factures', String(n), n > 1 ? n + ' factures' : '1 facture') +
+      card('Factures', String(n), n > 1 ? n + ' factures' : n + ' facture') +
       card('Panier moyen', money(avg), 'par facture') +
-      card('Encaissé', money(collected), 'taxes incluses');
+      card('Encaissé', money(collected), 'taxes incluses') +
+      (intInv.length ? card('Usage interne', money(intCost), intQty + ' article' + (intQty > 1 ? 's' : '') + ' pris · au coûtant') : '');
 
     // répartition par gabarit
     var catRows = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; }).map(function (c) {

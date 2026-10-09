@@ -404,7 +404,7 @@ create table if not exists public.invoices (
   client_contact text,                                       -- courriel / téléphone / Messenger
   client_address text,                                       -- adresse (facture pro)
   client_city    text,                                       -- ville, code postal
-  client_type    text    not null default 'client',          -- 'client' | 'dealer'
+  client_type    text    not null default 'client',          -- 'client' | 'dealer' | 'internal' (usage interne, 0 $)
   category       text    not null default 'filament',         -- 'filament' | 'spacer' | 'accessory' | 'mixte'
   invoice_date   date    not null default current_date,
   note           text,                                        -- conditions de paiement / mot libre
@@ -478,6 +478,7 @@ with (security_invoker = off) as
   from public.invoice_lines l
   join public.invoices i on i.id = l.invoice_id
   where i.status = 'final' and l.product_id is not null
+    and i.client_type is distinct from 'internal'          -- usage interne : pas une vente
   group by l.product_id;
 
 grant select on public.product_popularity to anon, authenticated;
@@ -1583,6 +1584,29 @@ end $$;
 revoke all on function public.customers_cleanup() from public, anon, authenticated;
 select cron.unschedule(jobid) from cron.job where jobname = 'customers-cleanup';
 select cron.schedule('customers-cleanup', '30 4 * * *', 'select public.customers_cleanup()');
+
+-- ============================================================
+-- USAGE INTERNE — bobines / articles que Théo prend dans son inventaire.
+-- Facturation › « Interne » : invoices.client_type = 'internal', prix 0 $
+-- (coût unitaire gardé = valeur au coûtant), stock déduit comme une vente.
+-- Série de numéros À PART (INT-AAAA-###) : les factures F- restent sans trou.
+-- Exclu des ventes : Statistiques (carte « Usage interne » à part), product_popularity.
+-- ------------------------------------------------------------
+alter table public.invoice_counters add column if not exists seq_int int not null default 0;
+create or replace function public.next_internal_number()
+returns text language plpgsql security definer set search_path = public as $$
+declare y int := extract(year from current_date)::int; n int;
+begin
+  if not public.is_admin() then
+    raise exception 'Réservé à l''administrateur.';
+  end if;
+  insert into public.invoice_counters (year, seq, seq_int) values (y, 0, 1)
+    on conflict (year) do update set seq_int = public.invoice_counters.seq_int + 1
+    returning seq_int into n;
+  return 'INT-' || y::text || '-' || lpad(n::text, 3, '0');
+end $$;
+revoke all on function public.next_internal_number() from public, anon;
+grant execute on function public.next_internal_number() to authenticated;
 
 -- ------------------------------------------------------------
 -- Vérification
