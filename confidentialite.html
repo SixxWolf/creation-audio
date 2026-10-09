@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=3">
-<link rel="stylesheet" href="assets/site.css?v=2">
+<link rel="stylesheet" href="assets/site.css?v=6">
 <link rel="stylesheet" href="assets/legal.css?v=1">
 </head>
 <body class="home-page">
@@ -41,6 +41,9 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     Dealer
   </a>
+  <a class="home-account" href="compte.html" aria-label="Mon compte" title="Mon compte">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
+  </a>
   <a class="home-cta" href="boutique.html">Magasiner</a>
   <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-drawer">
     <span></span><span></span><span></span>
@@ -51,7 +54,7 @@
   <div class="inner">
     <div class="eyebrow">Vie privée</div>
     <h1>Politique de confidentialité</h1>
-    <div class="updated">Dernière mise à jour : 23 septembre 2026</div>
+    <div class="updated">Dernière mise à jour : 8 octobre 2026</div>
   </div>
 </div>
 
@@ -84,9 +87,22 @@
     <li><strong>Détails de commande</strong> : produits demandés, quantités, et le lieu/heure de ramassage convenus.</li>
     <li><strong>Facturation</strong> : les informations nécessaires à l'établissement d'une facture (nom, coordonnées, éventuellement adresse).</li>
     <li><strong>Liste d'attente</strong> : ton courriel, si tu demandes à être avisé(e) du retour d'un produit en rupture (voir ci-dessous).</li>
+    <li><strong>Compte client</strong> (facultatif) : ton courriel, ton nom et, si tu le fournis, ton téléphone (voir ci-dessous).</li>
   </ul>
-  <p>Le site n'a <strong>pas de compte client ni de paiement en ligne</strong> : tu nous transmets ces
-    renseignements toi-même, par Messenger ou par courriel, au moment de commander.</p>
+  <p>Le site n'a <strong>aucun paiement en ligne</strong>. Le compte client est <strong>facultatif</strong> : sans compte, tu nous transmets
+    ces renseignements toi-même, par Messenger ou par courriel, au moment de commander.</p>
+
+  <h3 id="compte">Compte client</h3>
+  <p>Tu peux créer un compte pour retrouver tes factures et tes alertes de retour en stock. Dans ce cas :</p>
+  <ul>
+    <li>on recueille ton <strong>courriel</strong> (pour t'envoyer un code de connexion à 6 chiffres — aucun mot de passe), ton
+      <strong>nom</strong> et, si tu le fournis, ton <strong>téléphone</strong> ;</li>
+    <li>quand on relie ton compte à ta fiche client, tu vois l'historique des <strong>factures</strong> que nous avons émises à ton nom ;</li>
+    <li>tu peux modifier tes coordonnées et <strong>supprimer ton compte en tout temps</strong> depuis la page « Mon compte » ;</li>
+    <li>un compte sans connexion pendant <strong>3 ans</strong> est supprimé automatiquement.</li>
+  </ul>
+  <p>Supprimer ton compte efface ton accès, tes coordonnées de compte et tes alertes. Les factures, elles, restent dans nos
+    dossiers : la loi nous oblige à les conserver (voir « Conservation »).</p>
 
   <h3 id="liste-attente">Liste d'attente « M'aviser quand c'est de retour »</h3>
   <p>Quand un produit est en rupture, tu peux laisser ton courriel pour être avisé(e) de son retour. Dans ce cas :</p>
@@ -102,13 +118,15 @@
   <h2>3. Témoins (cookies)</h2>
   <p>Le site <strong>n'utilise aucun témoin de suivi, de publicité ou d'analyse</strong>. Le panier de la
     boutique utilise uniquement le stockage local de ton navigateur (fonctionnel) : ces données restent sur
-    ton appareil et ne nous sont pas transmises.</p>
+    ton appareil et ne nous sont pas transmises. Si tu te connectes à ton compte, ta session de connexion est aussi gardée
+    dans ce stockage local, sur ton appareil, jusqu'à ce que tu te déconnectes.</p>
 
   <h2>4. Utilisation des renseignements</h2>
   <ul>
     <li>Traiter, préparer et confirmer tes commandes et ramassages.</li>
     <li>Communiquer avec toi (questions, soumissions, suivi).</li>
     <li>T'aviser du retour en stock d'un produit, si tu l'as demandé.</li>
+    <li>Te donner accès à ton compte (connexion par code) et à l'historique de tes factures.</li>
     <li>Établir les factures et respecter nos obligations comptables et légales.</li>
   </ul>
   <p>On n'utilise pas tes renseignements à d'autres fins sans ton consentement.</p>
@@ -116,7 +134,7 @@
   <h2>5. Hébergement et communications</h2>
   <p>Les données de commande, de facturation et de liste d'attente sont conservées dans notre base de données,
     hébergée par un prestataire tiers (Supabase) dans un centre de données situé à <strong>Montréal (Québec)</strong>.</p>
-  <p>Les courriels d'avis de retour en stock sont envoyés par un service d'envoi de courriels (Resend), dont les
+  <p>Les courriels d'avis de retour en stock et les codes de connexion au compte sont envoyés par un service d'envoi de courriels (Resend), dont les
     serveurs peuvent être situés <strong>hors du Québec</strong> (notamment aux États-Unis) : ton adresse lui est transmise
     uniquement le temps de l'envoi. Nos autres échanges peuvent passer par Messenger (Meta) et par courriel, selon les
     politiques de confidentialité de ces services, qui peuvent aussi stocker des données hors Québec.</p>
@@ -128,11 +146,13 @@
   <h2>7. Conservation</h2>
   <p>On conserve tes renseignements le temps nécessaire à ta commande et au respect de nos obligations
     légales et comptables, après quoi ils sont détruits ou anonymisés. Le courriel laissé pour la liste d'attente
-    est supprimé dès l'envoi de l'avis, ou au plus tard après 60 jours.</p>
+    est supprimé dès l'envoi de l'avis, ou au plus tard après 60 jours. Un compte client est supprimé à ta demande, ou
+    automatiquement après 3 ans sans connexion ; les factures sont conservées le temps exigé par les lois fiscales (6 ans).</p>
 
   <h2>8. Tes droits (Loi 25)</h2>
   <p>Tu as le droit d'<strong>accéder</strong> à tes renseignements, de les faire <strong>rectifier</strong>,
-    et de <strong>retirer ton consentement</strong>. Pour exercer ces droits,
+    et de <strong>retirer ton consentement</strong>. Si tu as un compte, tu peux corriger tes coordonnées et le supprimer
+    toi-même depuis la page « Mon compte ». Pour exercer tes autres droits,
     <a class="ask" href="mailto:contact@creationaudio.ca?subject=Demande%20%E2%80%94%20renseignements%20personnels%20(Loi%2025)&amp;body=Bonjour%2C%0A%0AJe%20souhaite%20exercer%20mon%20droit%20%3A%20acc%C3%A8s%20%2F%20rectification%20%2F%20retrait%20du%20consentement%20(pr%C3%A9cise).%0ACourriel%20ou%20nom%20utilis%C3%A9%20%3A%20%0A%0AMerci.">écris-nous à contact@creationaudio.ca</a>. Tu peux aussi porter plainte auprès
     de la <strong>Commission d'accès à l'information du Québec (CAI)</strong>.</p>
 
@@ -170,6 +190,7 @@
       <h4>Aide</h4>
       <a href="./#etapes">Comment commander</a>
       <a href="./#contact">Nous joindre</a>
+      <a href="compte.html">Mon compte</a>
       <a href="dealer.html">Espace dealer</a>
     </nav>
     <nav class="foot-col" aria-label="Légal">
@@ -203,6 +224,7 @@
   </nav>
   <div class="drawer-cta">
     <a class="primary" href="boutique.html">Magasiner les filaments</a>
+    <a class="secondary" href="compte.html">Mon compte</a>
     <a class="secondary" href="dealer.html">Espace dealer</a>
   </div>
   <div class="drawer-foot">
@@ -212,6 +234,6 @@
   </div>
 </aside>
 
-<script src="assets/nav.js?v=2"></script>
+<script src="assets/nav.js?v=3"></script>
 </body>
 </html>

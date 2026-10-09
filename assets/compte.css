@@ -1,0 +1,201 @@
+/* =========================================================
+   Création Audio — Mon compte (compte.html)
+   Connexion par code (cartes centrées), espace client à onglets
+   (Mes commandes · Mes alertes · Mes infos), facture imprimable.
+   Le chrome (en-tête, tiroir, pied) vient de site.css.
+   ========================================================= */
+.acct-page { background:var(--wash); }
+.skip { position:absolute; left:-9999px; top:8px; z-index:100; padding:10px 14px; border-radius:10px;
+  background:var(--ink); color:#fff; font-weight:700; text-decoration:none; }
+.skip:focus { left:12px; }
+
+.acct { max-width:var(--maxw); margin:0 auto; padding:0 var(--gutter) clamp(48px, 7vw, 80px); min-height:60vh; }
+.acct-boot { padding:80px 0; text-align:center; color:var(--muted); }
+
+/* ---------- cartes de connexion ---------- */
+.acct-center { min-height:62vh; display:flex; align-items:center; justify-content:center; padding:32px 0; }
+.acct-card { width:100%; max-width:400px; padding:30px; background:#fff; border:1px solid var(--line);
+  border-radius:var(--radius-lg); box-shadow:var(--shadow); }
+.acct-card .eyebrow { color:var(--ember-ink); }
+.acct-card h1 { margin:0 0 6px; font-family:var(--display); font-size:1.55rem; letter-spacing:-.01em; }
+.acct-card h2 { margin:0 0 14px; font-family:var(--display); font-size:1.12rem; }
+.acct-lead { margin:0 0 20px; color:var(--muted); font-size:.93rem; line-height:1.5; overflow-wrap:anywhere; }
+.acct-lead b { color:var(--ink); }
+.acct-card .field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; min-width:0; }
+.acct-card label { font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.acct-opt { text-transform:none; letter-spacing:0; font-weight:500; }
+.acct-card input { width:100%; min-width:0; padding:11px 12px; font:inherit; color:var(--ink); background:#fff;
+  border:1.5px solid var(--line); border-radius:var(--radius-sm); }
+.acct-card input:focus { outline:none; border-color:var(--ember); }
+.acct-card input:disabled { color:var(--muted); background:var(--wash); }
+.acct-code-in { font-size:1.6rem !important; font-weight:700; letter-spacing:.32em; text-align:center;
+  font-variant-numeric:tabular-nums; padding:10px 12px 10px calc(12px + .32em) !important; }
+.acct-hp { position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
+
+.acct-submit { display:inline-flex; align-items:center; justify-content:center; width:100%; padding:12px 18px;
+  font:inherit; font-weight:700; color:var(--ink); cursor:pointer;
+  background:var(--ember); border:1.5px solid var(--ember); border-radius:100px; transition:background .15s, border-color .15s; }
+.acct-submit:hover { background:#FF7E45; border-color:#FF7E45; }
+.acct-submit:disabled { opacity:.55; cursor:not-allowed; }
+.acct-submit:focus-visible, .acct-link:focus-visible, .acct-btn:focus-visible, .acct-out:focus-visible,
+.acct-del:focus-visible, .acct-tabs a:focus-visible { outline:3px solid var(--ember-ink); outline-offset:2px; }
+
+.acct-status { margin:12px 0 0; min-height:1.3em; font-size:.88rem; color:var(--muted); }
+.acct-status:empty { min-height:0; margin:0; }
+.acct-status.bad { color:var(--bad); }
+.acct-status.ok { color:var(--good); }
+.acct-legal { margin:16px 0 0; font-size:.8rem; color:var(--muted); line-height:1.5; }
+.acct-legal a, .acct-empty a:not(.ask) { color:inherit; text-decoration:underline; text-underline-offset:3px; }
+.acct-links { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 16px; margin-top:16px; }
+.acct-link { padding:0; font:inherit; font-size:.86rem; font-weight:600; color:var(--ink-2); cursor:pointer;
+  background:none; border:none; text-decoration:underline; text-underline-offset:3px; }
+.acct-link:hover { color:var(--ember-ink); }
+.acct-link:disabled { color:var(--muted); text-decoration:none; cursor:default; }
+
+/* ---------- espace client ---------- */
+.acct-home { padding-top:clamp(24px, 4vw, 44px); }
+.acct-head { display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:14px 24px; margin-bottom:22px; }
+.acct-head-tx { min-width:0; }
+.acct-head .eyebrow { color:var(--ember-ink); }
+.acct-head h1 { margin:0; font-family:var(--display); font-size:clamp(1.7rem, 4vw, 2.3rem); letter-spacing:-.02em; overflow-wrap:anywhere; }
+.acct-sub { margin:6px 0 0; color:var(--muted); font-size:.92rem; overflow-wrap:anywhere; }
+.acct-out { flex:none; height:40px; padding:0 16px; font:inherit; font-weight:600; font-size:.88rem; color:var(--ink); cursor:pointer;
+  background:#fff; border:1px solid var(--line-2); border-radius:12px; }
+.acct-out:hover { border-color:var(--ink); }
+
+.acct-tabs { display:flex; gap:6px; width:max-content; max-width:100%; overflow-x:auto; margin-bottom:20px; padding:4px;
+  background:#fff; border:1px solid var(--line); border-radius:100px; scrollbar-width:none; }
+.acct-tabs::-webkit-scrollbar { display:none; }
+.acct-tabs a { flex:none; display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 16px; white-space:nowrap;
+  font-weight:600; font-size:.92rem; color:var(--ink-2); text-decoration:none; border-radius:100px; transition:color .15s, background .15s; }
+.acct-tabs a:hover { color:var(--ink); background:var(--wash); }
+.acct-tabs a[aria-current="page"] { color:#fff; background:var(--ink); }
+.acct-n { min-width:20px; height:20px; padding:0 6px; display:inline-flex; align-items:center; justify-content:center;
+  font-size:.72rem; font-weight:700; color:var(--ink); background:var(--ember); border-radius:100px; }
+
+.acct-empty { margin:0; padding:26px; background:#fff; border:1px dashed var(--line-2); border-radius:var(--radius);
+  color:var(--ink-2); line-height:1.6; }
+.acct-empty p { margin:0; }
+
+/* Mes commandes : une facture = un <details> */
+.ord-list { display:flex; flex-direction:column; gap:10px; }
+.ord { background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+.ord > summary { display:flex; align-items:center; gap:10px 14px; padding:15px 18px; cursor:pointer; list-style:none; }
+.ord > summary::-webkit-details-marker { display:none; }
+.ord > summary:hover { background:var(--wash); }
+.ord > summary:focus-visible { outline:3px solid var(--ember-ink); outline-offset:-3px; }
+.ord-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ord-no { font-family:var(--display); font-size:1.02rem; }
+.ord-meta { color:var(--muted); font-size:.85rem; }
+.ord-pill { flex:none; padding:4px 10px; border-radius:100px; font-size:.75rem; font-weight:700; white-space:nowrap; }
+.ord-pill.pend { color:#9A4A0E; background:#FFF3EC; }
+.ord-pill.off { color:#B42A19; background:var(--bad-wash); }
+.ord-total { flex:none; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ord-chev { flex:none; width:9px; height:9px; margin-left:2px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted);
+  transform:rotate(45deg) translateY(-2px); transition:transform .15s; }
+.ord[open] .ord-chev { transform:rotate(-135deg) translate(-2px, 0); }
+.ord.is-off .ord-total { color:var(--muted); text-decoration:line-through; }
+.ord-body { padding:4px 18px 18px; border-top:1px solid var(--line); }
+.ord-lines { list-style:none; margin:0; padding:0; }
+.ord-lines li { display:grid; grid-template-columns:auto minmax(0, 1fr) auto auto; align-items:center; gap:4px 14px;
+  padding:12px 0; border-bottom:1px solid var(--line); }
+.ol-tx { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.ol-tx b { font-weight:600; overflow-wrap:anywhere; }
+.ol-tx small { color:var(--muted); font-size:.82rem; overflow-wrap:anywhere; }
+.ol-pend { font-style:normal; font-size:.78rem; font-weight:700; color:#9A4A0E; }
+.ol-q { color:var(--muted); font-size:.88rem; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ol-t { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; min-width:5.2em; }
+.sw { width:22px; height:22px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.14); flex:none; }
+.sw-none { background:var(--wash); }
+.ord-tot { margin:12px 0 0 auto; width:min(280px, 100%); font-variant-numeric:tabular-nums; }
+.ord-tot div { display:flex; justify-content:space-between; gap:12px; padding:3px 0; color:var(--ink-2); }
+.ord-tot .grand { margin-top:4px; padding-top:8px; border-top:2px solid var(--ink); color:var(--ink); font-weight:700; font-size:1.05rem; }
+.ord-note { margin:14px 0 0; padding:10px 13px; background:var(--wash); border-radius:var(--radius-sm); font-size:.88rem; overflow-wrap:anywhere; }
+.ord-note span { margin-right:8px; font-size:.68rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.acct-btn { display:inline-flex; align-items:center; height:40px; margin-top:16px; padding:0 16px; font:inherit; font-weight:600; font-size:.9rem;
+  color:var(--ink); cursor:pointer; background:#fff; border:1px solid var(--line-2); border-radius:12px; }
+.acct-btn:hover { border-color:var(--ink); }
+
+/* Mes alertes */
+.al-list { list-style:none; margin:0; padding:0; background:#fff; border:1px solid var(--line); border-radius:var(--radius); }
+.al { display:flex; align-items:center; gap:10px 14px; padding:13px 18px; border-bottom:1px solid var(--line); }
+.al:last-child { border-bottom:none; }
+.al-tx { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; color:var(--ink); text-decoration:none; }
+.al-tx b { font-weight:600; overflow-wrap:anywhere; }
+.al-tx small { color:var(--muted); font-size:.82rem; overflow-wrap:anywhere; }
+.al-tx:hover b { color:var(--ember-ink); }
+.al-date { flex:none; color:var(--muted); font-size:.84rem; white-space:nowrap; }
+
+/* Mes infos */
+.acct-wide { max-width:760px; box-shadow:none; }
+.acct-wide + .acct-wide { margin-top:14px; }
+.acct-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0 14px; }
+.acct-grid .field:first-child { grid-column:1 / -1; }   /* courriel : toute la largeur (adresses longues) */
+.acct-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px 14px; }
+.acct-actions .acct-submit { width:auto; }
+.acct-actions .acct-status { margin:0; }
+.acct-danger p { margin:0 0 14px; color:var(--muted); font-size:.92rem; line-height:1.5; }
+.acct-del { height:40px; padding:0 16px; font:inherit; font-weight:600; font-size:.9rem; color:var(--bad); cursor:pointer;
+  background:#fff; border:1px solid color-mix(in srgb, var(--bad) 40%, transparent); border-radius:12px; }
+.acct-del:hover { background:var(--bad-wash); }
+.acct-del:disabled { opacity:.55; cursor:not-allowed; }
+
+@media (max-width:760px) {
+  .acct-grid { grid-template-columns:1fr; }
+}
+@media (max-width:560px) {
+  .acct-card { padding:24px 20px; }
+  .acct-tabs { width:100%; }
+  .acct-tabs a { flex:1 1 0; justify-content:center; padding:0 8px; font-size:.88rem; }
+  .ord > summary { flex-wrap:wrap; padding:14px 16px; }
+  .ord-main { flex-basis:100%; order:-1; }
+  .ord-total { margin-left:auto; }
+  .ord-body { padding:4px 16px 16px; }
+  .ord-lines li { grid-template-columns:auto minmax(0, 1fr) auto; }
+  .ol-q { grid-column:2; grid-row:2; }
+  .ol-t { grid-column:3; grid-row:1 / span 2; }
+  .al { flex-wrap:wrap; padding:13px 16px; }
+  .al-tx { flex-basis:calc(100% - 36px); }
+  .al-date { margin-left:36px; }
+  .al .al-del { margin-left:auto; }
+}
+
+/* ---------- facture imprimable (même document que l'admin) ---------- */
+.acct-print { display:none; }
+@media print {
+  body.acct-printing > *:not(.acct-print) { display:none !important; }
+  body.acct-printing { background:#fff; }
+  body.acct-printing .acct-print { display:block; color:#181A1F; font-size:12pt; }
+  @page { margin:14mm; }
+}
+.acct-print .inv-top { display:flex; justify-content:space-between; gap:20px; align-items:flex-start;
+  border-bottom:2px solid #181A1F; padding-bottom:16px; margin-bottom:16px; }
+.acct-print .inv-logo { max-height:56px; max-width:200px; object-fit:contain; margin-bottom:8px; display:block; }
+.acct-print .inv-co-name { font-size:1.2rem; font-weight:700; }
+.acct-print .inv-co-tag { color:#6C727C; font-size:.85rem; margin-top:2px; }
+.acct-print .inv-co-meta { color:#6C727C; font-size:.8rem; margin-top:8px; white-space:pre-line; line-height:1.5; }
+.acct-print .inv-title { text-align:right; flex:none; }
+.acct-print .inv-title h1 { margin:0; font-size:1.5rem; letter-spacing:.04em; }
+.acct-print .inv-meta { color:#6C727C; font-size:.85rem; margin-top:6px; font-variant-numeric:tabular-nums; }
+.acct-print .inv-cancelled { margin:0 0 14px; padding:8px; text-align:center; font-weight:700; letter-spacing:.1em;
+  color:#B42A19; border:2px solid #B42A19; border-radius:8px; }
+.acct-print .inv-billto { margin-bottom:12px; }
+.acct-print .inv-billto .lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#6C727C; }
+.acct-print .inv-billto .who { font-weight:700; font-size:1.02rem; }
+.acct-print .inv-table { width:100%; border-collapse:collapse; margin-bottom:14px; }
+.acct-print .inv-table th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em;
+  color:#6C727C; font-weight:700; padding:8px; border-bottom:1.5px solid #E7E7E2; }
+.acct-print .inv-table th.num, .acct-print .inv-table td.num { text-align:right; width:1%; white-space:nowrap; }
+.acct-print .inv-table td { padding:9px 8px; border-bottom:1px solid #E7E7E2; vertical-align:middle; font-size:.9rem; }
+.acct-print .inv-mat { color:#6C727C; font-size:.78rem; }
+.acct-print .inv-tot { margin-left:auto; width:min(320px, 100%); }
+.acct-print .inv-tot .line { display:flex; justify-content:space-between; padding:5px 0; font-variant-numeric:tabular-nums; }
+.acct-print .inv-tot .taxno { color:#6C727C; font-size:.75rem; font-weight:400; }
+.acct-print .inv-tot .grand { border-top:2px solid #181A1F; margin-top:6px; padding-top:10px; font-weight:700; font-size:1.1rem; }
+.acct-print .inv-pay { margin-top:16px; background:#F6F6F4; border-radius:10px; padding:10px 13px; font-size:.88rem; }
+.acct-print .inv-pay .lbl { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#6C727C; margin-right:8px; }
+.acct-print .inv-foot { margin-top:18px; color:#6C727C; font-size:.78rem; text-align:center; border-top:1px solid #E7E7E2; padding-top:12px; }
+
+@media (prefers-reduced-motion:reduce) {
+  .ord-chev, .acct-tabs a, .acct-submit { transition:none; }
+}

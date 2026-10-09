@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon compte — Création Audio</title>
+<meta name="description" content="Ton compte Création Audio : tes factures, tes alertes de retour en stock et tes coordonnées.">
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://creationaudio.ca/compte.html">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/img/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css?v=4">
+<link rel="stylesheet" href="assets/site.css?v=6">
+<link rel="stylesheet" href="assets/compte.css?v=3">
+</head>
+<body class="home-page acct-page">
+<a class="skip" href="#main">Aller au contenu</a>
+
+<div class="promo-bar">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+  Ramassage local à Québec · Aucun paiement en ligne — on confirme avant tout
+</div>
+
+<header class="home-top">
+  <a class="brand" href="./" aria-label="Création Audio — accueil">
+    <img class="brand-mark" src="assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="42" height="42">
+    <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
+  </a>
+  <nav class="home-nav" aria-label="Navigation principale">
+    <a href="boutique.html">Filaments</a>
+    <a href="spacers.html">Spacers</a>
+    <a href="boutique.html#/accessoires">Accessoires</a>
+    <a href="./#contact">Contact</a>
+  </nav>
+  <span class="spacer"></span>
+  <a class="home-dealer" href="dealer.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    Dealer
+  </a>
+  <a class="home-account is-active" href="compte.html" aria-label="Mon compte" title="Mon compte" aria-current="page">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
+  </a>
+  <a class="home-cta" href="boutique.html">Magasiner</a>
+  <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-drawer">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+
+<main class="acct" id="main">
+  <p class="acct-boot" id="acct-boot">Chargement…</p>
+
+  <!-- 1. Courriel -->
+  <section class="acct-center" id="acct-login" hidden>
+    <form class="acct-card" id="acct-email-form" novalidate>
+      <p class="eyebrow">Mon compte</p>
+      <h1>Connexion</h1>
+      <p class="acct-lead">Entre ton courriel : on t'envoie un code à 6 chiffres. Aucun mot de passe.</p>
+      <div class="field">
+        <label for="acct-email">Courriel</label>
+        <input type="email" id="acct-email" inputmode="email" autocomplete="email" maxlength="254" placeholder="ton@courriel.com" spellcheck="false">
+      </div>
+      <input type="text" name="website" class="acct-hp" id="acct-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="acct-submit" type="submit" id="acct-email-btn">Recevoir mon code</button>
+      <p class="acct-status" id="acct-email-status" role="status" aria-live="polite"></p>
+      <p class="acct-legal">Ton compte sert à retrouver tes factures et tes alertes. <a href="confidentialite.html#compte">Confidentialité</a></p>
+    </form>
+  </section>
+
+  <!-- 2. Code reçu -->
+  <section class="acct-center" id="acct-code" hidden>
+    <form class="acct-card" id="acct-code-form" novalidate>
+      <p class="eyebrow">Mon compte</p>
+      <h1>Ton code</h1>
+      <p class="acct-lead">Envoyé à <b id="acct-code-to"></b>. Il expire dans 10&nbsp;minutes.</p>
+      <div class="field">
+        <label for="acct-code-in">Code à 6 chiffres</label>
+        <input type="text" id="acct-code-in" class="acct-code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false">
+      </div>
+      <button class="acct-submit" type="submit" id="acct-code-btn">Me connecter</button>
+      <p class="acct-status" id="acct-code-status" role="status" aria-live="polite"></p>
+      <div class="acct-links">
+        <button type="button" class="acct-link" id="acct-resend">Renvoyer le code</button>
+        <button type="button" class="acct-link" id="acct-change">Changer de courriel</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 3. Première connexion : le nom -->
+  <section class="acct-center" id="acct-welcome" hidden>
+    <form class="acct-card" id="acct-welcome-form" novalidate>
+      <p class="eyebrow">Bienvenue</p>
+      <h1>Ton nom</h1>
+      <p class="acct-lead">Pour qu'on reconnaisse tes achats.</p>
+      <div class="field">
+        <label for="acct-w-name">Nom</label>
+        <input type="text" id="acct-w-name" autocomplete="name" maxlength="80">
+      </div>
+      <div class="field">
+        <label for="acct-w-phone">Téléphone <span class="acct-opt">facultatif</span></label>
+        <input type="tel" id="acct-w-phone" autocomplete="tel" maxlength="30">
+      </div>
+      <button class="acct-submit" type="submit" id="acct-w-btn">Continuer</button>
+      <p class="acct-status" id="acct-w-status" role="status" aria-live="polite"></p>
+    </form>
+  </section>
+
+  <!-- 4. Espace client -->
+  <section class="acct-home" id="acct-home" hidden>
+    <header class="acct-head">
+      <div class="acct-head-tx">
+        <p class="eyebrow">Mon compte</p>
+        <h1 id="acct-hello">Bonjour</h1>
+        <p class="acct-sub" id="acct-sub"></p>
+      </div>
+      <button class="acct-out" id="acct-logout" type="button">Se déconnecter</button>
+    </header>
+
+    <nav class="acct-tabs" aria-label="Mon compte">
+      <a href="#/commandes" data-tab="commandes">Commandes</a>
+      <a href="#/alertes" data-tab="alertes">Alertes<b class="acct-n" id="acct-n-alerts" hidden></b></a>
+      <a href="#/infos" data-tab="infos">Profil</a>
+    </nav>
+
+    <div class="acct-panel" data-panel="commandes" id="acct-orders"></div>
+    <div class="acct-panel" data-panel="alertes" id="acct-alerts" hidden></div>
+    <div class="acct-panel" data-panel="infos" hidden>
+      <form class="acct-card acct-wide" id="acct-infos-form" novalidate>
+        <h2>Coordonnées</h2>
+        <div class="acct-grid">
+          <div class="field">
+            <label for="acct-i-email">Courriel</label>
+            <input type="email" id="acct-i-email" disabled>
+          </div>
+          <div class="field">
+            <label for="acct-i-name">Nom</label>
+            <input type="text" id="acct-i-name" autocomplete="name" maxlength="80">
+          </div>
+          <div class="field">
+            <label for="acct-i-phone">Téléphone</label>
+            <input type="tel" id="acct-i-phone" autocomplete="tel" maxlength="30">
+          </div>
+        </div>
+        <div class="acct-actions">
+          <button class="acct-submit" type="submit" id="acct-i-btn">Enregistrer</button>
+          <p class="acct-status" id="acct-i-status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+      <div class="acct-card acct-wide acct-danger">
+        <h2>Supprimer mon compte</h2>
+        <p>Ton compte et tes alertes sont effacés. Tes factures restent dans nos dossiers (obligation fiscale).</p>
+        <button class="acct-del" id="acct-delete" type="button">Supprimer mon compte</button>
+        <p class="acct-status" id="acct-del-status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Facture à imprimer (seule visible à l'impression) -->
+<div class="acct-print" id="acct-print" aria-hidden="true"></div>
+
+<footer class="site-foot">
+  <div class="foot-inner">
+    <div class="foot-brand">
+      <a class="brand" href="./" aria-label="Création Audio — accueil">
+        <img class="brand-mark" src="assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="42" height="42">
+        <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
+      </a>
+      <p>Filaments d'impression 3D et spacers audio, dans la région de Québec.</p>
+      <div class="foot-contact">
+        <a class="foot-pill" href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
+        <a class="foot-pill" href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
+      </div>
+    </div>
+    <nav class="foot-col" aria-label="Boutique">
+      <h4>Boutique</h4>
+      <a href="boutique.html">Filaments</a>
+      <a href="spacers.html">Spacers &amp; adaptateurs</a>
+      <a href="boutique.html#/accessoires">Accessoires</a>
+    </nav>
+    <nav class="foot-col" aria-label="Aide">
+      <h4>Aide</h4>
+      <a href="./#etapes">Comment commander</a>
+      <a href="./#contact">Nous joindre</a>
+      <a href="compte.html">Mon compte</a>
+      <a href="dealer.html">Espace dealer</a>
+    </nav>
+    <nav class="foot-col" aria-label="Légal">
+      <h4>Légal</h4>
+      <a href="confidentialite.html">Confidentialité</a>
+      <a href="conditions.html">Conditions d'utilisation</a>
+      <a href="retours.html">Retours &amp; remboursements</a>
+    </nav>
+  </div>
+  <div class="foot-sign" aria-hidden="true">Création Audio</div>
+  <div class="foot-bottom">
+    <div class="foot-bottom-inner">
+      <span>© <span id="year">2026</span> Création Audio · NEQ 2282510769 · Québec (QC)</span>
+      <span class="foot-made"><span class="dot" aria-hidden="true"></span>Entreprise locale · Québec</span>
+    </div>
+  </div>
+</footer>
+
+<div class="nav-backdrop" id="nav-backdrop" hidden></div>
+<aside class="nav-drawer" id="nav-drawer" aria-label="Menu">
+  <div class="drawer-head">
+    <img class="brand-mark" src="assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="36" height="36">
+    <button class="close" id="nav-close" type="button" aria-label="Fermer le menu">&times;</button>
+  </div>
+  <nav class="drawer-links" aria-label="Menu mobile">
+    <a href="./">Accueil</a>
+    <a href="boutique.html">Filaments</a>
+    <a href="spacers.html">Spacers</a>
+    <a href="boutique.html#/accessoires">Accessoires</a>
+    <a href="./#contact">Contact</a>
+  </nav>
+  <div class="drawer-cta">
+    <a class="primary" href="boutique.html">Magasiner les filaments</a>
+    <a class="secondary" href="compte.html">Mon compte</a>
+    <a class="secondary" href="dealer.html">Espace dealer</a>
+  </div>
+  <div class="drawer-foot">
+    <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> ·
+    <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a><br>
+    Ramassage local à Québec · Aucun paiement en ligne
+  </div>
+</aside>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="assets/supabase-config.js?v=1"></script>
+<script src="assets/nav.js?v=3"></script>
+<script src="assets/compte.js?v=1"></script>
+</body>
+</html>

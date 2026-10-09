@@ -1288,6 +1288,302 @@ revoke all on function public.auth_gate_ok(text)    from public, anon, authentic
 grant execute on function public.auth_gate_begin(text) to service_role;
 grant execute on function public.auth_gate_ok(text)    to service_role;
 
+-- ============================================================
+-- COMPTES CLIENTS (étape 1) — connexion par CODE reçu par courriel
+-- Pas de mot de passe. L'Edge Function « compte-code » envoie un code à
+-- 6 chiffres (Resend), le vérifie (5 essais, 10 min), PUIS crée l'utilisateur
+-- Supabase Auth s'il n'existe pas et rend une session à la page compte.html.
+-- Un compte = auth.users + une ligne customers. L'admin relie le compte à une
+-- fiche « clients » (onglet Clients) : le client voit alors les factures de
+-- cette fiche (invoices.client_id) — jamais les coûts ni la marge.
+-- Le client ne lit AUCUNE table directement : RPC me_* seulement.
+-- Loi 25 : compte supprimé après 3 ans sans connexion (job customers-cleanup)
+-- ou à sa demande (me_delete) ; les factures restent (obligation fiscale).
+-- ------------------------------------------------------------
+create table if not exists public.customers (
+  id           uuid primary key references auth.users(id) on delete cascade,
+  email        text not null,
+  name         text,
+  phone        text,
+  client_id    uuid unique references public.clients(id) on delete set null,   -- fiche reliée par l'admin
+  can_reserve  boolean not null default false,                                  -- réservations (étape 3)
+  created_at   timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  linked_at    timestamptz
+);
+alter table public.customers enable row level security;
+drop policy if exists customers_admin_all on public.customers;
+create policy customers_admin_all on public.customers for all to authenticated
+  using  ( (select public.is_admin()) )
+  with check ( (select public.is_admin()) );
+
+-- facture -> fiche client (ce qui la rend visible au compte relié à cette fiche)
+alter table public.invoices add column if not exists client_id uuid references public.clients(id) on delete set null;
+create index if not exists invoices_client_idx on public.invoices (client_id);
+
+-- Nouvelle facture d'un client : reliée d'office à LA fiche du même nom (s'il n'y
+-- en a qu'une). Nom changé à la modification : on relie de nouveau.
+create or replace function public._invoice_link_client()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare v_ids uuid[];
+begin
+  if new.client_type is distinct from 'client' then return new; end if;
+  if tg_op = 'UPDATE' then
+    if new.client_name is not distinct from old.client_name then return new; end if;
+    if new.client_id is not distinct from old.client_id then new.client_id := null; end if;
+  end if;
+  if new.client_id is not null or coalesce(btrim(new.client_name), '') = '' then return new; end if;
+  select array_agg(c.id) into v_ids from public.clients c
+   where lower(btrim(c.name)) = lower(btrim(new.client_name));
+  if coalesce(array_length(v_ids, 1), 0) = 1 then new.client_id := v_ids[1]; end if;
+  return new;
+end $$;
+revoke all on function public._invoice_link_client() from public, anon, authenticated;
+drop trigger if exists invoices_link_client on public.invoices;
+create trigger invoices_link_client before insert or update of client_name, client_type on public.invoices
+  for each row execute function public._invoice_link_client();
+
+-- ---- codes de connexion (schéma private : Edge Function seulement) ----
+create table if not exists private.login_codes (
+  email        text primary key,
+  code_hash    text,                             -- HMAC du code en cours (jamais le code en clair)
+  expires_at   timestamptz,
+  tries        integer not null default 0,       -- mauvais codes pour le code en cours
+  sends        integer not null default 0,       -- envois dans la fenêtre d'une heure
+  window_start timestamptz,
+  last_sent    timestamptz,
+  updated_at   timestamptz not null default now()
+);
+create table if not exists private.login_code_ips (
+  ip           text primary key,
+  sends        integer not null default 0,
+  window_start timestamptz not null default now()
+);
+alter table private.login_codes    enable row level security;   -- aucune policy : fonctions seulement
+alter table private.login_code_ips enable row level security;
+
+create or replace function private._code_hash(p_email text, p_code text)
+returns text language sql stable set search_path = '' as $$
+  select encode(extensions.hmac(convert_to(lower(btrim(p_email)) || E'\n' || p_code, 'UTF8'),
+                                convert_to((select value from private.secrets where key = 'auth_pepper'), 'UTF8'),
+                                'sha256'), 'hex');
+$$;
+revoke all on function private._code_hash(text, text) from public, anon, authenticated;
+
+-- Nouveau code : 1 envoi / 60 s et 5 / heure par courriel, 20 / heure par adresse IP.
+-- -> { allowed, retry_after (s) }
+create or replace function public.compte_code_issue(p_email text, p_ip text, p_code text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := lower(btrim(coalesce(p_email, '')));
+  g private.login_codes;
+  r private.login_code_ips;
+begin
+  if random() < 0.05 then   -- ménage
+    delete from private.login_codes    where updated_at   < now() - interval '1 day';
+    delete from private.login_code_ips where window_start < now() - interval '1 day';
+  end if;
+  if coalesce(p_ip, '') <> '' then
+    insert into private.login_code_ips (ip) values (p_ip) on conflict (ip) do nothing;
+    select * into r from private.login_code_ips where ip = p_ip for update;
+    if r.window_start < now() - interval '1 hour' then r.sends := 0; r.window_start := now(); end if;
+    if r.sends >= 20 then
+      return jsonb_build_object('allowed', false,
+        'retry_after', ceil(extract(epoch from (r.window_start + interval '1 hour' - now())))::int);
+    end if;
+    update private.login_code_ips set sends = r.sends + 1, window_start = r.window_start where ip = p_ip;
+  end if;
+  insert into private.login_codes (email) values (v_email) on conflict (email) do nothing;
+  select * into g from private.login_codes where email = v_email for update;
+  if g.last_sent is not null and g.last_sent > now() - interval '60 seconds' then
+    return jsonb_build_object('allowed', false,
+      'retry_after', ceil(extract(epoch from (g.last_sent + interval '60 seconds' - now())))::int);
+  end if;
+  if g.window_start is null or g.window_start < now() - interval '1 hour' then g.sends := 0; g.window_start := now(); end if;
+  if g.sends >= 5 then
+    return jsonb_build_object('allowed', false,
+      'retry_after', ceil(extract(epoch from (g.window_start + interval '1 hour' - now())))::int);
+  end if;
+  update private.login_codes
+     set code_hash = private._code_hash(v_email, p_code), expires_at = now() + interval '10 minutes', tries = 0,
+         sends = g.sends + 1, window_start = g.window_start, last_sent = now(), updated_at = now()
+   where email = v_email;
+  return jsonb_build_object('allowed', true);
+end $$;
+
+-- Vérifie un code (usage unique ; 5 mauvais codes -> code annulé, en redemander un).
+-- -> { ok } | { ok:false, reason: 'none'|'expired'|'locked'|'invalid', left }
+create or replace function public.compte_code_check(p_email text, p_code text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := lower(btrim(coalesce(p_email, '')));
+  g private.login_codes;
+begin
+  select * into g from private.login_codes where email = v_email for update;
+  if not found or g.code_hash is null then return jsonb_build_object('ok', false, 'reason', 'none'); end if;
+  if g.expires_at < now() then
+    update private.login_codes set code_hash = null, updated_at = now() where email = v_email;
+    return jsonb_build_object('ok', false, 'reason', 'expired');
+  end if;
+  if g.code_hash = private._code_hash(v_email, coalesce(p_code, '')) then
+    update private.login_codes set code_hash = null, tries = 0, updated_at = now() where email = v_email;
+    return jsonb_build_object('ok', true);
+  end if;
+  g.tries := g.tries + 1;
+  if g.tries >= 5 then
+    update private.login_codes set code_hash = null, tries = g.tries, updated_at = now() where email = v_email;
+    return jsonb_build_object('ok', false, 'reason', 'locked');
+  end if;
+  update private.login_codes set tries = g.tries, updated_at = now() where email = v_email;
+  return jsonb_build_object('ok', false, 'reason', 'invalid', 'left', 5 - g.tries);
+end $$;
+
+-- Connexion réussie : crée/actualise la ligne du compte. -> { needs_name }
+create or replace function public.compte_touch(p_id uuid, p_email text)
+returns jsonb language sql security definer set search_path = '' as $$
+  insert into public.customers as c (id, email) values (p_id, lower(btrim(p_email)))
+  on conflict (id) do update set email = excluded.email, last_seen_at = now()
+  returning jsonb_build_object('needs_name', coalesce(btrim(c.name), '') = '');
+$$;
+
+revoke all on function public.compte_code_issue(text, text, text) from public, anon, authenticated;
+revoke all on function public.compte_code_check(text, text)       from public, anon, authenticated;
+revoke all on function public.compte_touch(uuid, text)            from public, anon, authenticated;
+grant execute on function public.compte_code_issue(text, text, text) to service_role;
+grant execute on function public.compte_code_check(text, text)       to service_role;
+grant execute on function public.compte_touch(uuid, text)            to service_role;
+
+-- ---- ce que le client connecté peut lire / faire (compte.html) ----
+create or replace function public.me_account()
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); c public.customers;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  update public.customers set last_seen_at = now() where id = v_uid returning * into c;
+  if not found then
+    insert into public.customers (id, email) values (v_uid, lower((select auth.jwt()) ->> 'email')) returning * into c;
+  end if;
+  return jsonb_build_object('email', c.email, 'name', c.name, 'phone', c.phone,
+    'linked', c.client_id is not null, 'can_reserve', c.can_reserve, 'created_at', c.created_at);
+end $$;
+
+create or replace function public.me_update(p_name text, p_phone text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_name text := btrim(coalesce(p_name, '')); v_phone text := nullif(btrim(coalesce(p_phone, '')), '');
+begin
+  if (select auth.uid()) is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  if v_name = '' or length(v_name) > 80 then raise exception 'Nom invalide.'; end if;
+  if length(coalesce(v_phone, '')) > 30 then raise exception 'Téléphone invalide.'; end if;
+  update public.customers set name = v_name, phone = v_phone where id = (select auth.uid());
+  return public.me_account();
+end $$;
+
+-- Factures de la fiche reliée — SANS coût, marge ni stock.
+create or replace function public.me_invoices()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(x order by x ->> 'invoice_date' desc, x ->> 'number' desc), '[]'::jsonb) from (
+    select jsonb_build_object(
+      'id', i.id, 'number', i.number, 'invoice_date', i.invoice_date, 'status', i.status, 'category', i.category,
+      'client_name', i.client_name, 'client_contact', i.client_contact,
+      'client_address', i.client_address, 'client_city', i.client_city, 'note', i.note,
+      'tax_enabled', i.tax_enabled, 'subtotal', i.subtotal, 'tax_gst', i.tax_gst, 'tax_qst', i.tax_qst, 'total', i.total,
+      'lines', coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'label', l.label, 'meta', l.meta, 'kind', l.kind, 'ptype', l.ptype, 'qty', l.qty,
+          'unit_price', l.unit_price, 'line_total', l.line_total, 'qty_pending', coalesce(l.qty_pending, 0),
+          'hex', (select p.hex from public.products p where p.id = l.product_id)
+        ) order by l.sort_order, l.id)
+        from public.invoice_lines l where l.invoice_id = i.id), '[]'::jsonb)) as x
+    from public.invoices i
+    join public.customers c on c.client_id = i.client_id
+    where c.id = (select auth.uid()) and i.status in ('final', 'cancelled')
+  ) s;
+$$;
+
+-- Alertes « M'aviser » ouvertes à son courriel.
+create or replace function public.me_waitlist()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'id', w.id, 'kind', w.kind, 'created_at', w.created_at, 'expires_at', w.expires_at,
+      'type', p.type, 'name', p.name, 'brand', p.brand, 'material', p.material, 'hex', p.hex, 'slug', p.slug,
+      'brand_slug', b.slug, 'material_slug', m.slug
+    ) order by w.created_at desc), '[]'::jsonb)
+  from public.waitlist w
+  join public.products p on p.id = w.product_id
+  left join public.brands b on b.name = p.brand
+  left join public.materials m on m.brand = p.brand and m.name = p.material
+  where w.status = 'open' and w.source = 'site'
+    and lower(w.contact) = lower((select auth.jwt()) ->> 'email');
+$$;
+
+create or replace function public.me_waitlist_cancel(p_id uuid)
+returns boolean language plpgsql security definer set search_path = '' as $$
+begin
+  update public.waitlist set status = 'expired', contact = null, name = null
+   where id = p_id and status = 'open' and source = 'site'
+     and lower(contact) = lower((select auth.jwt()) ->> 'email');
+  return found;
+end $$;
+
+-- Supprimer mon compte (Loi 25) : compte + alertes. Les factures restent (obligation
+-- fiscale) ; un compte admin ou dealer garde son accès (seule la ligne client part).
+create or replace function public.me_delete()
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); v_email text := lower((select auth.jwt()) ->> 'email');
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  update public.waitlist set status = 'expired', contact = null, name = null
+   where status = 'open' and source = 'site' and lower(contact) = v_email;
+  delete from public.customers where id = v_uid;
+  if v_email <> 'creationaudio.ca@gmail.com'
+     and not exists (select 1 from public.dealers d where lower(d.email) = v_email) then
+    delete from auth.users where id = v_uid;
+  end if;
+  return true;
+end $$;
+
+revoke all on function public.me_account()              from public, anon;
+revoke all on function public.me_update(text, text)     from public, anon;
+revoke all on function public.me_invoices()             from public, anon;
+revoke all on function public.me_waitlist()             from public, anon;
+revoke all on function public.me_waitlist_cancel(uuid)  from public, anon;
+revoke all on function public.me_delete()               from public, anon;
+grant execute on function public.me_account()             to authenticated;
+grant execute on function public.me_update(text, text)    to authenticated;
+grant execute on function public.me_invoices()            to authenticated;
+grant execute on function public.me_waitlist()            to authenticated;
+grant execute on function public.me_waitlist_cancel(uuid) to authenticated;
+grant execute on function public.me_delete()              to authenticated;
+
+-- Coordonnées de l'entreprise imprimées sur la facture (Réglages › Entreprise,
+-- recopiées ici par l'admin) : le client réimprime ses factures à l'identique.
+create or replace function public.company_public()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce((select jsonb_strip_nulls(jsonb_build_object(
+      'name', v -> 'name', 'tagline', v -> 'tagline', 'address', v -> 'address', 'city', v -> 'city',
+      'email', v -> 'email', 'phone', v -> 'phone', 'gst', v -> 'gst', 'qst', v -> 'qst', 'logo', v -> 'logo'))
+    from (select value as v from public.admin_settings where key = 'entreprise') s), '{}'::jsonb);
+$$;
+revoke all on function public.company_public() from public, anon;
+grant execute on function public.company_public() to authenticated;
+
+-- 3 ans sans connexion -> compte supprimé (sauf admin / dealer : seule la ligne client part).
+create or replace function public.customers_cleanup()
+returns integer language plpgsql security definer set search_path = '' as $$
+declare n integer;
+begin
+  delete from auth.users u using public.customers c
+   where c.id = u.id and c.last_seen_at < now() - interval '3 years'
+     and lower(u.email) <> 'creationaudio.ca@gmail.com'
+     and not exists (select 1 from public.dealers d where lower(d.email) = lower(u.email));
+  get diagnostics n = row_count;
+  delete from public.customers where last_seen_at < now() - interval '3 years';
+  return n;
+end $$;
+revoke all on function public.customers_cleanup() from public, anon, authenticated;
+select cron.unschedule(jobid) from cron.job where jobname = 'customers-cleanup';
+select cron.schedule('customers-cleanup', '30 4 * * *', 'select public.customers_cleanup()');
+
 -- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------

@@ -4,6 +4,7 @@
      Échap, focus renvoyé au burger.
    - Ombre de l'en-tête dès qu'on défile (.is-scrolled).
    - Année du pied de page (#year).
+   - Point « connecté » sur le bouton Mon compte (.home-account.is-in).
    Chargé par toutes les pages publiques.
    ========================================================= */
 (function () {
@@ -20,6 +21,11 @@
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
   }
+
+  /* ---- client connecté (compte.html range sa session sous « ca-compte-auth ») : point sur « Mon compte » ---- */
+  var signedIn = false;
+  try { signedIn = !!localStorage.getItem('ca-compte-auth'); } catch (e) {}
+  Array.prototype.forEach.call(document.querySelectorAll('.home-account'), function (a) { a.classList.toggle('is-in', signedIn); });
 
   /* ---- tiroir mobile ---- */
   var burger = $('#nav-burger'), drawer = $('#nav-drawer'), backdrop = $('#nav-backdrop'), closeBtn = $('#nav-close');
