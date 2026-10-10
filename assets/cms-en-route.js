@@ -159,31 +159,35 @@
       .then(function () {}, function () {});
   }
 
-  // n° de commande : « ca785184293604298752 » (Bambu), ou « Order #… / Commande n° … »
-  function findOrderNumber(text) {
-    var m = text.match(/\b([a-z]{2}\d{12,})\b/i);
-    if (m) return m[1];
-    m = text.match(/(?:order|commande)\s*(?:no\.?|number|num[ée]ro|n°|#)\s*:?\s*([A-Z0-9][A-Z0-9-]{4,})/i);
-    return m ? m[1] : '';
+  // n° de commande : « ca785184293604298752 » (Bambu), « Order #ECA55314 » (Elegoo), « Commande n° … »
+  function findOrderNumbers(text) {
+    var out = [], m, re = /(?:order|commande)\s*(?:no\.?|number|num[ée]ro|n°|#)\s*:?\s*([A-Z0-9][A-Z0-9-]{4,})/gi;
+    var bambu = text.match(/\b([a-z]{2}\d{12,})\b/gi) || [];
+    while ((m = re.exec(text))) out.push(m[1]);
+    return bambu.concat(out).filter(function (v, i, a) { return a.indexOf(v) === i; });
   }
 
-  // Format Bambu : « Matériau » puis « Couleur (code) / Refill|Spool|Filament with spool / 1kg »,
-  // puis « x N », un rabais éventuel, le total payé de la ligne puis le prix d'origine.
-  var ANCHOR = /^(.+?)\s*\((\d{4,6})\)\s*\/\s*([^/]+?)\s*\/\s*[\d.,]+\s*k?g\b/i;
   var PRICE = /^(?:CA)?\$\s*([\d,]*\d(?:\.\d{1,2})?)\s*$|^([\d,]*\d\.\d{2})\s*\$?$/;
   function priceOf(line) {
     var m = line.match(PRICE); if (!m) return null;
     return parseFloat(String(m[1] || m[2]).replace(/,/g, ''));
   }
-  function parseRules(text) {
-    var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); });
+  // prix payé de la ligne = le plus petit des montants du bloc (prix d'origine / total après rabais),
+  // quel que soit l'ordre (Bambu : payé puis origine ; Elegoo : origine puis payé)
+  function paidOf(lines, from, to) {
+    var prices = [];
+    for (var j = from; j < to; j++) { var p = priceOf(lines[j]); if (p != null) prices.push(p); }
+    return prices.length ? Math.min.apply(null, prices) : null;
+  }
+
+  // Bambu : « Matériau » puis « Couleur (code) / Refill|Spool|Filament with spool / 1kg », « x N », prix.
+  var BAMBU = /^(.+?)\s*\((\d{4,6})\)\s*\/\s*([^/]+?)\s*\/\s*[\d.,]+\s*k?g\b/i;
+  function parseBambu(lines) {
     var anchors = [];
-    lines.forEach(function (l, i) { if (ANCHOR.test(l)) anchors.push(i); });
+    lines.forEach(function (l, i) { if (BAMBU.test(l)) anchors.push(i); });
     return anchors.map(function (i, n) {
-      var m = lines[i].match(ANCHOR);
+      var m = lines[i].match(BAMBU);
       var color = m[1].trim(), code = m[2], typeStr = m[3];
-      var kind = /refill|recharge/i.test(typeStr) ? 'refill' : 'spool';
-      // matériau = ligne non vide juste au-dessus (ni prix, ni quantité, ni rabais)
       var material = '';
       for (var k = i - 1; k >= 0 && k >= i - 4; k--) {
         var t = lines[k];
@@ -191,29 +195,73 @@
         material = t; break;
       }
       var end = n + 1 < anchors.length ? anchors[n + 1] : lines.length;
-      var qty = null, prices = [];
+      var qty = null;
       for (var j = i + 1; j < end; j++) {
-        var t2 = lines[j];
-        var q = t2.match(/^(?:x|qt[ée]?\.?|quantit[ée]\s*:?)\s*(\d+)$/i);
-        if (q && qty == null) { qty = parseInt(q[1], 10); continue; }
-        var p = priceOf(t2);
-        if (p != null) prices.push(p);
+        var q = lines[j].match(/^(?:x|qt[ée]?\.?|quantit[ée]\s*:?)\s*(\d+)$/i);
+        if (q) { qty = parseInt(q[1], 10); break; }
       }
       if (qty == null) {   // ancien format : quantité seule sur une ligne au-dessus
         for (var b = i - 1; b >= 0 && b >= i - 3; b--) { if (/^\d+$/.test(lines[b])) { qty = parseInt(lines[b], 10); break; } }
       }
       qty = qty || 1;
-      // 1er prix = total payé de la ligne (après rabais), le suivant = prix d'origine
-      var paid = prices.length ? prices[0] : null;
-      return {
-        label: (material ? material + ' · ' : '') + color + ' (' + code + ')',
-        material: material, color: color, code: code, kind: kind, qty: qty,
-        unitCost: paid != null ? round2(paid / qty) : null
-      };
+      var paid = paidOf(lines, i + 1, end);
+      return { at: i, brand: 'bambu', label: (material ? material + ' · ' : '') + color + ' (' + code + ')',
+        material: material, color: color, code: code, kind: /refill|recharge/i.test(typeStr) ? 'refill' : 'spool', qty: qty,
+        unitCost: paid != null ? round2(paid / qty) : null };
     });
   }
 
-  // rattache une ligne lue à un produit : correction retenue > code > matériau + couleur
+  // Elegoo (boutique Shopify) : « Produit », « Quantity2 », « Produit » répété, puis la variante :
+  // « Filament with spool / Black », « Refill / Beige », « PETG / Black » ou juste « Silk Blue Purple » ;
+  // ensuite « $24.99/ea », rabais « (-$5.99) », prix d'origine, total payé.
+  var QTY = /^quantit(?:y|é|e)\s*:?\s*(\d+)$/i;
+  function parseShop(lines) {
+    var anchors = [];
+    lines.forEach(function (l, i) { if (QTY.test(l)) anchors.push(i); });
+    var titleAt = function (i) { for (var k = i - 1; k >= 0; k--) { if (lines[k]) return k; } return -1; };
+    return anchors.map(function (i, n) {
+      var ti = titleAt(i), title = ti > -1 ? lines[ti] : '';
+      var qty = parseInt(lines[i].match(QTY)[1], 10) || 1;
+      var j = i + 1;
+      while (j < lines.length && !lines[j]) j++;
+      if (j < lines.length && norm(lines[j]) === norm(title)) j++;
+      while (j < lines.length && !lines[j]) j++;
+      var variant = j < lines.length && priceOf(lines[j]) == null && !/^\(/.test(lines[j]) ? lines[j] : '';
+      var end = n + 1 < anchors.length ? titleAt(anchors[n + 1]) : lines.length;
+      var parts = variant.split('/').map(function (s) { return s.trim(); }).filter(Boolean);
+      var kind = 'spool', material = title, color = parts.length ? parts[parts.length - 1] : '';
+      if (parts.length > 1) {
+        var first = parts[0];
+        if (/refill|recharge/i.test(first)) kind = 'refill';
+        else if (!/spool|bobine/i.test(first)) material = first;      // « 3 kg Filament Spool » / « PETG / Black »
+      }
+      var paid = paidOf(lines, j + 1, end);
+      return { at: i, brand: 'elegoo', label: title + (variant ? ' · ' + variant : ''),
+        material: material, color: color, code: '', kind: kind, qty: qty,
+        unitCost: paid != null ? round2(paid / qty) : null };
+    });
+  }
+
+  function parseRules(text) {
+    var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); });
+    return parseBambu(lines).concat(parseShop(lines)).sort(function (a, z) { return a.at - z.at; });
+  }
+
+  // distance d'édition (fautes de frappe : Magenta / Megenta, Grey / Gray)
+  function lev(a, b) {
+    if (a === b) return 0;
+    var prev = [], cur, i, j;
+    for (j = 0; j <= b.length; j++) prev[j] = j;
+    for (i = 1; i <= a.length; i++) {
+      cur = [i];
+      for (j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+
+  // rattache une ligne lue à un produit : correction retenue > code > marque + matériau + couleur
+  // (exacte, puis sans le mot du matériau — « Silk Blue Purple » = « Blue Purple » —, puis à une faute près)
   function match(r) {
     var fils = inv().filaments();
     var a = aliases[norm(r.label)];
@@ -222,10 +270,25 @@
       var byCode = fils.filter(function (f) { return f.code && String(f.code).trim() === String(r.code).trim(); });
       if (byCode.length === 1) return { pid: byCode[0].id, kind: r.kind, how: 'code' };
     }
-    var nm = norm(r.material), nc = norm(r.color);
-    if (nc) {
-      var exact = fils.filter(function (f) { return norm(f.material) === nm && norm(f.name) === nc; });
-      if (exact.length === 1) return { pid: exact[0].id, kind: r.kind, how: 'nom' };
+    var pool = fils;
+    if (r.brand) {
+      var ofBrand = fils.filter(function (f) { return norm(f.brand).indexOf(r.brand) > -1; });
+      if (ofBrand.length) pool = ofBrand;
+    }
+    var nm = norm(r.material);
+    var mats = pool.filter(function (f) { return norm(f.material) === nm; });
+    // matériau absent du catalogue de cette marque (ex. PETG 3 kg pour l'atelier) : hors catalogue
+    if (!mats.length) return pool !== fils ? { pid: null, how: 'hors' } : null;
+    var drop = nm.split(' ');
+    var key = function (s) { return norm(s).split(' ').filter(function (w) { return drop.indexOf(w) < 0; }).join(' '); };
+    var nc = norm(r.color), kc = key(r.color);
+    var one = function (list, how) { return list.length === 1 ? { pid: list[0].id, kind: r.kind, how: how } : null; };
+    var hit = one(mats.filter(function (f) { return norm(f.name) === nc; }), 'nom') ||
+              one(mats.filter(function (f) { return key(f.name) === kc; }), 'nom');
+    if (hit || !kc) return hit;
+    var scored = mats.map(function (f) { return { f: f, d: lev(key(f.name), kc) }; }).sort(function (x, y) { return x.d - y.d; });
+    if (scored.length && scored[0].d <= Math.min(2, Math.floor(kc.length / 4)) && (scored.length === 1 || scored[1].d > scored[0].d)) {
+      return { pid: scored[0].f.id, kind: r.kind, how: 'proche' };
     }
     return null;
   }
@@ -286,17 +349,20 @@
   function analyse() {
     var text = pasteI.value || '';
     if (!text.trim()) { statusEl.textContent = 'Colle d\'abord ta commande.'; return; }
-    if (!numberI.value.trim()) numberI.value = findOrderNumber(text);
+    // une commande à la fois : la réception retrouve ensuite la bonne commande par son n°
+    var nums = findOrderNumbers(text);
+    if (nums.length > 1) { statusEl.textContent = nums.length + ' commandes dans le texte : colle-les une à la fois.'; return; }
+    if (!numberI.value.trim() && nums.length) numberI.value = nums[0];
     statusEl.textContent = 'Analyse…';
     parseBtn.disabled = true;
     Promise.all([inv().ready(), loadAliases()]).then(function () {
       var found = parseRules(text).map(function (r) {
         var m = match(r);
-        var p = m ? inv().prod(m.pid) : null;
-        return { label: r.label, productId: m ? String(m.pid) : '', kind: p ? inv().fitKind(p, m.kind) : r.kind,
+        var p = m && m.pid ? inv().prod(m.pid) : null;
+        return { label: r.label, productId: p ? String(p.id) : '', kind: p ? inv().fitKind(p, m.kind) : r.kind,
           qty: r.qty, unitCost: r.unitCost, how: m ? m.how : 'aucun', picked: false };
       });
-      var unknown = found.filter(function (r) { return !r.productId; });
+      var unknown = found.filter(function (r) { return r.how === 'aucun'; });   // « hors catalogue » : pas la peine de demander à l'IA
       // tout reconnu par les règles fixes : pas besoin de l'IA
       if (found.length && !unknown.length) return { rows: found, ai: null };
       if (!found.length) statusEl.textContent = 'Lecture IA…';
@@ -322,11 +388,13 @@
       // garde les lignes ajoutées à la main, remplace ce qui avait été lu
       rows = rows.filter(function (r) { return r.how === 'saisi'; }).concat(res.rows);
       renderRows();
-      var miss = rows.filter(function (r) { return !r.productId; }).length;
+      var miss = rows.filter(function (r) { return !r.productId && r.how !== 'hors'; }).length;
+      var off = rows.filter(function (r) { return !r.productId && r.how === 'hors'; }).length;
       var aiMsg = !res.ai ? '' : (res.ai.error === 'no_key' ? ' · lecture IA pas encore activée'
         : res.ai.error ? ' · lecture IA indisponible' : '');
       statusEl.textContent = !rows.length ? 'Rien reconnu' + aiMsg + '.'
-        : rows.length + ' ligne' + (rows.length > 1 ? 's' : '') + (miss ? ' · ' + miss + ' à choisir' : ' · tout reconnu') + aiMsg;
+        : rows.length + ' ligne' + (rows.length > 1 ? 's' : '') + (miss ? ' · ' + miss + ' à choisir' : ' · tout reconnu') +
+          (off ? ' · ' + off + ' hors catalogue' : '') + aiMsg;
     }, function (err) {
       parseBtn.disabled = false;
       statusEl.textContent = 'Erreur : ' + (err && err.message ? err.message : err);
@@ -365,7 +433,8 @@
       (acc.length ? '<optgroup label="Accessoires">' + acc.map(function (a) { return opt(a, inv().label(a)); }).join('') + '</optgroup>' : '');
   }
 
-  var HOW = { code: ['ok', 'Reconnu'], nom: ['ok', 'Reconnu'], appris: ['ok', 'Appris'], ia: ['ia', 'IA'], aucun: ['miss', 'À choisir'] };
+  var HOW = { code: ['ok', 'Reconnu'], nom: ['ok', 'Reconnu'], appris: ['ok', 'Appris'], proche: ['ia', 'Nom proche'], ia: ['ia', 'IA'],
+    aucun: ['miss', 'À choisir'], hors: ['off', 'Hors catalogue'] };
   function renderRows() {
     reviewEl.hidden = false;
     if (!rows.length) { rowsEl.innerHTML = '<tr><td colspan="6" class="po-empty">Aucune ligne.</td></tr>'; renderSum(); return; }
@@ -418,7 +487,7 @@
     if (!valid.length) { statusEl.textContent = 'Choisis au moins un article.'; return; }
     var num = numberI.value.trim() || null;
     if (!skipAsk) {
-      var orphan = rows.filter(function (r) { return !r.productId && r.qty > 0; }).length;
+      var orphan = rows.filter(function (r) { return !r.productId && r.qty > 0 && r.how !== 'hors'; }).length;   // hors catalogue : ignoré sans demander
       var dupCheck = (num && !editingId)
         ? Promise.all([
             sb.from('supplier_orders').select('id').ilike('order_number', num),
