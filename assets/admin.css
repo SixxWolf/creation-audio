@@ -1099,10 +1099,11 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .ms-row .person-av { width:38px; height:38px; font-size:.84rem; }
 .ms-row-tx { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .ms-row-top, .ms-row-bot { display:flex; align-items:center; gap:8px; min-width:0; }
-.ms-row-top b { flex:1; min-width:0; font-size:.93rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ms-row-top { align-items:baseline; }
+.ms-row-top b { flex:1; min-width:0; font-size:.93rem; overflow-wrap:anywhere; }
 .ms-row-top time { flex:none; font-size:.76rem; color:var(--muted); }
-.ms-row-about { font-size:.8rem; font-weight:600; color:var(--ember-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.ms-row-prev { flex:1; min-width:0; font-size:.84rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ms-row-about { font-size:.8rem; font-weight:600; color:var(--ember-ink); overflow-wrap:anywhere; }
+.ms-row-prev { flex:1; min-width:0; font-size:.84rem; color:var(--muted); overflow-wrap:anywhere; }
 .ms-row.is-unread .ms-row-prev { color:var(--ink); font-weight:600; }
 .ms-row .nav-count { margin-left:0; flex:none; }
 
@@ -1121,7 +1122,7 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .ms-day { align-self:center; margin:8px 0 2px; padding:3px 10px; border-radius:100px; background:var(--paper); border:1px solid var(--line);
   font-size:.74rem; font-weight:600; color:var(--muted); }
 .ms-b { max-width:min(78%, 640px); padding:9px 12px 6px; border-radius:16px; font-size:.93rem; line-height:1.45; }
-.ms-b p { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
+.ms-b p { margin:0; white-space:pre-line; overflow-wrap:anywhere; }
 .ms-b time { display:block; margin-top:3px; font-size:.7rem; color:var(--muted); }
 .ms-b.them { align-self:flex-start; background:var(--paper); border:1px solid var(--line); border-bottom-left-radius:6px; }
 .ms-b.me { align-self:flex-end; background:color-mix(in srgb, var(--ember) 16%, var(--paper)); border-bottom-right-radius:6px; }
@@ -1148,11 +1149,14 @@ td.num input, .catalog-table input.catcost { text-align:right; }
   .ms-wrap { grid-template-columns:minmax(0, 1fr); height:auto; min-height:0; }
   .ms-wrap.has-conv .ms-list { display:none; }
   .ms-wrap:not(.has-conv) .ms-thread { display:none; }
-  .ms-thread { height:calc(100dvh - 190px); min-height:480px; }
+  [data-panel="messages"]:has(.ms-wrap.has-conv) .panel-head { display:none; }   /* fil ouvert : ← ramène à la liste */
+  .ms-thread { height:calc(100dvh - 110px); min-height:420px; }
   .ms-back { display:inline-flex; }
 }
 @media (max-width:640px) {
   .ms-head { flex-wrap:wrap; }
+  .ms-head .person-av { display:none; }
+  .ms-head { align-items:flex-start; }
   .ms-acts { flex-basis:100%; }
   .ms-b { max-width:88%; }
 }

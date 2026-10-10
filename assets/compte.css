@@ -145,7 +145,7 @@
   cursor:pointer; background:none; border:none; border-radius:inherit; }
 .cv-btn:hover .al-tx b { color:var(--ember-ink); }
 .cv-btn:focus-visible { outline:3px solid var(--ember-ink); outline-offset:-3px; }
-.cv-btn .al-tx small { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cv-btn .al-tx small { overflow-wrap:anywhere; }
 .cv.is-unread .al-tx small { color:var(--ink); font-weight:600; }
 .cv-st { flex:none; font-size:.78rem; font-weight:700; color:var(--good); }
 

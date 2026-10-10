@@ -254,11 +254,12 @@
     var list = Array.prototype.slice.call(files || []).filter(function (f) { return /^image\//.test(f.type); });
     if (list.length > MAX_PHOTOS - photos.length && st) st.textContent = 'Au plus ' + MAX_PHOTOS + ' photos par message.';
     list = list.slice(0, Math.max(0, MAX_PHOTOS - photos.length));
-    Promise.all(list.map(function (f) {
+    photoJob = Promise.all([photoJob].concat(list.map(function (f) {
       return shrink(f).then(function (b) { photos.push({ blob: b, url: URL.createObjectURL(b) }); },
         function () { if (st) st.textContent = 'Format de photo non pris en charge.'; });
-    })).then(paintThumbs);
+    }))).then(paintThumbs);
   }
+  var photoJob = Promise.resolve();   // réduction des photos en cours : l'envoi l'attend
   function paintThumbs() {
     var box = $('.ms-thumbs', threadEl); if (!box) return;
     box.innerHTML = photos.map(function (p, i) {
@@ -273,10 +274,16 @@
   function send() {
     var c = conv(); if (!c || busy) return;
     var ta = $('#ms-reply-in', threadEl), btn = $('.ms-send', threadEl), st = $('#ms-status', threadEl);
-    var body = ta.value.trim();
-    if (!body && !photos.length) { ta.focus(); return; }
-    busy = true; btn.disabled = true; st.textContent = 'Envoi…';
-    Promise.all(photos.map(function (p) {
+    busy = true; btn.disabled = true;
+    photoJob.then(function () {
+      var body = ta.value.trim();
+      if (!body && !photos.length) { busy = false; btn.disabled = false; ta.focus(); return; }
+      st.textContent = 'Envoi…';
+      return sendNow(c, body, ta, btn, st);
+    });
+  }
+  function sendNow(c, body, ta, btn, st) {
+    return Promise.all(photos.map(function (p) {
       var path = c.customer_id + '/' + uuid() + '.jpg';
       return sb.storage.from('messages').upload(path, p.blob, { contentType: 'image/jpeg', upsert: false }).then(function (r) {
         if (r.error) throw new Error('Photo non envoyée : ' + r.error.message);

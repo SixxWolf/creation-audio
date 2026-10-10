@@ -512,7 +512,7 @@
         (un ? '<span class="acct-n">' + un + '</span>' : c.status === 'closed' ? '<span class="cv-st">Réglée</span>' : '') +
         '<span class="al-date">' + esc(fmtDate(c.updated_at, false)) + '</span></button></li>';
     }).join('') + '</ul>';
-    $('.cv-new', msgsEl).addEventListener('click', function () { openMsg({ topic: 'autre', ref: '' }); });
+    $('.cv-new', msgsEl).addEventListener('click', function () { openMsg({ topic: '', ref: '' }); });
     $$('.cv-btn', msgsEl).forEach(function (b) { b.addEventListener('click', function () { openMsg({ conv: b.getAttribute('data-id') }); }); });
   }
   document.addEventListener('ca:msg-change', function () { if (acct) loadMsgs(); });

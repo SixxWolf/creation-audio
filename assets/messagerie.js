@@ -136,12 +136,14 @@
     var room = MAX_PHOTOS - st.photos.length;
     if (list.length > room) say(statusEl, 'Au plus ' + MAX_PHOTOS + ' photos par message.', 'bad');
     list = list.slice(0, Math.max(0, room));
-    if (!list.length) return Promise.resolve();
-    return Promise.all(list.map(function (f) {
+    if (!list.length) return photoJob;
+    photoJob = Promise.all([photoJob].concat(list.map(function (f) {
       return shrink(f).then(function (b) { st.photos.push({ blob: b, url: URL.createObjectURL(b) }); },
         function () { say(statusEl, 'Format de photo non pris en charge : envoie une photo JPEG ou PNG.', 'bad'); });
-    })).then(function () { paintThumbs(); });
+    }))).then(function () { paintThumbs(); });
+    return photoJob;
   }
+  var photoJob = Promise.resolve();   // réduction des photos en cours : tout envoi l'attend
   function paintThumbs() {
     if (!panel) return;
     $$('.msg-thumbs', panel).forEach(function (box) {
@@ -220,7 +222,7 @@
       '</header>' +
       '<div class="msg-main" id="msg-main"></div>' +
       '<p class="msg-alt">Tu préfères&nbsp;? <a href="' + FB + '" target="_blank" rel="noopener">Messenger</a> · ' +
-        '<a href="mailto:' + EMAIL + '">' + EMAIL + '</a></p>';
+        '<a href="mailto:' + EMAIL + '">Courriel</a></p>';
     document.body.appendChild(backdrop); document.body.appendChild(panel);
     main = $('#msg-main', panel); titleEl = $('#msg-title', panel); subEl = $('#msg-sub', panel);
     backBtn = $('.msg-back', panel); altEl = $('.msg-alt', panel);
@@ -260,7 +262,8 @@
     };
     panel.hidden = false; backdrop.hidden = false;
     document.documentElement.classList.add('msg-open');
-    requestAnimationFrame(function () { panel.classList.add('is-open'); backdrop.classList.add('is-open'); });
+    void panel.offsetWidth;                                   // reflow : la transition part de translateX(100%)
+    panel.classList.add('is-open'); backdrop.classList.add('is-open');
     main.innerHTML = '<p class="msg-empty">Chargement…</p>'; head('Écris-nous', '', false);
 
     var p = getPending();
@@ -355,7 +358,7 @@
     var cv = $('.msg-convs', form); if (cv) cv.addEventListener('click', showList);
     ta.addEventListener('input', function () { st.ctx.body = ta.value; saveDraft(); });
     wirePhotos(form, status);
-    form.addEventListener('submit', function (e) { e.preventDefault(); submitCompose(form, status); });
+    form.addEventListener('submit', function (e) { e.preventDefault(); photoJob.then(function () { submitCompose(form, status); }); });
     focusFirst(st.ctx.topic ? '#msg-body' : 'input[name="msg-topic"]');
   }
   function wirePhotos(scope, status) {
@@ -546,10 +549,10 @@
     var form = $('#msg-reply', main), ta = $('#msg-reply-in', form), status = $('.msg-status', form);
     wirePhotos(form, status);
     ta.addEventListener('input', function () { grow(ta); });
-    ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); reply(); } });
-    form.addEventListener('submit', function (e) { e.preventDefault(); reply(); });
+    ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); photoJob.then(reply); } });
+    form.addEventListener('submit', function (e) { e.preventDefault(); photoJob.then(reply); });
     function reply() {
-      if (st.busy) return;
+      if (st.busy || st.view !== 'thread') return;
       var body = ta.value.trim(), btn = $('.msg-send-ic', form);
       if (!body && !st.photos.length) { ta.focus(); return; }
       st.busy = true; btn.disabled = true; say(status, 'Envoi…');
