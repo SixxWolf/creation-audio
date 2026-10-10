@@ -179,6 +179,25 @@ create policy materials_admin_all
   using  ( (select public.is_admin()) )
   with check ( (select public.is_admin()) );
 
+-- Stock GARDÉ par les réservations en cours (comptes clients, étape 3 — tables
+-- plus bas, section RÉSERVATIONS) : retiré du stock affiché par products_public
+-- tant que la réservation est active et pas expirée (libéré à la seconde près).
+-- plpgsql : le corps n'est validé qu'à l'appel (les tables sont créées plus bas).
+create or replace function public._held_stock()
+returns table (product_id uuid, held_main integer, held_refill integer)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  return query
+    select l.product_id,
+           coalesce(sum(l.qty) filter (where l.kind is distinct from 'refill'), 0)::int,
+           coalesce(sum(l.qty) filter (where l.kind = 'refill'), 0)::int
+      from public.customer_reservation_lines l
+      join public.customer_reservations r on r.id = l.reservation_id
+     where r.status = 'active' and r.expires_at > now() and l.product_id is not null
+     group by l.product_id;
+end $$;
+grant execute on function public._held_stock() to anon, authenticated;   -- appelée par la vue (quantités seulement)
+
 -- ------------------------------------------------------------
 -- VUE publique : produits actifs, SANS les coûts.
 -- Les PRIX proviennent du matériau (jointure) ; repli sur le prix
@@ -234,9 +253,13 @@ with (security_invoker = off) as
     m.specs       as material_specs,     -- fiche : specs libres [{k,v}]
     m.gallery     as material_gallery,   -- fiche : galerie « prints » (chemins d'images)
     m.sort_order  as material_sort,    -- ordre des matériaux (drag-and-drop admin) -> pilote l'ordre boutique
-    p.qty, p.qty_2, p.size, p.sort_order
+    -- stock offert = stock réel − réservations en cours (null = non suivi, reste null)
+    case when p.qty   is null then null else greatest(0, p.qty   - coalesce(h.held_main, 0))   end as qty,
+    case when p.qty_2 is null then null else greatest(0, p.qty_2 - coalesce(h.held_refill, 0)) end as qty_2,
+    p.size, p.sort_order
   from public.products p
   left join public.materials m on m.name = p.material and m.brand = p.brand
+  left join public._held_stock() h on h.product_id = p.id
   where p.active = true;
 
 grant select on public.products_public to anon, authenticated;
@@ -1859,6 +1882,319 @@ grant execute on function public.customer_update_order(uuid, jsonb, text) to aut
 grant execute on function public.customer_cancel_order(uuid)              to authenticated;
 grant execute on function public.me_orders()                               to authenticated;
 grant execute on function public.admin_invoice_customer_order(uuid, uuid)  to authenticated;
+
+-- ============================================================
+-- RÉSERVATIONS (comptes clients, étape 3)
+-- Un client APPROUVÉ (customers.can_reserve, case « Peut réserver » dans Clients)
+-- réserve depuis le panier de la boutique des filaments / accessoires EN STOCK
+-- (jamais les spacers, jamais au-delà du stock : il y a « Commander · délai »).
+-- Gardé 72 h, sans dépôt, sans maximum d'articles : le stock gardé sort de
+-- products_public (fonction _held_stock, plus haut) -> invisible aux autres.
+-- Numéros R-0001. Le client annule lui-même dans Mon compte (sans pénalité).
+-- À l'échéance (pg_cron « reservations-tick », aux 10 min) : « Expirée », stock
+-- libéré, 1 non récupérée comptée ; 2 non récupérées -> réservations suspendues
+-- 60 jours (compteur remis à 0). L'admin : Commandes › Réservations — « Facturer »
+-- (admin_invoice_reservation, pénalité retirée si expirée), « Annuler » (sans
+-- pénalité), « Retirer la pénalité » ; Clients : compteur + « Lever ».
+-- Courriels : Edge Function « reservation-notify » — confirmation (client) + avis
+-- (Création Audio) à la réservation ; avis d'annulation par le client ; rappel
+-- ~12 h avant l'échéance, avis d'expiration et d'annulation par l'admin envoyés
+-- par le tick (pg_net -> la fonction, clé private.secrets « cron_key »).
+-- ------------------------------------------------------------
+alter table public.customers add column if not exists no_shows integer not null default 0;   -- non récupérées (remis à 0 à la suspension)
+alter table public.customers add column if not exists reserve_suspended_until timestamptz;
+
+create sequence if not exists public.customer_reservation_seq;
+create table if not exists public.customer_reservations (
+  id               uuid primary key default gen_random_uuid(),
+  number           text not null unique,                     -- R-0001
+  customer_id      uuid references public.customers(id) on delete set null,
+  email            text not null,                            -- figés à la réservation
+  name             text,
+  phone            text,
+  status           text not null default 'active' check (status in ('active','invoiced','cancelled','expired')),
+  note             text,
+  total            numeric(10,2) not null default 0,
+  expires_at       timestamptz not null,
+  penalized        boolean not null default false,           -- comptée « non récupérée »
+  invoice_id       uuid references public.invoices(id) on delete set null,
+  cancelled_by     text,                                     -- 'client' | 'admin'
+  notified_at      timestamptz,                              -- confirmation envoyée
+  reminded_at      timestamptz,                              -- rappel ~12 h avant
+  closed_mailed_at timestamptz,                              -- avis d'expiration / d'annulation par l'admin
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+create index if not exists customer_reservations_customer_idx on public.customer_reservations (customer_id, created_at desc);
+create index if not exists customer_reservations_status_idx on public.customer_reservations (status, expires_at);
+create table if not exists public.customer_reservation_lines (
+  id             uuid primary key default gen_random_uuid(),
+  reservation_id uuid not null references public.customer_reservations(id) on delete cascade,
+  product_id     uuid references public.products(id) on delete set null,
+  ptype          text,                                       -- filament | accessory
+  kind           text,                                       -- spool | refill | unit
+  name           text not null,
+  meta           text,
+  qty            integer not null check (qty > 0),
+  unit_price     numeric(10,2) not null default 0,
+  line_total     numeric(10,2) not null default 0,
+  sort_order     integer not null default 0
+);
+create index if not exists customer_reservation_lines_res_idx on public.customer_reservation_lines (reservation_id);
+create index if not exists customer_reservation_lines_prod_idx on public.customer_reservation_lines (product_id);
+alter table public.customer_reservations enable row level security;
+alter table public.customer_reservation_lines enable row level security;
+drop policy if exists customer_reservations_admin_all on public.customer_reservations;
+create policy customer_reservations_admin_all on public.customer_reservations for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists customer_reservation_lines_admin_all on public.customer_reservation_lines;
+create policy customer_reservation_lines_admin_all on public.customer_reservation_lines for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+
+-- Non récupérée : +1 ; à 2 -> suspendu 60 jours et compteur remis à 0.
+create or replace function public._reservation_penalize(p_customer uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  update public.customers
+     set no_shows = case when no_shows + 1 >= 2 then 0 else no_shows + 1 end,
+         reserve_suspended_until = case when no_shows + 1 >= 2 then now() + interval '60 days' else reserve_suspended_until end
+   where id = p_customer;
+end $$;
+-- Pénalité retirée : -1 ; si elle avait déclenché la suspension, la suspension est levée.
+create or replace function public._reservation_forgive(p_customer uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  update public.customers
+     set no_shows = case when no_shows > 0 then no_shows - 1
+                         when reserve_suspended_until > now() then 1 else 0 end,
+         reserve_suspended_until = case when no_shows > 0 then reserve_suspended_until else null end
+   where id = p_customer;
+end $$;
+revoke all on function public._reservation_penalize(uuid) from public, anon, authenticated;
+revoke all on function public._reservation_forgive(uuid)  from public, anon, authenticated;
+
+-- Réservation par le client connecté. -> { id, number, total, expires_at }
+create or replace function public.customer_reserve(p_lines jsonb, p_note text default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); c public.customers; v_lines jsonb; v_id uuid; v_num text;
+        v_total numeric; v_short text; v_exp timestamptz := now() + interval '72 hours';
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  select * into c from public.customers where id = v_uid;
+  if not found then raise exception 'Compte introuvable. Reconnecte-toi.' using errcode = '42501'; end if;
+  if not c.can_reserve then raise exception 'Les réservations ne sont pas activées pour ton compte.'; end if;
+  if c.reserve_suspended_until > now() then
+    raise exception 'Réservations suspendues jusqu''au % (2 réservations non récupérées).',
+      to_char(c.reserve_suspended_until at time zone 'America/Toronto', 'DD/MM/YYYY');
+  end if;
+  if (select count(*) from public.customer_reservations where customer_id = v_uid and created_at > now() - interval '1 hour') >= 10 then
+    raise exception 'Trop de réservations en peu de temps. Réessaie plus tard.';
+  end if;
+  -- une réservation à la fois sur le stock : la 2e voit le stock déjà gardé par la 1re
+  perform pg_advisory_xact_lock(hashtext('ca_customer_reservations'));
+  v_lines := public._customer_fill_lines(p_lines);
+  if exists (select 1 from jsonb_array_elements(v_lines) x where x ->> 'ptype' not in ('filament', 'accessory')) then
+    raise exception 'Les spacers ne se réservent pas : envoie-les plutôt en commande.';
+  end if;
+  select string_agg(x ->> 'name' || coalesce(' (' || (x ->> 'meta') || ')', ''), ', ') into v_short
+    from jsonb_array_elements(v_lines) x where (x ->> 'qty_to_order')::int > 0;
+  if v_short is not null then
+    raise exception 'Plus assez de stock pour : %. Ajuste ton panier ou envoie-le en commande.', v_short;
+  end if;
+  select coalesce(sum((x ->> 'line_total')::numeric), 0) into v_total from jsonb_array_elements(v_lines) x;
+  v_num := 'R-' || lpad(nextval('public.customer_reservation_seq')::text, 4, '0');
+  insert into public.customer_reservations (number, customer_id, email, name, phone, note, total, expires_at)
+  values (v_num, v_uid, c.email, c.name, c.phone, nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_exp)
+  returning id into v_id;
+  insert into public.customer_reservation_lines (reservation_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, sort_order)
+  select v_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'sort_order')::int
+    from jsonb_array_elements(v_lines) x;
+  return jsonb_build_object('id', v_id, 'number', v_num, 'total', v_total, 'expires_at', v_exp);
+end $$;
+
+-- Annulation par le client (tant qu'elle est active) : stock libéré, aucune pénalité.
+create or replace function public.customer_cancel_reservation(p_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); r public.customer_reservations;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  select * into r from public.customer_reservations where id = p_id and customer_id = v_uid for update;
+  if not found then raise exception 'Réservation introuvable.'; end if;
+  if r.status <> 'active' or r.expires_at <= now() then raise exception 'Cette réservation n''est plus active.'; end if;
+  update public.customer_reservations set status = 'cancelled', cancelled_by = 'client', updated_at = now() where id = p_id;
+  return jsonb_build_object('id', p_id, 'number', r.number);
+end $$;
+
+-- Mon compte : droit de réserver, suspension, compteur + ses réservations récentes.
+create or replace function public.me_reservations()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'can_reserve', coalesce(c.can_reserve, false),
+    'suspended_until', case when c.reserve_suspended_until > now() then c.reserve_suspended_until end,
+    'no_shows', coalesce(c.no_shows, 0),
+    'list', coalesce((
+      select jsonb_agg(jsonb_build_object(
+          'id', r.id, 'number', r.number,
+          'status', case when r.status = 'active' and r.expires_at <= now() then 'expired' else r.status end,
+          'created_at', r.created_at, 'expires_at', r.expires_at, 'note', r.note, 'total', r.total,
+          'penalized', r.penalized or (r.status = 'active' and r.expires_at <= now()), 'cancelled_by', r.cancelled_by,
+          'invoice_number', (select i.number from public.invoices i where i.id = r.invoice_id),
+          'lines', coalesce((
+            select jsonb_agg(jsonb_build_object(
+              'product_id', l.product_id, 'ptype', l.ptype, 'kind', l.kind, 'name', l.name, 'meta', l.meta, 'qty', l.qty,
+              'unit_price', l.unit_price, 'line_total', l.line_total,
+              'hex', (select p.hex from public.products p where p.id = l.product_id)) order by l.sort_order)
+            from public.customer_reservation_lines l where l.reservation_id = r.id), '[]'::jsonb)
+        ) order by r.created_at desc)
+      from (select * from public.customer_reservations where customer_id = c.id
+            order by created_at desc limit 30) r), '[]'::jsonb))
+  from (select (select auth.uid()) as uid) u
+  left join public.customers c on c.id = u.uid;
+$$;
+
+-- Facture -> fiche du client (fiche du compte, sinon celle qui a son courriel, sinon
+-- nouvelle fiche) ; compte relié à cette fiche s'il ne l'était pas. -> id de la fiche
+create or replace function public._customer_link_invoice(p_customer uuid, p_email text, p_name text, p_phone text, p_invoice uuid)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare c public.customers; v_cid uuid;
+begin
+  if p_customer is null then return null; end if;
+  select * into c from public.customers where id = p_customer;
+  if not found then return null; end if;
+  v_cid := c.client_id;
+  if v_cid is null then
+    select id into v_cid from public.clients where lower(email) = lower(p_email) limit 1;
+    if v_cid is null then
+      insert into public.clients (name, email, phone)
+      values (coalesce(nullif(btrim(p_name), ''), p_email), lower(p_email), p_phone) returning id into v_cid;
+    end if;
+    if exists (select 1 from public.customers x where x.client_id = v_cid and x.id <> c.id) then
+      v_cid := null;   -- fiche déjà reliée à un autre compte : on ne touche à rien
+    else
+      update public.customers set client_id = v_cid, linked_at = now() where id = c.id;
+    end if;
+  end if;
+  if v_cid is not null then update public.invoices set client_id = v_cid where id = p_invoice; end if;
+  return v_cid;
+end $$;
+revoke all on function public._customer_link_invoice(uuid, text, text, text, uuid) from public, anon, authenticated;
+
+-- Admin : réservation facturée (même expirée : la pénalité est alors retirée).
+create or replace function public.admin_invoice_reservation(p_res uuid, p_invoice uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.customer_reservations; v_cid uuid;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into r from public.customer_reservations where id = p_res for update;
+  if not found then raise exception 'Réservation introuvable.'; end if;
+  update public.customer_reservations set status = 'invoiced', invoice_id = p_invoice, penalized = false, updated_at = now()
+   where id = p_res;
+  if r.penalized and r.customer_id is not null then perform public._reservation_forgive(r.customer_id); end if;
+  v_cid := public._customer_link_invoice(r.customer_id, r.email, r.name, r.phone, p_invoice);
+  return jsonb_build_object('client_id', v_cid);
+end $$;
+
+-- Admin : annuler (active -> stock libéré, sans pénalité ; le client est avisé par le tick)
+-- ou retirer la pénalité d'une expirée.
+create or replace function public.admin_reservation_action(p_res uuid, p_action text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.customer_reservations;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into r from public.customer_reservations where id = p_res for update;
+  if not found then raise exception 'Réservation introuvable.'; end if;
+  if p_action = 'cancel' then
+    if r.status not in ('active', 'expired') then raise exception 'Cette réservation est déjà fermée.'; end if;
+    update public.customer_reservations
+       set status = 'cancelled', cancelled_by = 'admin', penalized = false, updated_at = now(),
+           closed_mailed_at = case when r.status = 'active' then null else now() end   -- expirée : déjà avisé
+     where id = p_res;
+    if r.penalized and r.customer_id is not null then perform public._reservation_forgive(r.customer_id); end if;
+  elsif p_action = 'forgive' then
+    if r.status = 'active' and r.expires_at <= now() then   -- échue, pas encore passée au tick : fermée sans pénalité
+      update public.customer_reservations
+         set status = 'expired', penalized = false, closed_mailed_at = now(), updated_at = now() where id = p_res;
+      return jsonb_build_object('ok', true);
+    end if;
+    if not r.penalized then return jsonb_build_object('ok', true); end if;
+    update public.customer_reservations set penalized = false, updated_at = now() where id = p_res;
+    if r.customer_id is not null then perform public._reservation_forgive(r.customer_id); end if;
+  else
+    raise exception 'Action inconnue.';
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- Compte supprimé (Mon compte / ménage 3 ans) : ses réservations actives sont annulées.
+create or replace function public._customer_release_reservations()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update public.customer_reservations
+     set status = 'cancelled', cancelled_by = 'client', updated_at = now(), closed_mailed_at = now()
+   where customer_id = old.id and status = 'active';
+  return old;
+end $$;
+drop trigger if exists customers_release_reservations on public.customers;
+create trigger customers_release_reservations before delete on public.customers
+  for each row execute function public._customer_release_reservations();
+revoke all on function public._customer_release_reservations() from public, anon, authenticated;
+
+-- Clé du tick -> Edge Function (en-tête x-cron-key), vérifiée par la fonction.
+insert into private.secrets (key, value)
+  values ('cron_key', encode(extensions.gen_random_bytes(24), 'hex'))
+  on conflict (key) do nothing;
+create or replace function public.reservation_cron_ok(p_key text)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from private.secrets where key = 'cron_key' and value = p_key and length(coalesce(p_key, '')) >= 32);
+$$;
+revoke all on function public.reservation_cron_ok(text) from public, anon, authenticated;
+grant execute on function public.reservation_cron_ok(text) to service_role;
+
+-- Tick (aux 10 min) : échues -> « Expirée » + non récupérée comptée ; puis, s'il y a des
+-- courriels dus (rappel, expiration, annulation par l'admin), appel de reservation-notify.
+create extension if not exists pg_net with schema extensions;   -- fonctions dans le schéma net
+create or replace function public.reservations_tick()
+returns integer language plpgsql security definer set search_path = '' as $$
+declare r record; n integer := 0;
+begin
+  for r in select id, customer_id from public.customer_reservations
+            where status = 'active' and expires_at <= now() for update skip locked loop
+    update public.customer_reservations
+       set status = 'expired', penalized = (r.customer_id is not null), updated_at = now()
+     where id = r.id;
+    if r.customer_id is not null then perform public._reservation_penalize(r.customer_id); end if;
+    n := n + 1;
+  end loop;
+  if exists (select 1 from public.customer_reservations
+              where (status = 'active' and reminded_at is null and expires_at <= now() + interval '12 hours'
+                     and created_at <= now() - interval '1 hour')
+                 or (status = 'expired' and closed_mailed_at is null and updated_at > now() - interval '2 days')
+                 or (status = 'cancelled' and cancelled_by = 'admin' and closed_mailed_at is null
+                     and updated_at > now() - interval '2 days')) then
+    perform net.http_post(
+      url := 'https://cqfmvdknppscazfynoiy.supabase.co/functions/v1/reservation-notify',
+      body := '{"cron":true}'::jsonb,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                   'x-cron-key', (select value from private.secrets where key = 'cron_key')),
+      timeout_milliseconds := 20000);
+  end if;
+  return n;
+end $$;
+revoke all on function public.reservations_tick() from public, anon, authenticated;
+select cron.unschedule(jobid) from cron.job where jobname = 'reservations-tick';
+select cron.schedule('reservations-tick', '*/10 * * * *', 'select public.reservations_tick()');
+
+revoke all on function public.customer_reserve(jsonb, text)              from public, anon;
+revoke all on function public.customer_cancel_reservation(uuid)          from public, anon;
+revoke all on function public.me_reservations()                          from public, anon;
+revoke all on function public.admin_invoice_reservation(uuid, uuid)      from public, anon;
+revoke all on function public.admin_reservation_action(uuid, text)       from public, anon;
+grant execute on function public.customer_reserve(jsonb, text)              to authenticated;
+grant execute on function public.customer_cancel_reservation(uuid)          to authenticated;
+grant execute on function public.me_reservations()                          to authenticated;
+grant execute on function public.admin_invoice_reservation(uuid, uuid)      to authenticated;
+grant execute on function public.admin_reservation_action(uuid, text)       to authenticated;
 
 -- ------------------------------------------------------------
 -- Vérification

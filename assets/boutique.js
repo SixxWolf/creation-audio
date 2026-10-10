@@ -1517,7 +1517,16 @@
      Prix recalculés par le serveur (même règle que ce panier). Les articles au-delà du
      stock partent « à commander ». Confirmation par courriel (customer-order-notify). */
   var acctBox = $('#cart-acct'), sendBtn = $('#cart-send'), noteIn = $('#cart-note-in'),
-      editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login');
+      editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login'),
+      resvBtn = $('#cart-resv'), resvWhy = $('#cart-resv-why'), resvInfo = null;
+  // Réservation 72 h (client approuvé) : articles EN STOCK seulement -> lignes au-delà du stock listées
+  function overStock() {
+    return entries().filter(function (it) {
+      var m = metaOf(it); if (!m) return false;
+      var st = it.type === 'accessory' ? m.qty : stockOf(m, it.type);
+      return st != null && it.qty > Math.max(0, st | 0);
+    });
+  }
   function refreshAcctUi() {
     var on = canBackorder(), ed = on ? window.CA.custOrder.editing() : null;
     if (acctBox) acctBox.hidden = !on;
@@ -1528,7 +1537,35 @@
       sendBtn.textContent = ed ? 'Enregistrer les modifications' : 'Envoyer ma commande';
       sendBtn.classList.toggle('is-disabled', count() === 0);
     }
+    if (resvBtn) {
+      var showR = !!(on && !ed && resvInfo && resvInfo.can), why = '';
+      if (showR && resvInfo.suspendedUntil) {
+        why = 'Réservations suspendues jusqu\'au ' + new Date(resvInfo.suspendedUntil).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long' }) + '.';
+      } else if (showR && count() && overStock().length) why = 'Réserver : articles en stock seulement.';
+      resvBtn.hidden = !showR;
+      resvBtn.classList.toggle('is-disabled', !count() || !!why);
+      if (resvWhy) { resvWhy.hidden = !showR || !why; resvWhy.textContent = why; }
+    }
   }
+  if (canBackorder() && window.CA.custOrder.reserveInfo) {
+    window.CA.custOrder.reserveInfo().then(function (i) { resvInfo = i; refreshAcctUi(); });
+  }
+  if (resvBtn) resvBtn.addEventListener('click', function () {
+    if (!count() || resvBtn.disabled || resvBtn.classList.contains('is-disabled')) return;
+    var until = new Date(Date.now() + 72 * 3600 * 1000).toLocaleString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+    if (!window.confirm('Réserver ces articles jusqu\'au ' + until + ' ?\n\nSi tu ne passes pas à temps, elle compte comme non récupérée (2 = réservations suspendues 60 jours). Tu peux l\'annuler dans ton compte.')) return;
+    var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
+    resvBtn.disabled = true; cartMsg.textContent = 'Réservation…';
+    window.CA.custOrder.reserve(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
+      resvBtn.disabled = false;
+      cart = {}; saveCart(); if (noteIn) noteIn.value = '';
+      renderCart();
+      refreshStock();   // le stock gardé disparaît de la boutique
+      cartMsg.innerHTML = '✓ Réservation <b>' + esc(r.number) + '</b> : gardée jusqu\'au ' +
+        esc(new Date(r.expires_at).toLocaleString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })) +
+        '. Confirmation par courriel. <a href="compte.html#/commandes">Mes réservations</a>';
+    }, function (err) { resvBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Réservation impossible. Réessaie.'; });
+  });
   if (sendBtn) sendBtn.addEventListener('click', function () {
     if (!count() || sendBtn.disabled) return;
     var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });

@@ -97,7 +97,12 @@
 .ord-pill.st-invoiced { color:var(--ink-2); background:var(--wash); }
 .ord-pill.st-cancelled { color:#B42A19; background:var(--bad-wash); }
 .acct-h { margin:22px 0 10px; font-family:var(--display); font-size:1.08rem; }
-#acct-cmds .acct-h:first-child { margin-top:0; }
+#acct-cmds .acct-h:first-child, #acct-resv .acct-h:first-child { margin-top:0; }
+#acct-resv:not(:empty) + #acct-cmds .acct-h:first-child { margin-top:22px; }
+/* réservations 72 h */
+.ord-pill.st-active { color:#16794A; background:var(--good-wash); }
+.ord-pill.st-expired { color:#B42A19; background:var(--bad-wash); }
+.resv-susp { margin:0 0 10px; padding:10px 14px; font-size:.88rem; font-weight:600; color:#9A4A0E; background:#FFF3EC; border-radius:10px; }
 .ord-acts { display:flex; flex-wrap:wrap; gap:8px 10px; }
 .acct-btn-danger { color:var(--bad); border-color:color-mix(in srgb, var(--bad) 40%, transparent); }
 .acct-btn-danger:hover { border-color:var(--bad); background:var(--bad-wash); }

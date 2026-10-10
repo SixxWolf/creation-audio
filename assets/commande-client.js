@@ -10,6 +10,8 @@
      cancelEdit()
      send(lines, note) -> Promise({ id, number, has_backorder, total, updated })
                      lignes = [{ product_id, kind ('spool'|'refill'|'unit'), qty }] ; prix recalculés par le serveur
+     reserveInfo()     -> Promise({ can, suspendedUntil } | null)  (réservations, étape 3 ; lu une fois par page)
+     reserve(lines, note) -> Promise({ id, number, total, expires_at })  (72 h, articles en stock seulement)
    ========================================================= */
 window.CA = window.CA || {};
 (function () {
@@ -59,8 +61,33 @@ window.CA = window.CA || {};
     });
   }
 
+  // ---- réservations (client approuvé : customers.can_reserve) ----
+  var resvInfo = null;
+  function reserveInfo() {
+    var c = cli();
+    if (!c || !email()) return Promise.resolve(null);
+    if (!resvInfo) resvInfo = c.rpc('me_reservations').then(function (res) {
+      if (res.error) return null;
+      var d = res.data || {};
+      return { can: !!d.can_reserve, suspendedUntil: d.suspended_until || null };
+    }, function () { return null; });
+    return resvInfo;
+  }
+  function reserve(lines, note) {
+    var c = cli();
+    if (!c) return Promise.reject(new Error('Service indisponible pour le moment.'));
+    return c.rpc('customer_reserve', { p_lines: lines, p_note: note || null }).then(function (res) {
+      if (res.error) throw new Error(errMsg(res.error));
+      var r = res.data || {};
+      // confirmation au client + avis à Création Audio : sans bloquer l'écran
+      c.functions.invoke('reservation-notify', { body: { reservation_id: r.id, event: 'new' } }).then(null, function () {});
+      return r;
+    });
+  }
+
   window.CA.custOrder = {
     signedIn: function () { return !!email(); },
-    email: email, editing: editing, cancelEdit: cancelEdit, send: send
+    email: email, editing: editing, cancelEdit: cancelEdit, send: send,
+    reserveInfo: reserveInfo, reserve: reserve
   };
 })();
