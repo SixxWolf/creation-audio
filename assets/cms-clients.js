@@ -166,12 +166,15 @@ window.CA = window.CA || {};
   }
 
   function del(row) {
-    if (!window.confirm('Supprimer le client « ' + row.name + ' » ? (n\'affecte pas les factures déjà enregistrées)' +
-      (accOf(row.id) ? '\nSon compte en ligne sera délié.' : ''))) return;
-    sb.from('clients').delete().eq('id', row.id).select().then(function (res) {
-      if (res.error) { window.alert('Erreur : ' + res.error.message); return; }
-      if (!res.data || !res.data.length) { window.alert('Suppression refusée (permissions).'); return; }
-      reloadAll();   // le compte relié à cette fiche est délié par la base (on delete set null)
+    caDialog.confirm({ title: 'Supprimer le client « ' + row.name + ' » ?',
+      message: 'Les factures déjà enregistrées restent.' + (accOf(row.id) ? '\nSon compte en ligne sera délié.' : ''),
+      ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      sb.from('clients').delete().eq('id', row.id).select().then(function (res) {
+        if (res.error) { caDialog.error(res.error); return; }
+        if (!res.data || !res.data.length) { caDialog.error('Suppression refusée (permissions).'); return; }
+        reloadAll();   // le compte relié à cette fiche est délié par la base (on delete set null)
+      });
     });
   }
 
@@ -400,10 +403,13 @@ window.CA = window.CA || {};
   }
   function unlink(a) {
     var c = clientOf(a.client_id);
-    if (!window.confirm('Délier le compte ' + a.email + (c ? ' de la fiche « ' + c.name + ' »' : '') + ' ?\nLe client ne verra plus ses factures.')) return;
-    sb.from('customers').update({ client_id: null, linked_at: null }).eq('id', a.id).select('id').then(function (res) {
-      if (res.error || !res.data || !res.data.length) { window.alert('Erreur : ' + (res.error ? res.error.message : 'refusé (permissions).')); return; }
-      reloadAll();
+    caDialog.confirm({ title: 'Délier le compte ' + a.email + (c ? ' de « ' + c.name + ' »' : '') + ' ?',
+      message: 'Le client ne verra plus ses factures.', ok: 'Délier', danger: true, icon: 'link' }).then(function (ok) {
+      if (!ok) return;
+      sb.from('customers').update({ client_id: null, linked_at: null }).eq('id', a.id).select('id').then(function (res) {
+        if (res.error || !res.data || !res.data.length) { caDialog.error(res.error || 'Refusé (permissions).'); return; }
+        reloadAll();
+      });
     });
   }
   function setReserve(a, cb) {
@@ -411,19 +417,21 @@ window.CA = window.CA || {};
     cb.disabled = true;
     sb.from('customers').update({ can_reserve: want }).eq('id', a.id).select('id').then(function (res) {
       cb.disabled = false;
-      if (res.error || !res.data || !res.data.length) { cb.checked = !want; window.alert('Erreur : ' + (res.error ? res.error.message : 'refusé (permissions).')); return; }
+      if (res.error || !res.data || !res.data.length) { cb.checked = !want; caDialog.error(res.error || 'Refusé (permissions).'); return; }
       a.can_reserve = want;
     }, function () { cb.disabled = false; cb.checked = !want; });
   }
   function suspended(a) { return !!(a.reserve_suspended_until && Date.parse(a.reserve_suspended_until) > Date.now()); }
   // « Lever » : suspension des réservations levée, compteur de non récupérées remis à 0
   function liftReserve(a, btn) {
-    if (!window.confirm('Lever la suspension des réservations de ' + (a.name || a.email) + ' ?')) return;
-    btn.disabled = true;
-    sb.from('customers').update({ no_shows: 0, reserve_suspended_until: null }).eq('id', a.id).select('id').then(function (res) {
-      if (res.error || !res.data || !res.data.length) { btn.disabled = false; window.alert('Erreur : ' + (res.error ? res.error.message : 'refusé (permissions).')); return; }
-      a.no_shows = 0; a.reserve_suspended_until = null;
-      renderAccounts();
-    }, function () { btn.disabled = false; });
+    caDialog.confirm({ title: 'Lever la suspension ?', message: 'Réservations de ' + (a.name || a.email) + '.', ok: 'Lever' }).then(function (ok) {
+      if (!ok) return;
+      btn.disabled = true;
+      sb.from('customers').update({ no_shows: 0, reserve_suspended_until: null }).eq('id', a.id).select('id').then(function (res) {
+        if (res.error || !res.data || !res.data.length) { btn.disabled = false; caDialog.error(res.error || 'Refusé (permissions).'); return; }
+        a.no_shows = 0; a.reserve_suspended_until = null;
+        renderAccounts();
+      }, function () { btn.disabled = false; });
+    });
   }
 })();

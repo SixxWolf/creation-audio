@@ -1084,7 +1084,7 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .sec-add-row input.mfa-code { width:200px; min-width:200px; }
 .sec-actions { margin-top:14px; }
 
-/* =========================================================
+/* ==================================================
    ONGLET MESSAGES (messagerie du site — cms-messages.js)
    Liste à gauche, fil à droite ; une colonne sous 1100 px (le fil remplace la liste).
    ========================================================= */
@@ -1162,3 +1162,8 @@ td.num input, .catalog-table input.catcost { text-align:right; }
   .ms-acts { flex-basis:100%; }
   .ms-b { max-width:88%; }
 }
+=======
+/* Fenêtres (dialog.css) : l'action non destructive prend la couleur d'accent choisie */
+.dlg-go:not(.is-danger) { color:var(--on-ember); background:var(--ember); border-color:color-mix(in srgb, var(--ember) 80%, #000); }
+.dlg-go:not(.is-danger):hover { background:color-mix(in srgb, var(--ember) 90%, #000); }
+.dlg-b:focus-visible { outline-color:var(--ember); }

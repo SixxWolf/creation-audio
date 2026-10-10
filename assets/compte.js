@@ -348,28 +348,36 @@
     var spacersOnly = lines.length && lines.every(function (l) { return l.ptype === 'spacer'; });
     var key = spacersOnly ? 'ca_v2_cart_spacers' : 'ca_v2_cart', cur = {};
     try { cur = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) {}
-    if (Object.keys(cur).length && !window.confirm('Ton panier actuel sera remplacé par la commande ' + o.number + '. Continuer ?')) return;
-    var cart = {};
-    lines.forEach(function (l) {
-      if (spacersOnly) { cart[l.product_id] = { id: l.product_id, qty: +l.qty }; return; }
-      if (l.ptype === 'spacer') return;
-      var t = l.kind === 'unit' ? 'accessory' : l.kind;
-      cart[l.product_id + '|' + t] = { id: l.product_id, type: t, qty: +l.qty };
-    });
-    try {
-      localStorage.setItem(key, JSON.stringify(cart));
-      localStorage.setItem('ca_v2_order_edit', JSON.stringify({ id: o.id, number: o.number, at: Date.now() }));
-    } catch (e) {}
-    location.href = spacersOnly ? 'spacers.html' : 'boutique.html#/';
+    if (!Object.keys(cur).length) { loadIntoCart(); return; }
+    caDialog.confirm({ title: 'Remplacer ton panier ?', message: 'Ton panier actuel sera remplacé par la commande ' + o.number + '.',
+      ok: 'Remplacer', icon: 'cart' }).then(function (ok) { if (ok) loadIntoCart(); });
+    function loadIntoCart() {
+      var cart = {};
+      lines.forEach(function (l) {
+        if (spacersOnly) { cart[l.product_id] = { id: l.product_id, qty: +l.qty }; return; }
+        if (l.ptype === 'spacer') return;
+        var t = l.kind === 'unit' ? 'accessory' : l.kind;
+        cart[l.product_id + '|' + t] = { id: l.product_id, type: t, qty: +l.qty };
+      });
+      try {
+        localStorage.setItem(key, JSON.stringify(cart));
+        localStorage.setItem('ca_v2_order_edit', JSON.stringify({ id: o.id, number: o.number, at: Date.now() }));
+      } catch (e) {}
+      location.href = spacersOnly ? 'spacers.html' : 'boutique.html#/';
+    }
   }
   function cancelOrder(o, btn) {
-    if (!window.confirm('Annuler la commande ' + o.number + ' ?')) return;
-    btn.disabled = true;
-    sb.rpc('customer_cancel_order', { p_id: o.id }).then(function (res) {
-      if (res.error) { btn.disabled = false; window.alert(res.error.message || 'Annulation impossible.'); return; }
-      if (sb.functions) sb.functions.invoke('customer-order-notify', { body: { order_id: o.id, event: 'cancelled' } }).then(null, function () {});
-      loadOrders();
-    }, function () { btn.disabled = false; });
+    caDialog.confirm({ title: 'Annuler la commande ' + o.number + ' ?', message: 'Tu pourras en passer une nouvelle au besoin.',
+      ok: 'Annuler la commande', danger: true }).then(function (ok) {
+      if (!ok) return;
+      btn.disabled = true;
+      sb.rpc('customer_cancel_order', { p_id: o.id }).then(function (res) {
+        if (res.error) { btn.disabled = false; caDialog.error(res.error, 'Annulation impossible'); return; }
+        if (sb.functions) sb.functions.invoke('customer-order-notify', { body: { order_id: o.id, event: 'cancelled' } }).then(null, function () {});
+        caDialog.toast('Commande ' + o.number + ' annulée');
+        loadOrders();
+      }, function () { btn.disabled = false; caDialog.toast('Erreur réseau — réessaie.', 'bad'); });
+    });
   }
   /* ---- réservations 72 h (client approuvé — panier de la boutique) ---- */
   var RES_ST = { active: 'Gardée', invoiced: 'Facturée', cancelled: 'Annulée', expired: 'Expirée' };
@@ -425,13 +433,17 @@
     });
   }
   function cancelResv(r, btn) {
-    if (!window.confirm('Annuler la réservation ' + r.number + ' ?\nLes articles seront remis en vente.')) return;
-    btn.disabled = true;
-    sb.rpc('customer_cancel_reservation', { p_id: r.id }).then(function (res) {
-      if (res.error) { btn.disabled = false; window.alert(res.error.message || 'Annulation impossible.'); return; }
-      if (sb.functions) sb.functions.invoke('reservation-notify', { body: { reservation_id: r.id, event: 'cancelled' } }).then(null, function () {});
-      loadResv();
-    }, function () { btn.disabled = false; });
+    caDialog.confirm({ title: 'Annuler la réservation ' + r.number + ' ?', message: 'Les articles seront remis en vente.',
+      ok: 'Annuler la réservation', danger: true }).then(function (ok) {
+      if (!ok) return;
+      btn.disabled = true;
+      sb.rpc('customer_cancel_reservation', { p_id: r.id }).then(function (res) {
+        if (res.error) { btn.disabled = false; caDialog.error(res.error, 'Annulation impossible'); return; }
+        if (sb.functions) sb.functions.invoke('reservation-notify', { body: { reservation_id: r.id, event: 'cancelled' } }).then(null, function () {});
+        caDialog.toast('Réservation ' + r.number + ' annulée');
+        loadResv();
+      }, function () { btn.disabled = false; caDialog.toast('Erreur réseau — réessaie.', 'bad'); });
+    });
   }
   function pendingOf(inv) {
     return (inv.lines || []).reduce(function (s, l) { return s + (+l.qty_pending || 0); }, 0);
@@ -658,7 +670,10 @@
     }).then(null, function () {});
   }
   $('#acct-delete').addEventListener('click', function () {
-    if (!window.confirm('Supprimer ton compte ?\n\nTon compte, tes alertes et tes messages seront effacés. Cette action est définitive.')) return;
+    caDialog.confirm({ title: 'Supprimer ton compte ?', message: 'Ton compte, tes alertes et tes messages seront effacés. Cette action est définitive.',
+      ok: 'Supprimer mon compte', danger: true, icon: 'trash' }).then(function (ok) { if (ok) deleteAccount(); });
+  });
+  function deleteAccount() {
     var btn = $('#acct-delete'), st = $('#acct-del-status');
     btn.disabled = true; say(st, 'Suppression…');
     removeMyPhotos().then(function () { return sb.rpc('me_delete'); }).then(function (res) {
@@ -670,7 +685,7 @@
         openLogin('', 'Ton compte a été supprimé.');
       });
     }, function () { btn.disabled = false; say(st, 'Erreur réseau — réessaie.', 'bad'); });
-  });
+  }
 
   boot();
 })();

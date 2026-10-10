@@ -311,7 +311,7 @@
     var c = conv(); if (!c) return;
     var next = c.status === 'closed' ? 'open' : 'closed';
     sb.from('conversations').update({ status: next }).eq('id', c.id).then(function (res) {
-      if (res.error) { window.alert(res.error.message); return; }
+      if (res.error) { caDialog.error(res.error); return; }
       c.status = next;
       var b = $('.ms-close', threadEl); if (b) b.textContent = next === 'closed' ? 'Rouvrir' : 'Réglée';
       renderList();
@@ -322,11 +322,14 @@
   }
   function removeConv() {
     var c = conv(); if (!c) return;
-    if (!window.confirm('Supprimer la conversation avec ' + who(c) + ' ?\n\nMessages et photos effacés. Action définitive.')) return;
-    erase([c.id], photosOf(msgs)).then(function (err) {
-      if (err) { window.alert(err); return; }
-      convs = convs.filter(function (x) { return x.id !== c.id; });
-      go('');
+    caDialog.confirm({ title: 'Supprimer la conversation avec ' + who(c) + ' ?', message: 'Messages et photos effacés. Action définitive.',
+      ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      erase([c.id], photosOf(msgs)).then(function (err) {
+        if (err) { caDialog.error(err); return; }
+        convs = convs.filter(function (x) { return x.id !== c.id; });
+        go('');
+      });
     });
   }
   // photos par l'API Storage (jamais par SQL), puis les lignes

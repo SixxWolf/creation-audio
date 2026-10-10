@@ -1553,18 +1553,22 @@
   if (resvBtn) resvBtn.addEventListener('click', function () {
     if (!count() || resvBtn.disabled || resvBtn.classList.contains('is-disabled')) return;
     var until = new Date(Date.now() + 72 * 3600 * 1000).toLocaleString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
-    if (!window.confirm('Réserver ces articles jusqu\'au ' + until + ' ?\n\nSi tu ne passes pas à temps, elle compte comme non récupérée (2 = réservations suspendues 60 jours). Tu peux l\'annuler dans ton compte.')) return;
-    var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
-    resvBtn.disabled = true; cartMsg.textContent = 'Réservation…';
-    window.CA.custOrder.reserve(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
-      resvBtn.disabled = false;
-      cart = {}; saveCart(); if (noteIn) noteIn.value = '';
-      renderCart();
-      refreshStock();   // le stock gardé disparaît de la boutique
-      cartMsg.innerHTML = '✓ Réservation <b>' + esc(r.number) + '</b> : gardée jusqu\'au ' +
-        esc(new Date(r.expires_at).toLocaleString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })) +
-        '. Confirmation par courriel. <a href="compte.html#/commandes">Mes réservations</a>';
-    }, function (err) { resvBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Réservation impossible. Réessaie.'; });
+    caDialog.confirm({ title: 'Réserver jusqu\'au ' + until + ' ?',
+      message: 'Si tu ne passes pas à temps, elle compte comme non récupérée (2 = réservations suspendues 60 jours). Tu peux l\'annuler dans ton compte.',
+      ok: 'Réserver', icon: 'cart' }).then(function (ok) {
+      if (!ok) return;
+      var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
+      resvBtn.disabled = true; cartMsg.textContent = 'Réservation…';
+      window.CA.custOrder.reserve(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
+        resvBtn.disabled = false;
+        cart = {}; saveCart(); if (noteIn) noteIn.value = '';
+        renderCart();
+        refreshStock();   // le stock gardé disparaît de la boutique
+        cartMsg.innerHTML = '✓ Réservation <b>' + esc(r.number) + '</b> : gardée jusqu\'au ' +
+          esc(new Date(r.expires_at).toLocaleString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })) +
+          '. Confirmation par courriel. <a href="compte.html#/commandes">Mes réservations</a>';
+      }, function (err) { resvBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Réservation impossible. Réessaie.'; });
+    });
   });
   if (sendBtn) sendBtn.addEventListener('click', function () {
     if (!count() || sendBtn.disabled) return;

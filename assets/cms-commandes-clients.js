@@ -221,7 +221,7 @@
   /* ---- actions ---- */
   function act(o, what, btn) {
     if (what === 'invoice') {
-      if (!CA.invoiceFromOrder) { window.alert('Facturation indisponible.'); return; }
+      if (!CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
       var ord = Object.assign({ kind: 'client' }, o);
       if (CA.invoiceFromOrder(ord, linesOf(o)) !== false) location.hash = '#facturation';
       return;
@@ -232,16 +232,26 @@
       return;
     }
     if (what === 'delete') {
-      if (!window.confirm('Supprimer définitivement la commande ' + o.number + ' ?\nElle disparaîtra aussi de Mon compte du client.')) return;
-      btn.disabled = true;
-      sb.from('customer_orders').delete().eq('id', o.id).eq('status', 'cancelled').select('id').then(function (res) {
-        if (res.error) throw res.error;
-        if (!res.data || !res.data.length) throw new Error('Refusé : seule une commande annulée peut être supprimée.');
-        load();
-      }).then(null, function (err) { btn.disabled = false; window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
+      caDialog.confirm({ title: 'Supprimer la commande ' + o.number + ' ?', message: 'Elle disparaîtra aussi de Mon compte du client.',
+        ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+        if (!ok) return;
+        btn.disabled = true;
+        sb.from('customer_orders').delete().eq('id', o.id).eq('status', 'cancelled').select('id').then(function (res) {
+          if (res.error) throw res.error;
+          if (!res.data || !res.data.length) throw new Error('Refusé : seule une commande annulée peut être supprimée.');
+          load();
+        }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
+      });
       return;
     }
-    if (what === 'cancel' && !window.confirm('Annuler la commande ' + o.number + ' de ' + (o.name || o.email) + ' ?\nPense à prévenir le client.')) return;
+    if (what === 'cancel') {
+      caDialog.confirm({ title: 'Annuler la commande ' + o.number + ' ?', message: (o.name || o.email) + ' — pense à prévenir le client.',
+        ok: 'Annuler la commande', danger: true }).then(function (ok) { if (ok) setStatus(o, what, btn); });
+      return;
+    }
+    setStatus(o, what, btn);
+  }
+  function setStatus(o, what, btn) {
     var patch = { status: what === 'cancel' ? 'cancelled' : what, updated_at: new Date().toISOString(),
                   cancelled_by: what === 'cancel' ? 'admin' : null };
     btn.disabled = true;
@@ -249,6 +259,6 @@
       if (res.error) throw res.error;
       if (!res.data || !res.data.length) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
       load();
-    }).then(null, function (err) { btn.disabled = false; window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
+    }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
   }
 })();

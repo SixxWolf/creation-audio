@@ -1026,18 +1026,33 @@
     render();
   }
   // en modification : quitter = abandonner les changements (la facture enregistrée reste intacte)
-  function confirmLeaveEdit() {
-    return !editing || !lines.length ||
-      window.confirm('Abandonner la modification de la facture ' + (editing.number || '') + ' ?\nLa facture enregistrée reste inchangée.');
+  function confirmLeaveEdit(then) {
+    if (!editing || !lines.length) { then(); return; }
+    caDialog.confirm({ title: 'Abandonner la modification de ' + (editing.number || 'la facture') + ' ?',
+      message: 'La facture enregistrée reste inchangée.', ok: 'Abandonner', danger: true }).then(function (ok) { if (ok) then(); });
   }
-  if (elReset) elReset.addEventListener('click', function () { if (confirmLeaveEdit()) resetInvoice(); });
+  if (elReset) elReset.addEventListener('click', function () { confirmLeaveEdit(resetInvoice); });
   if (elEditCancel) elEditCancel.addEventListener('click', function () {
-    if (!confirmLeaveEdit()) return;
-    var id = editing && editing.id;
-    resetInvoice();
-    if (id && window.CA.focusInvoice) window.CA.focusInvoice(id);
-    location.hash = '#historique';
+    confirmLeaveEdit(function () {
+      var id = editing && editing.id;
+      resetInvoice();
+      if (id && window.CA.focusInvoice) window.CA.focusInvoice(id);
+      location.hash = '#historique';
+    });
   });
+  // remplacer la facture en cours par une autre (Historique « Modifier » / Commandes « Facturer ») :
+  // demande, puis rappelle la fonction avec force=true et ouvre l'onglet Facturation
+  function askReplace(retry) {
+    caDialog.confirm(editing
+      ? { title: 'Abandonner la modification de ' + (editing.number || 'la facture') + ' ?', message: 'La facture enregistrée reste inchangée.', ok: 'Abandonner', danger: true }
+      : { title: 'Remplacer la facture en cours ?', message: 'Elle n\'est pas enregistrée.', ok: 'Remplacer', danger: true })
+      .then(function (ok) {
+        if (!ok || retry() === false) return;
+        location.hash = '#facturation';
+        window.scrollTo(0, 0);
+      });
+    return false;
+  }
 
   /* ---------- modifier une facture enregistrée (bouton « Modifier » de l'Historique) ---------- */
   function setEditing(ed) {
@@ -1131,13 +1146,11 @@
   }
   // Appelé par l'Historique. Renvoie false si l'admin refuse de remplacer la facture
   // en cours ; sinon charge (catalogues -> tarifs/paliers) puis remplit l'éditeur.
-  window.CA.editInvoice = function (inv, savedLines) {
+  window.CA.editInvoice = function (inv, savedLines, force) {
     if (!inv || !inv.id) return false;
-    if (inv.status === 'cancelled') { window.alert('Une facture annulée ne peut pas être modifiée.'); return false; }
+    if (inv.status === 'cancelled') { caDialog.alert({ title: 'Une facture annulée ne peut pas être modifiée.' }); return false; }
     if (editing && editing.id === inv.id) return true;   // déjà ouverte
-    if (lines.length && !window.confirm(editing
-        ? 'Abandonner la modification de la facture ' + (editing.number || '') + ' ?'
-        : 'La facture en cours (non enregistrée) sera remplacée. Continuer ?')) return false;
+    if (lines.length && !force) return askReplace(function () { return window.CA.editInvoice(inv, savedLines, true); });
     ensureLoad();
     if (!editing) deductBeforeEdit = elDeduct.checked;
     lines = [];
@@ -1211,12 +1224,10 @@
       }, function () {});
   }
   // Renvoie false si l'admin refuse de remplacer la facture en cours.
-  window.CA.invoiceFromOrder = function (order, olines) {
+  window.CA.invoiceFromOrder = function (order, olines, force) {
     if (!order || !order.id) return false;
     if (fromOrder && fromOrder.id === order.id && lines.length) return true;   // déjà ouverte
-    if (lines.length && !window.confirm(editing
-        ? 'Abandonner la modification de la facture ' + (editing.number || '') + ' ?'
-        : 'La facture en cours (non enregistrée) sera remplacée. Continuer ?')) return false;
+    if (lines.length && !force) return askReplace(function () { return window.CA.invoiceFromOrder(order, olines, true); });
     ensureLoad();
     resetInvoice();
     setFromOrder(order);
