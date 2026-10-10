@@ -2459,6 +2459,21 @@ create policy supplier_order_lines_admin_all on public.supplier_order_lines for 
 revoke all on public.supplier_orders      from anon;
 revoke all on public.supplier_order_lines from anon;
 
+-- Réception = pointage d'une commande en route (2026-10-10) :
+-- taxes du fournisseur par commande (Bambu 14,975 % ; Elegoo 0 %), réception rattachée
+-- à sa commande, et plus de prix catalogue : les anciennes réceptions sans prix saisi
+-- gardent une fois pour toutes le prix catalogue de l'époque (le coût moyen ne bouge pas).
+alter table public.supplier_orders add column if not exists tax_rate numeric(6,3) not null default 0;
+alter table public.receipts add column if not exists supplier_order_id uuid references public.supplier_orders(id) on delete set null;
+create index if not exists receipts_supplier_order_idx on public.receipts (supplier_order_id);
+update public.supplier_orders set tax_rate = 14.975 where supplier ilike 'bambu%' and tax_rate = 0;
+update public.supplier_orders set order_number = ltrim(order_number, '#') where order_number like '#%';
+update public.receipt_lines rl
+   set unit_cost = case when rl.kind = 'refill' then m.cost_refill else m.cost_spool end
+  from public.products p
+  join public.materials m on m.brand = p.brand and m.name = p.material
+ where p.id = rl.product_id and rl.unit_cost is null and p.type = 'filament';
+
 -- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------

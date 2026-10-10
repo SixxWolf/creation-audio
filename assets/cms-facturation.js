@@ -187,10 +187,9 @@
   }
   function filBase(p, kind) { var m = matOf(p); if (m) return kind === 'refill' ? m.sell_refill : m.sell_spool; return kind === 'refill' ? p.sell_price_2 : p.sell_price; }
   function filCost(p, kind) {
-    // coût moyen réel (CMP, alimenté par les réceptions) prioritaire sur le coût catalogue
-    var ac = p && p.attrs && p.attrs.avg_cost;
-    if (ac) { var v = kind === 'refill' ? ac.refill : ac.spool; if (v != null && v !== '') return +v; }
-    var m = matOf(p); if (m) return (kind === 'refill' ? m.cost_refill : m.cost_spool) || 0;
+    // coût réel : CMP de ses réceptions, sinon moyenne de la même matière (cms-costing.js)
+    var c = window.CA.costing && window.CA.costing.costOf ? window.CA.costing.costOf(p, kind, catalog.filament) : null;
+    if (c != null) return c;
     return (kind === 'refill' ? p.cost_price_2 : p.cost_price) || 0;
   }
   function filTiers(p, kind) { var m = matOf(p); if (m) return kind === 'refill' ? m.tiers_refill : m.tiers_spool; return kind === 'refill' ? p.tiers_2 : p.tiers; }

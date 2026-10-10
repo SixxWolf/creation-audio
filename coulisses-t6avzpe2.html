@@ -15,13 +15,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=66">
+<link rel="stylesheet" href="assets/admin.css?v=67">
 <link rel="stylesheet" href="assets/facture.css?v=25">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
-<script src="assets/dialog.js?v=2"></script>
+<script src="assets/dialog.js?v=3"></script>
 <script src="assets/theme.js?v=1" defer></script>
 </head>
 <body>
@@ -465,15 +465,14 @@
       <div class="panel-head">
         <div>
           <h1>Inventaire</h1>
-          <p class="muted">Réceptionne une commande au scanner et garde un œil sur ce qu'il faut recommander.</p>
+          <p class="muted">Reçois tes commandes au scanner et garde un œil sur ce qu'il faut recommander.</p>
         </div>
       </div>
 
       <!-- Sous-onglets Inventaire -->
       <div class="inv-subtabs" role="tablist" aria-label="Sections inventaire">
-        <button type="button" class="inv-subtab is-active" role="tab" data-sub="reception">Réception (scan)</button>
+        <button type="button" class="inv-subtab is-active" role="tab" data-sub="reception">Réception</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="commander">À commander</button>
-        <button type="button" class="inv-subtab" role="tab" data-sub="catalogue">Prix catalogue</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="codes">Codes-barres</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="attente">Liste d'attente <span class="wl-tab-count" id="wl-tab-count" hidden></span></button>
       </div>
@@ -481,100 +480,80 @@
       <!-- ============ SOUS-ONGLET : RÉCEPTION SCANNABLE ============ -->
       <div class="inv-subpanel" id="inv-sub-reception" role="tabpanel">
 
-        <!-- Poste de scan -->
-        <div class="scan-station" id="scan-station">
-          <div class="scan-head">
-            <button type="button" class="btn btn-accent scan-toggle" id="scan-toggle" aria-pressed="false" data-ic="scan">Démarrer la réception</button>
-            <div class="scan-count" id="scan-count" aria-live="polite">
-              <span class="scan-count-num">0</span><span class="scan-count-lbl">article scanné</span>
-            </div>
+        <!-- Commandes en route : on choisit celle qu'on reçoit (cms-en-route.js) -->
+        <div class="reorder-card rv-pick" id="rv-pick">
+          <div class="reorder-card-head">
+            <h2>Commandes en route</h2>
+            <span class="grow"></span>
+            <button class="btn btn-ghost btn-sm" id="rv-free" type="button" data-ic="plus">Réception sans commande</button>
           </div>
-
-          <div class="scan-inputwrap">
-            <input type="text" id="scan-input" class="scan-input" autocomplete="off" autocorrect="off"
-                   autocapitalize="off" spellcheck="false" placeholder="Clique « Démarrer » puis scanne…" disabled>
-          </div>
-          <div class="scan-feedback" id="scan-feedback" aria-live="polite"></div>
-
-          <!-- Panneau d'apprentissage (code-barres inconnu) -->
-          <div class="scan-learn" id="scan-learn" hidden>
-            <div class="scan-learn-head">
-              <span>Code-barres inconnu&nbsp;: <code id="scan-learn-code"></code></span>
-            </div>
-            <div class="scan-learn-row">
-              <select id="scan-learn-fil" class="scan-learn-fil"></select>
-              <select id="scan-learn-kind" class="scan-learn-kind">
-                <option value="spool">Avec bobine</option>
-                <option value="refill">Recharge</option>
-              </select>
-              <button type="button" class="btn btn-accent btn-sm" id="scan-learn-save">Associer + compter</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="scan-learn-cancel">Ignorer</button>
-            </div>
-          </div>
+          <div class="rv-orders" id="rv-orders"></div>
         </div>
 
-        <!-- Alerte liste d'attente : quelqu'un attend un article qu'on vient de scanner / recevoir -->
-        <div class="wl-alert" id="wl-alert" hidden aria-live="polite"></div>
-        <!-- Alerte réservés : article facturé « à venir » à un client (cms-reserves.js) -->
-        <div class="wl-alert" id="res-alert" hidden aria-live="polite"></div>
-
-        <!-- Réception (n° + date + tableau) -->
-        <form class="editor" id="r-editor">
-          <h2 id="r-editor-title">Nouvelle réception</h2>
-          <div class="grid">
-            <div class="field">
-              <label class="lbl" for="r-order">N° de commande Bambu</label>
-              <input type="text" id="r-order" placeholder="Ex. US2409..." autocomplete="off">
+        <!-- Pointage : scanner + reçu / attendu -->
+        <div class="rv-work" id="rv-work" hidden>
+          <form class="editor" id="r-editor">
+            <div class="rv-head">
+              <div class="rv-title">
+                <h2 id="r-editor-title">Réception</h2>
+                <span class="rv-meta" id="rv-meta"></span>
+              </div>
+              <label class="po-f">Date <input type="text" id="r-date" placeholder="AAAA-MM-JJ" autocomplete="off"></label>
             </div>
-            <div class="field">
-              <label class="lbl" for="r-date">Date de réception</label>
-              <input type="text" id="r-date" placeholder="AAAA-MM-JJ" autocomplete="off">
-            </div>
-          </div>
+            <div class="rv-bar" id="rv-bar" hidden><span id="rv-bar-fill"></span></div>
 
-          <!-- Prix payé : rabais / prix appliqué à toute la commande -->
-          <div class="rcp-pricebar">
-            <span class="rcp-pricebar-lbl">Prix payé sur cette commande</span>
-            <select id="r-disc-mode" aria-label="Type d'ajustement de prix">
-              <option value="pct">Rabais %</option>
-              <option value="fixed">Prix fixe $/u</option>
-            </select>
-            <input type="number" id="r-disc-val" class="num" min="0" step="0.01" placeholder="0" aria-label="Valeur">
-            <button type="button" class="btn btn-ghost btn-sm" id="r-disc-apply">Appliquer à toutes les lignes</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="r-disc-reset">Prix catalogue</button>
-          </div>
+            <!-- Poste de scan -->
+            <div class="scan-station" id="scan-station">
+              <div class="scan-head">
+                <button type="button" class="btn btn-accent scan-toggle" id="scan-toggle" aria-pressed="false" data-ic="scan">Reprendre le scan</button>
+                <div class="scan-count" id="scan-count" aria-live="polite"></div>
+              </div>
+              <div class="scan-inputwrap">
+                <input type="text" id="scan-input" class="scan-input" autocomplete="off" autocorrect="off"
+                       autocapitalize="off" spellcheck="false" placeholder="Scanne un article…" disabled>
+              </div>
+              <div class="scan-feedback" id="scan-feedback" aria-live="polite"></div>
 
-          <!-- Tableau de confirmation (rempli par les scans, corrigeable) -->
-          <div class="rcp-table-wrap">
-            <table class="rcp-table" id="r-table">
-              <thead>
-                <tr><th>Filament</th><th>Type</th><th class="num">Quantité</th><th class="num">Prix payé $/u</th><th></th></tr>
-              </thead>
-              <tbody id="r-rows"></tbody>
-            </table>
-            <p class="hint" id="r-empty-hint">Aucun article scanné.</p>
-          </div>
-
-          <!-- Saisie manuelle (repli sans scanner) -->
-          <details class="rcp-manual">
-            <summary>Saisie manuelle / coller le texte de la commande</summary>
-            <div class="field" style="margin-top:10px">
-              <label class="lbl" for="r-paste">Coller le texte de la commande</label>
-              <textarea id="r-paste" rows="5" placeholder="Copie-colle le récapitulatif de ta commande Bambu ici, puis clique « Analyser »."></textarea>
-              <div class="inline" style="margin-top:8px; gap:8px">
-                <button type="button" class="btn btn-ghost btn-sm" id="r-parse">Analyser le texte</button>
-                <button type="button" class="btn btn-ghost btn-sm" id="r-add-line" data-ic="plus">Ajouter une ligne</button>
-                <span class="hint" id="r-parse-hint"></span>
+              <!-- Panneau d'apprentissage (code-barres inconnu) -->
+              <div class="scan-learn" id="scan-learn" hidden>
+                <div class="scan-learn-head">
+                  <span>Code-barres inconnu&nbsp;: <code id="scan-learn-code"></code></span>
+                </div>
+                <div class="scan-learn-row">
+                  <select id="scan-learn-fil" class="scan-learn-fil"></select>
+                  <select id="scan-learn-kind" class="scan-learn-kind">
+                    <option value="spool">Avec bobine</option>
+                    <option value="refill">Recharge</option>
+                  </select>
+                  <button type="button" class="btn btn-accent btn-sm" id="scan-learn-save">Associer + compter</button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="scan-learn-cancel">Ignorer</button>
+                </div>
               </div>
             </div>
-          </details>
 
-          <div class="editor-actions">
-            <button class="btn btn-accent" type="submit" id="r-confirm" data-ic="check">Confirmer la réception</button>
-            <button class="btn btn-ghost" type="button" id="r-reset">Vider</button>
-            <span class="status" id="r-status"></span>
-          </div>
-        </form>
+            <!-- Alerte liste d'attente : quelqu'un attend un article qu'on vient de scanner / recevoir -->
+            <div class="wl-alert" id="wl-alert" hidden aria-live="polite"></div>
+            <!-- Alerte réservés : article facturé « à venir » à un client (cms-reserves.js) -->
+            <div class="wl-alert" id="res-alert" hidden aria-live="polite"></div>
+
+            <div class="rcp-table-wrap">
+              <table class="rcp-table rv-table" id="r-table">
+                <thead>
+                  <tr><th>Article</th><th>Format</th><th class="num">Reçu</th><th class="num rv-exp">Attendu</th><th class="rv-stc">État</th><th></th></tr>
+                </thead>
+                <tbody id="r-rows"></tbody>
+              </table>
+              <p class="hint" id="r-empty-hint">Scanne un article ou ajoute une ligne.</p>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm rv-add" id="r-add-line" data-ic="plus">Ajouter une ligne</button>
+
+            <div class="editor-actions">
+              <button class="btn btn-accent" type="submit" id="r-confirm" data-ic="check">Confirmer la réception</button>
+              <button class="btn btn-ghost" type="button" id="r-reset">Annuler</button>
+              <span class="status" id="r-status"></span>
+            </div>
+          </form>
+        </div>
 
         <!-- Historique des réceptions -->
         <div class="panel-head" style="margin-top:26px">
@@ -602,6 +581,7 @@
             <div class="po-bar">
               <label class="po-f">N° de commande <input type="text" id="po-number" autocomplete="off"></label>
               <label class="po-f">Date <input type="text" id="po-date" placeholder="AAAA-MM-JJ" autocomplete="off"></label>
+              <label class="po-f">Taxes <span class="unit unit-sm" data-unit="%"><input type="text" id="po-tax" inputmode="decimal" autocomplete="off"></span></label>
               <button class="btn btn-ghost btn-sm" id="po-parse" type="button">Analyser</button>
               <span class="po-status" id="po-status" aria-live="polite"></span>
             </div>
@@ -650,32 +630,6 @@
         </div>
 
         <div id="reorder-body"></div>
-      </div>
-
-      <!-- ============ SOUS-ONGLET : PRIX CATALOGUE ============ -->
-      <div class="inv-subpanel" id="inv-sub-catalogue" role="tabpanel" hidden>
-        <div class="panel-head" style="margin-top:4px">
-          <div>
-            <h1 style="font-size:1.1rem">Prix catalogue</h1>
-            <p class="muted">Coût de base de chaque matériau.</p>
-          </div>
-          <span class="grow"></span>
-          <label class="reorder-flabel">Marque
-            <select id="catalog-brand"></select>
-          </label>
-          <button class="btn btn-ghost btn-sm" id="catalog-refresh" type="button" data-ic="refresh">Actualiser</button>
-        </div>
-
-        <!-- Application groupée : un prix -> plusieurs matériaux cochés -->
-        <div class="catalog-bulk">
-          <span class="cb-title">Appliquer aux matériaux cochés :</span>
-          <label class="cb-f">Bobine <input type="number" id="catalog-bulk-spool" min="0" step="0.01" placeholder="0.00" class="money"></label>
-          <label class="cb-f">Recharge <input type="number" id="catalog-bulk-refill" min="0" step="0.01" placeholder="0.00" class="money"></label>
-          <button class="btn btn-accent btn-sm" id="catalog-apply" type="button">Appliquer</button>
-          <span class="cb-status" id="catalog-status" aria-live="polite"></span>
-        </div>
-
-        <div id="catalog-body"></div>
       </div>
 
       <!-- ============ SOUS-ONGLET : CODES-BARRES ASSOCIÉS ============ -->
@@ -1816,21 +1770,21 @@
 <script src="assets/admin-core.js?v=7"></script>
 <script src="assets/admin-accent.js?v=1"></script>
 <script src="assets/cms-securite.js?v=2"></script>
-<script src="assets/cms-costing.js?v=2"></script>
+<script src="assets/cms-costing.js?v=3"></script>
 <script src="assets/cms-brands.js?v=6"></script>
 <script src="assets/cms-materials.js?v=13"></script>
 <script src="assets/cms-filaments.js?v=16"></script>
 <script src="assets/cms-linkbuilder.js?v=3"></script>
 <script src="assets/cms-spacers.js?v=13"></script>
 <script src="assets/cms-accessories.js?v=7"></script>
-<script src="assets/cms-inventory.js?v=30"></script>
+<script src="assets/cms-inventory.js?v=31"></script>
 <script src="assets/cms-attente.js?v=5"></script>
 <script src="assets/cms-reserves.js?v=1"></script>
-<script src="assets/cms-en-route.js?v=2"></script>
+<script src="assets/cms-en-route.js?v=3"></script>
 <script src="assets/cms-dealers.js?v=5"></script>
 <script src="assets/cms-clients.js?v=8"></script>
 <script src="assets/cms-messages.js?v=2"></script>
-<script src="assets/cms-facturation.js?v=41"></script>
+<script src="assets/cms-facturation.js?v=42"></script>
 <script src="assets/cms-historique.js?v=13"></script>
 <script src="assets/cms-commandes-clients.js?v=4"></script>
 <script src="assets/cms-reservations.js?v=2"></script>

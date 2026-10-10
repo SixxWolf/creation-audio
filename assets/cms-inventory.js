@@ -1,15 +1,15 @@
 /* =========================================================
    Création Audio V2 — Inventaire
-   Deux sous-onglets :
-   1) RÉCEPTION (scan) — un scanner de code-barres « tape » un code
-      EAN/UPC puis Entrée. Chaque scan crédite +1 le bon filament
-      dans le bon format (bobine / recharge). Décompte en direct.
-      Codes appris une fois (attrs.barcodes.{spool,refill}) puis
-      reconnus automatiquement. Confirmer -> receive_stock + archive.
+   Sous-onglets :
+   1) RÉCEPTION (scan) — on choisit une commande « en route » et on la
+      pointe au scanner (reçu / attendu, − / + à la main, lignes ajoutées).
+      Codes appris une fois (attrs.barcodes.{spool,refill}) puis reconnus.
+      Confirmer -> receive_stock + archive au prix payé de la commande
+      (taxes incluses) -> coût moyen (attrs.avg_cost) + dernier prix (attrs.last_cost).
    2) À COMMANDER — cible de stock par format (attrs.par_spool /
-      attrs.par_refill). Le manque (cible - stock) est calculé et
+      attrs.par_refill). Manque = cible + réservés − stock − en route,
       regroupé en liste de commande copiable.
-   Aucune migration SQL : tout vit dans products.attrs.
+   3) CODES-BARRES, 4) LISTE D'ATTENTE.
    ========================================================= */
 (function () {
   'use strict';
@@ -40,30 +40,29 @@
 
   var loaded = false, filaments = [];
 
-  var editor = $('#r-editor'), editorTitle = $('#r-editor-title'), orderI = $('#r-order'), dateI = $('#r-date'), pasteI = $('#r-paste'),
-      parseBtn = $('#r-parse'), parseHint = $('#r-parse-hint'), addLineBtn = $('#r-add-line'),
+  var editor = $('#r-editor'), editorTitle = $('#r-editor-title'), dateI = $('#r-date'), addLineBtn = $('#r-add-line'),
       rowsEl = $('#r-rows'), emptyHint = $('#r-empty-hint'),
       confirmBtn = $('#r-confirm'), resetBtn = $('#r-reset'), statusEl = $('#r-status'),
       historyEl = $('#r-history'), refreshBtn = $('#r-refresh'),
-      discMode = $('#r-disc-mode'), discVal = $('#r-disc-val'), discApply = $('#r-disc-apply'), discReset = $('#r-disc-reset');
+      pickEl = $('#rv-pick'), ordersEl = $('#rv-orders'), freeBtn = $('#rv-free'), workEl = $('#rv-work'),
+      metaEl = $('#rv-meta'), barEl = $('#rv-bar'), barFill = $('#rv-bar-fill');
 
   function num(v) { if (v == null || v === '') return null; var n = +v; return isFinite(n) ? n : null; }
   function round2(n) { return Math.round((+n || 0) * 100) / 100; }
   function money(n) { return round2(n).toFixed(2).replace('.', ',') + ' $'; }
   function uniq(a) { var s = {}, o = []; a.forEach(function (x) { if (x != null && !s[x]) { s[x] = 1; o.push(x); } }); return o; }
-  // coût catalogue (référence matériau) pour CE filament + format — sert de défaut
-  function refCostOf(f, kind) {
-    if (f && isAcc(f)) return num(f.cost_price);   // accessoire : prix à l'unité du produit
-    var m = matOf(f);
-    if (m) return num(kind === 'refill' ? m.cost_refill : m.cost_spool);
-    return num(kind === 'refill' ? f.cost_price_2 : f.cost_price);
+  // coût connu d'un article : coût moyen de ses réceptions (sinon moyenne de la même matière) ;
+  // accessoire : son coût moyen, sinon le coût saisi sur sa fiche
+  function costOf(f, kind) {
+    if (!f) return null;
+    if (isAcc(f)) { var ai = f.attrs && f.attrs.avg_cost && f.attrs.avg_cost.item; return num(ai != null ? ai : f.cost_price); }
+    return window.CA.costing.costOf(f, kind, filaments);
   }
-  // prix de vente (référence matériau) pour l'aperçu de marge à la réception
-  function sellOf(f, kind) {
-    if (f && isAcc(f)) return num(f.sell_price);
-    var m = matOf(f);
-    if (m) return num(kind === 'refill' ? m.sell_refill : m.sell_spool);
-    return num(kind === 'refill' ? f.sell_price_2 : f.sell_price);
+  // estimé de la liste à commander : le dernier prix payé, sinon le coût connu
+  function estCostOf(f, kind) {
+    var lc = f && f.attrs && f.attrs.last_cost;
+    var v = lc ? num(lc[kind]) : null;
+    return v != null ? v : costOf(f, kind);
   }
 
   /* ---- activation quand on ouvre l'onglet ---- */
@@ -83,7 +82,7 @@
     Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : Promise.resolve(),
       loadFilaments(), loadAccessories()
-    ]).then(function () { renderRows(); loadHistory(); renderReorder(); renderCatalog(); renderCodes(); }, function () { loadHistory(); });
+    ]).then(function () { renderPick(); loadHistory(); renderReorder(); renderCodes(); }, function () { loadHistory(); });
   }
 
   // toutes marques confondues (une réception peut mélanger, on rattache par code-barres appris)
@@ -135,20 +134,11 @@
     offersSpool: function (f) { return offersSpool(f); },
     offersRefill: function (f) { return offersRefill(f); },
     fitKind: function (p, k) { return fitKind(p, k); },
-    refCost: function (p, k) { return refCostOf(p, k); },
-    // « Recevoir » une commande en route : pré-remplit la réception avec ce qui reste à recevoir
-    receive: function (orderNumber, lines) {
-      if (editingReceiptId) setMode(null, []);
-      rows = lines.map(function (l) {
-        var p = bcProd(l.product_id);
-        return { productId: l.product_id ? String(l.product_id) : '', kind: fitKind(p, l.kind), qty: l.qty, label: l.label || '',
-          unitCost: (l.unit_cost != null && l.unit_cost !== '') ? +l.unit_cost : null };
-      });
-      orderI.value = orderNumber || ''; dateI.value = todayISO();
-      renderRows();
+    cost: function (p, k) { return costOf(p, k); },
+    // « Recevoir » une commande en route : ouvre son pointage dans Réception
+    receiveOrder: function (id) {
       if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub('reception'); else showSub('reception');
-      statusEl.textContent = 'Commande pré-remplie. Ajuste ce qui manque, puis confirme.';
-      setTimeout(function () { editor.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+      receiveOrder(id);
     }
   };
 
@@ -156,21 +146,20 @@
      SOUS-ONGLETS
      ========================================================= */
   var subReception = $('#inv-sub-reception'), subCommander = $('#inv-sub-commander'),
-      subCatalogue = $('#inv-sub-catalogue'), subCodes = $('#inv-sub-codes'), subAttente = $('#inv-sub-attente');
+      subCodes = $('#inv-sub-codes'), subAttente = $('#inv-sub-attente');
   // bascule DOM du sous-onglet (l'URL est gérée par le routing de admin-core)
   function showSub(sub) {
-    if (['commander', 'catalogue', 'codes', 'attente'].indexOf(sub) < 0) sub = 'reception';
+    if (['commander', 'codes', 'attente'].indexOf(sub) < 0) sub = 'reception';
     $$('.inv-subtab').forEach(function (b) {
       var on = b.getAttribute('data-sub') === sub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on));
     });
     if (subReception) subReception.hidden = (sub !== 'reception');
     if (subCommander) subCommander.hidden = (sub !== 'commander');
-    if (subCatalogue) subCatalogue.hidden = (sub !== 'catalogue');
     if (subCodes) subCodes.hidden = (sub !== 'codes');
     if (subAttente) subAttente.hidden = (sub !== 'attente');
     if (sub === 'commander') renderReorder();
-    if (sub === 'catalogue') renderCatalog();
+    if (sub === 'reception') renderPick();
     if (sub === 'codes') renderCodes();
     if (sub === 'reception' && scanActive) focusScan();
   }
@@ -188,20 +177,21 @@
   }
 
   /* =========================================================
-     RÉCEPTION — lignes du tableau (état : [{productId, kind, qty, label}])
+     RÉCEPTION — pointage d'une commande en route
+     On choisit une commande « en route » (cms-en-route.js), le scanner s'arme et
+     chaque scan coche +1 sur la bonne ligne (reçu / attendu). Les boutons − / +
+     comptent à la main (code-barres illisible) ; « Ajouter une ligne » pour un
+     article imprévu. Le prix payé vient de la commande (taxes du fournisseur
+     incluses) : rien à saisir ici.
+     rows : [{ productId, kind, qty (reçu), expected (attendu ; 0 = hors commande ;
+              null = sans commande / modification), label, unitCost (prix de la
+              commande, avant taxes), oldCost (modification : prix déjà enregistré),
+              free (ligne ajoutée à la main : article au choix) }]
      ========================================================= */
   var rows = [];
-  var editingReceiptId = null;
+  var current = null;          // commande en route pointée ; null = sans commande
+  var editingReceipt = null;   // réception de l'historique en cours de modification
   var editingOldLines = [];
-  var editingOldOrder = null;
-
-  function setMode(receipt, oldLines) {
-    editingReceiptId = receipt ? receipt.id : null;
-    editingOldOrder = receipt ? (receipt.order_number || null) : null;
-    editingOldLines = oldLines || [];
-    editorTitle.textContent = receipt ? 'Modifier la réception' : 'Nouvelle réception';
-    confirmBtn.textContent = receipt ? 'Enregistrer les modifications' : 'Confirmer la réception';
-  }
 
   function filamentOptions(selected) {
     function opt(p, label) { return '<option value="' + esc(p.id) + '"' + (String(p.id) === String(selected) ? ' selected' : '') + '>' + esc(label(p)) + '</option>'; }
@@ -219,108 +209,156 @@
     if (p && kind === 'spool' && !offersSpool(p) && offersRefill(p)) return 'refill';
     return kind;
   }
+  function orderRemaining(l) { return Math.max(0, (l.qty | 0) - (l.qty_received | 0)); }
+  function enRouteList() { return window.CA.enRoute && window.CA.enRoute.list ? window.CA.enRoute.list() : []; }
 
-  // cellule « prix payé » : champ + repère de marge réelle (vente − prix payé)
-  function priceCell(r, f) {
-    var ref = f ? refCostOf(f, r.kind) : null;
-    var val = (r.unitCost != null && r.unitCost !== '') ? r.unitCost : '';
-    var ph = ref != null ? ref.toFixed(2) : '';
-    var input = '<input type="number" class="rcp-price num" min="0" step="0.01" value="' + val + '"' +
-      ' placeholder="' + ph + '" title="Laisse vide pour le prix catalogue">';
-    return input + '<div class="rcp-price-hint">' + priceHint(r, f) + '</div>';
+  // choix de la commande à recevoir
+  function renderPick() {
+    if (!ordersEl) return;
+    var list = enRouteList();
+    if (!list.length) {
+      ordersEl.innerHTML = '<p class="po-none">Aucune commande en route. Ajoute-les dans « À commander ».</p>';
+      return;
+    }
+    ordersEl.innerHTML = list.map(function (o) {
+      var left = 0, got = 0;
+      o.lines.forEach(function (l) { left += orderRemaining(l); got += Math.min(l.qty | 0, l.qty_received | 0); });
+      return '<div class="rv-order" data-id="' + esc(o.id) + '">' +
+        '<div class="rv-order-main">' +
+          '<span class="po-num">' + esc(o.order_number || 'Sans n°') + '</span>' +
+          '<span class="po-meta">' + esc([o.supplier, o.ordered_at].filter(Boolean).join(' · ')) + '</span>' +
+          '<span class="po-prog">' + left + ' attendu' + (left > 1 ? 's' : '') + (got ? ' · ' + got + ' déjà reçu' + (got > 1 ? 's' : '') : '') + '</span>' +
+        '</div>' +
+        '<button type="button" class="btn btn-accent btn-sm rv-go" data-ic="scan">Recevoir</button>' +
+      '</div>';
+    }).join('');
+    $$('.rv-go', ordersEl).forEach(function (b) {
+      b.addEventListener('click', function () { receiveOrder(b.closest('.rv-order').getAttribute('data-id')); });
+    });
   }
-  function priceHint(r, f) {
-    if (!f) return '';
-    var paid = num(r.unitCost); var ref = refCostOf(f, r.kind);
-    var eff = paid != null ? paid : ref;               // prix effectif (payé, sinon catalogue)
-    var sell = sellOf(f, r.kind);
-    if (eff == null) return '<span class="muted">—</span>';
-    var bits = [];
-    if (paid != null && ref != null && Math.abs(paid - ref) >= 0.005) {
-      var d = paid - ref;
-      bits.push('<span class="' + (d < 0 ? 'pos' : 'neg') + '">' + (d < 0 ? '' : '+') + money(d) + ' vs catalogue</span>');
-    }
-    if (sell != null) {
-      var m = sell - eff, pct = sell > 0 ? Math.round(m / sell * 100) : 0;
-      bits.push('<span class="' + (m >= 0 ? 'pos' : 'neg') + '">marge ' + money(m) + (sell > 0 ? ' · ' + pct + '%' : '') + '</span>');
-    }
-    return bits.join(' · ') || '<span class="muted">catalogue</span>';
+  document.addEventListener('ca:enroute', function () { if (loaded) renderPick(); });
+  if (freeBtn) freeBtn.addEventListener('click', function () { startWork(null); });
+
+  function receiveOrder(id) {
+    var go = function () {
+      var o = enRouteList().filter(function (x) { return String(x.id) === String(id); })[0];
+      if (o) startWork(o);
+    };
+    if (!loaded) { ensureLoad(); setTimeout(go, 600); } else go();
   }
 
-  function renderRows() {
+  // ouvre le pointage : une commande (o), sans commande (null), ou la modification d'une réception (rc)
+  function startWork(o, rc, oldLines) {
+    current = rc ? null : (o || null);
+    editingReceipt = rc || null;
+    editingOldLines = oldLines || [];
+    rows = [];
+    if (rc) {
+      rows = editingOldLines.map(function (l) {
+        return { productId: l.product_id ? String(l.product_id) : '', kind: l.kind === 'refill' ? 'refill' : (l.kind === 'item' ? 'item' : 'spool'),
+          qty: l.qty | 0, expected: null, label: l.label || '', oldCost: l.unit_cost != null ? +l.unit_cost : null };
+      });
+    } else if (current) {
+      // une ligne par article + format : ce qui reste à recevoir, au prix moyen de la commande
+      var byKey = {};
+      current.lines.forEach(function (l) {
+        var left = orderRemaining(l); if (!left || !l.product_id) return;
+        var p = bcProd(l.product_id), kind = fitKind(p, l.kind), k = l.product_id + '|' + kind;
+        var r = byKey[k];
+        if (!r) { r = byKey[k] = { productId: String(l.product_id), kind: kind, qty: 0, expected: 0, label: l.label || '', unitCost: null, sum: 0, priced: 0 }; rows.push(r); }
+        r.expected += left;
+        if (l.unit_cost != null) { r.sum += (+l.unit_cost) * left; r.priced += left; }
+      });
+      rows.forEach(function (r) { r.unitCost = r.priced ? round2(r.sum / r.priced) : null; delete r.sum; delete r.priced; });
+    }
+    editorTitle.textContent = rc ? 'Modifier la réception' : (current ? 'Réception · ' + (current.order_number || 'commande sans n°') : 'Réception sans commande');
+    metaEl.textContent = rc ? [rc.order_number, rc.received_at].filter(Boolean).join(' · ')
+      : current ? [current.supplier, current.ordered_at].filter(Boolean).join(' · ') : '';
+    dateI.value = rc ? (rc.received_at || todayISO()) : todayISO();
+    confirmBtn.textContent = rc ? 'Enregistrer les modifications' : 'Confirmer la réception';
+    statusEl.textContent = '';
+    feedback('', ''); closeLearn();
+    if (pickEl) pickEl.hidden = true;
+    if (workEl) workEl.hidden = false;
+    renderRows();
+    setScanActive(true);
+    setTimeout(function () { (workEl || editor).scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 40);
+  }
+  function closeWork() {
+    setScanActive(false);
+    rows = []; current = null; editingReceipt = null; editingOldLines = [];
+    statusEl.textContent = '';
+    if (workEl) workEl.hidden = true;
+    if (pickEl) pickEl.hidden = false;
+    renderPick();
+  }
+  if (resetBtn) resetBtn.addEventListener('click', closeWork);
+
+  function stateOf(r) {
+    if (r.expected == null) return null;
+    if (r.expected === 0) return ['off', 'Hors commande'];
+    if (r.qty === r.expected) return ['ok', '✓ Reçu'];
+    if (r.qty > r.expected) return ['over', '+' + (r.qty - r.expected) + ' de trop'];
+    return ['wait', 'Manque ' + (r.expected - r.qty)];
+  }
+  function artName(f) { return isAcc(f) ? accLabel(f) : ((f.material ? f.material + ' · ' : '') + (f.name || '(sans nom)')); }
+  function kindTxt(k) { return k === 'item' ? 'Article' : (k === 'refill' ? 'Recharge' : 'Bobine'); }
+
+  function renderRows(flashIdx) {
+    var table = rowsEl.closest('table');
+    if (table) table.classList.toggle('rv-noexp', !rows.some(function (r) { return r.expected != null; }));
     if (!rows.length) { rowsEl.innerHTML = ''; emptyHint.style.display = ''; updateScanCount(); return; }
     emptyHint.style.display = 'none';
     rowsEl.innerHTML = rows.map(function (r, i) {
-      var f = bcProd(r.productId), acc = isAcc(f);
-      var hasS = !r.productId || acc || offersSpool(f);
-      var hasR = !r.productId || acc || offersRefill(f);
-      return '<tr class="rcp-row' + (r.productId ? '' : ' unmatched') + '" data-i="' + i + '">' +
-        '<td class="rcp-fil"><select class="rcp-fil-sel">' + filamentOptions(r.productId) + '</select>' +
-          (!r.productId && r.label ? '<div class="hint">détecté : ' + esc(r.label) + '</div>' : '') + '</td>' +
-        '<td>' + (acc
-          ? '<span class="rcp-kind-item">Article</span>'
-          : '<select class="rcp-kind">' +
-            '<option value="spool"' + (r.kind !== 'refill' ? ' selected' : '') + (hasS ? '' : ' disabled') + '>Avec bobine</option>' +
-            '<option value="refill"' + (r.kind === 'refill' ? ' selected' : '') + (hasR ? '' : ' disabled') + '>Recharge</option>' +
-          '</select>') + '</td>' +
-        '<td class="num"><input type="number" class="rcp-qty num" min="0" step="1" value="' + (r.qty != null ? r.qty : '') + '"></td>' +
-        '<td class="num rcp-price-cell">' + priceCell(r, f) + '</td>' +
-        '<td><button type="button" class="rcp-row-del" aria-label="Retirer">✕</button></td>' +
+      var f = bcProd(r.productId), acc = isAcc(f), st = stateOf(r);
+      var art = r.free
+        ? '<select class="rcp-fil-sel" aria-label="Article">' + filamentOptions(r.productId) + '</select>'
+        : '<div class="rv-art">' + (f && !acc ? '<span class="ro-sw" style="background:' + esc(swatchBg(f.hex, colorsOf(f))) + '"></span>' : '') +
+            '<span>' + esc(f ? artName(f) : (r.label || '(article retiré)')) + '</span></div>';
+      var fmt = r.free && !acc
+        ? '<select class="rcp-kind" aria-label="Format">' +
+            '<option value="spool"' + (r.kind !== 'refill' ? ' selected' : '') + (!f || offersSpool(f) ? '' : ' disabled') + '>Bobine</option>' +
+            '<option value="refill"' + (r.kind === 'refill' ? ' selected' : '') + (!f || offersRefill(f) ? '' : ' disabled') + '>Recharge</option>' +
+          '</select>'
+        : '<span class="rv-kind">' + kindTxt(acc ? 'item' : r.kind) + '</span>';
+      var removable = r.free || !r.expected;
+      return '<tr class="rcp-row' + (r.productId ? '' : ' unmatched') + (st ? ' is-' + st[0] : '') + (flashIdx === i ? ' rv-flash' : '') + '" data-i="' + i + '">' +
+        '<td class="rcp-fil">' + art + '</td>' +
+        '<td>' + fmt + '</td>' +
+        '<td class="num"><div class="rv-step">' +
+          '<button type="button" class="rv-minus" aria-label="Un de moins">−</button>' +
+          '<input type="number" class="rcp-qty num" min="0" step="1" value="' + (r.qty | 0) + '" aria-label="Reçu">' +
+          '<button type="button" class="rv-plus" aria-label="Un de plus">+</button>' +
+        '</div></td>' +
+        '<td class="num rv-exp">' + (r.expected > 0 ? r.expected : '—') + '</td>' +
+        '<td class="rv-stc">' + (st ? '<span class="rv-st is-' + st[0] + '">' + st[1] + '</span>' : '') + '</td>' +
+        '<td>' + (removable ? '<button type="button" class="rcp-row-del" aria-label="Retirer la ligne">✕</button>' : '') + '</td>' +
       '</tr>';
     }).join('');
 
     $$('.rcp-row', rowsEl).forEach(function (tr) {
-      var i = +tr.getAttribute('data-i');
-      $('.rcp-fil-sel', tr).addEventListener('change', function () {
-        rows[i].productId = this.value;
-        rows[i].kind = fitKind(bcProd(this.value), rows[i].kind);
-        renderRows();
-      });
+      var i = +tr.getAttribute('data-i'), r = rows[i];
+      var sel = $('.rcp-fil-sel', tr);
+      if (sel) sel.addEventListener('change', function () { r.productId = this.value; r.kind = fitKind(bcProd(this.value), r.kind); renderRows(); focusScan(); });
       var kindSel = $('.rcp-kind', tr);
-      if (kindSel) kindSel.addEventListener('change', function () { rows[i].kind = this.value; renderRows(); });
-      $('.rcp-qty', tr).addEventListener('input', function () { rows[i].qty = Math.max(0, parseInt(this.value, 10) || 0); updateScanCount(); });
-      var priceInp = $('.rcp-price', tr);
-      if (priceInp) priceInp.addEventListener('input', function () {
-        rows[i].unitCost = this.value === '' ? null : Math.max(0, parseFloat(this.value) || 0);
-        var hint = $('.rcp-price-hint', tr);
-        if (hint) hint.innerHTML = priceHint(rows[i], bcProd(rows[i].productId));
-      });
-      $('.rcp-row-del', tr).addEventListener('click', function () { rows.splice(i, 1); renderRows(); });
+      if (kindSel) kindSel.addEventListener('change', function () { r.kind = this.value; renderRows(); focusScan(); });
+      var qty = $('.rcp-qty', tr);
+      qty.addEventListener('input', function () { r.qty = Math.max(0, parseInt(this.value, 10) || 0); updateScanCount(); });
+      qty.addEventListener('change', function () { renderRows(); focusScan(); });
+      $('.rv-minus', tr).addEventListener('click', function () { r.qty = Math.max(0, (r.qty | 0) - 1); renderRows(); focusScan(); });
+      $('.rv-plus', tr).addEventListener('click', function () { r.qty = (r.qty | 0) + 1; renderRows(i); focusScan(); });
+      var del = $('.rcp-row-del', tr);
+      if (del) del.addEventListener('click', function () { rows.splice(i, 1); renderRows(); focusScan(); });
     });
     updateScanCount();
   }
 
-  if (addLineBtn) addLineBtn.addEventListener('click', function () { rows.push({ productId: '', kind: 'spool', qty: 1, label: '', unitCost: null }); renderRows(); });
-  if (resetBtn) resetBtn.addEventListener('click', resetForm);
-
-  // « Prix payé » global : applique un rabais % ou un prix fixe à toutes les lignes
-  if (discApply) discApply.addEventListener('click', function () {
-    var mode = discMode ? discMode.value : 'pct';
-    var v = num(discVal && discVal.value);
-    if (v == null) { statusEl.textContent = 'Entre une valeur à appliquer.'; return; }
-    rows.forEach(function (r) {
-      var f = bcProd(r.productId); if (!f) return;
-      if (mode === 'fixed') { r.unitCost = round2(Math.max(0, v)); return; }
-      var ref = refCostOf(f, r.kind);
-      if (ref != null) r.unitCost = round2(Math.max(0, ref * (1 - v / 100)));
-    });
+  // ligne vide : article imprévu, ou code-barres qui ne passe pas
+  if (addLineBtn) addLineBtn.addEventListener('click', function () {
+    rows.push({ productId: '', kind: 'spool', qty: 1, expected: current ? 0 : null, label: '', free: true });
     renderRows();
-    statusEl.textContent = mode === 'fixed'
-      ? '✓ Prix fixé à ' + money(v) + '/unité sur toutes les lignes.'
-      : '✓ Rabais de ' + v + ' % appliqué sur le prix catalogue de chaque ligne.';
+    var sel = rowsEl.querySelector('tr:last-child .rcp-fil-sel'); if (sel) sel.focus();
   });
-  if (discReset) discReset.addEventListener('click', function () {
-    rows.forEach(function (r) { r.unitCost = null; });
-    if (discVal) discVal.value = '';
-    renderRows();
-    statusEl.textContent = 'Prix catalogue rétabli sur toutes les lignes.';
-  });
-  function resetForm() {
-    rows = []; pasteI.value = ''; orderI.value = ''; dateI.value = todayISO();
-    parseHint.textContent = ''; statusEl.textContent = '';
-    setMode(null, []);
-    renderRows();
-  }
 
   /* =========================================================
      POSTE DE SCAN
@@ -342,9 +380,9 @@
     scanInput.disabled = !scanActive;
     scanStation.classList.toggle('is-armed', scanActive);
     scanToggle.setAttribute('aria-pressed', String(scanActive));
-    scanToggle.textContent = scanActive ? 'Réception en cours…' : 'Démarrer la réception';
+    scanToggle.textContent = scanActive ? 'Mettre en pause' : 'Reprendre le scan';
     scanToggle.dataset.ic = scanActive ? 'pause' : 'scan';
-    scanInput.placeholder = scanActive ? 'En attente d\'un scan…' : 'Clique « Démarrer » puis scanne…';
+    scanInput.placeholder = scanActive ? 'Scanne un article…' : 'Scan en pause';
     if (scanActive) { scanInput.value = ''; focusScan(); }
     else { closeLearn(); }
   }
@@ -357,7 +395,7 @@
       if (!scanActive || learnOpen) return;
       var a = document.activeElement;
       if (a && a !== document.body && a.closest &&
-          a.closest('#r-rows, #scan-learn, .editor-actions, #r-order, #r-date, .rcp-manual, .inv-subtab')) return;
+          a.closest('#r-rows, #scan-learn, .editor-actions, #r-date, #r-add-line, .inv-subtab')) return;
       focusScan();
     }, 40);
   });
@@ -395,30 +433,46 @@
   function processScan(code) {
     var hit = findByBarcode(code);
     if (!hit) { openLearn(code); return; }
-    var qty = addScanUnit(hit.f, hit.kind);
-    feedback('✓ ' + scanLabel(hit.f, hit.kind) + '  (×' + qty + ')', 'ok');
+    scanNote(addScanUnit(hit.f, hit.kind), hit.f, hit.kind, '');
     bumpCount();
     if (window.CA.waitlist) window.CA.waitlist.onScan(hit.f.id, hit.kind);   // quelqu'un l'attend ?
     if (window.CA.reserved) window.CA.reserved.onScan(hit.f.id, hit.kind);   // réservé pour un client ?
     focusScan();
   }
 
-  // crédite +1 la ligne (productId+kind) ; renvoie la nouvelle quantité de cette ligne
+  // crédite +1 : d'abord une ligne attendue pas encore complète, sinon la ligne de cet article ;
+  // un article absent de la commande s'ajoute en « hors commande ». Renvoie la ligne.
   function addScanUnit(f, kind) {
-    var line = rows.filter(function (r) { return String(r.productId) === String(f.id) && r.kind === kind; })[0];
-    if (line) { line.qty = (line.qty | 0) + 1; }
-    else { line = { productId: String(f.id), kind: kind, qty: 1, label: bcLabel(f), unitCost: null }; rows.push(line); }
-    renderRows();
-    return line.qty;
+    var same = rows.filter(function (r) { return String(r.productId) === String(f.id) && r.kind === kind; });
+    var line = same.filter(function (r) { return r.expected > 0 && r.qty < r.expected; })[0] || same[0];
+    if (line) line.qty = (line.qty | 0) + 1;
+    else { line = { productId: String(f.id), kind: kind, qty: 1, expected: current ? 0 : null, label: bcLabel(f) }; rows.push(line); }
+    renderRows(rows.indexOf(line));
+    return line;
+  }
+  function scanNote(line, f, kind, prefix) {
+    var name = scanLabel(f, kind);
+    if (line.expected === 0) feedback('⚠ ' + prefix + 'Pas dans la commande : ' + name, 'warn');
+    else if (line.expected > 0 && line.qty > line.expected) feedback('⚠ ' + prefix + name + ' : ' + (line.qty - line.expected) + ' de trop', 'warn');
+    else feedback('✓ ' + prefix + name + (line.expected > 0 ? '  (' + line.qty + ' / ' + line.expected + ')' : '  (×' + line.qty + ')'), 'ok');
   }
 
+  // compteur : « reçus / attendus » + barre pour une commande, sinon le nombre d'articles
   function updateScanCount() {
     if (!scanCount) return;
-    var total = rows.reduce(function (s, r) { return s + (r.qty | 0); }, 0);
-    var lines = rows.filter(function (r) { return (r.qty | 0) > 0; }).length;
-    scanCount.innerHTML = '<span class="scan-count-num">' + total + '</span>' +
-      '<span class="scan-count-lbl">' + (total <= 1 ? 'article' : 'articles') +
-      (lines ? ' · ' + lines + ' ligne' + (lines > 1 ? 's' : '') : '') + '</span>';
+    var exp = 0, got = 0, total = 0;
+    rows.forEach(function (r) {
+      total += r.qty | 0;
+      if (r.expected > 0) { exp += r.expected; got += Math.min(r.qty | 0, r.expected); }
+    });
+    if (exp) {
+      scanCount.innerHTML = '<span class="scan-count-num">' + got + '</span><span class="scan-count-lbl">/ ' + exp + ' reçus</span>';
+      if (barEl) { barEl.hidden = false; barEl.classList.toggle('is-done', got >= exp); }
+      if (barFill) barFill.style.width = Math.round(got / exp * 100) + '%';
+    } else {
+      scanCount.innerHTML = '<span class="scan-count-num">' + total + '</span><span class="scan-count-lbl">' + (total > 1 ? 'articles' : 'article') + '</span>';
+      if (barEl) barEl.hidden = true;
+    }
   }
   function bumpCount() {
     var num = scanCount && scanCount.querySelector('.scan-count-num');
@@ -472,8 +526,7 @@
         if (res.error || !res.data || !res.data.length) { feedback('Échec de l\'association (permissions ?).', 'bad'); return; }
         f.attrs = res.data[0].attrs || attrs;   // maj en mémoire -> reconnu immédiatement ensuite
         closeLearn();
-        var qty = addScanUnit(f, kind);
-        feedback('✓ Associé & compté : ' + scanLabel(f, kind) + '  (×' + qty + ')', 'ok');
+        scanNote(addScanUnit(f, kind), f, kind, 'Associé · ');
         bumpCount();
         if (window.CA.waitlist) window.CA.waitlist.onScan(f.id, kind);
         if (window.CA.reserved) window.CA.reserved.onScan(f.id, kind);
@@ -485,61 +538,7 @@
   });
 
   /* =========================================================
-     ANALYSE DU TEXTE COLLÉ (repli manuel — inchangé)
-     ========================================================= */
-  if (parseBtn) parseBtn.addEventListener('click', function () {
-    var text = pasteI.value || '';
-    if (!text.trim()) { parseHint.textContent = 'Colle d\'abord le texte de la commande.'; return; }
-    var found = parseText(text);
-    if (!found.length) { parseHint.textContent = 'Rien reconnu.'; return; }
-    found.forEach(function (r) { rows.push(r); });
-    parseHint.textContent = found.length + ' ligne(s) détectée(s).';
-    renderRows();
-  });
-
-  function norm(s) { return String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim(); }
-
-  function matchFilament(material, color, code) {
-    if (code) {
-      var byCode = filaments.filter(function (f) { return f.code && String(f.code).trim() === String(code).trim(); })[0];
-      if (byCode) return byCode;
-    }
-    var nm = norm(material), nc = norm(color);
-    var exact = filaments.filter(function (f) { return norm(f.material) === nm && norm(f.name) === nc; })[0];
-    if (exact) return exact;
-    return filaments.filter(function (f) { return norm(f.name) === nc; })[0] || null;
-  }
-
-  function parseText(text) {
-    var lines = text.split(/\r?\n/).map(function (s) { return s.trim(); });
-    var out = [];
-    var anchor = /^(.+?)\s*\((\d+)\)\s*\/\s*(.+?)\s*\/\s*[\d.]+\s*kg\b/i;
-    lines.forEach(function (l, i) {
-      var m = l.match(anchor);
-      if (!m) return;
-      var color = m[1].trim(), code = m[2], typeStr = m[3];
-      var kind = /spool/i.test(typeStr) ? 'spool' : (/refill/i.test(typeStr) ? 'refill' : 'spool');
-      var material = (i >= 1 ? lines[i - 1] : '') || '';
-      var qty = 1;
-      for (var k = i - 1; k >= 0 && k >= i - 3; k--) {
-        if (/^\d+$/.test(lines[k])) { qty = parseInt(lines[k], 10); break; }
-      }
-      var f = matchFilament(material, color, code);
-      if (f && kind === 'refill' && !offersRefill(f) && offersSpool(f)) kind = 'spool';
-      if (f && kind === 'spool' && !offersSpool(f) && offersRefill(f)) kind = 'refill';
-      out.push({
-        productId: f ? String(f.id) : '',
-        kind: kind,
-        qty: qty,
-        label: material + ' · ' + color + ' (' + code + ')',
-        unitCost: null
-      });
-    });
-    return out;
-  }
-
-  /* =========================================================
-     CONFIRMATION (création / modification) — inchangé
+     CONFIRMATION — stock + archive + commande en route consommée
      ========================================================= */
   function applyStock(lines, sign) {
     return Promise.all(lines.filter(function (l) { return l.product_id && l.qty > 0; }).map(function (l) {
@@ -547,81 +546,85 @@
         .then(function (res) { if (res && res.error) throw res.error; return res; });   // ne PAS masquer une erreur RPC
     }));
   }
+  // commande à laquelle une réception de l'historique est rattachée (id, sinon ancien n°)
+  function orderRefOf(rc) { return rc ? (rc.supplier_order_id ? { id: rc.supplier_order_id } : (rc.order_number || null)) : null; }
 
-  if (editor) editor.addEventListener('submit', onConfirm);
-  function onConfirm(e, skipAsk) {
-    if (e) e.preventDefault();
+  if (editor) editor.addEventListener('submit', function (e) { e.preventDefault(); onConfirm(false, false); });
+  function onConfirm(skipOrphan, skipMissing) {
     var valid = rows.filter(function (r) { return r.productId && r.qty > 0; });
-    if (!valid.length) { statusEl.textContent = 'Ajoute au moins une ligne (filament + quantité).'; return; }
-    var missing = rows.some(function (r) { return !r.productId && r.qty > 0; });
-    if (missing && !skipAsk) {
-      caDialog.confirm({ title: 'Ignorer les lignes sans filament ?', message: 'Certaines lignes n\'ont pas de filament choisi.', ok: 'Continuer' })
-        .then(function (ok) { if (ok) onConfirm(null, true); });
+    if (!valid.length) { statusEl.textContent = 'Aucun article reçu.'; return; }
+    if (!skipOrphan && rows.some(function (r) { return !r.productId && r.qty > 0; })) {
+      caDialog.confirm({ title: 'Ignorer les lignes sans article ?', message: 'Certaines lignes n\'ont pas d\'article choisi.', ok: 'Continuer' })
+        .then(function (ok) { if (ok) onConfirm(true, skipMissing); });
       return;
     }
+    var missing = rows.reduce(function (s, r) { return s + (r.expected > 0 ? Math.max(0, r.expected - (r.qty | 0)) : 0); }, 0);
+    if (current && missing && !skipMissing) {
+      caDialog.confirm({ title: missing + ' article' + (missing > 1 ? 's' : '') + ' pas reçu' + (missing > 1 ? 's' : ''),
+        message: 'Ils restent en route pour une prochaine livraison, ou tu les retires de la commande.',
+        ok: 'Laisser en route', alt: 'Retirer de la commande', icon: 'clock' })
+        .then(function (v) { if (v === true) save(valid, false); else if (v === 'alt') save(valid, true); });
+      return;
+    }
+    save(valid, false);
+  }
 
-    var date = /^\d{4}-\d{2}-\d{2}$/.test(dateI.value) ? dateI.value : todayISO();
-    var order = orderI.value.trim() || null;
+  function save(valid, dropRest) {
+    var date = /^\d{4}-\d{2}-\d{2}$/.test(dateI.value.trim()) ? dateI.value.trim() : todayISO();
+    var order = current, rc = editingReceipt, oldLines = editingOldLines;
+    var tax = order ? (+order.tax_rate || 0) : 0;
+    var newLines = null;
     var newLinesFor = function (receiptId) {
       return valid.map(function (r) {
-        var f = bcProd(r.productId);
-        return { receipt_id: receiptId, product_id: r.productId, label: f ? bcLabel(f) : null, kind: fitKind(f, r.kind), qty: r.qty,
-          unit_cost: (r.unitCost != null && r.unitCost !== '') ? round2(r.unitCost) : null };
+        var f = bcProd(r.productId), kind = fitKind(f, r.kind);
+        // prix payé : celui de la commande + taxes du fournisseur ; hors commande / sans commande : le coût connu
+        var cost = r.oldCost != null ? r.oldCost : (r.unitCost != null ? r.unitCost * (1 + tax / 100) : costOf(f, kind));
+        return { receipt_id: receiptId, product_id: r.productId, label: f ? bcLabel(f) : null, kind: kind, qty: r.qty,
+          unit_cost: cost != null ? round2(cost) : null };
       });
     };
-    // produits dont le coût moyen doit être recalculé (anciennes + nouvelles lignes)
-    var affected = uniq(
-      editingOldLines.map(function (l) { return l.product_id; })
-        .concat(valid.map(function (r) { return r.productId; }))
-    );
+    var affected = uniq(oldLines.map(function (l) { return l.product_id; }).concat(valid.map(function (r) { return r.productId; })));
+    var ref = rc ? orderRefOf(rc) : (order ? { id: order.id } : null);
 
     confirmBtn.disabled = true;
     statusEl.textContent = 'Enregistrement…';
-
     var chain;
-    if (editingReceiptId) {
-      var rid = editingReceiptId;
-      chain = applyStock(editingOldLines, -1)
-        .then(function () { return sb.from('receipt_lines').delete().eq('receipt_id', rid); })
-        .then(function () { return sb.from('receipts').update({ order_number: order, received_at: date }).eq('id', rid).select(); })
+    if (rc) {
+      chain = applyStock(oldLines, -1)
+        .then(function () { return sb.from('receipt_lines').delete().eq('receipt_id', rc.id); })
+        .then(function () { return sb.from('receipts').update({ received_at: date }).eq('id', rc.id).select(); })
         .then(function (res) {
           if (res.error || !res.data || !res.data.length) throw (res.error || new Error('Modification refusée (permissions).'));
-          var lines = newLinesFor(rid);
-          return sb.from('receipt_lines').insert(lines).then(function (r2) {
-            if (r2.error) throw r2.error;
-            return applyStock(lines, +1);
-          });
+          newLines = newLinesFor(rc.id);
+          return sb.from('receipt_lines').insert(newLines).then(function (r2) { if (r2.error) throw r2.error; return applyStock(newLines, +1); });
         });
     } else {
-      chain = sb.from('receipts').insert({ order_number: order, received_at: date, note: null }).select()
+      var head = { order_number: order ? (order.order_number || null) : null, received_at: date, note: null,
+        supplier: order ? (order.supplier || null) : null, supplier_order_id: order ? order.id : null };
+      chain = sb.from('receipts').insert(head).select()
         .then(function (res) {
           if (res.error || !res.data || !res.data.length) throw (res.error || new Error('Réception refusée (permissions).'));
-          var lines = newLinesFor(res.data[0].id);
-          return sb.from('receipt_lines').insert(lines).then(function (r2) {
-            if (r2.error) throw r2.error;
-            return applyStock(lines, +1);
-          });
+          newLines = newLinesFor(res.data[0].id);
+          return sb.from('receipt_lines').insert(newLines).then(function (r2) { if (r2.error) throw r2.error; return applyStock(newLines, +1); });
         });
     }
-
-    // commandes « en route » : la réception consomme ce qui était attendu (modif = on rend l'ancien d'abord)
-    var wasEditing = !!editingReceiptId, oldLines = editingOldLines, oldOrder = editingOldOrder;
+    // commande en route : la réception consomme ce qui était attendu (modification = on rend l'ancien d'abord)
     chain = chain.then(function () {
-      var er = window.CA.enRoute; if (!er) return;
-      var newLines = valid.map(function (r) { return { product_id: r.productId, kind: fitKind(bcProd(r.productId), r.kind), qty: r.qty }; });
-      return (wasEditing ? er.allocate(oldLines, oldOrder, -1) : Promise.resolve())
-        .then(function () { return er.allocate(newLines, order, +1); })
+      var er = window.CA.enRoute; if (!er || !ref) return;
+      return (rc ? er.allocate(oldLines, ref, -1) : Promise.resolve())
+        .then(function () { return er.allocate(newLines, ref, +1); })
+        .then(function () { if (dropRest && order) return er.dropRemaining(order.id); })
         .then(null, function (e) { console.warn('en route', e); });   // la réception est déjà enregistrée
     });
 
     chain.then(function () { return recomputeAvgCosts(affected); }).then(function () {
       confirmBtn.disabled = false;
-      statusEl.textContent = editingReceiptId ? '✓ Réception modifiée, stock et coût moyen ajustés.' : '✓ Réception enregistrée, stock et coût moyen mis à jour.';
-      // liste d'attente : alerte pour TOUT ce qui vient d'entrer (y compris lignes saisies à la main)
+      // liste d'attente / réservés : alerte pour TOUT ce qui vient d'entrer
       var recv = valid.map(function (r) { return { productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind) }; });
       if (window.CA.waitlist) window.CA.waitlist.onReceived(recv);
-      if (window.CA.reserved) window.CA.reserved.onReceived(recv);   // réservé pour un client (facture « à venir »)
-      resetForm();
+      if (window.CA.reserved) window.CA.reserved.onReceived(recv);
+      if (window.caDialog && caDialog.toast) caDialog.toast(rc ? 'Réception modifiée' : 'Réception enregistrée');
+      closeWork();
       Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
       loadHistory();
     }, function (err) {
@@ -631,38 +634,48 @@
   }
 
   /* ---- Coût moyen pondéré : recalcul par rejeu des réceptions ----
-     Pour chaque produit touché, on relit TOUTES ses lignes de réception
-     et on recalcule attrs.avg_cost { spool, refill }. Une ligne sans prix
-     saisi retombe sur le coût catalogue du matériau. Le rejeu rend le tout
-     rétroactif et cohérent même après modification/suppression. */
+     Pour chaque produit touché, on relit TOUTES ses lignes de réception et on
+     recalcule attrs.avg_cost { spool, refill | item } (prix payés, taxes incluses)
+     + attrs.last_cost (dernier prix payé : estimé de la liste à commander).
+     Le rejeu rend le tout cohérent même après modification/suppression. */
   function recomputeAvgCosts(productIds) {
     productIds = uniq(productIds || []).filter(Boolean);
     if (!productIds.length) return Promise.resolve();
-    return sb.from('receipt_lines').select('product_id,kind,qty,unit_cost').in('product_id', productIds)
+    var lines;
+    return sb.from('receipt_lines').select('product_id,kind,qty,unit_cost,receipt_id').in('product_id', productIds)
       .then(function (res) {
         if (res.error) throw res.error;
+        lines = res.data || [];
+        var rids = uniq(lines.map(function (l) { return l.receipt_id; }));
+        return rids.length ? sb.from('receipts').select('id,received_at,created_at').in('id', rids) : { data: [] };
+      })
+      .then(function (r2) {
+        var when = {};
+        ((r2 && r2.data) || []).forEach(function (r) { when[r.id] = (r.received_at || '') + '|' + (r.created_at || ''); });
         var byProd = {};
-        (res.data || []).forEach(function (l) {
+        lines.forEach(function (l) {
           var g = byProd[l.product_id] || (byProd[l.product_id] = { spool: [], refill: [] });
-          (l.kind === 'refill' ? g.refill : g.spool).push(l);
+          (l.kind === 'refill' ? g.refill : g.spool).push({ qty: l.qty, unit_cost: l.unit_cost, w: when[l.receipt_id] || '' });
         });
+        var last = function (arr) {
+          var priced = arr.filter(function (l) { return num(l.unit_cost) != null; });
+          if (!priced.length) return null;
+          priced.sort(function (a, z) { return a.w < z.w ? -1 : a.w > z.w ? 1 : 0; });
+          return round2(priced[priced.length - 1].unit_cost);
+        };
         return Promise.all(productIds.map(function (pid) {
           var f = bcProd(pid);
           if (!f) return null;
           var g = byProd[pid] || { spool: [], refill: [] };
           var attrs = Object.assign({}, f.attrs || {});
-          var ac = {};
-          if (isAcc(f)) {
-            // accessoire : un seul coût moyen (lignes 'item' rangées avec 'spool' ci-dessus)
-            var avgI = CA.costing.avg(g.spool, refCostOf(f, 'item'));
-            if (avgI != null) ac.item = avgI;
-          } else {
-            var avgS = CA.costing.avg(g.spool, refCostOf(f, 'spool'));
-            var avgR = CA.costing.avg(g.refill, refCostOf(f, 'refill'));
-            if (avgS != null) ac.spool = avgS;
-            if (avgR != null) ac.refill = avgR;
-          }
+          var ac = {}, lc = {}, v;
+          // accessoire : un seul coût (lignes 'item' rangées avec 'spool' ci-dessus)
+          (isAcc(f) ? [['item', g.spool]] : [['spool', g.spool], ['refill', g.refill]]).forEach(function (k) {
+            v = CA.costing.avg(k[1], null); if (v != null) ac[k[0]] = v;
+            v = last(k[1]); if (v != null) lc[k[0]] = v;
+          });
           if (Object.keys(ac).length) attrs.avg_cost = ac; else delete attrs.avg_cost;
+          if (Object.keys(lc).length) attrs.last_cost = lc; else delete attrs.last_cost;
           return sb.from('products').update({ attrs: attrs, updated_at: new Date().toISOString() }).eq('id', pid).select()
             .then(function (r) { if (r.data && r.data[0]) f.attrs = r.data[0].attrs || attrs; });
         }));
@@ -696,11 +709,11 @@
       var linesHtml = lines.map(function (l) {
         var q = l.qty | 0;
         var priced = (l.unit_cost != null && l.unit_cost !== '');
-        var eff = priced ? +l.unit_cost : refCostOf(bcProd(l.product_id), l.kind === 'refill' ? 'refill' : 'spool');
+        var eff = priced ? +l.unit_cost : null;
         if (eff != null) { totalCost += eff * q; hasAnyCost = true; }
         var priceTxt = priced
           ? '<span class="rcp-hist-price">' + money(l.unit_cost) + '/u</span>'
-          : '<span class="rcp-hist-price muted">catalogue' + (eff != null ? ' ' + money(eff) + '/u' : '') + '</span>';
+          : '<span class="rcp-hist-price muted">—</span>';
         return '<li>' + esc(l.label || '(produit supprimé)') + ' — ' + kindLabel(l.kind) + ' × ' + q + ' · ' + priceTxt + '</li>';
       }).join('');
       var costTxt = hasAnyCost ? ' · ' + money(totalCost) : '';
@@ -730,17 +743,9 @@
   }
 
   function editReceipt(rc, lines) {
-    orderI.value = rc.order_number || '';
-    dateI.value = rc.received_at || todayISO();
-    pasteI.value = ''; parseHint.textContent = '';
-    rows = lines.map(function (l) {
-      return { productId: l.product_id ? String(l.product_id) : '', kind: l.kind === 'refill' ? 'refill' : (l.kind === 'item' ? 'item' : 'spool'), qty: l.qty | 0, label: l.label || '',
-        unitCost: (l.unit_cost != null && l.unit_cost !== '') ? +l.unit_cost : null };
-    });
-    setMode(rc, lines);
-    renderRows();
-    statusEl.textContent = 'Modifie puis « Enregistrer les modifications ». Le stock sera réajusté.';
-    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var sub = window.CA.route && window.CA.route.goSub;
+    startWork(null, rc, lines);
+    if (sub) sub('reception');
   }
 
   function delReceipt(rc, lines) {
@@ -753,7 +758,7 @@
         .then(function (res) {
           // ce qu'elle avait consommé redevient « en route »
           if (res.error || !window.CA.enRoute) return res;
-          return window.CA.enRoute.allocate(lines, rc.order_number || null, -1).then(function () { return res; }, function () { return res; });
+          return window.CA.enRoute.allocate(lines, orderRefOf(rc), -1).then(function () { return res; }, function () { return res; });
         })
         .then(function (res) {
           if (res.error) throw res.error;
@@ -761,7 +766,7 @@
           return recomputeAvgCosts(affected);
         })
         .then(function () {
-          if (editingReceiptId === rc.id) resetForm();
+          if (editingReceipt && editingReceipt.id === rc.id) closeWork();
           Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
           loadHistory();
         }, function (err) { caDialog.error(err); });
@@ -986,24 +991,6 @@
     renderReorderSummary();
   }
 
-  // enregistre le coût catalogue d'un matériau (cost_spool / cost_refill) dans la table materials.
-  // `cols` = { cost_spool?, cost_refill? } (valeur nombre ou null). Met à jour le cache CA.materials
-  // en place -> réception (refCostOf) et facturation en profitent aussitôt. Renvoie une promesse.
-  function updateMaterialCost(brand, name, cols) {
-    var m = window.CA.materialOf ? window.CA.materialOf(brand, name) : null;
-    if (!m) return Promise.resolve({ error: 'introuvable' });
-    var patch = { updated_at: new Date().toISOString() };
-    if ('cost_spool' in cols) patch.cost_spool = cols.cost_spool;
-    if ('cost_refill' in cols) patch.cost_refill = cols.cost_refill;
-    return sb.from('materials').update(patch).eq('brand', brand).eq('name', name).select()
-      .then(function (res) {
-        if (res.error || !res.data || !res.data.length) return { error: res.error || 'refusé' };
-        if ('cost_spool' in cols) m.cost_spool = res.data[0].cost_spool;
-        if ('cost_refill' in cols) m.cost_refill = res.data[0].cost_refill;
-        return { data: res.data[0] };
-      }, function (err) { return { error: err }; });
-  }
-
   // la « liste à commander » : agrège tous les manques, groupés par marque
   function renderReorderSummary() {
     if (!reorderSummary) return;
@@ -1034,12 +1021,12 @@
     var byBrand = {};
     items.forEach(function (it) { (byBrand[it.f.brand || '—'] = byBrand[it.f.brand || '—'] || []).push(it); });
 
-    // Estimé de la commande = prix catalogue (coût matériau par format, même base que
-    // la réception) × quantité manquante ; avant taxes, rabais et livraison. Les
-    // articles sans prix catalogue ne sont pas comptés (listés pour les compléter).
+    // Estimé de la commande = dernier prix payé (taxes incluses ; sinon coût moyen,
+    // sinon moyenne de la même matière) × quantité manquante. Un article jamais reçu
+    // dont la matière non plus n'est pas compté (listé).
     var est = 0, estByBrand = {}, noPrice = {};
     items.forEach(function (it) {
-      var c = refCostOf(it.f, it.kind), b = it.f.brand || '—';
+      var c = estCostOf(it.f, it.kind), b = it.f.brand || '—';
       if (c == null) { noPrice[(it.f.material || it.f.name || '—') + ' · ' + kindLabel(it.kind)] = 1; return; }
       est += c * it.qty;
       estByBrand[b] = (estByBrand[b] || 0) + c * it.qty;
@@ -1047,12 +1034,11 @@
     var missing = Object.keys(noPrice);
     var multiBrand = Object.keys(byBrand).length > 1;
     var estHtml = (est > 0 || !missing.length)
-      ? '<span class="reorder-est" title="Somme des prix catalogue × quantités à commander — avant taxes, rabais et livraison">Estimé <b>≈ ' + money(est) + '</b></span>'
+      ? '<span class="reorder-est" title="Dernier prix payé (taxes incluses) × quantités à commander">Estimé <b>≈ ' + money(est) + '</b></span>'
       : '';
     var noteHtml = missing.length
-      ? '<p class="reorder-est-note">Sans prix catalogue, non compté' + (missing.length > 1 ? 's' : '') + ' : ' +
-          esc(missing.slice(0, 4).join(', ')) + (missing.length > 4 ? '…' : '') +
-          ' — <button type="button" class="ro-link" id="reorder-to-catalog">compléter les prix catalogue</button></p>'
+      ? '<p class="reorder-est-note">Jamais reçu, non compté' + (missing.length > 1 ? 's' : '') + ' : ' +
+          esc(missing.slice(0, 4).join(', ')) + (missing.length > 4 ? '…' : '') + '</p>'
       : '';
 
     var listHtml = Object.keys(byBrand).map(function (brand) {
@@ -1092,10 +1078,6 @@
         location.hash = '#historique';
       });
     });
-    var toCat = $('#reorder-to-catalog');
-    if (toCat) toCat.addEventListener('click', function () {
-      if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub('catalogue'); else showSub('catalogue');
-    });
     var copyBtn = $('#reorder-copy');
     if (copyBtn) copyBtn.addEventListener('click', function () {
       var text = buildOrderText(byBrand);
@@ -1127,159 +1109,6 @@
     document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); } catch (e) {}
     document.body.removeChild(ta);
-  }
-
-  /* =========================================================
-     PRIX CATALOGUE — coût de base par matériau (cost_spool / cost_refill).
-     Édition ligne par ligne + application groupée d'un prix (bobine / recharge)
-     à plusieurs matériaux cochés d'un coup. C'est ce coût qui sert de base au
-     rabais % de la réception (refCostOf), avant que le CMP prenne le relais.
-     ========================================================= */
-  var catalogBody = $('#catalog-body'), catalogBrand = $('#catalog-brand'),
-      catalogBulkSpool = $('#catalog-bulk-spool'), catalogBulkRefill = $('#catalog-bulk-refill'),
-      catalogApply = $('#catalog-apply'), catalogStatus = $('#catalog-status'), catalogRefresh = $('#catalog-refresh');
-  var catBrand = '';   // '' = toutes les marques
-
-  if (catalogBrand) catalogBrand.addEventListener('change', function () { catBrand = this.value; renderCatalog(); });
-  if (catalogRefresh) catalogRefresh.addEventListener('click', function () {
-    (window.CA.loadMaterials ? window.CA.loadMaterials() : Promise.resolve()).then(renderCatalog, renderCatalog);
-  });
-  if (catalogApply) catalogApply.addEventListener('click', applyBulkCost);
-
-  function catalogBrands() {
-    var list = (window.CA.materials && window.CA.materials.list) || [];
-    var seen = {}, out = [];
-    list.forEach(function (m) { if (!seen[m.brand]) { seen[m.brand] = 1; out.push(m.brand); } });
-    out.sort(function (a, z) { return brandOrderIndex(a) - brandOrderIndex(z); });
-    return out;
-  }
-  function catalogMaterials() {
-    var list = ((window.CA.materials && window.CA.materials.list) || []).slice();
-    list = list.filter(function (m) { return !catBrand || m.brand === catBrand; });
-    list.sort(function (a, z) {
-      var ba = brandOrderIndex(a.brand), bz = brandOrderIndex(z.brand); if (ba !== bz) return ba - bz;
-      return matOrderIndex(a.brand, a.name) - matOrderIndex(z.brand, z.name);
-    });
-    return list;
-  }
-  function populateCatalogBrand() {
-    if (!catalogBrand) return;
-    var brands = catalogBrands();
-    if (catBrand && brands.indexOf(catBrand) < 0) catBrand = '';
-    catalogBrand.innerHTML = '<option value="">Toutes les marques</option>' + brands.map(function (b) {
-      return '<option value="' + esc(b) + '"' + (b === catBrand ? ' selected' : '') + '>' + esc(b) + '</option>';
-    }).join('');
-    catalogBrand.value = catBrand || '';
-  }
-
-  function renderCatalog() {
-    if (!catalogBody) return;
-    if (!loaded) { ensureLoad(); return; }
-    populateCatalogBrand();
-    var mats = catalogMaterials();
-    if (!mats.length) {
-      catalogBody.innerHTML = '<p class="empty">Aucun matériau. Ajoute des matériaux dans l\'onglet <b>Filaments</b>.</p>';
-      return;
-    }
-    var multiBrand = !catBrand && catalogBrands().length > 1;
-    function costCell(kind, has, val) {
-      if (!has) return '<td class="cat-na">—</td>';
-      return '<td><input type="number" class="catcost num" data-kind="' + kind + '" min="0" step="0.01" value="' +
-        (val != null ? val : '') + '" placeholder="0.00"></td>';
-    }
-    var rows = mats.map(function (m) {
-      var hasS = m.sell_spool != null, hasR = m.sell_refill != null;
-      return '<tr data-brand="' + esc(m.brand || '') + '" data-mat="' + esc(m.name || '') + '">' +
-        '<td class="cat-check-td"><input type="checkbox" class="cat-check"></td>' +
-        '<td class="l"><span class="cat-mat">' + esc(m.name || '(sans nom)') + '</span>' +
-          (multiBrand ? ' <span class="cat-brand">' + esc(m.brand || '') + '</span>' : '') + '</td>' +
-        costCell('spool', hasS, m.cost_spool) +
-        costCell('refill', hasR, m.cost_refill) +
-      '</tr>';
-    }).join('');
-    catalogBody.innerHTML =
-      '<div class="reorder-table-wrap"><table class="reorder-table catalog-table">' +
-        '<thead><tr>' +
-          '<th class="cat-check-td"><input type="checkbox" class="cat-check-all" title="Tout cocher / décocher"></th>' +
-          '<th class="l">Matériau</th><th>Bobine</th><th>Recharge</th>' +
-        '</tr></thead><tbody>' + rows + '</tbody>' +
-      '</table></div>';
-    wireCatalog();
-  }
-
-  function wireCatalog() {
-    $$('.catcost', catalogBody).forEach(function (inp) {
-      var tr = inp.closest('tr');
-      var brand = tr.getAttribute('data-brand'), mat = tr.getAttribute('data-mat');
-      var col = inp.getAttribute('data-kind') === 'refill' ? 'cost_refill' : 'cost_spool';
-      var commit = function () {
-        var v = (inp.value === '') ? null : Math.max(0, round2(inp.value));
-        var cols = {}; cols[col] = v;
-        tr.classList.add('saving');
-        updateMaterialCost(brand, mat, cols).then(function (r) {
-          tr.classList.remove('saving');
-          if (!r.error && v != null) inp.value = v;
-          flashRow(tr, !r.error);
-        });
-      };
-      inp.addEventListener('change', commit);
-      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } });
-    });
-    var all = $('.cat-check-all', catalogBody);
-    if (all) all.addEventListener('change', function () {
-      $$('.cat-check', catalogBody).forEach(function (c) { c.checked = all.checked; });
-    });
-  }
-
-  function flashRow(tr, ok) {
-    var cls = ok ? 'saved' : 'save-err';
-    tr.classList.add(cls);
-    setTimeout(function () { tr.classList.remove(cls); }, ok ? 900 : 2500);
-  }
-
-  // applique le(s) prix saisi(s) dans la barre à tous les matériaux cochés.
-  // Un champ vide = ce format n'est pas touché ; un matériau qui n'offre pas le format est ignoré pour ce format.
-  function applyBulkCost() {
-    if (!catalogStatus) return;
-    var setS = catalogBulkSpool && catalogBulkSpool.value !== '';
-    var setR = catalogBulkRefill && catalogBulkRefill.value !== '';
-    if (!setS && !setR) { catalogStatus.textContent = 'Entre un prix bobine et/ou recharge à appliquer.'; return; }
-    var sNum = setS ? Math.max(0, round2(catalogBulkSpool.value)) : null;
-    var rNum = setR ? Math.max(0, round2(catalogBulkRefill.value)) : null;
-    var checked = $$('.cat-check', catalogBody).filter(function (c) { return c.checked; });
-    if (!checked.length) { catalogStatus.textContent = 'Coche au moins un matériau.'; return; }
-
-    var jobs = [];
-    checked.forEach(function (c) {
-      var tr = c.closest('tr');
-      var brand = tr.getAttribute('data-brand'), mat = tr.getAttribute('data-mat');
-      var m = window.CA.materialOf ? window.CA.materialOf(brand, mat) : null;
-      if (!m) return;
-      var cols = {};
-      if (setS && m.sell_spool != null) cols.cost_spool = sNum;
-      if (setR && m.sell_refill != null) cols.cost_refill = rNum;
-      if (!('cost_spool' in cols) && !('cost_refill' in cols)) return;   // n'offre pas le(s) format(s) saisi(s)
-      tr.classList.add('saving');
-      jobs.push(updateMaterialCost(brand, mat, cols).then(function (r) {
-        tr.classList.remove('saving');
-        if (!r.error) {
-          if ('cost_spool' in cols) { var i1 = tr.querySelector('.catcost[data-kind="spool"]'); if (i1) i1.value = cols.cost_spool != null ? cols.cost_spool : ''; }
-          if ('cost_refill' in cols) { var i2 = tr.querySelector('.catcost[data-kind="refill"]'); if (i2) i2.value = cols.cost_refill != null ? cols.cost_refill : ''; }
-        }
-        flashRow(tr, !r.error);
-        return r;
-      }));
-    });
-    if (!jobs.length) { catalogStatus.textContent = 'Les matériaux cochés n\'offrent pas ce(s) format(s).'; return; }
-
-    catalogApply.disabled = true;
-    catalogStatus.textContent = 'Application…';
-    Promise.all(jobs).then(function (rs) {
-      catalogApply.disabled = false;
-      var okN = rs.filter(function (r) { return !r.error; }).length, errN = rs.length - okN;
-      catalogStatus.textContent = '✓ Prix appliqué à ' + okN + ' matériau' + (okN > 1 ? 'x' : '') +
-        (errN ? ' · ' + errN + ' refusé' + (errN > 1 ? 's' : '') : '') + '.';
-    });
   }
 
   /* =========================================================
@@ -1574,5 +1403,5 @@
   }
 
   // si les matériaux changent ailleurs (formats offerts, ORDRE réarrangé), rafraîchir
-  if (window.CA.onMaterialsChange) window.CA.onMaterialsChange(function () { if (loaded) { renderReorder(); renderCatalog(); renderCodes(); } });
+  if (window.CA.onMaterialsChange) window.CA.onMaterialsChange(function () { if (loaded) { renderReorder(); renderCodes(); } });
 })();
