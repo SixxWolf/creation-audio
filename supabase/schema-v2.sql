@@ -2411,6 +2411,47 @@ create policy messages_photos_delete on storage.objects for delete to authentica
                                        or (select public.is_admin()) ) );
 
 -- ------------------------------------------------------------
+-- COMMANDES FOURNISSEUR « EN ROUTE » (Inventaire › À commander)
+-- Théo colle sa commande (Bambu, etc.) -> les articles passent « en route » :
+-- déduits du Manque (cible + réservés − stock − en route), sans toucher au stock.
+-- La Réception les consomme (qty_received) ; la commande se ferme toute seule.
+-- Admin seulement (coûts privés).
+-- ------------------------------------------------------------
+create table if not exists public.supplier_orders (
+  id           uuid primary key default gen_random_uuid(),
+  order_number text,                                   -- n° fournisseur (ex. ca785184293604298752)
+  supplier     text,                                   -- marque / boutique (Bambu Lab, Elegoo…)
+  ordered_at   date not null default current_date,
+  status       text not null default 'open' check (status in ('open', 'closed', 'cancelled')),
+  note         text,
+  created_at   timestamptz not null default now()
+);
+create table if not exists public.supplier_order_lines (
+  id           uuid primary key default gen_random_uuid(),
+  order_id     uuid not null references public.supplier_orders(id) on delete cascade,
+  product_id   uuid references public.products(id) on delete set null,
+  label        text,                                   -- texte lu dans la commande
+  kind         text not null default 'spool',          -- 'spool' | 'refill' | 'item'
+  qty          integer not null default 0 check (qty >= 0),
+  qty_received integer not null default 0 check (qty_received >= 0),
+  unit_cost    numeric(10,2)                           -- [PRIVÉ] prix payé /unité (pré-remplit la réception)
+);
+create index if not exists supplier_orders_status_idx     on public.supplier_orders (status, ordered_at);
+create index if not exists supplier_order_lines_order_idx on public.supplier_order_lines (order_id);
+create index if not exists supplier_order_lines_prod_idx  on public.supplier_order_lines (product_id);
+
+alter table public.supplier_orders      enable row level security;
+alter table public.supplier_order_lines enable row level security;
+drop policy if exists supplier_orders_admin_all on public.supplier_orders;
+create policy supplier_orders_admin_all on public.supplier_orders for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists supplier_order_lines_admin_all on public.supplier_order_lines;
+create policy supplier_order_lines_admin_all on public.supplier_order_lines for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.supplier_orders      from anon;
+revoke all on public.supplier_order_lines from anon;
+
+-- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
 select count(*) as produits_v2 from public.products;

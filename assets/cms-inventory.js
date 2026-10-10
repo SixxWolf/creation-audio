@@ -124,6 +124,34 @@
   function bcProd(id) { return filProd(id) || accProd(id); }
   function bcLabel(p) { return isAcc(p) ? accLabel(p) : filLabel(p); }
 
+  /* ---- API pour cms-en-route.js (commandes fournisseur « en route ») ---- */
+  window.CA.inv = {
+    ready: function () { ensureLoad(); return Promise.all([loadFilaments(), loadAccessories()]); },
+    filaments: function () { return filaments; },
+    accessories: function () { return accessories; },
+    prod: function (id) { return bcProd(id); },
+    label: function (p) { return bcLabel(p); },
+    isAcc: function (p) { return isAcc(p); },
+    offersSpool: function (f) { return offersSpool(f); },
+    offersRefill: function (f) { return offersRefill(f); },
+    fitKind: function (p, k) { return fitKind(p, k); },
+    refCost: function (p, k) { return refCostOf(p, k); },
+    // « Recevoir » une commande en route : pré-remplit la réception avec ce qui reste à recevoir
+    receive: function (orderNumber, lines) {
+      if (editingReceiptId) setMode(null, []);
+      rows = lines.map(function (l) {
+        var p = bcProd(l.product_id);
+        return { productId: l.product_id ? String(l.product_id) : '', kind: fitKind(p, l.kind), qty: l.qty, label: l.label || '',
+          unitCost: (l.unit_cost != null && l.unit_cost !== '') ? +l.unit_cost : null };
+      });
+      orderI.value = orderNumber || ''; dateI.value = todayISO();
+      renderRows();
+      if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub('reception'); else showSub('reception');
+      statusEl.textContent = 'Commande pré-remplie. Ajuste ce qui manque, puis confirme.';
+      setTimeout(function () { editor.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60);
+    }
+  };
+
   /* =========================================================
      SOUS-ONGLETS
      ========================================================= */
@@ -165,9 +193,11 @@
   var rows = [];
   var editingReceiptId = null;
   var editingOldLines = [];
+  var editingOldOrder = null;
 
   function setMode(receipt, oldLines) {
     editingReceiptId = receipt ? receipt.id : null;
+    editingOldOrder = receipt ? (receipt.order_number || null) : null;
     editingOldLines = oldLines || [];
     editorTitle.textContent = receipt ? 'Modifier la réception' : 'Nouvelle réception';
     confirmBtn.textContent = receipt ? 'Enregistrer les modifications' : 'Confirmer la réception';
@@ -574,6 +604,16 @@
         });
     }
 
+    // commandes « en route » : la réception consomme ce qui était attendu (modif = on rend l'ancien d'abord)
+    var wasEditing = !!editingReceiptId, oldLines = editingOldLines, oldOrder = editingOldOrder;
+    chain = chain.then(function () {
+      var er = window.CA.enRoute; if (!er) return;
+      var newLines = valid.map(function (r) { return { product_id: r.productId, kind: fitKind(bcProd(r.productId), r.kind), qty: r.qty }; });
+      return (wasEditing ? er.allocate(oldLines, oldOrder, -1) : Promise.resolve())
+        .then(function () { return er.allocate(newLines, order, +1); })
+        .then(null, function (e) { console.warn('en route', e); });   // la réception est déjà enregistrée
+    });
+
     chain.then(function () { return recomputeAvgCosts(affected); }).then(function () {
       confirmBtn.disabled = false;
       statusEl.textContent = editingReceiptId ? '✓ Réception modifiée, stock et coût moyen ajustés.' : '✓ Réception enregistrée, stock et coût moyen mis à jour.';
@@ -711,6 +751,11 @@
       applyStock(lines, -1)
         .then(function () { return sb.from('receipts').delete().eq('id', rc.id).select(); })
         .then(function (res) {
+          // ce qu'elle avait consommé redevient « en route »
+          if (res.error || !window.CA.enRoute) return res;
+          return window.CA.enRoute.allocate(lines, rc.order_number || null, -1).then(function () { return res; }, function () { return res; });
+        })
+        .then(function (res) {
           if (res.error) throw res.error;
           if (!res.data || !res.data.length) throw new Error('Suppression refusée (permissions).');
           return recomputeAvgCosts(affected);
@@ -789,10 +834,12 @@
   function missOf(f, kind) {
     var offers = kind === 'refill' ? offersRefill(f) : offersSpool(f);
     if (!offers) return 0;
-    // les articles promis à un client (facture « à venir ») s'ajoutent à la cible
-    return Math.max(0, parOf(f, kind) + reservedOf(f, kind) - stockOf(f, kind));
+    // les articles promis à un client (facture « à venir ») s'ajoutent à la cible ;
+    // ceux déjà commandés chez le fournisseur (« en route », cms-en-route.js) s'en retirent
+    return Math.max(0, parOf(f, kind) + reservedOf(f, kind) - stockOf(f, kind) - enRouteOf(f, kind));
   }
   function reservedOf(f, kind) { return window.CA.reserved ? window.CA.reserved.count(f.id, kind) : 0; }
+  function enRouteOf(f, kind) { return window.CA.enRoute ? window.CA.enRoute.count(f.id, kind) : 0; }
 
   // enregistre une cible dans attrs.par_spool / attrs.par_refill
   function saveTarget(f, kind, value, cell) {
@@ -838,9 +885,15 @@
     if (!n) return '';
     return ' <span class="ro-res" title="' + esc('Réservé : ' + window.CA.reserved.who(f.id).join(', ')) + '">📦 ' + n + ' réservé' + (n > 1 ? 's' : '') + '</span>';
   }
+  // pastille « N en route » : commandés chez le fournisseur, pas encore reçus (cms-en-route.js)
+  function routeBadge(f) {
+    var n = enRouteOf(f, 'spool') + enRouteOf(f, 'refill');
+    return n ? ' <span class="ro-route" title="Commandé, pas encore reçu">🚚 ' + n + ' en route</span>' : '';
+  }
   // la liste d'attente se charge en parallèle -> on rafraîchit les pastilles à son arrivée
   document.addEventListener('ca:waitlist', function () { if (loaded && reorderBody && subCommander && !subCommander.hidden) renderReorder(); });
   document.addEventListener('ca:reserved', function () { if (loaded && reorderBody && subCommander && !subCommander.hidden) renderReorder(); });
+  document.addEventListener('ca:enroute', function () { if (loaded && reorderBody) renderReorder(); });
 
   function renderReorder() {
     if (!reorderBody) return;
@@ -904,7 +957,7 @@
           '<td class="l"><div class="reorder-fil">' +
             '<span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
             '<span><span class="ro-name">' + esc(f.name || '(sans nom)') + '</span>' +
-            (f.code ? ' <span class="ro-code">' + esc(f.code) + '</span>' : '') + waitBadge(f) + resBadge(f) + '</span>' +
+            (f.code ? ' <span class="ro-code">' + esc(f.code) + '</span>' : '') + waitBadge(f) + resBadge(f) + routeBadge(f) + '</span>' +
           '</div></td>' +
           fmtCells('spool', hasS, anyS) +
           fmtCells('refill', hasR, anyR) +
