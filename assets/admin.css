@@ -579,7 +579,7 @@ input.mfa-code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, mono
 
 /* =========================================================
    ONGLET INVENTAIRE (v3) — sous-onglets, poste de scan, réception,
-   À commander, prix catalogue, codes-barres, liste d'attente
+   À commander, codes-barres, liste d'attente
    ========================================================= */
 
 /* ---- Sous-onglets (soulignés, défilables sur mobile) ---- */
@@ -597,7 +597,7 @@ input.mfa-code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, mono
   font-size:.72rem; font-weight:700; color:var(--on-ember); background:var(--ember); border-radius:100px; }
 .wl-tab-count[hidden] { display:none; }
 
-/* ---- Tableaux (réception, À commander, prix catalogue, codes-barres) ---- */
+/* ---- Tableaux (réception, À commander, codes-barres) ---- */
 .rcp-table-wrap, .reorder-table-wrap, .bc-table-wrap { overflow-x:auto; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
 .rcp-table, .reorder-table, .bc-table { width:100%; border-collapse:separate; border-spacing:0; font-size:.9rem; }
 .rcp-table th, .reorder-table th, .bc-table th { padding:10px 14px; font-size:.67rem; font-weight:700; letter-spacing:.08em; text-align:left;
@@ -613,7 +613,7 @@ input.mfa-code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, mono
    tableaux (les unités/décimales s'empilent en colonne) ; dans un formulaire,
    la valeur reste à gauche, près de son libellé, comme les autres champs. */
 .num input, input.num { font-variant-numeric:tabular-nums; }
-td.num input, .catalog-table input.catcost { text-align:right; }
+td.num input { text-align:right; }
 
 /* ---- Poste de scan ---- */
 .scan-station { position:relative; margin-bottom:22px; padding:20px; background:var(--paper); border:1px solid var(--line);
@@ -654,32 +654,55 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .scan-learn-fil { flex:1; min-width:220px; }
 .scan-learn-kind { width:auto; min-width:150px; }
 
-/* ---- Réception : prix payé, lignes, saisie manuelle ---- */
-.rcp-pricebar { display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; margin-top:16px; padding:12px 14px;
-  background:var(--wash); border:1px solid var(--line); border-radius:12px; }
-.rcp-pricebar-lbl { margin-right:4px; font-size:.86rem; font-weight:700; }
-.rcp-pricebar select { width:auto; min-width:150px; }
-.rcp-pricebar #r-disc-val { width:110px; text-align:right; }
+/* ---- Réception : choix de la commande en route, puis pointage (reçu / attendu) ---- */
+.rv-pick { margin-bottom:22px; }
+.rv-pick[hidden], .rv-work[hidden] { display:none; }
+.rv-orders { margin-top:6px; }
+.rv-order { display:flex; align-items:center; gap:10px 14px; padding:12px 0; border-top:1px solid var(--line); }
+.rv-order:first-child { border-top:0; }
+.rv-order-main { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 12px; flex:1; min-width:0; }
+.rv-work .editor { margin-bottom:22px; }
+.rv-head { display:flex; align-items:center; flex-wrap:wrap; gap:10px 16px; margin-bottom:14px; }
+.rv-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 12px; flex:1; min-width:0; }
+.rv-title h2 { margin:0; overflow-wrap:anywhere; }
+.rv-meta { font-size:.86rem; color:var(--muted); }
+.rv-head #r-date { width:130px; }
+/* progression de la commande : barre qui se remplit, verte quand tout est reçu */
+.rv-bar { height:6px; margin:0 0 16px; overflow:hidden; background:var(--wash); border-radius:100px; }
+.rv-bar[hidden] { display:none; }
+.rv-bar span { display:block; width:0; height:100%; background:var(--ember); border-radius:inherit; transition:width .25s ease; }
+.rv-bar.is-done span { background:var(--good); }
+.rv-work .scan-station { margin-bottom:0; }
 .rcp-table-wrap { margin-top:16px; }
 .rcp-table-wrap > .hint { margin:0; padding:16px; text-align:center; }
-.rcp-table .rcp-qty { width:90px; text-align:right; }
 .rcp-table .rcp-kind { width:140px; }
-.rcp-table .rcp-kind-item { display:inline-block; width:140px; padding:0 2px; font-size:.9rem; color:var(--muted); }
-.rcp-table .rcp-fil { min-width:200px; }
-.rcp-table .rcp-price { width:110px; text-align:right; }
-.rcp-price-cell { min-width:130px; }
-.rcp-price-hint { margin-top:3px; font-size:.72rem; white-space:nowrap; color:var(--muted); }
-.rcp-price-hint .pos { color:var(--good); } .rcp-price-hint .neg { color:var(--bad); }
+.rcp-table .rcp-fil { min-width:220px; }
+.rv-art { display:flex; align-items:center; gap:9px; font-weight:600; }
+.rv-art .ro-sw { flex:none; width:16px; height:16px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.15); }
+.rv-kind { font-size:.9rem; color:var(--ink-2); white-space:nowrap; }
+/* compteur − / + : pour les codes-barres qui ne passent pas */
+.rv-step { display:inline-flex; align-items:center; gap:4px; }
+.rv-step .rcp-qty { width:64px; text-align:center; }
+.rv-step button { display:grid; place-items:center; width:34px; height:34px; padding:0; font-size:1.15rem; font-weight:700; line-height:1;
+  color:var(--ink); cursor:pointer; background:var(--wash); border:1px solid var(--line-2); border-radius:9px; transition:background .15s, border-color .15s; }
+.rv-step button:hover { border-color:var(--ember); background:color-mix(in srgb, var(--ember) 10%, var(--paper)); }
+.rv-step button:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
+.rv-table td.rv-exp { font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums; }
+.rv-table .rv-stc { white-space:nowrap; }
+.rv-table.rv-noexp .rv-exp, .rv-table.rv-noexp .rv-stc { display:none; }
+.rv-st { display:inline-block; padding:2px 10px; font-size:.76rem; font-weight:700; white-space:nowrap; border-radius:100px;
+  color:var(--muted); background:var(--wash); }
+.rv-st.is-ok { color:var(--good); background:var(--good-wash); }
+.rv-st.is-over, .rv-st.is-off { color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 14%, transparent); }
+.rcp-row.is-ok td { background:color-mix(in srgb, var(--good-wash) 55%, transparent); }
+/* ligne qui vient d'être scannée */
+.rcp-row.rv-flash td { animation:rvFlash .9s ease; }
+@keyframes rvFlash { 0% { background:color-mix(in srgb, var(--ember) 22%, transparent); } 100% { background:transparent; } }
+.rv-add { margin-top:12px; }
 .rcp-row-del { display:grid; place-items:center; width:30px; height:30px; padding:0; font-size:1rem; color:var(--muted); cursor:pointer;
   background:none; border:none; border-radius:8px; }
 .rcp-row-del:hover { color:var(--bad); background:var(--bad-wash); }
 .rcp-row.unmatched select { border-color:var(--ember); box-shadow:var(--ring); }
-.rcp-manual { margin-top:16px; padding-top:12px; border-top:1px solid var(--line); }
-.rcp-manual summary { display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:.9rem; color:var(--ink-2); cursor:pointer; list-style:none; }
-.rcp-manual summary::-webkit-details-marker { display:none; }
-.rcp-manual summary::before { content:''; width:16px; height:16px; background:var(--chev) center / 14px no-repeat; transform:rotate(-90deg); transition:transform .2s; }
-.rcp-manual[open] summary::before { transform:none; }
-.rcp-manual summary:hover { color:var(--ink); }
 
 /* Historique des réceptions (lignes dépliables) */
 .rcp-hist { align-items:flex-start; }
@@ -704,7 +727,7 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .reorder-total { padding:4px 12px; font-size:.84rem; font-weight:700; color:var(--on-ember); background:var(--ember); border-radius:100px; }
 .reorder-total.zero { color:#fff; background:var(--good); }
 .reorder-empty { margin:6px 0 0; font-weight:600; color:var(--good); }
-/* estimé de la commande (prix catalogue × quantités) */
+/* estimé de la commande (dernier prix payé × quantités) */
 .reorder-est { font-size:.84rem; color:var(--muted); }
 .reorder-est b { white-space:nowrap; }
 .reorder-est b { margin-left:4px; font-family:var(--display); font-size:1.08rem; font-weight:700; letter-spacing:-.01em; color:var(--ink); font-variant-numeric:tabular-nums; }
@@ -747,6 +770,7 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .po-f input { width:auto; min-width:0; font-size:.9rem; font-weight:500; letter-spacing:0; text-transform:none; }
 .po-f #po-number { width:230px; }
 .po-f #po-date { width:130px; }
+.po-f .unit { width:96px; }
 .po-status { font-size:.86rem; font-weight:600; color:var(--muted); }
 .po-review[hidden] { display:none; }
 .po-review .rcp-table-wrap { margin-top:14px; }
@@ -816,21 +840,6 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .reorder-miss.ok { font-weight:500; color:var(--muted); }
 .reorder-na { color:var(--line-2); }
 
-/* ---- Prix catalogue ---- */
-.catalog-bulk { display:flex; align-items:center; flex-wrap:wrap; gap:10px 16px; margin:2px 0 6px; padding:12px 14px;
-  background:var(--paper); border:1px solid var(--line); border-radius:12px; }
-.catalog-bulk .cb-title { font-size:.88rem; font-weight:700; color:var(--ink); }
-.catalog-bulk .cb-f { display:inline-flex; align-items:center; gap:8px; font-size:.84rem; font-weight:600; color:var(--muted); }
-.catalog-bulk .cb-f input { width:96px; padding:7px 10px; text-align:right; }
-.catalog-bulk .cb-status { font-size:.84rem; font-weight:600; color:var(--good); }
-.catalog-table td.cat-check-td, .catalog-table th.cat-check-td { padding-left:12px; padding-right:4px; text-align:center; }
-.catalog-table input.catcost { width:96px; }
-.catalog-table .cat-mat { font-weight:600; }
-.catalog-table .cat-brand { margin-left:6px; font-size:.78rem; color:var(--muted); }
-.catalog-table .cat-na { color:var(--line-2); }
-.catalog-table tr.saving td { opacity:.55; }
-.catalog-table tr.saved td { background:var(--good-wash); }
-.catalog-table tr.save-err td { background:var(--bad-wash); }
 
 /* ---- Codes-barres ---- */
 .bc-scan { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin:0 0 16px; padding:14px 16px;
@@ -949,11 +958,9 @@ td.num input, .catalog-table input.catcost { text-align:right; }
   .scan-input { font-size:1.05rem; padding-left:48px; padding-right:36px; }
   .scan-inputwrap::before { left:14px; width:22px; height:22px; margin-top:-11px; }
   .bc-bar input[type=search] { flex:1; max-width:none; }
-  .rcp-pricebar-lbl { flex-basis:100%; }
-  .rcp-pricebar select, .rcp-pricebar #r-disc-val { flex:1; min-width:0; }
 }
 @media (prefers-reduced-motion:reduce) {
-  .scan-station.is-armed .scan-inputwrap::after, .wl-alert { animation:none; }
+  .scan-station.is-armed .scan-inputwrap::after, .wl-alert, .rcp-row.rv-flash td { animation:none; }
 }
 
 /* =========================================================

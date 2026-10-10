@@ -28,7 +28,7 @@
   function round2(n) { return Math.round((+n || 0) * 100) / 100; }
   function money(n) { return round2(n).toFixed(2).replace('.', ',') + ' $'; }
   function norm(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(); }
-  function normOrder(s) { return String(s || '').trim().toLowerCase(); }
+  function normOrder(s) { return String(s || '').trim().replace(/^#/, '').toLowerCase(); }
   function kindOf(k) { return k === 'refill' ? 'refill' : (k === 'item' ? 'item' : 'spool'); }
   function inv() { return window.CA.inv; }
 
@@ -73,11 +73,12 @@
   }
 
   /* ---- la Réception consomme (sign +1) ou rend (sign −1) les quantités en route ----
-     N° de commande saisi à la réception :
-       - correspond à une commande enregistrée -> seulement celle-là ;
-       - inconnu -> achat à part, on ne touche à rien ;
-       - vide -> la plus ancienne commande d'abord (on rend : la plus récente d'abord). */
-  function allocate(lines, orderNumber, sign) {
+     ref = { id } (commande pointée dans Réception) ou un ancien n° de commande (texte) :
+     seulement cette commande. Sans commande (null) : rien n'est consommé (achat à part). */
+  function allocate(lines, ref, sign) {
+    if (!ref) return Promise.resolve();
+    var byId = typeof ref === 'object' && ref.id;
+    var orderNumber = byId ? null : normOrder(ref);
     lines = (lines || []).map(function (l) {
       return { pid: l.product_id || l.productId, kind: kindOf(l.kind), qty: (l.qty | 0) };
     }).filter(function (l) { return l.pid && l.qty > 0; });
@@ -88,17 +89,14 @@
       .then(function (res) {
         if (res.error) throw res.error;
         oLines = res.data || [];
-        var ids = oLines.map(function (l) { return l.order_id; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
         var q = sb.from('supplier_orders').select('id,order_number,ordered_at,created_at,status').neq('status', 'cancelled');
-        // n° saisi : on cherche aussi parmi les commandes sans ces articles (=> achat connu, rien à consommer ailleurs)
-        return orderNumber ? q.ilike('order_number', String(orderNumber).trim()) : (ids.length ? q.in('id', ids) : { data: [] });
+        return byId ? q.eq('id', byId) : q.ilike('order_number', orderNumber);
       })
       .then(function (res) {
         if (res.error) throw res.error;
         (res.data || []).forEach(function (o) { oById[o.id] = o; });
-        if (orderNumber && !Object.keys(oById).length) return null;   // achat qui n'a pas été collé : rien à consommer
         var pool = oLines.filter(function (l) { return oById[l.order_id]; });
-        if (!orderNumber && sign > 0) pool = pool.filter(function (l) { return oById[l.order_id].status === 'open'; });
+        if (!pool.length) return null;
         var when = function (l) { var o = oById[l.order_id]; return (o.ordered_at || '') + (o.created_at || ''); };
         pool.sort(function (a, z) { return sign > 0 ? (when(a) < when(z) ? -1 : 1) : (when(a) > when(z) ? -1 : 1); });
 
@@ -138,7 +136,20 @@
     });
   }
 
-  window.CA.enRoute = { count: count, allocate: allocate, reload: load };
+  function dropRemaining(orderId) {
+    return sb.from('supplier_order_lines').select('id,qty,qty_received').eq('order_id', orderId).then(function (res) {
+      if (res.error) throw res.error;
+      return Promise.all((res.data || []).filter(function (l) { return remaining(l) > 0; }).map(function (l) {
+        return sb.from('supplier_order_lines').update({ qty: l.qty_received | 0 }).eq('id', l.id)
+          .then(function (r) { if (r.error) throw r.error; });
+      }));
+    }).then(function () { return syncStatus([orderId]); }).then(function () { return load(); });
+  }
+
+  window.CA.enRoute = {
+    count: count, allocate: allocate, reload: load, dropRemaining: dropRemaining,
+    list: function () { return orders; }
+  };
 
   /* =========================================================
      LECTURE DU TEXTE COLLÉ
@@ -302,6 +313,27 @@
       cancelBtn = $('#po-cancel'), sumEl = $('#po-sum'), listEl = $('#po-list'), totalEl = $('#po-total');
   if (!card) return;
 
+  var taxI = $('#po-tax');
+  var taxes = null;          // admin_settings « taxes_fournisseur » : { marque: % }
+  function loadTaxes() {
+    if (taxes) return Promise.resolve(taxes);
+    return sb.from('admin_settings').select('value').eq('key', 'taxes_fournisseur').maybeSingle()
+      .then(function (res) { taxes = (res.data && res.data.value) || {}; return taxes; }, function () { taxes = {}; return taxes; });
+  }
+  function taxDefault(supplier) {
+    if (!supplier) return 0;
+    if (taxes && taxes[supplier] != null) return +taxes[supplier];
+    return /bambu/i.test(supplier) ? 14.975 : 0;   // TPS 5 % + TVQ 9,975 %
+  }
+  function taxVal() { var v = parseFloat(String(taxI && taxI.value || '').replace(',', '.')); return isFinite(v) && v > 0 ? v : 0; }
+  function fmtTax(v) { return String(+(+v || 0).toFixed(3)).replace('.', ','); }
+  function supplierOf(list) {
+    var brands = {};
+    list.forEach(function (r) { var pr = r.productId && inv().prod(r.productId); var b = pr && pr.brand; if (b) brands[b] = (brands[b] || 0) + (r.qty || 0); });
+    return Object.keys(brands).sort(function (a, z) { return brands[z] - brands[a]; })[0] || null;
+  }
+  if (taxI) taxI.addEventListener('input', function () { taxI.dataset.touched = '1'; renderSum(); });
+
   var rows = [];             // { label, productId, kind, qty, unitCost, how, picked }
   var editingId = null;      // commande en cours de modification
   var editingReceived = {};  // pid|kind -> qté déjà reçue (gardée à la modification)
@@ -315,6 +347,7 @@
       pasteI.value = '';
       numberI.value = order.order_number || '';
       dateI.value = order.ordered_at || todayISO();
+      if (taxI) { taxI.value = fmtTax(order.tax_rate); taxI.dataset.touched = '1'; }
       rows = order.lines.map(function (l) {
         var k = (l.product_id || '') + '|' + kindOf(l.kind);
         editingReceived[k] = (editingReceived[k] || 0) + (l.qty_received | 0);
@@ -324,12 +357,13 @@
       renderRows();
     } else {
       pasteI.value = ''; numberI.value = ''; dateI.value = todayISO();
+      if (taxI) { taxI.value = ''; delete taxI.dataset.touched; }
       rows = []; reviewEl.hidden = true;
       setTimeout(function () { pasteI.focus(); }, 30);
     }
     saveBtn.textContent = order ? 'Enregistrer les modifications' : 'Enregistrer la commande';
     inv().ready();
-    loadAliases();
+    loadAliases(); loadTaxes();
   }
   function closeEditor() {
     editorEl.hidden = true; newBtn.hidden = false;
@@ -387,6 +421,7 @@
       parseBtn.disabled = false;
       // garde les lignes ajoutées à la main, remplace ce qui avait été lu
       rows = rows.filter(function (r) { return r.how === 'saisi'; }).concat(res.rows);
+      if (taxI && !taxI.dataset.touched) taxI.value = fmtTax(taxDefault(supplierOf(rows)));
       renderRows();
       var miss = rows.filter(function (r) { return !r.productId && r.how !== 'hors'; }).length;
       var off = rows.filter(function (r) { return !r.productId && r.how === 'hors'; }).length;
@@ -442,7 +477,7 @@
       var p = r.productId ? inv().prod(r.productId) : null, acc = p && inv().isAcc(p);
       var hasS = !p || acc || inv().offersSpool(p), hasR = !p || acc || inv().offersRefill(p);
       var how = r.picked ? null : HOW[r.how];
-      var ref = p ? inv().refCost(p, r.kind) : null;
+      var ref = p ? inv().cost(p, r.kind) : null;
       return '<tr class="po-row' + (r.productId ? '' : ' unmatched') + (how ? ' is-' + how[0] : '') + '" data-i="' + i + '">' +
         '<td class="po-read"><div class="po-read-in">' +
           (r.label ? '<span class="po-lbl">' + esc(r.label) + '</span>' : '<span class="muted">—</span>') +
@@ -478,14 +513,16 @@
   function renderSum() {
     var n = 0, tot = 0, priced = false;
     rows.forEach(function (r) { if (r.productId && r.qty > 0) { n += r.qty; if (r.unitCost != null) { tot += r.unitCost * r.qty; priced = true; } } });
-    sumEl.innerHTML = n ? n + ' article' + (n > 1 ? 's' : '') + (priced ? ' · <b>' + money(tot) + '</b>' : '') : '';
+    var tx = taxVal();
+    sumEl.innerHTML = n ? n + ' article' + (n > 1 ? 's' : '') +
+      (priced ? ' · <b>' + money(tot * (1 + tx / 100)) + '</b>' + (tx ? ' taxes incl.' : '') : '') : '';
   }
 
   saveBtn.addEventListener('click', function () { save(false); });
   function save(skipAsk) {
     var valid = rows.filter(function (r) { return r.productId && r.qty > 0; });
     if (!valid.length) { statusEl.textContent = 'Choisis au moins un article.'; return; }
-    var num = numberI.value.trim() || null;
+    var num = numberI.value.trim().replace(/^#/, '') || null;
     if (!skipAsk) {
       var orphan = rows.filter(function (r) { return !r.productId && r.qty > 0 && r.how !== 'hors'; }).length;   // hors catalogue : ignoré sans demander
       var dupCheck = (num && !editingId)
@@ -527,7 +564,12 @@
     });
 
     saveBtn.disabled = true; statusEl.textContent = 'Enregistrement…';
-    var head = { order_number: num, supplier: supplier, ordered_at: date };
+    var tax = taxVal();
+    if (supplier && Math.abs(tax - taxDefault(supplier)) > 0.0005) {   // nouvelle taxe pour ce fournisseur : retenue
+      taxes = Object.assign({}, taxes || {}); taxes[supplier] = tax;
+      sb.from('admin_settings').upsert({ key: 'taxes_fournisseur', value: taxes, updated_at: new Date().toISOString() }).then(function () {}, function () {});
+    }
+    var head = { order_number: num, supplier: supplier, ordered_at: date, tax_rate: tax };
     var chain = editingId
       ? sb.from('supplier_orders').update(head).eq('id', editingId).select().then(function (res) {
           if (res.error || !res.data || !res.data.length) throw (res.error || new Error('Modification refusée (permissions).'));
@@ -593,11 +635,7 @@
         ul.hidden = !ul.hidden; tg.setAttribute('aria-expanded', String(!ul.hidden)); el.classList.toggle('open', !ul.hidden);
       });
       $('.po-recv', el).addEventListener('click', function () {
-        inv().ready().then(function () {
-          inv().receive(o.order_number, o.lines.filter(remaining).map(function (l) {
-            return { product_id: l.product_id, kind: l.kind, qty: remaining(l), label: l.label, unit_cost: l.unit_cost };
-          }));
-        });
+        inv().receiveOrder(o.id);
       });
       $('.po-edit', el).addEventListener('click', function () {
         inv().ready().then(function () { openEditor(o); card.scrollIntoView({ behavior: 'smooth', block: 'start' }); });

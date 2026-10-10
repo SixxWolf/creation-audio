@@ -2,7 +2,8 @@
    Fenêtres du site — remplacent confirm / alert / prompt du navigateur.
    Style : dialog.css (carte centrée, pastille d'icône, rouge si irréversible).
 
-   caDialog.confirm({ title, message, ok, cancel, danger, icon })  → Promise<boolean>
+   caDialog.confirm({ title, message, ok, cancel, danger, icon, alt })  → Promise<boolean | 'alt'>
+   (alt : texte d'un 3e bouton, ex. « Retirer de la commande » → la promesse rend 'alt')
    caDialog.alert({ title, message, ok, icon, danger })            → Promise<void>
    caDialog.prompt({ title, message, value, placeholder, readonly, ok, cancel, icon }) → Promise<string|null>
    (cancel: false = pas de bouton « Retour »)
@@ -72,6 +73,11 @@
         back = el('button', 'dlg-b dlg-back', o.cancel || 'Retour'); back.type = 'button';
         foot.appendChild(back);
       }
+      var alt = null;
+      if (kind === 'confirm' && o.alt) {
+        alt = el('button', 'dlg-b dlg-back dlg-alt', o.alt); alt.type = 'button';
+        foot.appendChild(alt);
+      }
       var go = el('button', 'dlg-b dlg-go' + (o.danger && kind !== 'alert' ? ' is-danger' : ''),
         o.ok || (kind === 'alert' ? 'Compris' : 'Confirmer'));
       go.type = 'button';
@@ -90,6 +96,7 @@
       }
       go.addEventListener('click', function () { finish(kind === 'confirm' ? true : kind === 'prompt' ? field.value : undefined); });
       if (back) back.addEventListener('click', function () { finish(nope); });
+      if (alt) alt.addEventListener('click', function () { finish('alt'); });
       if (field) field.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go.click(); } });
       // Échap = Retour ; on bloque la propagation pour ne pas fermer aussi un panneau de la page
       d.addEventListener('keydown', function (e) { if (e.key === 'Escape') e.stopPropagation(); });

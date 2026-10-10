@@ -144,6 +144,7 @@
              qty: (p.qty == null ? null : (p.qty | 0)),
              tiers: normalizeTiers(p.tiers).filter(function (t) { return t.min > 1; }),
              cat: String(a.category || '').trim(),
+             stockOnly: a.stock_only === true,
              onFil: a.on_filament === true,
              filBrands: Array.isArray(a.fil_brands) ? a.fil_brands : [],
              slug: p.slug || slugify(p.name),
@@ -151,6 +152,8 @@
              specs: Array.isArray(a.specs) ? a.specs.filter(function (s) { return s && (s.k || s.v); }) : [] };
   }
   function accOut(a) { return a.qty != null && a.qty <= 0; }
+  // « Stock seulement » (admin, ex. bobines vides récupérées) : jamais commandable au-delà du stock
+  function accCanBO(a) { return canBackorder() && !(a && a.stockOnly); }
   function accCatKey(a) { return a.cat ? a.cat.toLowerCase() : ''; }
   function accCatName(a) { return a.cat || 'Autres'; }
   // meilleur palier (le plus bas prix atteignable en quantité), null si aucun
@@ -1102,7 +1105,7 @@
   function accNotify(a) { return { id: a.id, kind: 'item', what: a.name, the: '« ' + a.name + ' »', uid: 'acc' }; }
 
   function renderAcc() {
-    var a = curAcc, out = accOut(a), c = accCatOf(a), bo = out && canBackorder();
+    var a = curAcc, out = accOut(a), c = accCatOf(a), bo = out && accCanBO(a);
     if (accImg >= (a.imgs || []).length) accImg = 0;
     var tabs = [];
     var paras = String(a.longDesc || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -1131,7 +1134,7 @@
             (out && !bo ? '' :
             '<div class="qty">' +
               '<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>' +
-              '<input type="number" class="q-val" aria-label="Quantité" min="1"' + (a.qty != null && !canBackorder() ? ' max="' + a.qty + '"' : '') + ' value="' + accQty + '" inputmode="numeric">' +
+              '<input type="number" class="q-val" aria-label="Quantité" min="1"' + (a.qty != null && !accCanBO(a) ? ' max="' + a.qty + '"' : '') + ' value="' + accQty + '" inputmode="numeric">' +
               '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
             '</div>') +
             '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? '<span>Commander<span class="bo-d"> · 3 à 7 jours</span></span>' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
@@ -1177,7 +1180,7 @@
     onCartChange = refresh;
     function setQ(n) {
       if (isNaN(n) || n < 1) n = 1;
-      if (!canBackorder() && a.qty != null && a.qty > 0 && n > a.qty) { n = a.qty; toast('Maximum ' + a.qty + ' en stock.'); }
+      if (!accCanBO(a) && a.qty != null && a.qty > 0 && n > a.qty) { n = a.qty; toast('Maximum ' + a.qty + ' en stock.'); }
       accQty = n; if (qv) qv.value = n; refresh();
     }
     if (qv) {
@@ -1315,8 +1318,8 @@
     return tierPrice(baseOf(p, it.type), tiersOf(p, it.type), groupQty(p, it.type));
   }
   function maxOf(it) {
+    if (it.type === 'accessory') { var a = accById[it.id]; return accCanBO(a) ? BO_MAX : a && a.qty != null ? a.qty : Infinity; }
     if (canBackorder()) return BO_MAX;
-    if (it.type === 'accessory') { var a = accById[it.id]; return a && a.qty != null ? a.qty : Infinity; }
     var p = byId[it.id]; return p ? stockOf(p, it.type) : it.qty;
   }
 
@@ -1335,7 +1338,7 @@
     var a = accById[id]; if (!a) return;
     var k = keyOf(id, 'accessory');
     var cur = cart[k] ? cart[k].qty : 0;
-    var max = canBackorder() ? BO_MAX : (a.qty == null ? Infinity : a.qty);
+    var max = accCanBO(a) ? BO_MAX : (a.qty == null ? Infinity : a.qty);
     if (cur >= max) { toast('Maximum ' + max + ' en stock.'); return; }
     var next = Math.min(cur + (qty || 1), max);
     cart[k] = { id: id, type: 'accessory', qty: next };
@@ -1645,7 +1648,7 @@
       if (!changed) return;
       // panier : ramène chaque ligne au stock réellement disponible
       var trimmed = [];
-      if (!canBackorder()) Object.keys(cart).forEach(function (k) {
+      Object.keys(cart).forEach(function (k) {
         var it = cart[k], max = maxOf(it);
         if (it.qty > max) {
           var m = metaOf(it); trimmed.push(m ? m.name : '');
