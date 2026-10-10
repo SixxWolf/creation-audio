@@ -473,6 +473,8 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .pm-loc::before { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z'/%3E%3Ccircle cx='12' cy='10' r='2.5'/%3E%3C/svg%3E"); }
 .pm-none { font-style:italic; }
 .pm-none::before { display:none; }
+.cpt-strike { flex-basis:100%; font-weight:700; color:var(--bad); }   /* réservations : non récupérée / suspendu */
+.cpt-strike::before { display:none; }
 /* carnet de clients : 2 colonnes sur grand écran (l'éditeur ouvert prend toute la largeur) */
 #cl-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap:10px; }
 #cl-list > .empty, #cl-list > .muted { grid-column:1 / -1; }

@@ -238,7 +238,7 @@ window.CA = window.CA || {};
   }
 
   CA.loadAccounts = function () {
-    return sb.from('customers').select('id, email, name, phone, client_id, can_reserve, created_at, last_seen_at, linked_at')
+    return sb.from('customers').select('id, email, name, phone, client_id, can_reserve, no_shows, reserve_suspended_until, created_at, last_seen_at, linked_at')
       .order('created_at', { ascending: false })
       .then(function (res) {
         if (res.error) throw res.error;
@@ -261,11 +261,15 @@ window.CA = window.CA || {};
     if (!accounts.length) { accList.innerHTML = ''; return; }
     var list = accounts.slice().sort(function (a, b) { return (a.client_id ? 1 : 0) - (b.client_id ? 1 : 0); });   // à relier d'abord
     accList.innerHTML = list.map(function (a) {
-      var c = a.client_id ? clientOf(a.client_id) : null;
+      var c = a.client_id ? clientOf(a.client_id) : null, susp = suspended(a);
+      // réservations : 2 non récupérées = suspendu 60 jours (compteur remis à 0 à la suspension)
+      var resTag = susp ? '<span class="pm cpt-strike">Suspendu jusqu\'au ' +
+          esc(new Date(a.reserve_suspended_until).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' })) + '</span>'
+        : a.no_shows ? '<span class="pm cpt-strike">' + a.no_shows + ' réservation non récupérée</span>' : '';
       return '<article class="mat-row person cpt-row" data-cpt="' + esc(a.id) + '">' + CA.avatar(a.name || a.email) +
         '<div class="mat-main">' +
           '<div class="mat-name">' + esc(a.name || 'Sans nom') + (a.client_id ? '' : '<span class="person-tag">À relier</span>') + '</div>' +
-          '<div class="person-meta"><span class="pm pm-mail">' + esc(a.email) + '</span>' +
+          '<div class="person-meta">' + resTag + '<span class="pm pm-mail">' + esc(a.email) + '</span>' +
             (a.phone ? '<span class="pm pm-tel">' + esc(a.phone) + '</span>' : '') +
             (c ? '<span class="pm pm-link">' + esc(c.name) + '</span>' : '') +
             '<span class="pm pm-date">' + esc(fmtD(a.created_at)) + '</span></div>' +
@@ -273,6 +277,7 @@ window.CA = window.CA || {};
         '<div class="mat-actions">' +
           (a.client_id
             ? '<label class="inline cpt-res"><input type="checkbox" class="cpt-res-cb"' + (a.can_reserve ? ' checked' : '') + '> Peut réserver</label>' +
+              (susp ? '<button class="btn btn-ghost btn-sm cpt-lift" type="button">Lever</button>' : '') +
               '<button class="btn btn-ghost btn-sm cpt-unlink" type="button">Délier</button>'
             : '<button class="btn btn-accent btn-sm cpt-link" type="button" data-ic="check">Relier</button>') +
         '</div>' +
@@ -280,7 +285,8 @@ window.CA = window.CA || {};
     }).join('');
     $$('.cpt-row', accList).forEach(function (el) {
       var a = accounts.filter(function (x) { return String(x.id) === el.getAttribute('data-cpt'); })[0];
-      var linkBtn = $('.cpt-link', el), unlinkBtn = $('.cpt-unlink', el), cb = $('.cpt-res-cb', el);
+      var linkBtn = $('.cpt-link', el), unlinkBtn = $('.cpt-unlink', el), cb = $('.cpt-res-cb', el), lift = $('.cpt-lift', el);
+      if (lift) lift.addEventListener('click', function () { liftReserve(a, lift); });
       if (linkBtn) linkBtn.addEventListener('click', function () { openLinker(a, el); });
       if (unlinkBtn) unlinkBtn.addEventListener('click', function () { unlink(a); });
       if (cb) cb.addEventListener('change', function () { setReserve(a, cb); });
@@ -408,5 +414,16 @@ window.CA = window.CA || {};
       if (res.error || !res.data || !res.data.length) { cb.checked = !want; window.alert('Erreur : ' + (res.error ? res.error.message : 'refusé (permissions).')); return; }
       a.can_reserve = want;
     }, function () { cb.disabled = false; cb.checked = !want; });
+  }
+  function suspended(a) { return !!(a.reserve_suspended_until && Date.parse(a.reserve_suspended_until) > Date.now()); }
+  // « Lever » : suspension des réservations levée, compteur de non récupérées remis à 0
+  function liftReserve(a, btn) {
+    if (!window.confirm('Lever la suspension des réservations de ' + (a.name || a.email) + ' ?')) return;
+    btn.disabled = true;
+    sb.from('customers').update({ no_shows: 0, reserve_suspended_until: null }).eq('id', a.id).select('id').then(function (res) {
+      if (res.error || !res.data || !res.data.length) { btn.disabled = false; window.alert('Erreur : ' + (res.error ? res.error.message : 'refusé (permissions).')); return; }
+      a.no_shows = 0; a.reserve_suspended_until = null;
+      renderAccounts();
+    }, function () { btn.disabled = false; });
   }
 })();

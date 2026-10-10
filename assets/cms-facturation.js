@@ -571,7 +571,15 @@
         price: tierPrice(base, tiers, 1), manual: false, sp: sp });
     }
     afterChange();
+    warnHeld(p, c, kind, ex ? ex.qty : 1);
     return ex ? ex.qty : 1;
+  }
+  // stock gardé par une réservation en ligne (cms-reservations.js) : le vendre au comptoir la viderait
+  function warnHeld(p, c, kind, q) {
+    if (c === 'spacer' || !window.CA.held || (fromOrder && fromOrder.kind === 'reservation')) return;
+    var h = window.CA.held(p.id, kind), st = kind === 'refill' ? p.qty_2 : p.qty;
+    if (!h || !h.qty || st == null || (st | 0) - h.qty >= q) return;
+    elStatus.textContent = '⚠ ' + p.name + ' : ' + h.qty + ' gardé' + (h.qty > 1 ? 's' : '') + ' en réservation (' + h.who.join(', ') + ').';
   }
   // re-tarife les lignes spacer quand on bascule client <-> dealer
   function repriceSpacers() {
@@ -912,7 +920,7 @@
       });
     }).then(function (inv) {
       // auto-mémorisation du client (mode client seulement ; les dealers = onglet Dealers)
-      if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value) && !(order && order.kind === 'client')) {
+      if (clientType === 'client' && window.CA.rememberClient && norm(elCliName.value) && !(order && (order.kind === 'client' || order.kind === 'reservation'))) {
         window.CA.rememberClient(clientFields());
       }
       var deducted = !!elDeduct.checked, pend = pendingCount();
@@ -1153,7 +1161,7 @@
   function setFromOrder(o) {
     fromOrder = o ? { id: o.id, number: o.number, kind: o.kind || 'dealer' } : null;
     if (elOrderBanner) elOrderBanner.hidden = !fromOrder;
-    if (elOrderNum) elOrderNum.textContent = fromOrder ? fromOrder.number : '';
+    if (elOrderNum) elOrderNum.textContent = fromOrder ? (fromOrder.kind === 'reservation' ? 'la réservation ' : 'la commande ') + fromOrder.number : '';
   }
   if (elOrderDetach) elOrderDetach.addEventListener('click', function () {
     // garde la facture en cours, mais ne la relie plus à la commande (qui reste à facturer)
@@ -1174,6 +1182,15 @@
     return ln;
   }
   function linkOrder(order, inv) {
+    if (order.kind === 'reservation') {   // réservation 72 h : Facturée (pénalité retirée si expirée) + compte relié à sa fiche
+      sb.rpc('admin_invoice_reservation', { p_res: order.id, p_invoice: inv.id }).then(function (res) {
+        if (res.error) { elStatus.appendChild(document.createTextNode(' ⚠ Réservation ' + order.number + ' non marquée « Facturée » — fais-le dans l\'onglet Commandes. ')); return; }
+        elStatus.insertBefore(document.createTextNode('Réservation ' + order.number + ' → Facturée. '), elStatus.firstChild ? elStatus.firstChild.nextSibling : null);
+        if (window.CA.reloadReservations) window.CA.reloadReservations();
+        if (window.CA.loadAccounts) window.CA.loadAccounts().then(null, function () {});
+      }, function () {});
+      return;
+    }
     if (order.kind === 'client') {   // commande en ligne : Facturée + compte du client relié à sa fiche (RPC)
       sb.rpc('admin_invoice_customer_order', { p_order: order.id, p_invoice: inv.id }).then(function (res) {
         if (res.error) { elStatus.appendChild(document.createTextNode(' ⚠ Commande ' + order.number + ' non marquée « Facturée » — fais-le dans l\'onglet Commandes. ')); return; }
@@ -1206,7 +1223,7 @@
     var token = {}; editToken = token;
     elInvoice.innerHTML = '<p class="inv-empty">Chargement de la commande ' + esc(order.number) + '…</p>';
     elSave.disabled = true;   // réactivé une fois la facture remplie
-    if (order.kind === 'client') {   // commande en ligne d'un client (cms-commandes-clients.js)
+    if (order.kind === 'client' || order.kind === 'reservation') {   // commande en ligne / réservation d'un client (cms-commandes-clients.js, cms-reservations.js)
       Promise.all([loadCatalog('filament', true), loadCatalog('accessory', true), loadCatalog('spacer', true)])
         .then(null, function () {}).then(function () {
           if (editToken !== token) return;
@@ -1226,7 +1243,7 @@
             return ln;
           });
           settleLoadedPrices();
-          elNote.value = 'Commande en ligne ' + order.number + (order.note ? ' — ' + order.note : '');
+          elNote.value = (order.kind === 'reservation' ? 'Réservation ' : 'Commande en ligne ') + order.number + (order.note ? ' — ' + order.note : '');
           var c0 = lines[0] && ['filament', 'spacer', 'accessory'].indexOf(lines[0].ptype) !== -1 ? lines[0].ptype : 'filament';
           setCat(c0);
           unlock();

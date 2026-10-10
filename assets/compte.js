@@ -276,11 +276,12 @@
   });
 
   /* ---- Mes commandes ---- */
-  // onglet Commandes = commandes en ligne (#acct-cmds) puis factures (#acct-invs)
-  var tabEl = $('#acct-orders'), cmdEl = null, ordersEl = null, myOrders = [];
+  // onglet Commandes = réservations (#acct-resv), commandes en ligne (#acct-cmds) puis factures (#acct-invs)
+  var tabEl = $('#acct-orders'), cmdEl = null, ordersEl = null, resvEl = null, myOrders = [];
   function loadOrders() {
-    tabEl.innerHTML = '<div id="acct-cmds"></div><div id="acct-invs"><p class="acct-empty">Chargement…</p></div>';
-    cmdEl = $('#acct-cmds'); ordersEl = $('#acct-invs');
+    tabEl.innerHTML = '<div id="acct-resv"></div><div id="acct-cmds"></div><div id="acct-invs"><p class="acct-empty">Chargement…</p></div>';
+    cmdEl = $('#acct-cmds'); ordersEl = $('#acct-invs'); resvEl = $('#acct-resv');
+    loadResv();
     sb.rpc('me_orders').then(function (res) {
       myOrders = (!res.error && res.data) || [];
       renderCmds();
@@ -358,6 +359,68 @@
       if (res.error) { btn.disabled = false; window.alert(res.error.message || 'Annulation impossible.'); return; }
       if (sb.functions) sb.functions.invoke('customer-order-notify', { body: { order_id: o.id, event: 'cancelled' } }).then(null, function () {});
       loadOrders();
+    }, function () { btn.disabled = false; });
+  }
+  /* ---- réservations 72 h (client approuvé — panier de la boutique) ---- */
+  var RES_ST = { active: 'Gardée', invoiced: 'Facturée', cancelled: 'Annulée', expired: 'Expirée' };
+  var myResv = [], resvMeta = {};
+  function whenTxt(iso) {
+    var d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleString('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  }
+  function loadResv() {
+    sb.rpc('me_reservations').then(function (res) {
+      resvMeta = (!res.error && res.data) || {};
+      myResv = resvMeta.list || [];
+      renderResv();
+    }, function () {});
+  }
+  function renderResv() {
+    var susp = resvMeta.suspended_until;
+    if (!myResv.length && !susp) { resvEl.innerHTML = ''; return; }
+    resvEl.innerHTML = '<h2 class="acct-h">Réservations</h2>' +
+      (susp ? '<p class="resv-susp">Réservations suspendues jusqu\'au ' + esc(fmtDate(susp)) + ' : 2 réservations non récupérées.</p>' : '') +
+      '<div class="ord-list">' + myResv.map(function (r) {
+        var active = r.status === 'active', off = r.status === 'cancelled' || r.status === 'expired';
+        var pill = '<span class="ord-pill st-' + esc(r.status) + '">' + esc(RES_ST[r.status] || r.status) +
+          (r.status === 'invoiced' && r.invoice_number ? ' · ' + esc(r.invoice_number) : '') + '</span>';
+        var meta = active ? 'jusqu\'au ' + whenTxt(r.expires_at)
+          : r.status === 'expired' ? (r.penalized ? 'non récupérée' : fmtDate(r.created_at))
+          : fmtDate(r.created_at);
+        var items = (r.lines || []).reduce(function (s, l) { return s + (+l.qty || 0); }, 0);
+        var lines = (r.lines || []).map(function (l) {
+          return '<li>' + swatch(l.hex, (l.name || '') + ' ' + (l.meta || '')) +
+            '<span class="ol-tx"><b>' + esc(l.name || '') + '</b>' + (l.meta ? '<small>' + esc(l.meta) + '</small>' : '') + '</span>' +
+            '<span class="ol-q">' + (+l.qty) + ' × ' + money(l.unit_price) + '</span>' +
+            '<span class="ol-t">' + money(l.line_total) + '</span></li>';
+        }).join('');
+        return '<details class="ord' + (off ? ' is-off' : '') + '" data-rid="' + esc(r.id) + '"' + (active ? ' open' : '') + '>' +
+          '<summary>' +
+            '<span class="ord-main"><b class="ord-no">' + esc(r.number) + '</b>' +
+              '<span class="ord-meta">' + esc(meta) + ' · ' + plural(items, 'article', 'articles') + '</span></span>' +
+            pill + '<span class="ord-total">' + money(r.total) + '</span><span class="ord-chev" aria-hidden="true"></span>' +
+          '</summary>' +
+          '<div class="ord-body">' +
+            '<ul class="ord-lines">' + lines + '</ul>' +
+            '<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>' + money(r.total) + '</span></div></div>' +
+            (r.note ? '<p class="ord-note"><span>Note</span>' + esc(r.note) + '</p>' : '') +
+            (active ? '<div class="ord-acts"><button class="acct-btn acct-btn-danger resv-cancel" type="button">Annuler la réservation</button></div>' : '') +
+          '</div>' +
+        '</details>';
+      }).join('') + '</div>';
+    $$('.ord', resvEl).forEach(function (el) {
+      var r = myResv.filter(function (x) { return String(x.id) === el.getAttribute('data-rid'); })[0];
+      var ca = $('.resv-cancel', el);
+      if (ca) ca.addEventListener('click', function () { cancelResv(r, ca); });
+    });
+  }
+  function cancelResv(r, btn) {
+    if (!window.confirm('Annuler la réservation ' + r.number + ' ?\nLes articles seront remis en vente.')) return;
+    btn.disabled = true;
+    sb.rpc('customer_cancel_reservation', { p_id: r.id }).then(function (res) {
+      if (res.error) { btn.disabled = false; window.alert(res.error.message || 'Annulation impossible.'); return; }
+      if (sb.functions) sb.functions.invoke('reservation-notify', { body: { reservation_id: r.id, event: 'cancelled' } }).then(null, function () {});
+      loadResv();
     }, function () { btn.disabled = false; });
   }
   function pendingOf(inv) {

@@ -2,7 +2,8 @@
    Création Audio — CMS Commandes › Clients en ligne
    Commandes envoyées par les clients connectés (compte.html -> panier de la
    boutique ou de la page spacers) : tables customer_orders + customer_order_lines.
-   - Sous-onglets Dealers / Clients en ligne (#commandes/clients).
+   - Sous-onglets Dealers / Clients en ligne (#commandes/clients) / Réservations
+     (#commandes/reservations — liste dans cms-reservations.js, CA.loadReservations).
    - Pastille de la barre latérale = nouvelles commandes dealer + client
      (CA.paintOrdersBadge, CA.ordersCount — cms-commandes.js y écrit les dealers).
    - Par commande : lignes, stock actuel, « à commander » (qté − stock), note, statut.
@@ -46,34 +47,37 @@
   CA.ordersCount = CA.ordersCount || {};
   CA.paintOrdersBadge = function () {
     var navN = $('#nav-orders-n'); if (!navN) return;
-    var c = CA.ordersCount, n = (c.dealer || 0) + (c.client || 0);
+    var c = CA.ordersCount, n = (c.dealer || 0) + (c.client || 0) + (c.resv || 0);
     navN.textContent = n; navN.hidden = !n;
     var tab = navN.closest('.tab');
     if (tab) tab.setAttribute('aria-label', 'Commandes' + (n ? ' (' + plural(n, 'nouvelle', 'nouvelles') + ')' : ''));
     var cn = $('#cc-new-n'); if (cn) { cn.textContent = c.client || 0; cn.hidden = !c.client; }
+    var rn = $('#cr-n'); if (rn) { rn.textContent = c.resv || 0; rn.hidden = !c.resv; }
   };
   function setClientBadge(n) { CA.ordersCount.client = n; CA.paintOrdersBadge(); }
 
-  var wrap = $('#cc-wrap'), listEl = $('#cc-list'), dealersEl = $('#co-dealers');
+  var wrap = $('#cc-wrap'), listEl = $('#cc-list'), dealersEl = $('#co-dealers'), resvEl = $('#cr-wrap');
   if (!wrap || !listEl) return;
   var orders = [], stock = {}, filter = 'open', loaded = false, pending = null, sub = 'dealers', tabOpen = false;
 
-  /* ---- sous-onglets Dealers / Clients en ligne (#commandes/clients) ---- */
+  /* ---- sous-onglets Dealers / Clients en ligne / Réservations (#commandes/clients, #commandes/reservations) ---- */
   function showSub(s) {
-    sub = s === 'clients' ? 'clients' : 'dealers';
+    sub = s === 'clients' || s === 'reservations' ? s : 'dealers';
     $$('[data-cosub]').forEach(function (b) {
       var on = b.getAttribute('data-cosub') === sub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on);
     });
     if (dealersEl) dealersEl.hidden = sub !== 'dealers';
     wrap.hidden = sub !== 'clients';
+    if (resvEl) resvEl.hidden = sub !== 'reservations';
     $$('[data-co-dealer]').forEach(function (el) { el.hidden = sub !== 'dealers'; });
     if (sub === 'clients' && tabOpen) load();
+    if (sub === 'reservations' && tabOpen && CA.loadReservations) CA.loadReservations();
   }
   $$('[data-cosub]').forEach(function (b) {
     b.addEventListener('click', function () {
       var s = b.getAttribute('data-cosub');
-      if (CA.route && CA.route.goSub) CA.route.goSub(s === 'clients' ? 'clients' : ''); else showSub(s);
+      if (CA.route && CA.route.goSub) CA.route.goSub(s === 'dealers' ? '' : s); else showSub(s);
     });
   });
   if (CA.route && CA.route.onSub) CA.route.onSub(function (s, tab) { if (tab === 'commandes') showSub(s); });
@@ -82,8 +86,9 @@
     if (typeof prevOnTab === 'function') prevOnTab(name);
     tabOpen = name === 'commandes';
     if (!tabOpen) return;
-    var want = /^#commandes\/clients\b/.test(location.hash) ? 'clients' : 'dealers';   // lien direct #commandes/clients
+    var m = /^#commandes\/(clients|reservations)\b/.exec(location.hash), want = m ? m[1] : 'dealers';   // lien direct
     if (want !== sub) showSub(want); else if (sub === 'clients') load();
+    else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
   };
   $$('.cc-filter').forEach(function (b) {
     b.addEventListener('click', function () {
@@ -93,7 +98,9 @@
     });
   });
   var refreshBtn = $('#co-refresh');
-  if (refreshBtn) refreshBtn.addEventListener('click', function () { if (sub === 'clients') load(); });
+  if (refreshBtn) refreshBtn.addEventListener('click', function () {
+    if (sub === 'clients') load(); else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
+  });
   CA.reloadCustomerOrders = function () { if (loaded) load(); else refreshBadge(); };
 
   function refreshBadge() {
