@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=64">
+<link rel="stylesheet" href="assets/admin.css?v=65">
 <link rel="stylesheet" href="assets/facture.css?v=25">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
@@ -588,8 +588,46 @@
       <!-- ============ SOUS-ONGLET : À COMMANDER ============ -->
       <div class="inv-subpanel" id="inv-sub-commander" role="tabpanel" hidden>
 
+        <!-- Commandes fournisseur « en route » (cms-en-route.js) -->
+        <div class="reorder-card po-card" id="po-card">
+          <div class="reorder-card-head">
+            <h2>En route</h2>
+            <span class="grow"></span>
+            <span class="po-total" id="po-total"></span>
+            <button class="btn btn-accent btn-sm" id="po-new" type="button" data-ic="plus">J'ai commandé</button>
+          </div>
+
+          <div class="po-editor" id="po-editor" hidden>
+            <textarea id="po-paste" rows="6" aria-label="Texte de la commande" placeholder="Colle ici ta commande : courriel de confirmation, page de commande…"></textarea>
+            <div class="po-bar">
+              <label class="po-f">N° de commande <input type="text" id="po-number" autocomplete="off"></label>
+              <label class="po-f">Date <input type="text" id="po-date" placeholder="AAAA-MM-JJ" autocomplete="off"></label>
+              <button class="btn btn-ghost btn-sm" id="po-parse" type="button">Analyser</button>
+              <span class="po-status" id="po-status" aria-live="polite"></span>
+            </div>
+            <div class="po-review" id="po-review" hidden>
+              <div class="rcp-table-wrap">
+                <table class="rcp-table po-table">
+                  <thead><tr><th>Lu dans la commande</th><th>Article</th><th>Format</th><th class="num">Qté</th><th class="num">Payé $/u</th><th></th></tr></thead>
+                  <tbody id="po-rows"></tbody>
+                </table>
+              </div>
+              <div class="editor-actions">
+                <button class="btn btn-accent" id="po-save" type="button" data-ic="check">Enregistrer la commande</button>
+                <button class="btn btn-ghost btn-sm" id="po-add" type="button" data-ic="plus">Ligne</button>
+                <button class="btn btn-ghost" id="po-cancel" type="button">Annuler</button>
+                <span class="grow"></span>
+                <span class="po-sum" id="po-sum"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="po-list" id="po-list"></div>
+        </div>
+
         <!-- Liste à commander (calculée) -->
         <div class="reorder-summary" id="reorder-summary" aria-live="polite"></div>
+
 
         <div class="panel-head" style="margin-top:22px">
           <div>
@@ -1784,9 +1822,10 @@
 <script src="assets/cms-linkbuilder.js?v=3"></script>
 <script src="assets/cms-spacers.js?v=13"></script>
 <script src="assets/cms-accessories.js?v=6"></script>
-<script src="assets/cms-inventory.js?v=29"></script>
+<script src="assets/cms-inventory.js?v=30"></script>
 <script src="assets/cms-attente.js?v=5"></script>
 <script src="assets/cms-reserves.js?v=1"></script>
+<script src="assets/cms-en-route.js?v=1"></script>
 <script src="assets/cms-dealers.js?v=5"></script>
 <script src="assets/cms-clients.js?v=8"></script>
 <script src="assets/cms-messages.js?v=2"></script>
