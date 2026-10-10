@@ -112,12 +112,12 @@
   function hasRefill(p) { return p.sell_price_2 != null; }
   function offered(p, type) { return type === 'refill' ? hasRefill(p) : hasSpool(p); }
   // client connecté (Mon compte, commande-client.js) : il peut commander au-delà du stock
-  // (la part en trop est « à commander » : délai annoncé dans la confirmation)
-  var BO_MAX = 99;
+  // (la part en trop est « à commander » chez le fournisseur : BO_DELAY, confirmé à l'envoi)
+  var BO_MAX = 99, BO_DELAY = '3 à 7 jours ouvrables';
   function canBackorder() { return !!(window.CA && window.CA.custOrder && window.CA.custOrder.signedIn()); }
   function boNote(stock, qty) {
     var n = canBackorder() && stock != null ? qty - Math.max(0, stock | 0) : 0;
-    return n > 0 ? '<span class="buy-bo">' + n + ' à commander · délai à prévoir</span>' : '';
+    return n > 0 ? '<span class="buy-bo">' + n + ' à commander · ' + BO_DELAY + '</span>' : '';
   }
   function stockOf(p, type) { return type === 'refill' ? (p.qty_2 | 0) : (p.qty | 0); }
   function baseOf(p, type) { return type === 'refill' ? p.sell_price_2 : p.sell_price; }
@@ -734,7 +734,7 @@
               '<input type="number" class="q-val" aria-label="Quantité" min="1" max="' + (canBackorder() ? BO_MAX : stock) + '" value="' + curQty + '" inputmode="numeric">' +
               '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
             '</div>') +
-            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? 'Commander · délai' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? '<span>Commander<span class="bo-d"> · 3 à 7 jours</span></span>' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + buySumText() + '</p>' +
           (out && !bo && offered(p, curType) ? notifyHtml(filNotify(p)) : '') +
@@ -1134,7 +1134,7 @@
               '<input type="number" class="q-val" aria-label="Quantité" min="1"' + (a.qty != null && !canBackorder() ? ' max="' + a.qty + '"' : '') + ' value="' + accQty + '" inputmode="numeric">' +
               '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
             '</div>') +
-            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? 'Commander · délai' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? '<span>Commander<span class="bo-d"> · 3 à 7 jours</span></span>' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + accBuySum() + '</p>' +
           (out && !bo ? notifyHtml(accNotify(a)) : '') +
@@ -1383,7 +1383,7 @@
     var m = metaOf(it); if (!m) return '';
     var st = it.type === 'accessory' ? m.qty : stockOf(m, it.type);
     var n = st == null ? 0 : it.qty - Math.max(0, st | 0);
-    return n > 0 ? ' · <span class="citem-bo">' + n + ' à commander</span>' : '';
+    return n > 0 ? ' · <span class="citem-bo">' + n + ' à commander · 3 à 7 jours</span>' : '';
   }
   function renderCart() {
     var n = count();
@@ -1572,6 +1572,27 @@
   });
   if (sendBtn) sendBtn.addEventListener('click', function () {
     if (!count() || sendBtn.disabled) return;
+    var bo = overStock();
+    if (!bo.length) { sendOrder(); return; }
+    // articles au-delà du stock : le client confirme avoir compris le délai avant l'envoi
+    var boN = function (it) { var m = metaOf(it), st = it.type === 'accessory' ? m.qty : stockOf(m, it.type); return it.qty - Math.max(0, st | 0); };
+    var label = function (it) {
+      var m = metaOf(it);
+      return m.name + ' — ' + (it.type === 'accessory' ? (m.cat || 'accessoire')
+        : ((m.brand ? m.brand + ' ' : '') + (m.material || '')).trim() + ', ' + typeLabel(it));
+    };
+    var one = bo.length === 1, n1 = one ? boN(bo[0]) : 0, many = !one || n1 > 1;
+    caDialog.confirm({
+      title: many ? 'Articles à commander' : 'Article à commander',
+      message: one
+        ? (n1 > 1 ? n1 + ' × ' : '') + label(bo[0]) + (n1 > 1 ? ' ne sont pas en stock. On les commande' : ' n\'est pas en stock. On le commande') +
+          ' chez notre fournisseur : compte ' + BO_DELAY + ' avant la cueillette. On t\'écrit dès ' + (n1 > 1 ? 'leur arrivée.' : 'qu\'il est arrivé.')
+        : 'Ces articles ne sont pas en stock :\n' + bo.map(function (it) { return '• ' + boN(it) + ' × ' + label(it); }).join('\n') +
+          '\nOn les commande chez notre fournisseur : compte ' + BO_DELAY + ' avant la cueillette. On t\'écrit dès leur arrivée.',
+      ok: 'Compris, envoyer', icon: 'clock'
+    }).then(function (ok) { if (ok) sendOrder(); });
+  });
+  function sendOrder() {
     var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
     sendBtn.disabled = true; cartMsg.textContent = 'Envoi…';
     window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
@@ -1579,10 +1600,10 @@
       cart = {}; saveCart(); if (noteIn) noteIn.value = '';
       renderCart();
       cartMsg.innerHTML = '✓ Commande <b>' + esc(r.number) + '</b> ' + (r.updated ? 'modifiée' : 'envoyée') +
-        (r.has_backorder ? ' · certains articles sont à commander (délai).' : '.') +
+        (r.has_backorder ? ' · articles à commander : ' + BO_DELAY + '.' : '.') +
         ' Confirmation par courriel. <a href="compte.html#/commandes">Mes commandes</a>';
     }, function (err) { sendBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Envoi impossible. Réessaie.'; });
-  });
+  }
   if (editCancel) editCancel.addEventListener('click', function () {
     window.CA.custOrder.cancelEdit();
     cart = {}; saveCart(); renderCart();

@@ -9,7 +9,7 @@
    caDialog.error(err [, title])   fenêtre « Compris » avec le message d'erreur
    caDialog.toast(text [, 'bad'])  court message en bas de l'écran
 
-   icon : warn | trash | cart | info | edit | plus | link | copy (défaut : warn si danger, sinon info)
+   icon : warn | trash | cart | info | edit | plus | link | copy | clock (défaut : warn si danger, sinon info)
    ========================================================= */
 (function () {
   'use strict';
@@ -21,6 +21,7 @@
     edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>'
   };
   var native = typeof HTMLDialogElement === 'function';

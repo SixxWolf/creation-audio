@@ -34,7 +34,11 @@ function money(n: unknown) {
 }
 function plural(n: number, one: string, many: string) { return n + " " + (n > 1 ? many : one); }
 
-type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number; qty_to_order: number; product_id: string | null; kind: string | null };
+type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number; qty_to_order: number; product_id: string | null; kind: string | null; ptype: string | null };
+
+// filaments / accessoires à commander chez le fournisseur : délai annoncé (les spacers, imprimés ici, gardent « on te confirme »)
+const BO_DELAY = "3 à 7 jours ouvrables";
+const boLabel = (l: Line, n: number) => n + " à commander" + (l.ptype === "spacer" ? "" : " · " + BO_DELAY);
 
 const ADMIN_LABEL: Record<string, string> = {
   new: "Nouvelle commande en ligne",
@@ -92,7 +96,7 @@ Deno.serve(async (req) => {
   if (/@resend\.dev$/i.test(order.email || "")) adminTo = "delivered@resend.dev";   // tests
 
   const { data: lines } = await db.from("customer_order_lines")
-    .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind").eq("order_id", orderId).order("sort_order");
+    .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype").eq("order_id", orderId).order("sort_order");
   const L = (lines || []) as Line[];
   const items = L.reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const toOrder = L.filter((l) => (Number(l.qty_to_order) || 0) > 0);
@@ -105,11 +109,15 @@ Deno.serve(async (req) => {
   if (event !== "cancelled") {
     const verb = event === "updated" ? "modifiée" : "reçue";
     const subject = "Commande " + order.number + " " + verb + " — Création Audio";
-    const status = toOrder.length
-      ? "Certains articles doivent être commandés : il y aura donc un délai. On te contacte sous peu pour te le confirmer."
-      : "Tout est en stock : on te contacte sous peu pour convenir de la cueillette à Québec.";
+    const supplierBo = toOrder.some((l) => l.ptype !== "spacer");
+    const status = !toOrder.length
+      ? "Tout est en stock : on te contacte sous peu pour convenir de la cueillette à Québec."
+      : supplierBo
+      ? "Certains articles ne sont pas en stock : on les commande chez notre fournisseur. Prévois un délai de " + BO_DELAY +
+        " avant la cueillette ; on t'écrit dès leur arrivée."
+      : "Certains articles doivent être imprimés : il y aura donc un délai. On te contacte sous peu pour te le confirmer.";
     const toOrderTxt = toOrder.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " : " +
-      Number(l.qty_to_order) + " à commander").join("\n");
+      boLabel(l, Number(l.qty_to_order))).join("\n");
     const text =
       "Bonjour " + first + ",\n\n" +
       "Merci ! Ta commande " + order.number + " est bien " + verb + ".\n\n" +
@@ -126,7 +134,7 @@ Deno.serve(async (req) => {
       return '<tr>' +
         '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(l.name) + '</strong>' +
           (l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(l.meta) + '</span>' : '') +
-          (bo ? '<br><span style="color:#B23F12;font-size:12px;font-weight:700">' + bo + ' à commander</span>' : '') + '</td>' +
+          (bo ? '<br><span style="color:#B23F12;font-size:12px;font-weight:700">' + esc(boLabel(l, bo)) + '</span>' : '') + '</td>' +
         '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
         '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(l.line_total) + '</td>' +
       '</tr>';

@@ -271,6 +271,7 @@
 }
 .btn-add { flex:1; min-width:0; height:52px; font-size:1rem; }
 .btn-add svg { width:19px; height:19px; flex:none; }
+@media (max-width:440px) { .btn-add .bo-d { display:none; } }   /* délai rappelé juste dessous (.buy-bo) */
 .btn-add:hover, .add-btn:hover { background:var(--ember-dim); border-color:var(--ember-dim); }
 .btn-add:active, .add-btn:active { transform:translateY(1px); }
 .btn-add:disabled, .add-btn:disabled { color:var(--muted); background:var(--wash-2); border-color:var(--wash-2); box-shadow:none; cursor:not-allowed; transform:none; }

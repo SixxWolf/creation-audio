@@ -316,7 +316,7 @@
         var bo = open ? (+l.qty_to_order || 0) : 0;
         return '<li>' + swatch(l.hex, (l.name || '') + ' ' + (l.meta || '')) +
           '<span class="ol-tx"><b>' + esc(l.name || '') + '</b>' + (l.meta ? '<small>' + esc(l.meta) + '</small>' : '') +
-            (bo ? '<em class="ol-pend">' + bo + ' à commander · délai</em>' : '') + '</span>' +
+            (bo ? '<em class="ol-pend">' + bo + ' à commander · ' + (l.ptype === 'spacer' ? 'délai à confirmer' : '3 à 7 jours ouvrables') + '</em>' : '') + '</span>' +
           '<span class="ol-q">' + (+l.qty) + ' × ' + money(l.unit_price) + '</span>' +
           '<span class="ol-t">' + money(l.line_total) + '</span></li>';
       }).join('');
