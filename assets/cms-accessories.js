@@ -7,6 +7,7 @@
    affichage sur la fiche filament (marques visées), fiche
    détaillée (boutique.html#/a/<slug>) : description, specs.
    attrs : category · on_filament · fil_brands [noms ; vide = toutes]
+           · stock_only (jamais commandé au-delà du stock, ex. bobines vides)
            · description · long_desc · specs [{k, v}] · gallery
    (les autres clés d'attrs — avg_cost, barcodes… — sont conservées)
    ========================================================= */
@@ -71,7 +72,7 @@
       nameI = $('#ac-name'), catI = $('#ac-cat'), catList = $('#ac-cat-list'), descI = $('#ac-desc'),
       priceI = $('#ac-price'), costI = $('#ac-cost'), marginEl = $('#ac-margin'), qtyI = $('#ac-qty'),
       tiersEl = $('#ac-tiers'), tierAdd = $('#ac-tier-add'),
-      activeI = $('#ac-active'), onFilI = $('#ac-onfil'), brandsEl = $('#ac-brands'),
+      activeI = $('#ac-active'), onFilI = $('#ac-onfil'), stockOnlyI = $('#ac-stockonly'), brandsEl = $('#ac-brands'),
       linksEl = $('#ac-fiche-links'), longDescI = $('#ac-long-desc'), specsEl = $('#ac-specs'), specAdd = $('#ac-spec-add'),
       statusEl = $('#ac-status'), listEl = $('#ac-list'),
       newBtn = $('#ac-new'), refreshBtn = $('#ac-refresh'),
@@ -262,6 +263,7 @@
     normalizeTiers(row ? row.tiers : []).forEach(function (t) { addTierRow(t.min, t.price); });
     activeI.checked = row ? !!row.active : true;
     onFilI.checked = row ? !!a.on_filament : false;
+    stockOnlyI.checked = a.stock_only === true;
     brandsEl.hidden = !onFilI.checked;
     selBrands = Array.isArray(a.fil_brands) ? a.fil_brands.filter(function (n) { return typeof n === 'string' && n; }) : [];
     renderBrands();
@@ -294,6 +296,7 @@
     var attrs = Object.assign({}, attrsOf(editingRow), {
       category: cat,                       // toujours écrites (même vides) : le SQL d'amorçage n'y retouche plus
       on_filament: !!onFilI.checked,
+      stock_only: !!stockOnlyI.checked,    // boutique : jamais commandé / réservé au-delà du stock
       fil_brands: selBrands.slice(),
       description: descI.value.trim() || null,
       specs: collectSpecs(),
@@ -386,6 +389,7 @@
     var url = publicUrl(r.image_path), out = (r.qty | 0) <= 0, a = attrsOf(r), nPhotos = photosOf(r).length;
     var fb = Array.isArray(a.fil_brands) ? a.fil_brands : [];
     var tags = (a.on_filament ? '<span class="sp-mini is-feat">★ Fiche filament · ' + esc(fb.length ? fb.join(', ') : 'toutes marques') + '</span>' : '') +
+      (a.stock_only ? '<span class="sp-mini">Stock seulement</span>' : '') +
       (nPhotos > 1 ? '<span class="sp-mini">' + nPhotos + ' photos</span>' : '');
     return '<article class="card' + (r.active ? '' : ' is-hidden') + '" data-id="' + esc(r.id) + '" draggable="true">' +
       '<div class="card-thumb">' +

@@ -234,7 +234,9 @@ with (security_invoker = off) as
       -- accessoires : catégorie (puces + rabais cumulé), affichage sur la fiche filament (+ marques visées)
       'category',     p.attrs -> 'category',
       'on_filament',  p.attrs -> 'on_filament',
-      'fil_brands',   p.attrs -> 'fil_brands'
+      'fil_brands',   p.attrs -> 'fil_brands',
+      -- accessoires « stock seulement » (bobines vides récupérées) : jamais commandés au-delà du stock
+      'stock_only',   p.attrs -> 'stock_only'
     )) as attrs,
     p.image_path,
     p.slug,                            -- slug perso de la couleur (null = auto côté boutique)
@@ -1704,7 +1706,7 @@ $$;
 -- meta, qty, unit_price, line_total, qty_to_order, sort_order}]
 create or replace function public._customer_fill_lines(p_lines jsonb)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
-declare v_in int; v_ok int; v_out jsonb;
+declare v_in int; v_ok int; v_out jsonb; v_short text;
 begin
   if jsonb_typeof(p_lines) is distinct from 'array' or jsonb_array_length(p_lines) = 0 then
     raise exception 'Ton panier est vide.';
@@ -1727,7 +1729,8 @@ begin
                 when pp.type = 'accessory' and coalesce(btrim(pp.attrs ->> 'category'), '') <> ''
                   then 'acc|' || lower(btrim(pp.attrs ->> 'category'))
                 else 'one|' || l.pid::text || '|' || l.kind end as gkey,
-           case when l.kind = 'refill' then coalesce(pp.qty_2, 0) else pp.qty end as stock
+           case when l.kind = 'refill' then coalesce(pp.qty_2, 0) else pp.qty end as stock,
+           coalesce(pp.attrs ->> 'stock_only', '') = 'true' as stock_only
       from l
       join public.products_public pp on pp.id = l.pid
      where (pp.type = 'filament' and l.kind in ('spool', 'refill'))
@@ -1749,12 +1752,17 @@ begin
                         when type = 'accessory' then 'Accessoire' else 'Spacer · paire' end,
            'qty', qty, 'unit_price', unit, 'line_total', round(unit * qty, 2),
            'qty_to_order', case when stock is null then 0 else greatest(0, qty - greatest(stock, 0)) end,
-           'sort_order', rn) order by rn), '[]'::jsonb)
-    into v_in, v_ok, v_out
+           'sort_order', rn) order by rn), '[]'::jsonb),
+         string_agg(name, ', ' order by rn) filter (where stock_only and stock is not null and qty > greatest(stock, 0))
+    into v_in, v_ok, v_out, v_short
     from s;
   if v_in = 0 then raise exception 'Ton panier est vide.'; end if;
   if v_ok <> v_in then
     raise exception 'Un article de ton panier n''est plus offert. Recharge la page puis réessaie.';
+  end if;
+  -- « stock seulement » : ni commande au-delà du stock, ni réservation
+  if v_short is not null then
+    raise exception 'Plus assez de stock pour : %. Ajuste la quantité dans ton panier.', v_short;
   end if;
   return v_out;
 end $$;
