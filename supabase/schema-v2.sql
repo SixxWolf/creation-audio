@@ -2196,6 +2196,220 @@ grant execute on function public.me_reservations()                          to a
 grant execute on function public.admin_invoice_reservation(uuid, uuid)      to authenticated;
 grant execute on function public.admin_reservation_action(uuid, text)       to authenticated;
 
+-- ============================================================
+-- MESSAGERIE (questions filaments / spacers / compte)
+-- Panneau « Écris-nous » de tout le site public (assets/messagerie.js) : on
+-- écrit, puis on confirme son courriel par le code à 6 chiffres (Edge Function
+-- compte-code) -> la conversation est reliée au compte client (customers).
+-- Le client ne lit AUCUNE table directement : RPC msg_start / msg_send /
+-- me_conversations / me_messages. L'admin lit / écrit par RLS (onglet Messages).
+-- Photos : bucket PRIVÉ « messages », dossier = id du compte (<uid>/<uuid>.jpg),
+-- 4 max par message, lues par URL signée ; effacées par le navigateur (API
+-- Storage) avec la conversation (admin) ou le compte (Mon compte › Supprimer).
+-- Compteurs (non lus, aperçu, réouverture) tenus par un déclencheur.
+-- Courriels : Edge Function « message-notify » — admin : 1 avis par conversation
+-- tant qu'il n'a pas répondu ; client : 1 avis par série de réponses non lues.
+-- Loi 25 : conversation effacée 12 mois après le dernier message (purge lancée
+-- par l'onglet admin Messages : les photos doivent passer par l'API Storage).
+-- ------------------------------------------------------------
+create table if not exists public.conversations (
+  id                 uuid primary key default gen_random_uuid(),
+  customer_id        uuid not null references public.customers(id) on delete cascade,
+  topic              text not null default 'autre' check (topic in ('filaments','spacers','compte','autre')),
+  ref                text,                     -- contexte : code du spacer, produit consulté…
+  page               text,                     -- page d'où la question est partie
+  status             text not null default 'open' check (status in ('open','closed')),
+  last_from          text check (last_from in ('client','admin')),
+  last_preview       text,
+  admin_unread       integer not null default 0,
+  client_unread      integer not null default 0,
+  admin_notified_at  timestamptz,              -- avis envoyé à l'admin ; remis à null quand il répond
+  client_notified_at timestamptz,              -- avis envoyé au client ; remis à null quand il lit
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()   -- dernier message
+);
+create index if not exists conversations_customer_idx on public.conversations (customer_id, updated_at desc);
+create index if not exists conversations_updated_idx  on public.conversations (updated_at desc);
+create table if not exists public.messages (
+  id              uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  sender          text not null check (sender in ('client','admin')),
+  body            text not null default '' check (length(body) <= 4000),
+  photos          jsonb not null default '[]'::jsonb,   -- chemins dans le bucket « messages »
+  created_at      timestamptz not null default now()
+);
+create index if not exists messages_conv_idx on public.messages (conversation_id, created_at);
+alter table public.conversations enable row level security;
+alter table public.messages      enable row level security;
+drop policy if exists conversations_admin_all on public.conversations;
+create policy conversations_admin_all on public.conversations for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists messages_admin_all on public.messages;
+create policy messages_admin_all on public.messages for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+
+-- Nouveau message -> conversation à jour (aperçu, non lus ; le client rouvre une conversation fermée ;
+-- la réponse de l'admin vaut lecture et réarme son prochain avis courriel).
+create or replace function public._message_after_insert()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update public.conversations set
+    updated_at        = new.created_at,
+    last_from         = new.sender,
+    last_preview      = left(coalesce(nullif(regexp_replace(btrim(new.body), '\s+', ' ', 'g'), ''),
+                             case when jsonb_array_length(new.photos) > 1 then 'Photos' else 'Photo' end), 140),
+    admin_unread      = case when new.sender = 'client' then admin_unread + 1 else 0 end,
+    client_unread     = case when new.sender = 'admin' then client_unread + 1 else client_unread end,
+    status            = case when new.sender = 'client' then 'open' else status end,
+    admin_notified_at = case when new.sender = 'admin' then null else admin_notified_at end
+  where id = new.conversation_id;
+  return null;
+end $$;
+revoke all on function public._message_after_insert() from public, anon, authenticated;
+drop trigger if exists messages_after_insert on public.messages;
+create trigger messages_after_insert after insert on public.messages
+  for each row execute function public._message_after_insert();
+
+-- Photos jointes : chemins du dossier du compte, déjà téléversés, 4 max.
+create or replace function public._msg_photos(p_photos jsonb, p_owner uuid)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare v jsonb := '[]'::jsonb; x text;
+begin
+  if p_photos is null or jsonb_typeof(p_photos) <> 'array' then return v; end if;
+  if jsonb_array_length(p_photos) > 4 then raise exception 'Au plus 4 photos par message.'; end if;
+  for x in select jsonb_array_elements_text(p_photos) loop
+    if x !~ ('^' || p_owner::text || '/[0-9a-f-]{36}\.(jpg|png|webp)$') then raise exception 'Photo invalide.'; end if;
+    if not exists (select 1 from storage.objects o where o.bucket_id = 'messages' and o.name = x) then
+      raise exception 'Une photo n''a pas été reçue. Réessaie.';
+    end if;
+    v := v || to_jsonb(x);
+  end loop;
+  return v;
+end $$;
+revoke all on function public._msg_photos(jsonb, uuid) from public, anon, authenticated;
+
+-- Garde-fous communs aux envois du client (compte présent, rythme, contenu).
+create or replace function public._msg_guard(p_uid uuid, p_body text, p_photos jsonb)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if p_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  if not exists (select 1 from public.customers where id = p_uid) then
+    raise exception 'Compte introuvable. Reconnecte-toi.' using errcode = '42501';
+  end if;
+  if btrim(coalesce(p_body, '')) = '' and coalesce(jsonb_array_length(p_photos), 0) = 0 then
+    raise exception 'Écris ton message.';
+  end if;
+  if length(btrim(coalesce(p_body, ''))) > 4000 then raise exception 'Message trop long (4000 caractères max).'; end if;
+  if (select count(*) from public.messages m join public.conversations c on c.id = m.conversation_id
+       where c.customer_id = p_uid and m.sender = 'client' and m.created_at > now() - interval '1 hour') >= 30 then
+    raise exception 'Trop de messages envoyés en peu de temps. Réessaie plus tard.';
+  end if;
+  update public.customers set last_seen_at = now() where id = p_uid;   -- compte actif (ménage des 3 ans)
+end $$;
+revoke all on function public._msg_guard(uuid, text, jsonb) from public, anon, authenticated;
+
+-- Nouvelle conversation. -> { conversation_id, message_id }
+create or replace function public.msg_start(p_topic text, p_ref text, p_page text, p_body text, p_photos jsonb default '[]'::jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); v_ph jsonb; v_conv uuid; v_msg uuid;
+begin
+  perform public._msg_guard(v_uid, p_body, p_photos);
+  if (select count(*) from public.conversations where customer_id = v_uid and created_at > now() - interval '1 day') >= 10 then
+    raise exception 'Trop de nouvelles conversations aujourd''hui. Réponds dans une conversation existante.';
+  end if;
+  v_ph := public._msg_photos(p_photos, v_uid);
+  insert into public.conversations (customer_id, topic, ref, page)
+  values (v_uid, case when p_topic in ('filaments','spacers','compte','autre') then p_topic else 'autre' end,
+          nullif(left(btrim(coalesce(p_ref, '')), 120), ''), nullif(left(btrim(coalesce(p_page, '')), 200), ''))
+  returning id into v_conv;
+  insert into public.messages (conversation_id, sender, body, photos)
+  values (v_conv, 'client', btrim(coalesce(p_body, '')), v_ph) returning id into v_msg;
+  return jsonb_build_object('conversation_id', v_conv, 'message_id', v_msg);
+end $$;
+
+-- Réponse du client dans une de ses conversations (une conversation fermée se rouvre). -> { message_id }
+create or replace function public.msg_send(p_conv uuid, p_body text, p_photos jsonb default '[]'::jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); v_ph jsonb; v_msg uuid;
+begin
+  perform public._msg_guard(v_uid, p_body, p_photos);
+  if not exists (select 1 from public.conversations where id = p_conv and customer_id = v_uid) then
+    raise exception 'Conversation introuvable.';
+  end if;
+  v_ph := public._msg_photos(p_photos, v_uid);
+  insert into public.messages (conversation_id, sender, body, photos)
+  values (p_conv, 'client', btrim(coalesce(p_body, '')), v_ph) returning id into v_msg;
+  return jsonb_build_object('message_id', v_msg);
+end $$;
+
+-- Ses conversations (panneau + Mon compte › Messages).
+create or replace function public.me_conversations()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'id', c.id, 'topic', c.topic, 'ref', c.ref, 'status', c.status, 'last_from', c.last_from,
+      'last_preview', c.last_preview, 'unread', c.client_unread, 'created_at', c.created_at, 'updated_at', c.updated_at
+    ) order by c.updated_at desc), '[]'::jsonb)
+  from (select * from public.conversations where customer_id = (select auth.uid())
+        order by updated_at desc limit 100) c;
+$$;
+
+-- Fil d'une conversation ; l'ouvrir vaut lecture (réarme l'avis courriel du client).
+create or replace function public.me_messages(p_conv uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); c public.conversations;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  update public.conversations set client_unread = 0, client_notified_at = null
+   where id = p_conv and customer_id = v_uid returning * into c;
+  if not found then raise exception 'Conversation introuvable.'; end if;
+  return jsonb_build_object(
+    'conversation', jsonb_build_object('id', c.id, 'topic', c.topic, 'ref', c.ref, 'status', c.status,
+                                       'created_at', c.created_at, 'updated_at', c.updated_at),
+    'messages', coalesce((select jsonb_agg(jsonb_build_object('id', m.id, 'sender', m.sender, 'body', m.body,
+                            'photos', m.photos, 'created_at', m.created_at) order by m.created_at, m.id)
+                          from public.messages m where m.conversation_id = c.id), '[]'::jsonb));
+end $$;
+
+revoke all on function public.msg_start(text, text, text, text, jsonb) from public, anon;
+revoke all on function public.msg_send(uuid, text, jsonb)              from public, anon;
+revoke all on function public.me_conversations()                       from public, anon;
+revoke all on function public.me_messages(uuid)                        from public, anon;
+grant execute on function public.msg_start(text, text, text, text, jsonb) to authenticated;
+grant execute on function public.msg_send(uuid, text, jsonb)              to authenticated;
+grant execute on function public.me_conversations()                       to authenticated;
+grant execute on function public.me_messages(uuid)                        to authenticated;
+
+-- ---- photos : bucket privé, un dossier par compte, 200 fichiers max par compte ----
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('messages', 'messages', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit,
+                               allowed_mime_types = excluded.allowed_mime_types;
+
+-- quota du compte connecté seulement (aucun paramètre : on ne compte jamais les photos d'un autre)
+drop policy if exists messages_photos_insert on storage.objects;
+drop function if exists public._msg_quota_ok(uuid);
+create or replace function public._msg_quota_ok()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select (select count(*) from storage.objects o
+           where o.bucket_id = 'messages' and (storage.foldername(o.name))[1] = (select auth.uid())::text) < 200;
+$$;
+revoke all on function public._msg_quota_ok() from public, anon;
+grant execute on function public._msg_quota_ok() to authenticated;
+
+drop policy if exists messages_photos_read on storage.objects;
+create policy messages_photos_read on storage.objects for select to authenticated
+  using ( bucket_id = 'messages' and ( (storage.foldername(name))[1] = (select auth.uid())::text
+                                       or (select public.is_admin()) ) );
+drop policy if exists messages_photos_insert on storage.objects;
+create policy messages_photos_insert on storage.objects for insert to authenticated
+  with check ( bucket_id = 'messages' and ( (select public.is_admin())
+               or ( (storage.foldername(name))[1] = (select auth.uid())::text
+                    and (select public._msg_quota_ok()) ) ) );
+drop policy if exists messages_photos_delete on storage.objects;
+create policy messages_photos_delete on storage.objects for delete to authenticated
+  using ( bucket_id = 'messages' and ( (storage.foldername(name))[1] = (select auth.uid())::text
+                                       or (select public.is_admin()) ) );
+
 -- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------

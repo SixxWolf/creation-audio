@@ -21,9 +21,11 @@ window.CA = window.CA || {};
 
   function session() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function email() { var s = session(); return (s && s.user && s.user.email) || ''; }
+  // client partagé avec le panneau Messagerie (CA.compteSb) : un seul client par clé de session
   function cli() {
+    if (!client) client = window.CA.compteSb || null;
     if (!client && window.supabase && window.supabase.createClient && cfg.url) {
-      client = window.supabase.createClient(cfg.url, cfg.anonKey, {
+      client = window.CA.compteSb = window.supabase.createClient(cfg.url, cfg.anonKey, {
         auth: { storageKey: KEY, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
       });
     }

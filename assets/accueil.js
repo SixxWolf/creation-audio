@@ -370,7 +370,7 @@
 
   function fail() {
     buildRail(FALLBACK, 1);
-    emptyNote(matGrid, 'Catalogue momentanément indisponible — <a href="boutique.html">ouvrir la boutique</a> ou <a class="ask" href="https://m.me/61591945465745" target="_blank" rel="noopener">nous écrire</a>.');
+    emptyNote(matGrid, 'Catalogue momentanément indisponible — <a href="boutique.html">ouvrir la boutique</a> ou <a class="ask" href="/compte.html#/messages" data-msg="filaments">nous écrire</a>.');
     emptyNote(popGrid, 'Catalogue momentanément indisponible.');
   }
 

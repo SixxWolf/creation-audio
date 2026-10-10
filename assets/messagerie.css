@@ -1,0 +1,173 @@
+/* =========================================================
+   Création Audio — panneau Messagerie (site public, clair)
+   Chargé par nav.js avec assets/messagerie.js au premier « Écris-nous ».
+   Glisse depuis la droite (440 px) ; plein écran sous 560 px.
+   ========================================================= */
+html.msg-open { overflow:hidden; }
+
+.msg-backdrop { position:fixed; inset:0; z-index:90; background:rgba(20,22,26,.42); opacity:0; transition:opacity .22s; }
+.msg-backdrop.is-open { opacity:1; }
+.msg-panel {
+  position:fixed; top:0; right:0; bottom:0; z-index:91; width:440px; max-width:100%;
+  display:flex; flex-direction:column; background:#fff; color:var(--ink); font-family:var(--font);
+  box-shadow:-24px 0 60px -24px rgba(0,0,0,.35);
+  transform:translateX(100%); transition:transform .24s cubic-bezier(.2,.8,.2,1);
+}
+.msg-panel.is-open { transform:none; }
+.msg-panel *, .msg-panel *::before, .msg-panel *::after { box-sizing:border-box; }
+.msg-panel button, .msg-panel input, .msg-panel textarea { font:inherit; color:inherit; }
+.msg-panel :focus-visible { outline:3px solid var(--ember-dim); outline-offset:2px; border-radius:10px; }
+
+/* ---- en-tête ---- */
+.msg-head { display:flex; align-items:center; gap:10px; padding:14px 14px 14px 20px; border-bottom:1px solid var(--line); flex:none; }
+.msg-head-tx { flex:1; min-width:0; }
+.msg-head h2 { margin:0; font-family:var(--display, var(--font)); font-size:1.18rem; font-weight:700; letter-spacing:-.01em;
+  overflow-wrap:anywhere; }
+.msg-sub { margin:2px 0 0; font-size:.82rem; color:var(--muted); overflow-wrap:anywhere; }
+.msg-ic { flex:none; width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;
+  background:var(--wash); border:none; border-radius:12px; color:var(--ink-2, var(--ink)); }
+.msg-ic:hover { background:var(--wash-2, #EFEDE8); color:var(--ink); }
+.msg-ic svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.msg-back { margin-left:-6px; }
+
+/* ---- corps ---- */
+.msg-main { flex:1; min-height:0; display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain; }
+.msg-empty { margin:0; padding:28px 20px; text-align:center; color:var(--muted); font-size:.92rem; }
+.msg-alt { flex:none; margin:0; padding:12px 20px 14px; border-top:1px solid var(--line); font-size:.84rem; color:var(--muted); text-align:center; }
+.msg-alt a { color:var(--ink-2, var(--ink)); font-weight:600; text-underline-offset:3px; }
+.msg-alt a:hover { color:var(--ember-ink, #B23F12); }
+
+.msg-form { display:flex; flex-direction:column; gap:16px; padding:18px 20px 22px; }
+.msg-lead { margin:0; font-size:.95rem; line-height:1.5; color:var(--ink-2, var(--ink)); overflow-wrap:anywhere; }
+.msg-field { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.msg-field label, .msg-topics legend { font-size:.8rem; font-weight:700; color:var(--ink-2, var(--ink)); padding:0; }
+.msg-field input, .msg-field textarea {
+  width:100%; min-width:0; padding:11px 13px; font-size:.95rem; line-height:1.45; background:#fff;
+  border:1px solid var(--line-2, #DAD7CF); border-radius:12px; transition:border-color .15s, box-shadow .15s;
+}
+.msg-field textarea { resize:vertical; min-height:120px; }
+.msg-field input:focus, .msg-field textarea:focus, .msg-reply textarea:focus {
+  outline:none; border-color:var(--ember); box-shadow:0 0 0 3px color-mix(in srgb, var(--ember) 18%, transparent);
+}
+.msg-field .msg-code-in { font-size:1.5rem; letter-spacing:.3em; font-weight:700; text-align:center; font-variant-numeric:tabular-nums; }
+.msg-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.msg-grid.one { grid-template-columns:1fr; }
+.msg-hp { position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
+
+/* sujet : puces */
+.msg-topics { margin:0; padding:0; border:0; min-width:0; }
+.msg-topics legend { margin-bottom:8px; }
+.msg-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.msg-chip { position:relative; cursor:pointer; }
+.msg-chip input { position:absolute; opacity:0; pointer-events:none; }
+.msg-chip span { display:inline-flex; align-items:center; height:36px; padding:0 14px; border-radius:100px; font-size:.88rem; font-weight:600;
+  background:#fff; border:1px solid var(--line-2, #DAD7CF); color:var(--ink-2, var(--ink)); transition:background .15s, border-color .15s, color .15s; }
+.msg-chip:hover span { border-color:var(--ink); color:var(--ink); }
+.msg-chip input:checked + span { background:var(--ink); border-color:var(--ink); color:#fff; }
+.msg-chip input:focus-visible + span { outline:3px solid var(--ember-dim); outline-offset:2px; }
+
+/* contexte (spacer consulté…) */
+.msg-ref { display:flex; align-items:center; gap:8px; margin:-4px 0 0; padding:8px 8px 8px 12px; border-radius:12px;
+  background:color-mix(in srgb, var(--ember) 9%, #fff); font-size:.86rem; color:var(--ink-2, var(--ink)); }
+.msg-ref span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.msg-ref-x { flex:none; width:28px; height:28px; border:none; border-radius:8px; background:transparent; cursor:pointer; font-size:1.2rem; line-height:1; color:var(--muted); }
+.msg-ref-x:hover { background:rgba(0,0,0,.06); color:var(--ink); }
+
+/* photos */
+.msg-photos { display:flex; flex-direction:column; gap:10px; }
+.msg-thumbs { display:flex; flex-wrap:wrap; gap:8px; }
+.msg-thumbs[hidden] { display:none; }
+.msg-thumb { position:relative; width:64px; height:64px; border-radius:10px; overflow:hidden; border:1px solid var(--line); background:var(--wash); }
+.msg-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.msg-thumb-x { position:absolute; top:3px; right:3px; width:22px; height:22px; border:none; border-radius:50%; cursor:pointer;
+  background:rgba(20,22,26,.72); color:#fff; font-size:.95rem; line-height:1; display:flex; align-items:center; justify-content:center; }
+.msg-attach { align-self:flex-start; display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 14px; cursor:pointer;
+  border:1px dashed var(--line-2, #DAD7CF); border-radius:12px; font-size:.88rem; font-weight:600; color:var(--ink-2, var(--ink)); }
+.msg-attach:hover { border-color:var(--ink); color:var(--ink); }
+.msg-attach:focus-within { outline:3px solid var(--ember-dim); outline-offset:2px; }
+.msg-attach svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.msg-attach.is-full { opacity:.45; pointer-events:none; }
+
+/* boutons + statuts */
+.msg-send { display:inline-flex; align-items:center; justify-content:center; width:100%; height:48px; padding:0 18px; cursor:pointer;
+  font-weight:700; font-size:.98rem; color:var(--ink); background:var(--ember); border:1px solid var(--ember); border-radius:12px;
+  transition:background .15s, transform .1s; }
+.msg-send:hover { background:#FF7E45; border-color:#FF7E45; }
+.msg-send:active { transform:translateY(1px); }
+.msg-send:disabled { opacity:.55; cursor:not-allowed; }
+.msg-status { margin:-6px 0 0; min-height:1.3em; font-size:.88rem; color:var(--muted); }
+.msg-status:empty { min-height:0; margin:0; }
+.msg-status.bad { color:var(--bad); }
+.msg-status.ok { color:var(--good); }
+.msg-legal { margin:-4px 0 0; font-size:.8rem; color:var(--muted); line-height:1.5; }
+.msg-legal a { color:inherit; text-underline-offset:3px; }
+.msg-links { display:flex; flex-wrap:wrap; justify-content:center; gap:4px 18px; }
+.msg-link { padding:6px 2px; border:none; background:none; cursor:pointer; font-size:.88rem; font-weight:600; color:var(--ink-2, var(--ink));
+  text-decoration:underline; text-underline-offset:3px; }
+.msg-link:disabled { color:var(--muted); text-decoration:none; cursor:default; }
+
+/* lien « Mes conversations » */
+.msg-convs { display:flex; align-items:center; gap:8px; width:100%; padding:11px 14px; cursor:pointer; text-align:left;
+  background:var(--wash); border:1px solid var(--line); border-radius:12px; font-weight:600; font-size:.92rem; }
+.msg-convs span:first-child { flex:1; }
+.msg-convs b { min-width:24px; height:22px; padding:0 7px; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:100px; background:#fff; border:1px solid var(--line); font-size:.78rem; }
+.msg-convs::after { content:'→'; color:var(--muted); }
+.msg-convs:hover { border-color:var(--line-2, #DAD7CF); }
+.msg-dot { width:9px; height:9px; border-radius:50%; background:var(--ember); }
+
+/* ---- liste des conversations ---- */
+.msg-list-wrap { display:flex; flex-direction:column; gap:14px; padding:18px 20px 22px; }
+.msg-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.msg-row { display:flex; flex-direction:column; gap:4px; width:100%; padding:12px 14px; cursor:pointer; text-align:left;
+  background:#fff; border:1px solid var(--line); border-radius:14px; transition:border-color .15s, background .15s; }
+.msg-row:hover { border-color:var(--line-2, #DAD7CF); background:var(--wash); }
+.msg-row.is-unread { border-color:color-mix(in srgb, var(--ember) 55%, #fff); }
+.msg-row-top, .msg-row-bot { display:flex; align-items:center; gap:10px; min-width:0; width:100%; }
+.msg-row-top b { flex:1; min-width:0; font-size:.93rem; overflow-wrap:anywhere; }
+.msg-row-top time { flex:none; font-size:.78rem; color:var(--muted); }
+.msg-row-prev { flex:1; min-width:0; font-size:.86rem; color:var(--muted); overflow-wrap:anywhere; }
+.msg-row.is-unread .msg-row-prev { color:var(--ink); font-weight:600; }
+.msg-row-n { flex:none; min-width:20px; height:20px; padding:0 6px; border-radius:100px; background:var(--ember); color:var(--ink);
+  font-size:.74rem; font-weight:800; display:inline-flex; align-items:center; justify-content:center; }
+.msg-row-st { flex:none; font-size:.74rem; font-weight:700; color:var(--good); }
+
+/* ---- fil ---- */
+.msg-thread { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:8px;
+  padding:16px 16px 10px; background:var(--wash); }
+.msg-day { align-self:center; margin:8px 0 2px; padding:3px 10px; border-radius:100px; background:#fff; border:1px solid var(--line);
+  font-size:.74rem; font-weight:600; color:var(--muted); text-align:center; }
+.msg-b { max-width:84%; padding:9px 12px 6px; border-radius:16px; font-size:.93rem; line-height:1.45; }
+.msg-b p { margin:0; white-space:pre-line; overflow-wrap:anywhere; }
+.msg-b time { display:block; margin-top:3px; font-size:.7rem; color:var(--muted); }
+.msg-b.me { align-self:flex-end; background:color-mix(in srgb, var(--ember) 16%, #fff); border-bottom-right-radius:6px; }
+.msg-b.me time { text-align:right; }
+.msg-b.them { align-self:flex-start; background:#fff; border:1px solid var(--line); border-bottom-left-radius:6px; }
+.msg-b-photos { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 6px; }
+.msg-b-photos a, .msg-b-ph { display:block; width:120px; height:120px; border-radius:10px; overflow:hidden; background:var(--wash-2, #EFEDE8); }
+.msg-b-photos img { width:100%; height:100%; object-fit:cover; display:block; }
+
+.msg-reply { flex:none; display:flex; flex-direction:column; gap:8px; padding:10px 12px 12px; border-top:1px solid var(--line); background:#fff; }
+.msg-reply .msg-thumbs { padding:2px 2px 0; }
+.msg-reply-row { display:flex; align-items:flex-end; gap:8px; }
+.msg-reply textarea { flex:1; min-width:0; min-height:44px; max-height:160px; padding:11px 13px; font-size:.95rem; line-height:1.4; resize:none;
+  background:#fff; border:1px solid var(--line-2, #DAD7CF); border-radius:14px; }
+.msg-attach-ic { flex:none; width:44px; height:44px; padding:0; justify-content:center; border-style:solid; }
+.msg-attach-ic svg { width:20px; height:20px; }
+.msg-send-ic { flex:none; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;
+  background:var(--ember); border:none; border-radius:14px; color:var(--ink); }
+.msg-send-ic:hover { background:#FF7E45; }
+.msg-send-ic:disabled { opacity:.55; cursor:not-allowed; }
+.msg-send-ic svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linejoin:round; }
+.msg-reply .msg-status { margin:0; }
+
+@media (max-width:560px) {
+  .msg-panel { width:100%; }
+  .msg-grid { grid-template-columns:1fr; }
+  .msg-form, .msg-list-wrap { padding:16px 16px 20px; }
+  .msg-head { padding:10px 10px 10px 16px; }
+  .msg-alt { padding:10px 16px 12px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .msg-panel, .msg-backdrop { transition:none; }
+}

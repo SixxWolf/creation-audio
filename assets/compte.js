@@ -26,6 +26,7 @@
         auth: { storageKey: KEY, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
       })
     : null);
+  if (sb) CA.compteSb = sb;   // même session pour le panneau Messagerie (assets/messagerie.js)
   var callFn = CA.compteFn || function (body) {
     return fetch(cfg.url + '/functions/v1/compte-code', {
       method: 'POST',
@@ -61,10 +62,11 @@
     var bg = (SPARKLE.test(name || '') ? 'var(--sparkle), ' : '') + esc(hex);
     return '<span class="sw" style="background:' + bg + '" aria-hidden="true"></span>';
   }
+  // « Écris-nous » -> panneau Messagerie (nav.js) ; Messenger et courriel restent au choix
   function askHtml(subject, body) {
-    return '<a class="ask" href="' + FB + '" target="_blank" rel="noopener">Écris-nous</a>' +
-      '<span class="ask-alt"> ou <a href="mailto:' + EMAIL + '?subject=' + encodeURIComponent(subject) +
-      '&amp;body=' + encodeURIComponent(body) + '">par courriel</a></span>';
+    return '<a class="ask" href="#/messages" data-msg="compte" data-msg-ref="" data-msg-body="' + esc(body) + '">Écris-nous</a>' +
+      '<span class="ask-alt"> ou par <a href="' + FB + '" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:' + EMAIL +
+      '?subject=' + encodeURIComponent(subject) + '&amp;body=' + encodeURIComponent(body) + '">courriel</a></span>';
   }
 
   /* ---------- écrans ---------- */
@@ -252,14 +254,22 @@
     $('#acct-sub').textContent = acct.email || '';
     fillInfos();
     show('acct-home');
-    if (!/^#\/(commandes|alertes|infos)$/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search + '#/commandes');
+    if (!ROUTE.test(location.hash)) history.replaceState(null, '', location.pathname + location.search + '#/commandes');
     route();
     loadOrders();
+    loadMsgs();
     loadAlerts();
   }
+  // #/messages/<id> (lien du courriel « On t'a répondu ») : onglet Messages + fil ouvert dans le panneau
+  var ROUTE = /^#\/(commandes|alertes|messages|infos)(?:\/([0-9a-f-]{36}))?$/;
   function route() {
     if ($('#acct-home').hidden) return;
-    var m = /^#\/(commandes|alertes|infos)$/.exec(location.hash), tab = m ? m[1] : 'commandes';
+    var m = ROUTE.exec(location.hash), tab = m ? m[1] : 'commandes';
+    if (m && m[2]) {
+      var conv = m[2];
+      history.replaceState(null, '', location.pathname + location.search + '#/messages');
+      if (CA.loadMsg) CA.loadMsg().then(function (mm) { mm.open({ conv: conv }); }, function () {});
+    }
     $$('.acct-tabs a').forEach(function (a) {
       if (a.getAttribute('data-tab') === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -535,6 +545,41 @@
     });
   }
 
+  /* ---- Mes messages (conversations de la Messagerie ; le fil s'ouvre dans le panneau) ---- */
+  var msgsEl = $('#acct-msgs'), msgsN = $('#acct-n-msgs');
+  var TOPIC = { filaments: 'Filaments', spacers: 'Spacers', compte: 'Mon compte', autre: 'Autre' };
+  function openMsg(opts) {
+    if (CA.loadMsg) CA.loadMsg().then(function (m) { m.open(opts); }, function () { window.open(FB, '_blank', 'noopener'); });
+  }
+  function loadMsgs() {
+    if (!msgsEl) return;
+    if (!msgsEl.innerHTML) msgsEl.innerHTML = '<p class="acct-empty">Chargement…</p>';
+    sb.rpc('me_conversations').then(function (res) {
+      if (res.error) { msgsEl.innerHTML = '<p class="acct-empty">Impossible de charger tes messages. Réessaie plus tard.</p>'; return; }
+      renderMsgs(res.data || []);
+    }, function () { msgsEl.innerHTML = '<p class="acct-empty">Erreur réseau — réessaie.</p>'; });
+  }
+  function renderMsgs(convs) {
+    var unread = convs.reduce(function (s, c) { return s + (+c.unread || 0); }, 0);
+    msgsN.hidden = !unread; msgsN.textContent = unread;
+    var head = '<div class="cv-head"><button class="acct-btn cv-new" type="button">Nouveau message</button></div>';
+    if (!convs.length) {
+      msgsEl.innerHTML = '<div class="acct-empty"><p>Aucun message. Une question sur un filament, un spacer ou ton compte&nbsp;? ' +
+        '<a class="ask" href="#/messages" data-msg="">Écris-nous</a></p></div>';
+      return;
+    }
+    msgsEl.innerHTML = head + '<ul class="al-list cv-list">' + convs.map(function (c) {
+      var un = +c.unread || 0, title = (TOPIC[c.topic] || 'Question') + (c.ref ? ' · ' + c.ref : '');
+      return '<li class="al cv' + (un ? ' is-unread' : '') + '"><button class="cv-btn" type="button" data-id="' + esc(c.id) + '">' +
+        '<span class="al-tx"><b>' + esc(title) + '</b><small>' + (c.last_from === 'client' ? 'Toi : ' : '') + esc(c.last_preview || '') + '</small></span>' +
+        (un ? '<span class="acct-n">' + un + '</span>' : c.status === 'closed' ? '<span class="cv-st">Réglée</span>' : '') +
+        '<span class="al-date">' + esc(fmtDate(c.updated_at, false)) + '</span></button></li>';
+    }).join('') + '</ul>';
+    $('.cv-new', msgsEl).addEventListener('click', function () { openMsg({ topic: '', ref: '' }); });
+    $$('.cv-btn', msgsEl).forEach(function (b) { b.addEventListener('click', function () { openMsg({ conv: b.getAttribute('data-id') }); }); });
+  }
+  document.addEventListener('ca:msg-change', function () { if (acct) loadMsgs(); });
+
   /* ---- Mes alertes (« M'aviser ») ---- */
   var alertsEl = $('#acct-alerts'), alertsN = $('#acct-n-alerts');
   var KIND = { spool: 'avec bobine', refill: 'recharge' };
@@ -599,11 +644,24 @@
       say(st, 'Enregistré ✓', 'ok');
     }, function () { btn.disabled = false; say(st, 'Erreur réseau — réessaie.', 'bad'); });
   });
+  // photos jointes à ses messages (bucket privé « messages », dossier <uid>/) : effacées avant le compte
+  function removeMyPhotos() {
+    if (!sb.storage) return Promise.resolve();
+    return sb.auth.getSession().then(function (r) {
+      var uid = r && r.data && r.data.session && r.data.session.user && r.data.session.user.id;
+      if (!uid) return;
+      var bucket = sb.storage.from('messages');
+      return bucket.list(uid, { limit: 1000 }).then(function (l) {
+        var paths = ((l && l.data) || []).map(function (f) { return uid + '/' + f.name; });
+        return paths.length ? bucket.remove(paths) : null;
+      });
+    }).then(null, function () {});
+  }
   $('#acct-delete').addEventListener('click', function () {
-    if (!window.confirm('Supprimer ton compte ?\n\nTon compte et tes alertes seront effacés. Cette action est définitive.')) return;
+    if (!window.confirm('Supprimer ton compte ?\n\nTon compte, tes alertes et tes messages seront effacés. Cette action est définitive.')) return;
     var btn = $('#acct-delete'), st = $('#acct-del-status');
     btn.disabled = true; say(st, 'Suppression…');
-    sb.rpc('me_delete').then(function (res) {
+    removeMyPhotos().then(function () { return sb.rpc('me_delete'); }).then(function (res) {
       if (res.error) { btn.disabled = false; say(st, 'Suppression impossible. Écris-nous à ' + EMAIL + '.', 'bad'); return; }
       return sb.auth.signOut().catch(function () {}).then(function () {
         try { localStorage.removeItem(KEY); } catch (e) {}

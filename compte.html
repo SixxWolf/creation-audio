@@ -17,7 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
 <link rel="stylesheet" href="assets/site.css?v=6">
-<link rel="stylesheet" href="assets/compte.css?v=5">
+<link rel="stylesheet" href="assets/compte.css?v=6">
 </head>
 <body class="home-page acct-page">
 <a class="skip" href="#main">Aller au contenu</a>
@@ -123,11 +123,13 @@
 
     <nav class="acct-tabs" aria-label="Mon compte">
       <a href="#/commandes" data-tab="commandes">Commandes</a>
+      <a href="#/messages" data-tab="messages">Messages<b class="acct-n" id="acct-n-msgs" hidden></b></a>
       <a href="#/alertes" data-tab="alertes">Alertes<b class="acct-n" id="acct-n-alerts" hidden></b></a>
       <a href="#/infos" data-tab="infos">Profil</a>
     </nav>
 
     <div class="acct-panel" data-panel="commandes" id="acct-orders"></div>
+    <div class="acct-panel" data-panel="messages" id="acct-msgs" hidden></div>
     <div class="acct-panel" data-panel="alertes" id="acct-alerts" hidden></div>
     <div class="acct-panel" data-panel="infos" hidden>
       <form class="acct-card acct-wide" id="acct-infos-form" novalidate>
@@ -153,7 +155,7 @@
       </form>
       <div class="acct-card acct-wide acct-danger">
         <h2>Supprimer mon compte</h2>
-        <p>Ton compte et tes alertes sont effacés. Tes factures restent dans nos dossiers (obligation fiscale).</p>
+        <p>Ton compte, tes alertes et tes messages sont effacés. Tes factures restent dans nos dossiers (obligation fiscale).</p>
         <button class="acct-del" id="acct-delete" type="button">Supprimer mon compte</button>
         <p class="acct-status" id="acct-del-status" role="status" aria-live="polite"></p>
       </div>
@@ -173,6 +175,7 @@
       </a>
       <p>Filaments d'impression 3D et spacers audio, dans la région de Québec.</p>
       <div class="foot-contact">
+        <a class="foot-pill" href="/compte.html#/messages" data-msg="">Messagerie</a>
         <a class="foot-pill" href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
         <a class="foot-pill" href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
       </div>
@@ -225,6 +228,7 @@
     <a class="secondary" href="dealer.html">Espace dealer</a>
   </div>
   <div class="drawer-foot">
+    <a href="/compte.html#/messages" data-msg="">Messagerie</a> ·
     <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> ·
     <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a><br>
     Ramassage local à Québec · Aucun paiement en ligne
@@ -233,7 +237,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="assets/supabase-config.js?v=1"></script>
-<script src="assets/nav.js?v=3"></script>
-<script src="assets/compte.js?v=4"></script>
+<script src="assets/nav.js?v=4"></script>
+<script src="assets/compte.js?v=5"></script>
 </body>
 </html>

@@ -57,7 +57,8 @@ async function fetchSpacers(c) {
 
 /* ---------- rendu : on exécute spacer-catalog.js tel quel ---------- */
 function loadCatalog() {
-  const ctx = { window: {}, console };
+  // CA.loadMsg présent comme sur le site (nav.js) : les « Écris-nous » pré-rendus ouvrent la Messagerie
+  const ctx = { window: { CA: { loadMsg: function () {} } }, console };
   vm.createContext(ctx);
   vm.runInContext(read('assets/spacer-catalog.js'), ctx, { filename: 'assets/spacer-catalog.js' });
   if (!ctx.window.CASpacers) throw new Error('spacer-catalog.js : window.CASpacers absent');
