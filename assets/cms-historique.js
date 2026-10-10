@@ -252,13 +252,13 @@
       if (btn) btn.disabled = false;
       var msg = (err && err.message) ? err.message : String(err);
       if (/PGRST202|could not find the function/i.test(((err && err.code) || '') + ' ' + msg)) msg = 'Fonction deliver_invoice absente : relance schema-v2.sql dans Supabase.';
-      window.alert('Erreur : ' + msg);
+      caDialog.error(msg);
     });
   }
 
   /* ---------- modifier : la facture est rechargée dans l'éditeur de Facturation ---------- */
   function editInvoice(inv, lines) {
-    if (!window.CA.editInvoice) { window.alert('Le module Facturation n\'est pas chargé. Recharge la page.'); return; }
+    if (!window.CA.editInvoice) { caDialog.error('Le module Facturation n\'est pas chargé. Recharge la page.'); return; }
     if (!window.CA.editInvoice(inv, lines)) return;   // l'admin a gardé sa facture en cours
     location.hash = '#facturation';
     window.scrollTo(0, 0);
@@ -279,31 +279,35 @@
 
   function cancelInvoice(inv, lines) {
     if (inv.status === 'cancelled') return;
-    if (!window.confirm('Annuler la facture ' + (inv.number || '') + ' ?\n' +
-      (inv.stock_deducted ? 'Le stock déduit sera remis.\n' : '') +
-      'Elle restera dans l\'historique (marquée « Annulée ») et sortira des statistiques.')) return;
-    var chain = inv.stock_deducted ? restoreStock(lines) : Promise.resolve();
-    chain.then(function () {
-      return sb.from('invoices').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), stock_deducted: false })
-        .eq('id', inv.id).select();
-    }).then(function (res) {
-      if (res.error) throw res.error;
-      if (!res.data || !res.data.length) throw new Error('Annulation refusée (permissions).');
-      load();
-    }, function (err) { window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
+    caDialog.confirm({ title: 'Annuler la facture ' + (inv.number || '') + ' ?',
+      message: (inv.stock_deducted ? 'Le stock déduit sera remis.\n' : '') + 'Elle restera dans l\'historique (« Annulée ») et sortira des statistiques.',
+      ok: 'Annuler la facture', danger: true }).then(function (ok) {
+      if (!ok) return;
+      var chain = inv.stock_deducted ? restoreStock(lines) : Promise.resolve();
+      chain.then(function () {
+        return sb.from('invoices').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), stock_deducted: false })
+          .eq('id', inv.id).select();
+      }).then(function (res) {
+        if (res.error) throw res.error;
+        if (!res.data || !res.data.length) throw new Error('Annulation refusée (permissions).');
+        load();
+      }, function (err) { caDialog.error(err); });
+    });
   }
 
   function delInvoice(inv, lines) {
-    if (!window.confirm('Supprimer définitivement la facture ' + (inv.number || '') + ' ?\n' +
-      (inv.stock_deducted ? 'Le stock déduit sera remis avant suppression.\n' : '') +
-      'Cette action est irréversible.')) return;
-    var chain = inv.stock_deducted ? restoreStock(lines) : Promise.resolve();
-    chain.then(function () { return sb.from('invoices').delete().eq('id', inv.id).select(); })
-      .then(function (res) {
-        if (res.error) throw res.error;
-        if (!res.data || !res.data.length) throw new Error('Suppression refusée (permissions).');
-        load();
-      }, function (err) { window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
+    caDialog.confirm({ title: 'Supprimer la facture ' + (inv.number || '') + ' ?',
+      message: (inv.stock_deducted ? 'Le stock déduit sera remis avant suppression.\n' : '') + 'Cette action est irréversible.',
+      ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      var chain = inv.stock_deducted ? restoreStock(lines) : Promise.resolve();
+      chain.then(function () { return sb.from('invoices').delete().eq('id', inv.id).select(); })
+        .then(function (res) {
+          if (res.error) throw res.error;
+          if (!res.data || !res.data.length) throw new Error('Suppression refusée (permissions).');
+          load();
+        }, function (err) { caDialog.error(err); });
+    });
   }
 
   /* ---------- réimpression (format facture) ---------- */

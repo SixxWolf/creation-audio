@@ -258,17 +258,20 @@
     if (what === 'edit') { if (fEd) openEditor(o); return; }
     if (what === 'delete') {
       // seulement une commande annulée (garde côté requête) ; ses lignes partent avec (on delete cascade)
-      if (!window.confirm('Supprimer définitivement la commande ' + o.number + ' ?\nElle disparaîtra aussi du portail du dealer.')) return;
-      btn.disabled = true;
-      sb.from('dealer_orders').delete().eq('id', o.id).eq('status', 'cancelled').select('id').then(function (res) {
-        if (res.error) throw res.error;
-        if (!res.data || !res.data.length) throw new Error('Refusé : seule une commande annulée peut être supprimée.');
-        load();
-      }).then(null, function (err) { btn.disabled = false; window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
+      caDialog.confirm({ title: 'Supprimer la commande ' + o.number + ' ?', message: 'Elle disparaîtra aussi du portail du dealer.',
+        ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+        if (!ok) return;
+        btn.disabled = true;
+        sb.from('dealer_orders').delete().eq('id', o.id).eq('status', 'cancelled').select('id').then(function (res) {
+          if (res.error) throw res.error;
+          if (!res.data || !res.data.length) throw new Error('Refusé : seule une commande annulée peut être supprimée.');
+          load();
+        }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
+      });
       return;
     }
     if (what === 'invoice') {
-      if (!window.CA.invoiceFromOrder) { window.alert('Facturation indisponible.'); return; }
+      if (!window.CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
       if (window.CA.invoiceFromOrder(o, linesOf(o)) !== false) location.hash = '#facturation';
       return;
     }
@@ -277,7 +280,14 @@
       location.hash = '#historique';
       return;
     }
-    if (what === 'cancel' && !window.confirm('Annuler la commande ' + o.number + ' de ' + (o.dealer_name || o.dealer_email) + ' ?\nPense à prévenir le dealer.')) return;
+    if (what === 'cancel') {
+      caDialog.confirm({ title: 'Annuler la commande ' + o.number + ' ?', message: (o.dealer_name || o.dealer_email) + ' — pense à prévenir le dealer.',
+        ok: 'Annuler la commande', danger: true }).then(function (ok) { if (ok) setStatus(o, what, btn); });
+      return;
+    }
+    setStatus(o, what, btn);
+  }
+  function setStatus(o, what, btn) {
     var patch = { status: what === 'cancel' ? 'cancelled' : what, updated_at: new Date().toISOString() };
     patch.cancelled_by = what === 'cancel' ? 'admin' : null;
     btn.disabled = true;
@@ -285,7 +295,7 @@
       if (res.error) throw res.error;
       if (!res.data || !res.data.length) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
       load();
-    }).then(null, function (err) { btn.disabled = false; window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
+    }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
   }
 
   /* ---- saisie manuelle : Nouvelle commande / Modifier ----
@@ -464,8 +474,11 @@
     fDealer.disabled = !!fOrder;   // le dealer d'une commande existante ne change pas
   }
 
+  function askDiscard() {
+    return caDialog.confirm({ title: 'Abandonner la saisie en cours ?', message: 'Les changements non enregistrés seront perdus.', ok: 'Abandonner', danger: true });
+  }
   function openEditor(o) {
-    if (!fEd.hidden && fDirty && !window.confirm('Abandonner la saisie en cours ?')) return;
+    if (!fEd.hidden && fDirty) { askDiscard().then(function (ok) { if (ok) { fDirty = false; openEditor(o); } }); return; }
     fOrder = o || null;
     fItems = []; fDirty = false;
     fTitle.textContent = o ? 'Modifier ' + o.number : 'Nouvelle commande';
@@ -498,7 +511,7 @@
     });
   }
   function closeEditor() {
-    if (fDirty && !window.confirm('Abandonner la saisie en cours ?')) return;
+    if (fDirty) { askDiscard().then(function (ok) { if (ok) { fDirty = false; closeEditor(); } }); return; }
     fEd.hidden = true; fOrder = null; fItems = []; fDirty = false; fToken = null;
     hideResults();
   }

@@ -302,16 +302,21 @@
   cartBackdrop.addEventListener('click', closeCart);
   $('#cart-close').addEventListener('click', closeCart);
   $('#cart-clear').addEventListener('click', function () {
-    if (count() && !window.confirm('Vider la commande ?')) return;
-    clearCart(); cartMsg.textContent = '';
+    function empty() { clearCart(); cartMsg.textContent = ''; }
+    if (!count()) { empty(); return; }
+    caDialog.confirm({ title: 'Vider la commande ?', message: 'Les articles ajoutés seront retirés.', ok: 'Vider', danger: true, icon: 'trash' })
+      .then(function (ok) { if (ok) empty(); });
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && cartPanel.classList.contains('is-open')) closeCart(); });
 
   function stopEditing() { editing = null; saveJSON(EDIT_KEY, null); }
   function resetNote() { noteI.value = ''; saveJSON(NOTE_KEY, null); }
   $('#cart-edit-cancel').addEventListener('click', function () {
-    if (!window.confirm('Abandonner la modification ? La commande ' + (editing ? editing.number : '') + ' reste telle qu\'envoyée.')) return;
-    stopEditing(); clearCart(); resetNote(); cartMsg.textContent = '';
+    caDialog.confirm({ title: 'Abandonner la modification ?', message: 'La commande ' + (editing ? editing.number : '') + ' reste telle qu\'envoyée.',
+      ok: 'Abandonner', danger: true }).then(function (ok) {
+      if (!ok) return;
+      stopEditing(); clearCart(); resetNote(); cartMsg.textContent = '';
+    });
   });
 
   /* ---------- envoi ---------- */
@@ -431,31 +436,38 @@
   }
   function editOrder(o) {
     if (editing && editing.id === o.id) { openCart(); return; }
-    if (count() && !window.confirm(editing ? 'Abandonner la modification de ' + editing.number + ' ?' :
-        'Ta commande en cours (non envoyée) sera remplacée par ' + o.number + '. Continuer ?')) return;
-    var missing = [];
-    cart = {};
-    (o.dealer_order_lines || []).forEach(function (l) {
-      if (l.product_id && byId[l.product_id]) cart[l.product_id] = { id: l.product_id, qty: (cart[l.product_id] ? cart[l.product_id].qty : 0) + (l.qty | 0) };
-      else missing.push(l.name);
-    });
-    editing = { id: o.id, number: o.number };
-    saveJSON(EDIT_KEY, editing); saveCart();
-    noteI.value = o.note || ''; try { localStorage.setItem(NOTE_KEY, noteI.value); } catch (e) {}
-    cartMsg.className = 'cart-msg';
-    cartMsg.textContent = missing.length ? 'Plus offert, retiré : ' + missing.join(', ') + '.' : '';
-    renderCart(); openCart();
+    if (!count()) { load(); return; }
+    caDialog.confirm(editing
+      ? { title: 'Abandonner la modification de ' + editing.number + ' ?', message: 'Les changements non envoyés seront perdus.', ok: 'Abandonner', danger: true }
+      : { title: 'Remplacer ta commande en cours ?', message: 'Ta commande non envoyée sera remplacée par ' + o.number + '.', ok: 'Remplacer', icon: 'cart' })
+      .then(function (ok) { if (ok) load(); });
+    function load() {
+      var missing = [];
+      cart = {};
+      (o.dealer_order_lines || []).forEach(function (l) {
+        if (l.product_id && byId[l.product_id]) cart[l.product_id] = { id: l.product_id, qty: (cart[l.product_id] ? cart[l.product_id].qty : 0) + (l.qty | 0) };
+        else missing.push(l.name);
+      });
+      editing = { id: o.id, number: o.number };
+      saveJSON(EDIT_KEY, editing); saveCart();
+      noteI.value = o.note || ''; try { localStorage.setItem(NOTE_KEY, noteI.value); } catch (e) {}
+      cartMsg.className = 'cart-msg';
+      cartMsg.textContent = missing.length ? 'Plus offert, retiré : ' + missing.join(', ') + '.' : '';
+      renderCart(); openCart();
+    }
   }
   function cancelOrder(o, btn) {
-    if (!window.confirm('Annuler la commande ' + o.number + ' ?')) return;
-    btn.disabled = true;
-    sb.rpc('dealer_cancel_order', { p_id: o.id }).then(function (res) {
-      if (res.error) throw res.error;
-      if (editing && editing.id === o.id) { stopEditing(); renderCart(); }
-      notify(o.id, 'cancelled');
-      flash = { id: o.id, text: 'Commande ' + o.number + ' annulée.' };
-      loadOrders();
-    }).then(null, function (err) { btn.disabled = false; window.alert(errMsg(err)); loadOrders(); });
+    caDialog.confirm({ title: 'Annuler la commande ' + o.number + ' ?', ok: 'Annuler la commande', danger: true }).then(function (ok) {
+      if (!ok) return;
+      btn.disabled = true;
+      sb.rpc('dealer_cancel_order', { p_id: o.id }).then(function (res) {
+        if (res.error) throw res.error;
+        if (editing && editing.id === o.id) { stopEditing(); renderCart(); }
+        notify(o.id, 'cancelled');
+        flash = { id: o.id, text: 'Commande ' + o.number + ' annulée.' };
+        loadOrders();
+      }).then(null, function (err) { btn.disabled = false; caDialog.error(errMsg(err), 'Annulation impossible'); loadOrders(); });
+    });
   }
 
   var toastEl = $('#toast'), toastT;

@@ -77,11 +77,13 @@
 
   function del(row) {
     // Côté base (trigger dealers_access_sync) : compte bloqué + sessions fermées ; le rajouter le débloque.
-    if (!window.confirm('Retirer l\'accès dealer de « ' + row.email + ' » ?\nSon compte sera bloqué et déconnecté.')) return;
-    sb.from('dealers').delete().eq('email', row.email).select().then(function (res) {
-      if (res.error) { window.alert('Erreur : ' + res.error.message); return; }
-      if (!res.data || !res.data.length) { window.alert('Suppression refusée (permissions).'); return; }
-      load();
+    caDialog.confirm({ title: 'Retirer l\'accès dealer ?', message: row.email + ' sera bloqué et déconnecté.', ok: 'Retirer l\'accès', danger: true }).then(function (ok) {
+      if (!ok) return;
+      sb.from('dealers').delete().eq('email', row.email).select().then(function (res) {
+        if (res.error) { caDialog.error(res.error); return; }
+        if (!res.data || !res.data.length) { caDialog.error('Suppression refusée (permissions).'); return; }
+        load();
+      });
     });
   }
 

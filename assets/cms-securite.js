@@ -63,9 +63,11 @@
 
   function removeDevice(id, btn) {
     if (devices.length < 2) return;
-    if (!window.confirm('Retirer cet appareil ? Ses codes ne fonctionneront plus.')) return;
-    btn.disabled = true;
-    window.CA.mfa.remove(id).then(load, function (e) { btn.disabled = false; say('Erreur : ' + errMsg(e), 'warn'); });
+    caDialog.confirm({ title: 'Retirer cet appareil ?', message: 'Ses codes ne fonctionneront plus.', ok: 'Retirer', danger: true }).then(function (ok) {
+      if (!ok) return;
+      btn.disabled = true;
+      window.CA.mfa.remove(id).then(load, function (e) { btn.disabled = false; say('Erreur : ' + errMsg(e), 'warn'); });
+    });
   }
 
   function closeAdd() { pending = null; addBox.hidden = true; newBtn.hidden = false; codeI.value = ''; }

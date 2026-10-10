@@ -492,13 +492,15 @@
   }
 
   function del(row) {
-    if (!window.confirm('Supprimer « ' + row.name + ' » ? Action définitive.')) return;
-    sb.from('products').delete().eq('id', row.id).select().then(function (res) {
-      if (res.error) { window.alert('Erreur : ' + res.error.message); return; }
-      if (!res.data || !res.data.length) { window.alert('Suppression refusée (permissions).'); return; }
-      var toRemove = [row.image_path, row.attrs && row.attrs.img_spool, row.attrs && row.attrs.img_refill].filter(Boolean);
-      if (toRemove.length) sb.storage.from(BUCKET).remove(toRemove).then(null, function () {});
-      load();
+    caDialog.confirm({ title: 'Supprimer « ' + row.name + ' » ?', message: 'Action définitive.', ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      sb.from('products').delete().eq('id', row.id).select().then(function (res) {
+        if (res.error) { caDialog.error(res.error); return; }
+        if (!res.data || !res.data.length) { caDialog.error('Suppression refusée (permissions).'); return; }
+        var toRemove = [row.image_path, row.attrs && row.attrs.img_spool, row.attrs && row.attrs.img_refill].filter(Boolean);
+        if (toRemove.length) sb.storage.from(BUCKET).remove(toRemove).then(null, function () {});
+        load();
+      });
     });
   }
 

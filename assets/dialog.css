@@ -1,0 +1,65 @@
+/* =========================================================
+   Fenêtres du site (dialog.js) : confirmer / message / saisie + toast.
+   Carte centrée, pastille d'icône à gauche du titre (rouge si irréversible).
+   Ne dépend que des jetons (tokens.css / site.css) → suit le mode sombre.
+   ========================================================= */
+.ca-dlg { --dlg-pad:24px;
+  width:min(440px, calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 32px); margin:auto; padding:0;
+  color:var(--ink); background:var(--paper); border:none; border-radius:20px; overflow:auto;
+  box-shadow:0 0 0 1px rgba(20,22,26,.06), 0 2px 6px rgba(20,22,26,.06), 0 28px 64px -16px rgba(20,22,26,.38);
+  font-family:var(--font); font-size:15px; line-height:1.5; text-align:left; }
+.ca-dlg[open] { animation:ca-dlg-in .2s cubic-bezier(.2,.8,.2,1); }
+.ca-dlg.is-closing { animation:ca-dlg-out .12s ease-in forwards; }
+.ca-dlg::backdrop { background:rgba(20,22,26,.42); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px); animation:ca-bd-in .2s ease-out; }
+.ca-dlg.is-closing::backdrop { animation:ca-bd-out .12s ease-in forwards; }
+@keyframes ca-dlg-in { from { opacity:0; transform:translateY(10px) scale(.98); } }
+@keyframes ca-dlg-out { to { opacity:0; transform:translateY(4px) scale(.99); } }
+@keyframes ca-bd-in { from { opacity:0; } }
+@keyframes ca-bd-out { to { opacity:0; } }
+@media (prefers-reduced-motion:reduce) { .ca-dlg[open], .ca-dlg.is-closing, .ca-dlg::backdrop { animation:none; } }
+html:has(.ca-dlg[open]) { overflow:hidden; }
+:root[data-theme="dark"] .ca-dlg { box-shadow:0 0 0 1px rgba(255,255,255,.07), 0 28px 64px -16px rgba(0,0,0,.7); }
+:root[data-theme="dark"] .ca-dlg::backdrop { background:rgba(0,0,0,.55); }
+
+.dlg-in { display:grid; grid-template-columns:40px minmax(0, 1fr); column-gap:14px; padding:var(--dlg-pad); }
+.dlg-ic { grid-row:1 / span 2; width:40px; height:40px; display:grid; place-items:center; border-radius:12px;
+  color:var(--ink); background:var(--wash-2, var(--wash)); }
+.dlg-ic.is-danger { color:var(--bad); background:var(--bad-wash); }
+.dlg-ic svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.dlg-t { margin:0; padding-top:8px; font-family:var(--display, var(--font)); font-weight:700; font-size:1.22rem; line-height:1.25;
+  letter-spacing:-.015em; text-wrap:balance; overflow-wrap:anywhere; color:var(--ink); }
+.dlg-m { margin:8px 0 0; color:var(--ink-2, var(--muted)); font-size:.95rem; line-height:1.5; text-wrap:pretty; overflow-wrap:anywhere; white-space:pre-line; }
+.dlg-field { grid-column:1 / -1; display:block; width:100%; min-width:0; height:46px; margin:16px 0 0; padding:0 14px; font:inherit; font-size:1rem;
+  color:var(--ink); background:var(--paper); border:1px solid var(--line-2, var(--line)); border-radius:12px; box-sizing:border-box; }
+.dlg-field:focus { outline:none; border-color:var(--ink); box-shadow:0 0 0 3px color-mix(in srgb, var(--ink) 12%, transparent); }
+.dlg-f { grid-column:1 / -1; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; margin-top:24px; }
+.dlg-b { display:inline-flex; align-items:center; justify-content:center; height:44px; margin:0; padding:0 18px; white-space:nowrap;
+  font:inherit; font-weight:700; font-size:.93rem; cursor:pointer; border:1px solid transparent; border-radius:12px;
+  transition-property:background-color, border-color, transform, box-shadow; transition-duration:.15s; transition-timing-function:ease-out; }
+.dlg-b:active { transform:scale(.97); }
+.dlg-b:focus-visible { outline:3px solid var(--ember-dim, var(--ember)); outline-offset:2px; }
+.dlg-back { color:var(--ink); background:var(--paper); border-color:var(--line-2, var(--line)); }
+.dlg-back:hover { border-color:var(--ink); }
+.dlg-go { color:var(--paper); background:var(--ink); border-color:var(--ink); }
+.dlg-go:hover { background:color-mix(in srgb, var(--ink) 88%, #000); }
+.dlg-go.is-danger { color:#fff; background:var(--bad); border-color:var(--bad);
+  box-shadow:0 10px 22px -12px color-mix(in srgb, var(--bad) 80%, transparent); }
+.dlg-go.is-danger:hover { background:color-mix(in srgb, var(--bad) 86%, #000); }
+
+/* Téléphone : boutons empilés pleine largeur, l'action en haut */
+@media (max-width:480px) {
+  .ca-dlg { --dlg-pad:20px; }
+  .dlg-f { flex-direction:column-reverse; }
+  .dlg-b { width:100%; }
+}
+
+/* Toast : court message qui disparaît seul */
+.ca-toast { position:fixed; left:0; right:0; bottom:24px; z-index:2000; display:flex; align-items:center; gap:10px;
+  width:max-content; max-width:calc(100vw - 32px); margin:0 auto;
+  padding:12px 18px 12px 14px; color:#fff; background:#181A1F; border-radius:14px; font-family:var(--font); font-weight:600; font-size:.93rem;
+  line-height:1.4; box-shadow:0 14px 34px -10px rgba(20,22,26,.5); transform:translateY(0);
+  transition-property:opacity, transform; transition-duration:.2s; transition-timing-function:ease-out; }
+.ca-toast.is-hidden { opacity:0; transform:translateY(12px); pointer-events:none; }
+.ca-toast i { width:22px; height:22px; flex:none; display:grid; place-items:center; border-radius:50%; color:#fff; background:#1F9D57;
+  font-style:normal; font-size:.8rem; font-weight:800; }
+.ca-toast.is-bad i { background:#D2321F; }

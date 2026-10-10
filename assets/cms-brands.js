@@ -156,29 +156,33 @@ window.CA = window.CA || {};
         if (!res.data || !res.data.length) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
         if (oldPath) sb.storage.from(BUCKET).remove([oldPath]).then(null, function () {});
         CA.loadBrands();
-      }, function (err) { window.alert('Erreur image : ' + (err && err.message ? err.message : err)); });
+      }, function (err) { caDialog.error(err, 'Erreur image'); });
   }
   function removeLogo() {
     var brand = CA.currentBrand, oldPath = (curBrandObj() || {}).image_path;
     if (!brand || !oldPath) return;
-    if (!window.confirm('Retirer l\'image de la marque « ' + brand + ' » ?')) return;
-    sb.from('brands').update({ image_path: null }).eq('name', brand).select().then(function (res) {
-      if (res.error) { window.alert('Erreur : ' + res.error.message); return; }
-      sb.storage.from(BUCKET).remove([oldPath]).then(null, function () {});
-      CA.loadBrands();
+    caDialog.confirm({ title: 'Retirer l\'image de « ' + brand + ' » ?', ok: 'Retirer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      sb.from('brands').update({ image_path: null }).eq('name', brand).select().then(function (res) {
+        if (res.error) { caDialog.error(res.error); return; }
+        sb.storage.from(BUCKET).remove([oldPath]).then(null, function () {});
+        CA.loadBrands();
+      });
     });
   }
 
   function addBrand() {
-    var name = (window.prompt('Nom de la nouvelle marque (ex. Elegoo, Anycubic) :') || '').trim();
-    if (!name) return;
-    if (CA.brands.list.some(function (b) { return b.name.toLowerCase() === name.toLowerCase(); })) { window.alert('Cette marque existe déjà.'); return; }
-    var order = CA.brands.list.length ? Math.max.apply(null, CA.brands.list.map(function (b) { return b.sort_order || 0; })) + 1 : 0;
-    sb.from('brands').insert({ name: name, sort_order: order }).select().then(function (res) {
-      if (res.error) { window.alert('Erreur : ' + res.error.message); return; }
-      if (!res.data || !res.data.length) { window.alert('Ajout refusé (permissions).'); return; }
-      CA.currentBrand = name; remember(name);
-      CA.loadBrands();
+    caDialog.prompt({ title: 'Nouvelle marque', placeholder: 'ex. Elegoo, Anycubic', ok: 'Ajouter', icon: 'plus' }).then(function (val) {
+      var name = (val || '').trim();
+      if (!name) return;
+      if (CA.brands.list.some(function (b) { return b.name.toLowerCase() === name.toLowerCase(); })) { caDialog.alert({ title: 'Cette marque existe déjà.' }); return; }
+      var order = CA.brands.list.length ? Math.max.apply(null, CA.brands.list.map(function (b) { return b.sort_order || 0; })) + 1 : 0;
+      sb.from('brands').insert({ name: name, sort_order: order }).select().then(function (res) {
+        if (res.error) { caDialog.error(res.error); return; }
+        if (!res.data || !res.data.length) { caDialog.error('Ajout refusé (permissions).'); return; }
+        CA.currentBrand = name; remember(name);
+        CA.loadBrands();
+      });
     });
   }
 
@@ -186,47 +190,51 @@ window.CA = window.CA || {};
   function editBrandSlug() {
     var b = curBrandObj(); if (!b) return;
     var auto = CA.slugify(b.name);
-    var val = window.prompt(
-      'URL de la marque « ' + b.name + ' » — segment d\'adresse en boutique.\n' +
-      'Laisse vide pour l\'auto : « ' + auto + ' ».', b.slug || auto);
-    if (val === null) return;                       // annulé
-    var next = CA.slugify(val) || null;             // vide => repli auto côté boutique
-    sb.from('brands').update({ slug: next }).eq('name', b.name).select().then(function (res) {
-      if (res.error) { window.alert('Erreur : ' + res.error.message); return; }
-      if (!res.data || !res.data.length) { window.alert('Refusé (permissions). Es-tu connecté en admin ?'); return; }
-      b.slug = next;
+    caDialog.prompt({ title: 'URL de « ' + b.name + ' »', message: 'Segment d\'adresse en boutique. Vide = auto (« ' + auto + ' »).',
+      value: b.slug || auto, placeholder: auto, ok: 'Enregistrer', icon: 'link' }).then(function (val) {
+      if (val === null) return;                       // annulé
+      var next = CA.slugify(val) || null;             // vide => repli auto côté boutique
+      sb.from('brands').update({ slug: next }).eq('name', b.name).select().then(function (res) {
+        if (res.error) { caDialog.error(res.error); return; }
+        if (!res.data || !res.data.length) { caDialog.error('Refusé (permissions). Es-tu connecté en admin ?'); return; }
+        b.slug = next;
+      });
     });
   }
 
   function renameBrand() {
     var old = CA.currentBrand; if (!old) return;
-    var name = (window.prompt('Renommer la marque « ' + old +' » en :', old) || '').trim();
-    if (!name || name === old) return;
-    if (CA.brands.list.some(function (b) { return b.name.toLowerCase() === name.toLowerCase(); })) { window.alert('Ce nom est déjà pris.'); return; }
-    // cascade : matériaux + produits de cette marque suivent
-    sb.from('brands').insert({ name: name, sort_order: 0 }).select()
-      .then(function (r) { if (r.error) throw r.error; return sb.from('materials').update({ brand: name }).eq('brand', old); })
-      .then(function (r) { if (r.error) throw r.error; return sb.from('products').update({ brand: name }).eq('brand', old); })
-      .then(function (r) { if (r.error) throw r.error; return sb.from('brands').delete().eq('name', old); })
-      .then(function () {
-        CA.currentBrand = name; remember(name);
-        return CA.loadBrands();
-      }).then(function () {
-        if (CA.loadMaterials) CA.loadMaterials();
-        notify(); // recharge filaments de la marque
-      }, function (err) { window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
+    caDialog.prompt({ title: 'Renommer « ' + old + ' »', value: old, ok: 'Renommer', icon: 'edit' }).then(function (val) {
+      var name = (val || '').trim();
+      if (!name || name === old) return;
+      if (CA.brands.list.some(function (b) { return b.name.toLowerCase() === name.toLowerCase(); })) { caDialog.alert({ title: 'Ce nom est déjà pris.' }); return; }
+      // cascade : matériaux + produits de cette marque suivent
+      sb.from('brands').insert({ name: name, sort_order: 0 }).select()
+        .then(function (r) { if (r.error) throw r.error; return sb.from('materials').update({ brand: name }).eq('brand', old); })
+        .then(function (r) { if (r.error) throw r.error; return sb.from('products').update({ brand: name }).eq('brand', old); })
+        .then(function (r) { if (r.error) throw r.error; return sb.from('brands').delete().eq('name', old); })
+        .then(function () {
+          CA.currentBrand = name; remember(name);
+          return CA.loadBrands();
+        }).then(function () {
+          if (CA.loadMaterials) CA.loadMaterials();
+          notify(); // recharge filaments de la marque
+        }, function (err) { caDialog.error(err); });
+    });
   }
 
   function deleteBrand() {
     var name = CA.currentBrand; if (!name) return;
-    if (CA.brands.list.length <= 1) { window.alert('Impossible de supprimer la dernière marque.'); return; }
+    if (CA.brands.list.length <= 1) { caDialog.alert({ title: 'Impossible de supprimer la dernière marque.' }); return; }
     var mats = ((CA.materials && CA.materials.list) || []).filter(function (m) { return m.brand === name; }).length;
-    if (mats) { window.alert('Cette marque a encore ' + mats + ' matériau(x). Supprime-les d\'abord.'); return; }
-    if (!window.confirm('Supprimer la marque « ' + name + ' » ?')) return;
-    sb.from('brands').delete().eq('name', name).select().then(function (res) {
-      if (res.error) { window.alert('Erreur : ' + res.error.message); return; }
-      CA.currentBrand = null;
-      CA.loadBrands();
+    if (mats) { caDialog.alert({ title: 'Cette marque a encore ' + mats + ' matériau' + (mats > 1 ? 'x' : '') + '.', message: 'Supprime-les d\'abord.' }); return; }
+    caDialog.confirm({ title: 'Supprimer la marque « ' + name + ' » ?', ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      sb.from('brands').delete().eq('name', name).select().then(function (res) {
+        if (res.error) { caDialog.error(res.error); return; }
+        CA.currentBrand = null;
+        CA.loadBrands();
+      });
     });
   }
 })();

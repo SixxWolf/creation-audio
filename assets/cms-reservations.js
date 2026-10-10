@@ -204,11 +204,11 @@
 
   /* ---- actions ---- */
   function fail(btn) {
-    return function (err) { btn.disabled = false; window.alert('Erreur : ' + (err && err.message ? err.message : err)); };
+    return function (err) { btn.disabled = false; caDialog.error(err); };
   }
   function act(r, what, btn) {
     if (what === 'invoice') {
-      if (!CA.invoiceFromOrder) { window.alert('Facturation indisponible.'); return; }
+      if (!CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
       var ord = Object.assign({}, r, { kind: 'reservation' });
       if (CA.invoiceFromOrder(ord, linesOf(r)) !== false) location.hash = '#facturation';
       return;
@@ -219,17 +219,29 @@
       return;
     }
     if (what === 'delete') {
-      if (!window.confirm('Supprimer définitivement la réservation ' + r.number + ' ?\nElle disparaîtra aussi de Mon compte du client.')) return;
-      btn.disabled = true;
-      sb.from('customer_reservations').delete().eq('id', r.id).eq('status', 'cancelled').select('id').then(function (res) {
-        if (res.error) throw res.error;
-        if (!res.data || !res.data.length) throw new Error('Refusé : seule une réservation annulée peut être supprimée.');
-        load();
-      }).then(null, fail(btn));
+      caDialog.confirm({ title: 'Supprimer la réservation ' + r.number + ' ?', message: 'Elle disparaîtra aussi de Mon compte du client.',
+        ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+        if (!ok) return;
+        btn.disabled = true;
+        sb.from('customer_reservations').delete().eq('id', r.id).eq('status', 'cancelled').select('id').then(function (res) {
+          if (res.error) throw res.error;
+          if (!res.data || !res.data.length) throw new Error('Refusé : seule une réservation annulée peut être supprimée.');
+          load();
+        }).then(null, fail(btn));
+      });
       return;
     }
-    if (what === 'cancel' && !window.confirm('Annuler la réservation ' + r.number + ' de ' + (r.name || r.email) + ' ?\nLe stock est libéré, sans pénalité ; le client est avisé par courriel.')) return;
-    if (what === 'forgive' && !window.confirm('Retirer la pénalité de ' + r.number + ' ?\nElle ne comptera plus comme non récupérée (une suspension qu\'elle a causée est levée).')) return;
+    var ask = what === 'cancel'
+      ? { title: 'Annuler la réservation ' + r.number + ' ?', message: (r.name || r.email) + ' — stock libéré, sans pénalité ; le client est avisé par courriel.',
+          ok: 'Annuler la réservation', danger: true }
+      : what === 'forgive'
+      ? { title: 'Retirer la pénalité de ' + r.number + ' ?', message: 'Elle ne comptera plus comme non récupérée (une suspension qu\'elle a causée est levée).',
+          ok: 'Retirer la pénalité' }
+      : null;
+    if (ask) { caDialog.confirm(ask).then(function (ok) { if (ok) run(r, what, btn); }); return; }
+    run(r, what, btn);
+  }
+  function run(r, what, btn) {
     btn.disabled = true;
     sb.rpc('admin_reservation_action', { p_res: r.id, p_action: what }).then(function (res) {
       if (res.error) throw res.error;

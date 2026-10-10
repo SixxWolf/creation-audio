@@ -293,7 +293,9 @@
     copyText(txt).then(function () {
       copied[id] = true; renderAll();
       toast('Message copié — colle-le dans Messenger, puis « Marquer avisé ».');
-    }, function () { window.prompt('Copie ce message :', txt); copied[id] = true; renderAll(); });
+    }, function () {
+      caDialog.prompt({ title: 'Copie ce message', value: txt, ok: 'Fermer', cancel: false, readonly: true, icon: 'copy' }).then(function () { copied[id] = true; renderAll(); });
+    });
   }
   // avisé à la main -> on efface nom + contact (Loi 25), trace anonyme conservée
   function markDone(id, btn) {
@@ -306,10 +308,12 @@
   }
   function removeReq(id) {
     var w = open.filter(function (x) { return x.id === id; })[0]; if (!w) return;
-    if (!window.confirm('Supprimer cette demande (' + (w.name || w.contact || 'anonyme') + ') ?')) return;
-    sb.from('waitlist').delete().eq('id', id).select().then(function (res) {
-      if (res.error || !res.data || !res.data.length) { toast('Suppression refusée' + (res.error ? ' : ' + res.error.message : '.'), true); return; }
-      open = open.filter(function (x) { return x.id !== id; }); delete copied[id]; renderAll();
+    caDialog.confirm({ title: 'Supprimer cette demande ?', message: w.name || w.contact || 'Anonyme', ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      sb.from('waitlist').delete().eq('id', id).select().then(function (res) {
+        if (res.error || !res.data || !res.data.length) { toast('Suppression refusée' + (res.error ? ' : ' + res.error.message : '.'), true); return; }
+        open = open.filter(function (x) { return x.id !== id; }); delete copied[id]; renderAll();
+      });
     });
   }
 

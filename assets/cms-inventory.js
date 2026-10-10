@@ -519,12 +519,16 @@
   }
 
   if (editor) editor.addEventListener('submit', onConfirm);
-  function onConfirm(e) {
-    e.preventDefault();
+  function onConfirm(e, skipAsk) {
+    if (e) e.preventDefault();
     var valid = rows.filter(function (r) { return r.productId && r.qty > 0; });
     if (!valid.length) { statusEl.textContent = 'Ajoute au moins une ligne (filament + quantité).'; return; }
     var missing = rows.some(function (r) { return !r.productId && r.qty > 0; });
-    if (missing && !window.confirm('Certaines lignes n\'ont pas de filament choisi et seront ignorées. Continuer ?')) return;
+    if (missing && !skipAsk) {
+      caDialog.confirm({ title: 'Ignorer les lignes sans filament ?', message: 'Certaines lignes n\'ont pas de filament choisi.', ok: 'Continuer' })
+        .then(function (ok) { if (ok) onConfirm(null, true); });
+      return;
+    }
 
     var date = /^\d{4}-\d{2}-\d{2}$/.test(dateI.value) ? dateI.value : todayISO();
     var order = orderI.value.trim() || null;
@@ -700,21 +704,23 @@
   }
 
   function delReceipt(rc, lines) {
-    if (!window.confirm('Supprimer cette réception' + (rc.order_number ? ' (' + rc.order_number + ')' : '') +
-      ' ?\nLe stock qu\'elle a ajouté sera retiré.')) return;
-    var affected = uniq(lines.map(function (l) { return l.product_id; }));
-    applyStock(lines, -1)
-      .then(function () { return sb.from('receipts').delete().eq('id', rc.id).select(); })
-      .then(function (res) {
-        if (res.error) throw res.error;
-        if (!res.data || !res.data.length) throw new Error('Suppression refusée (permissions).');
-        return recomputeAvgCosts(affected);
-      })
-      .then(function () {
-        if (editingReceiptId === rc.id) resetForm();
-        Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
-        loadHistory();
-      }, function (err) { window.alert('Erreur : ' + (err && err.message ? err.message : err)); });
+    caDialog.confirm({ title: 'Supprimer cette réception' + (rc.order_number ? ' (' + rc.order_number + ')' : '') + ' ?',
+      message: 'Le stock qu\'elle a ajouté sera retiré.', ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      var affected = uniq(lines.map(function (l) { return l.product_id; }));
+      applyStock(lines, -1)
+        .then(function () { return sb.from('receipts').delete().eq('id', rc.id).select(); })
+        .then(function (res) {
+          if (res.error) throw res.error;
+          if (!res.data || !res.data.length) throw new Error('Suppression refusée (permissions).');
+          return recomputeAvgCosts(affected);
+        })
+        .then(function () {
+          if (editingReceiptId === rc.id) resetForm();
+          Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
+          loadHistory();
+        }, function (err) { caDialog.error(err); });
+    });
   }
 
   /* =========================================================
@@ -1440,10 +1446,13 @@
     $$('.bc-del', bcBody).forEach(function (b) {
       b.addEventListener('click', function () {
         var e = entryByKey(b.closest('tr').getAttribute('data-key')); if (!e) return;
-        if (!window.confirm('Supprimer l\'association du code « ' + e.code +' » ?\n(' + bcLabel(e.f) + ' · ' + kindLabel(e.kind) + ')')) return;
-        applyBarcodeChange(e, null, function (err) {
-          if (err) { window.alert('Erreur : ' + (err.message || err)); return; }
-          renderCodes();
+        caDialog.confirm({ title: 'Supprimer le code « ' + e.code + ' » ?', message: bcLabel(e.f) + ' · ' + kindLabel(e.kind),
+          ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+          if (!ok) return;
+          applyBarcodeChange(e, null, function (err) {
+            if (err) { caDialog.error(err); return; }
+            renderCodes();
+          });
         });
       });
     });
@@ -1462,12 +1471,12 @@
         // doublon : ce code appartient-il déjà à une AUTRE association ?
         var owner = findCodeOwner(code);
         if (owner && (!oldEntry || owner.key !== oldEntry.key)) {
-          window.alert('Ce code est déjà associé à :\n' + bcLabel(owner.f) + ' · ' + kindLabel(owner.kind) +
-            '.\nModifie ou supprime cette association-là d\'abord.');
+          caDialog.alert({ title: 'Code déjà associé', message: bcLabel(owner.f) + ' · ' + kindLabel(owner.kind) +
+            '\nModifie ou supprime cette association-là d\'abord.' });
           return;
         }
         applyBarcodeChange(oldEntry, { productId: pid, kind: kind, code: code }, function (err) {
-          if (err) { window.alert('Erreur : ' + (err.message || err)); return; }
+          if (err) { caDialog.error(err); return; }
           bcEditing = null; pendingScanCode = ''; renderCodes();
           if (bcScanActive) { bcScanFb('✓ Associé & vérifié : ' + code, 'ok'); bcFocusScan(); }
         });
