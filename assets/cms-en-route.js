@@ -609,7 +609,8 @@
       var lis = o.lines.filter(remaining).map(function (l) {
         var p = l.product_id && inv() ? inv().prod(l.product_id) : null;
         var name = p ? ((p.material ? p.material + ' · ' : '') + (p.name || '')) : (l.label || '(article retiré)');
-        return '<li><span>' + esc(name) + ' <span class="ro-code">' + kindTxt(kindOf(l.kind)) + '</span></span>' +
+        var sw = p && !inv().isAcc(p) ? '<span class="ro-sw" style="background:' + esc(inv().swatch(p)) + '"></span>' : '';
+        return '<li>' + sw + '<span>' + esc(name) + ' <span class="ro-code">' + kindTxt(kindOf(l.kind)) + '</span></span>' +
           '<span class="ro-q">×' + remaining(l) + '</span></li>';
       }).join('');
       return '<div class="po-order" data-id="' + esc(o.id) + '">' +
