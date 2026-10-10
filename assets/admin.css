@@ -765,6 +765,10 @@ td.num input, .catalog-table input.catcost { text-align:right; }
 .po-row.is-miss .po-how { color:var(--bad); background:var(--bad-wash); }
 .po-row.unmatched select.po-fil { border-color:var(--ember); box-shadow:var(--ring); }
 .po-row.is-ia select.po-fil { border-color:color-mix(in srgb, var(--ember) 60%, var(--line-2)); }
+/* hors catalogue (ex. PETG 3 kg pour l'atelier) : grisé, ignoré à l'enregistrement */
+.po-row.is-off .po-how { color:var(--muted); background:var(--wash); }
+.po-row.is-off .po-lbl, .po-row.is-off input { opacity:.6; }
+.po-row.is-off.unmatched select.po-fil { border-color:var(--line-2); box-shadow:none; }
 .po-empty { padding:16px; text-align:center; color:var(--muted); }
 .po-list { margin-top:10px; }
 .po-none { margin:6px 0 0; font-size:.9rem; color:var(--muted); }
