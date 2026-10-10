@@ -37,6 +37,11 @@
     return cs[0] || (isHex(hex) ? hex : '#c9c9c4');
   }
   function colorsOf(row) { return row && row.attrs && Array.isArray(row.attrs.colors) ? row.attrs.colors.filter(isHex) : []; }
+  // pastille d'un filament : sa couleur (dégradé si multicolore) + paillettes pour Sparkle / Galaxy, comme en boutique
+  function swOf(f) {
+    var bg = swatchBg(f && f.hex, colorsOf(f));
+    return f && /sparkle|galaxy|glitter|paillet/i.test(f.material || '') ? 'var(--sparkle), ' + bg : bg;
+  }
 
   var loaded = false, filaments = [];
 
@@ -135,6 +140,7 @@
     offersRefill: function (f) { return offersRefill(f); },
     fitKind: function (p, k) { return fitKind(p, k); },
     cost: function (p, k) { return costOf(p, k); },
+    swatch: function (p) { return swOf(p); },
     // « Recevoir » une commande en route : ouvre son pointage dans Réception
     receiveOrder: function (id) {
       if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub('reception'); else showSub('reception');
@@ -313,7 +319,7 @@
       var f = bcProd(r.productId), acc = isAcc(f), st = stateOf(r);
       var art = r.free
         ? '<select class="rcp-fil-sel" aria-label="Article">' + filamentOptions(r.productId) + '</select>'
-        : '<div class="rv-art">' + (f && !acc ? '<span class="ro-sw" style="background:' + esc(swatchBg(f.hex, colorsOf(f))) + '"></span>' : '') +
+        : '<div class="rv-art">' + (f && !acc ? '<span class="ro-sw" style="background:' + esc(swOf(f)) + '"></span>' : '') +
             '<span>' + esc(f ? artName(f) : (r.label || '(article retiré)')) + '</span></div>';
       var fmt = r.free && !acc
         ? '<select class="rcp-kind" aria-label="Format">' +
@@ -949,7 +955,7 @@
         var hasS = offersSpool(f), hasR = offersRefill(f);
         var mS = missOf(f, 'spool'), mR = missOf(f, 'refill');
         var anyMiss = mS > 0 || mR > 0;
-        var sw = swatchBg(f.hex, colorsOf(f));
+        var sw = swOf(f);
         function fmtCells(kind, has, colOn) {
           if (!colOn) return '';
           if (!has) return '<td class="reorder-na">—</td><td class="reorder-na">—</td><td class="reorder-na">—</td>';
@@ -1043,7 +1049,7 @@
 
     var listHtml = Object.keys(byBrand).map(function (brand) {
       var lis = byBrand[brand].map(function (it) {
-        var sw = swatchBg(it.f.hex, colorsOf(it.f));
+        var sw = swOf(it.f);
         var name = '<span>' + esc((it.f.material ? it.f.material + ' · ' : '') + (it.f.name || '')) +
           ' <span class="ro-code">' + kindLabel(it.kind) + (it.f.code ? ' · ' + esc(it.f.code) : '') + '</span></span>';
         // commandé (en tout ou en partie) pour un client : étiquette cliquable -> sa facture
@@ -1275,7 +1281,7 @@
   }
 
   function viewRowHtml(e) {
-    var sw = e.acc ? '' : '<span class="ro-sw" style="background:' + esc(swatchBg(e.f.hex, colorsOf(e.f))) + '"></span>';
+    var sw = e.acc ? '' : '<span class="ro-sw" style="background:' + esc(swOf(e.f)) + '"></span>';
     return '<tr data-key="' + esc(e.key) + '">' +
       '<td class="bc-code"><code>' + esc(e.code) + '</code></td>' +
       '<td class="bc-fil"><span class="bc-fil-in">' + sw + (e.acc
