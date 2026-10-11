@@ -381,9 +381,10 @@
     e.preventDefault();
     var name = nameI.value.trim();
     if (!name) { nameI.focus(); return; }
-    // attrs : on repart des attrs existants (avg_cost, barcodes… sont conservés)
+    // attrs : seules les clés de la fiche sont gérées ici ; elles sont fusionnées dans les attrs
+    // ACTUELS de la base (CA.updateProduct) -> coût moyen, codes-barres… jamais écrasés.
     // (l'ancien « Résumé » — attrs.description — a été retiré : la fiche détaillée suffit)
-    var attrs = Object.assign({}, attrsOf(editingRow), {
+    var fields = {
       description: null,
       speaker_size: sizeI.value.trim() || null,
       fitment: collectFitment(),
@@ -391,19 +392,19 @@
       long_desc: longDescI.value.trim() || null,
       replaces: collectReplaces(),
       speakers: collectSpeakers()
-    });
-    ['description', 'speaker_size', 'long_desc'].forEach(function (k) { if (attrs[k] == null) delete attrs[k]; });
-    if (!attrs.fitment.length) delete attrs.fitment;
-    if (!attrs.specs.length) delete attrs.specs;
-    if (!attrs.replaces.length) delete attrs.replaces;
-    if (!attrs.speakers.length) delete attrs.speakers;
+    };
+    ['fitment', 'specs', 'replaces', 'speakers'].forEach(function (k) { if (!fields[k].length) fields[k] = null; });
     // renommé (ex. « AP 5 / SRX52V » -> CA-ADP-525-001) : l'ancien nom est gardé pour les anciens liens,
     // la recherche et les fichiers AutoLoop qui le portent encore
     var oldName = editingRow && String(editingRow.name || '').trim();
-    if (oldName && oldName !== name) {
-      var al = (Array.isArray(attrs.aliases) ? attrs.aliases : []).filter(function (x) { return x && x !== name; });
-      if (al.indexOf(oldName) === -1) al.push(oldName);
-      attrs.aliases = al;
+    function buildAttrs(cur) {   // cur = attrs actuels en base ({} pour un nouveau spacer)
+      var a = CA.mergeAttrs(cur, fields);
+      if (oldName && oldName !== name) {
+        var al = (Array.isArray(a.aliases) ? a.aliases : []).filter(function (x) { return x && x !== name; });
+        if (al.indexOf(oldName) === -1) al.push(oldName);
+        a.aliases = al;
+      }
+      return a;
     }
     var patch = {
       type: TYPE, brand: BRAND, material: null,
@@ -425,10 +426,11 @@
 
     Promise.all(photos.map(function (p) { return p.path ? p.path : uploadPhoto(p.file); })).then(function (paths) {
       patch.image_path = paths[0] || null;
-      attrs.gallery = paths.slice(1);
-      if (!attrs.gallery.length) delete attrs.gallery;
-      patch.attrs = attrs;
-      if (editingId) return sb.from('products').update(patch).eq('id', editingId).select().then(function (res) { return { res: res, paths: paths }; });
+      fields.gallery = paths.length > 1 ? paths.slice(1) : null;
+      // stock non touché dans le formulaire -> celui de la base est gardé (vente / réception entre-temps)
+      if (editingId) return CA.updateProduct(editingId, patch, { attrs: buildAttrs, opened: { qty: editingRow.qty, qty_2: editingRow.qty_2 } })
+        .then(function (res) { return { res: res, paths: paths }; });
+      patch.attrs = buildAttrs({});
       patch.sort_order = cache.length ? (Math.max.apply(null, cache.map(function (x) { return x.sort_order || 0; })) + 1) : 0;
       return sb.from('products').insert(patch).select().then(function (res) { return { res: res, paths: paths }; });
     }).then(function (out) {

@@ -1,9 +1,9 @@
 /* =========================================================
-   Création Audio V2 — Réservés (articles facturés « À venir »)
-   Une commande remise en deux fois : la facture est faite au complet,
-   les lignes pas encore remises gardent invoice_lines.qty_pending > 0
-   (factures non annulées). Ce module les rend visibles là où on achète
-   et où on reçoit :
+   Création Audio V2 — Réservés (articles promis à un client, pas encore sortis du stock)
+   - facture « À venir » (commande remise en deux fois : invoice_lines.qty_pending > 0) ;
+   - réservation 72 h active (le stock est gardé, pas déduit) ;
+   - commande en ligne ouverte (Nouvelle / En préparation / Prête).
+   Ce module les rend visibles là où on achète et où on reçoit :
    - CA.reserved.count(pid, kind) -> « Manque » + pastille dans
      Inventaire › À commander (cms-inventory.js) ;
    - alerte au poste de scan (Inventaire › Réception) quand un article
@@ -24,30 +24,72 @@
     });
   }
 
-  /* ---------- données ---------- */
+  /* ---------- données ----------
+     Trois sources d'articles PROMIS à un client (pas encore sortis du stock) :
+       - facture « À venir »       : invoice_lines.qty_pending (facture non annulée)
+       - réservation 72 h active   : customer_reservation_lines (le stock est gardé, pas déduit)
+       - commande en ligne ouverte : customer_order_lines (Nouvelle / En préparation / Prête)
+     Une réservation ou commande facturée sort d'ici (sa facture prend le relais si « À venir »). */
   var loaded = false, loading = null;
-  var rows = [];        // { line, inv } — lignes de produit encore à remettre
+  var rows = [];        // { line: {product_id, kind, label, meta, qty}, src: {type, id, number, client} }
   var alerted = [];     // { pid, kind } signalés au poste de scan (ordre d'arrivée)
+  var SRC = {
+    invoice: { open: '#historique', btn: 'Voir la facture', what: 'à remettre' },
+    resv:    { open: '#commandes/reservations', btn: 'Voir la réservation', what: 'réservé' },
+    order:   { open: '#commandes/clients', btn: 'Voir la commande', what: 'en commande' }
+  };
 
-  function load() {
-    loading = sb.from('invoice_lines').select('id,invoice_id,product_id,kind,label,meta,qty,qty_pending')
+  function pendingInvoices() {
+    return sb.from('invoice_lines').select('id,invoice_id,product_id,kind,label,meta,qty,qty_pending')
       .gt('qty_pending', 0).then(function (res) {
         if (res.error) throw res.error;
         var lines = (res.data || []).filter(function (l) { return l.product_id; });
         var ids = lines.map(function (l) { return l.invoice_id; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
-        if (!ids.length) return [lines, []];
+        if (!ids.length) return [];
         return sb.from('invoices').select('id,number,client_name,invoice_date,status').in('id', ids).then(function (r2) {
           if (r2.error) throw r2.error;
-          return [lines, r2.data || []];
+          var byId = {}; (r2.data || []).forEach(function (inv) { byId[inv.id] = inv; });
+          return lines.filter(function (l) { var inv = byId[l.invoice_id]; return inv && inv.status !== 'cancelled'; })
+            .map(function (l) {
+              var inv = byId[l.invoice_id];
+              return { line: { product_id: l.product_id, kind: l.kind, label: l.label, meta: l.meta, qty: +l.qty_pending || 0 },
+                src: { type: 'invoice', id: inv.id, number: inv.number || '', client: inv.client_name || 'Sans nom' } };
+            });
         });
-      }).then(function (r) {
-        var byId = {}; r[1].forEach(function (inv) { byId[inv.id] = inv; });
-        rows = r[0].map(function (l) { return { line: l, inv: byId[l.invoice_id] }; })
-          .filter(function (x) { return x.inv && x.inv.status !== 'cancelled'; });
-        loaded = true;
-        renderAlert();
-        try { document.dispatchEvent(new CustomEvent('ca:reserved')); } catch (e) {}
-      }, function () { loaded = true; rows = []; });   // colonne absente / réseau : rien de réservé
+      }).then(null, function () { return []; });   // colonne absente / réseau : rien
+  }
+  // réservations actives (pas échues) et commandes en ligne ouvertes : toutes leurs lignes
+  function openCustomer(query, linesKey, type) {
+    return query.then(function (res) {
+      if (res.error) throw res.error;
+      var out = [];
+      (res.data || []).forEach(function (o) {
+        if (type === 'resv' && !(Date.parse(o.expires_at) > Date.now())) return;   // échue : le tick va l'expirer
+        (o[linesKey] || []).forEach(function (l) {
+          if (!l.product_id || !(l.qty > 0)) return;
+          out.push({ line: { product_id: l.product_id, kind: l.kind, label: l.name, meta: l.meta, qty: l.qty | 0 },
+            src: { type: type, id: o.id, number: o.number || '', client: o.name || o.email || 'Sans nom' } });
+        });
+      });
+      return out;
+    }).then(null, function () { return []; });
+  }
+
+  function load() {
+    loading = Promise.all([
+      pendingInvoices(),
+      openCustomer(sb.from('customer_reservations')
+        .select('id,number,name,email,status,expires_at,customer_reservation_lines(product_id,kind,name,meta,qty)')
+        .eq('status', 'active'), 'customer_reservation_lines', 'resv'),
+      openCustomer(sb.from('customer_orders')
+        .select('id,number,name,email,status,customer_order_lines(product_id,kind,name,meta,qty)')
+        .in('status', ['new', 'preparing', 'ready']), 'customer_order_lines', 'order')
+    ]).then(function (r) {
+      rows = r[0].concat(r[1], r[2]);
+      loaded = true;
+      renderAlert();
+      try { document.dispatchEvent(new CustomEvent('ca:reserved')); } catch (e) {}
+    });
     return loading;
   }
   function ensure() { return loaded ? Promise.resolve() : (loading || load()); }
@@ -61,7 +103,11 @@
     });
   }
   function count(pid, kind) {
-    return matchFor(pid, kind).reduce(function (s, x) { return s + ((+x.line.qty_pending) || 0); }, 0);
+    return matchFor(pid, kind).reduce(function (s, x) { return s + (x.line.qty || 0); }, 0);
+  }
+  function openSrc(type, id) {
+    if (type === 'invoice' && window.CA.focusInvoice) window.CA.focusInvoice(id);
+    location.hash = (SRC[type] || SRC.invoice).open;
   }
 
   /* ---------- alerte au poste de scan ---------- */
@@ -70,7 +116,7 @@
     var groups = alerted.map(function (a) { return matchFor(a.pid, a.kind); }).filter(function (g) { return g.length; });
     if (!groups.length) { el.hidden = true; el.innerHTML = ''; return; }
     var clients = {};
-    groups.forEach(function (g) { g.forEach(function (x) { clients[x.inv.id] = 1; }); });
+    groups.forEach(function (g) { g.forEach(function (x) { clients[x.src.type + x.src.id] = 1; }); });
     var nc = Object.keys(clients).length;
     el.innerHTML =
       '<div class="wl-alert-head"><span class="wl-alert-ic" aria-hidden="true">📦</span>' +
@@ -83,11 +129,11 @@
           '<div class="wl-group-head"><span class="wl-group-name">' + esc(l0.label || '(article)') + '</span>' +
             (l0.meta ? '<span class="res-meta">' + esc(l0.meta) + '</span>' : '') + '</div>' +
           g.map(function (x) {
-            var n = +x.line.qty_pending || 0;
+            var s = SRC[x.src.type] || SRC.invoice;
             return '<div class="wl-req">' +
-              '<div class="wl-req-main"><span class="wl-req-who">' + esc(x.inv.client_name || 'Sans nom') + '</span>' +
-                '<span class="wl-req-meta">' + esc(x.inv.number || '') + ' · ' + n + ' à remettre</span></div>' +
-              '<div class="wl-req-act"><button type="button" class="btn btn-ghost btn-sm res-open" data-inv="' + esc(x.inv.id) + '">Voir la facture</button></div>' +
+              '<div class="wl-req-main"><span class="wl-req-who">' + esc(x.src.client) + '</span>' +
+                '<span class="wl-req-meta">' + esc(x.src.number) + ' · ' + x.line.qty + ' ' + s.what + (x.src.type === 'resv' && x.line.qty > 1 ? 's' : '') + '</span></div>' +
+              '<div class="wl-req-act"><button type="button" class="btn btn-ghost btn-sm res-open" data-type="' + esc(x.src.type) + '" data-id="' + esc(x.src.id) + '">' + s.btn + '</button></div>' +
             '</div>';
           }).join('') +
         '</div>';
@@ -95,10 +141,7 @@
     el.hidden = false;
     $('.wl-alert-close', el).addEventListener('click', function () { alerted = []; renderAlert(); });
     $$('.res-open', el).forEach(function (b) {
-      b.addEventListener('click', function () {
-        if (window.CA.focusInvoice) window.CA.focusInvoice(b.getAttribute('data-inv'));
-        location.hash = '#historique';
-      });
+      b.addEventListener('click', function () { openSrc(b.getAttribute('data-type'), b.getAttribute('data-id')); });
     });
   }
   function flag(pid, kind) {
@@ -128,18 +171,20 @@
     count: count,
     // clients qui attendent ce produit (infobulle de la pastille « réservés »)
     who: function (pid, kind) {
-      return matchFor(pid, kind).map(function (x) { return (x.inv.client_name || 'Sans nom') + ' (' + (x.inv.number || '') + ')'; });
+      return matchFor(pid, kind).map(function (x) { return x.src.client + ' (' + x.src.number + ')'; });
     },
-    // détail par facture (Liste à commander) : [{ invoiceId, number, client, qty }]
+    // détail par facture / réservation / commande (Liste à commander) : [{ type, id, number, client, qty }]
     detail: function (pid, kind) {
       var by = {}, out = [];
       matchFor(pid, kind).forEach(function (x) {
-        var d = by[x.inv.id];
-        if (!d) { d = by[x.inv.id] = { invoiceId: x.inv.id, number: x.inv.number || '', client: x.inv.client_name || 'Sans nom', qty: 0 }; out.push(d); }
-        d.qty += (+x.line.qty_pending) || 0;
+        var k = x.src.type + '|' + x.src.id, d = by[k];
+        if (!d) { d = by[k] = { type: x.src.type, id: x.src.id, number: x.src.number, client: x.src.client, qty: 0 }; out.push(d); }
+        d.qty += x.line.qty || 0;
       });
       return out;
     },
+    // ouvre la facture (Historique), la réservation ou la commande (Commandes)
+    open: function (type, id) { openSrc(type, id); },
     reload: load
   };
 })();

@@ -47,6 +47,7 @@
   function matHasRefillM(mat) { return !!(mat && mat.sell_refill != null); }
 
   var loaded = false, editingId = null, pendingFile = null, cache = [];
+  var openedStock = null;   // { qty, qty_2 } affichés à l'ouverture de l'éditeur
 
   /* ---- éléments ---- */
   var editor = $('#f-editor'), editorTitle = $('#f-editor-title'),
@@ -253,6 +254,7 @@
     sizeI.value = row && row.size ? row.size : '1x1';
     qtyI.value = row && row.qty != null ? row.qty : 0;
     qty2I.value = row && row.qty_2 != null ? row.qty_2 : '';
+    openedStock = row ? { qty: row.qty, qty_2: row.qty_2 } : null;   // stock affiché à l'ouverture
     // formats vendus pour cette couleur (défaut : tout ce que le matériau offre)
     offerSpoolI.checked = row ? (row.offer_spool !== false) : true;
     offerRefillI.checked = row ? (row.offer_refill !== false) : true;
@@ -318,10 +320,9 @@
     var hasR = matHasRefillM(mat) && offerRefillI.checked;
     if (mat && !hasS && !hasR) { statusEl.textContent = 'Coche au moins un format vendu pour cette couleur.'; return; }
 
-    // conserve les autres clés attrs éventuelles ; n'écrit/efface que « colors »
-    var existing = cache.filter(function (r) { return r.id === editingId; })[0];
-    var attrs = Object.assign({}, (existing && existing.attrs) || {});
-    if (colorsArr) attrs.colors = colorsArr; else delete attrs.colors;
+    // attrs : seules « colors » et « img_* » sont gérées ici ; elles sont fusionnées dans les attrs
+    // ACTUELS de la base (CA.updateProduct) -> coût moyen, codes-barres, cibles… jamais écrasés
+    var attrs = { colors: colorsArr || null };
 
     var patch = {
       type: TYPE,
@@ -331,10 +332,10 @@
       code: codeI.value.trim() || null,
       slug: (slugI && CA.slugify(slugI.value)) || null,   // vide => auto (slug du nom) côté boutique
       hex: hex,
-      attrs: attrs,
       size: sizeI.value || '1x1',
       offer_spool: !!offerSpoolI.checked,
       offer_refill: !!offerRefillI.checked,
+      // stock non touché dans le formulaire -> pas réécrit (CA.updateProduct, opened)
       qty: hasS ? Math.max(0, parseInt(qtyI.value, 10) || 0) : 0,
       qty_2: hasR ? (qty2I.value === '' ? 0 : Math.max(0, parseInt(qty2I.value, 10) || 0)) : null,
       active: !!activeI.checked,
@@ -356,10 +357,10 @@
     var mainChain = pendingFile ? uploadPhoto(pendingFile) : Promise.resolve(oldPath);
     Promise.all([mainChain, Promise.all(fmtUploads)]).then(function (r) {
       patch.image_path = r[0];
-      // attrs === patch.attrs (même référence) : on y range les images de format
-      r[1].forEach(function (f) { if (f.path) attrs['img_' + f.key] = f.path; else delete attrs['img_' + f.key]; });
+      r[1].forEach(function (f) { attrs['img_' + f.key] = f.path || null; });   // null = image de format retirée
       statusEl.textContent = 'Enregistrement…';
-      if (editingId) return sb.from('products').update(patch).eq('id', editingId).select();
+      if (editingId) return CA.updateProduct(editingId, patch, { attrs: attrs, opened: openedStock || {} });
+      patch.attrs = CA.mergeAttrs({}, attrs);
       patch.sort_order = cache.length ? (Math.max.apply(null, cache.map(function (x) { return x.sort_order || 0; })) + 1) : 0;
       return sb.from('products').insert(patch).select();
     }).then(function (res) {

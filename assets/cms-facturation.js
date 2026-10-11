@@ -85,7 +85,7 @@
   var elReset = $('#fx-reset'), elNextHint = $('#fx-nexthint'),
       elTax = $('#fx-tax'),
       elCliName = $('#fx-cli-name'), elCliEmail = $('#fx-cli-email'), elCliPhone = $('#fx-cli-phone'),
-      elCliAddress = $('#fx-cli-address'), elCliCity = $('#fx-cli-city'), elCliHint = $('#fx-cli-hint'),
+      elCliAddress = $('#fx-cli-address'), elCliCity = $('#fx-cli-city'),
       elDealerField = $('#fx-dealer-field'), elDealerSelect = $('#fx-dealer-select'),
       elClientField = $('#fx-client-field'), elClientSearch = $('#fx-client-search'), elClientResults = $('#fx-client-results'),
       elNumber = $('#fx-number'), elDate = $('#fx-date'), elNote = $('#fx-note'),
@@ -393,7 +393,6 @@
     if (!keepFields) {
       setClientFields(isInt ? { name: INTERNAL_NAME } : {});
       if (elDealerSelect) elDealerSelect.value = '';
-      if (elCliHint) elCliHint.textContent = isDlr ? 'Choisis un dealer — ses coordonnées et les prix dealer s\'appliquent.' : '';
     }
     if (elCliName) elCliName.readOnly = isInt;   // usage interne : nom fixe
     repriceSpacers();                       // bascule prix client <-> dealer sur les lignes spacer
@@ -1124,7 +1123,6 @@
     setClientFields({ name: inv.client_name || '', email: ct.email, phone: ct.phone,
       address: inv.client_address || '', city: inv.client_city || '' });
     if (elDealerSelect) { var d = dealer ? dealerByEmail(ct.email) : null; elDealerSelect.value = d ? d.email : ''; }
-    if (elCliHint) elCliHint.textContent = '';
     elNote.value = inv.note || '';
     elNumber.value = inv.number || '';
     elDate.value = inv.invoice_date || todayISO();
@@ -1532,14 +1530,14 @@
     var kind = pick.c === 'accessory' ? 'item' : (elScanLearnKind.value === 'refill' ? 'refill' : 'spool');
     var code = pendingCode;
     elScanLearnSave.disabled = true; scanFeedback('Association…', 'warn');
-    var attrs = Object.assign({}, p.attrs || {});
-    attrs.barcodes = Object.assign({}, attrs.barcodes || {});
-    attrs.barcodes[kind] = code;
-    sb.from('products').update({ attrs: attrs, updated_at: new Date().toISOString() }).eq('id', p.id).select()
+    // fusion dans les attrs ACTUELS de la base (un autre onglet a pu les changer entre-temps)
+    CA.updateProduct(p.id, { updated_at: new Date().toISOString() }, { attrs: function (a) {
+      a.barcodes = Object.assign({}, a.barcodes || {}); a.barcodes[kind] = code; return a;
+    } })
       .then(function (res) {
         elScanLearnSave.disabled = false;
         if (res.error || !res.data || !res.data.length) { scanFeedback('Échec de l\'association (permissions ?).', 'bad'); return; }
-        p.attrs = res.data[0].attrs || attrs;   // reconnu immédiatement ensuite
+        p.attrs = res.data[0].attrs || p.attrs;   // reconnu immédiatement ensuite
         closeLearn();
         var r = scanAdd({ p: p, kind: kind });
         scanFeedback('✓ Associé & ajouté : ' + r.label + '  (×' + r.qty + ')', 'ok');

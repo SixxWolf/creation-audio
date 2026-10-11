@@ -277,6 +277,27 @@
     return Promise.all(calls);
   }
 
+  // facture annulée / supprimée : sa commande (dealer, client) ou réservation d'origine redevient
+  // « à facturer » (RPC admin_reopen_invoice_orders) -> « Commande D-0007 → Prête »
+  function reopenOrders(inv) {
+    return sb.rpc('admin_reopen_invoice_orders', { p_invoice: inv.id }).then(function (res) {
+      if (res.error) throw res.error;
+      var list = Array.isArray(res.data) ? res.data : [];
+      if (!list.length) return '';
+      if (window.CA.reloadOrders) window.CA.reloadOrders();
+      if (window.CA.reloadCustomerOrders) window.CA.reloadCustomerOrders();
+      if (window.CA.reloadReservations) window.CA.reloadReservations();
+      if (window.CA.reserved) window.CA.reserved.reload();
+      var ST = { ready: 'Prête', active: 'Active', expired: 'Expirée' };
+      return list.map(function (o) {
+        return (o.kind === 'reservation' ? 'Réservation ' : 'Commande ') + o.number + ' → ' + (ST[o.status] || o.status);
+      }).join(' · ');
+    });
+  }
+  function toastDone(what, reopened) {
+    if (window.caDialog && caDialog.toast) caDialog.toast(what + (reopened ? ' · ' + reopened : ''));
+  }
+
   function cancelInvoice(inv, lines) {
     if (inv.status === 'cancelled') return;
     caDialog.confirm({ title: 'Annuler la facture ' + (inv.number || '') + ' ?',
@@ -291,6 +312,9 @@
         if (res.error) throw res.error;
         if (!res.data || !res.data.length) throw new Error('Annulation refusée (permissions).');
         load();
+        return reopenOrders(inv).then(function (msg) { toastDone('Facture ' + (inv.number || '') + ' annulée', msg); }, function (err) {
+          caDialog.error(err, 'Facture annulée, mais sa commande d\'origine n\'a pas été remise « à facturer »');
+        });
       }, function (err) { caDialog.error(err); });
     });
   }
@@ -300,12 +324,17 @@
       message: (inv.stock_deducted ? 'Le stock déduit sera remis avant suppression.\n' : '') + 'Cette action est irréversible.',
       ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
       if (!ok) return;
-      var chain = inv.stock_deducted ? restoreStock(lines) : Promise.resolve();
-      chain.then(function () { return sb.from('invoices').delete().eq('id', inv.id).select(); })
+      var reopened = '';
+      // la commande d'origine EN PREMIER : après la suppression, son lien vers la facture est perdu ;
+      // si ça échoue, rien n'a encore bougé (ni stock, ni facture)
+      reopenOrders(inv)
+        .then(function (msg) { reopened = msg; return inv.stock_deducted ? restoreStock(lines) : null; })
+        .then(function () { return sb.from('invoices').delete().eq('id', inv.id).select(); })
         .then(function (res) {
           if (res.error) throw res.error;
           if (!res.data || !res.data.length) throw new Error('Suppression refusée (permissions).');
           load();
+          toastDone('Facture ' + (inv.number || '') + ' supprimée', reopened);
         }, function (err) { caDialog.error(err); });
     });
   }

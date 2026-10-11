@@ -841,7 +841,8 @@ begin
     client_contact = p_invoice ->> 'client_contact',
     client_address = p_invoice ->> 'client_address',
     client_city    = p_invoice ->> 'client_city',
-    client_type    = case when p_invoice ->> 'client_type' = 'dealer' then 'dealer' else 'client' end,
+    -- 'internal' (Usage interne, n° INT-) doit le rester : sinon la sortie compterait dans les ventes
+    client_type    = case when p_invoice ->> 'client_type' in ('dealer', 'internal') then p_invoice ->> 'client_type' else 'client' end,
     category       = coalesce(nullif(p_invoice ->> 'category', ''), category),
     invoice_date   = coalesce((p_invoice ->> 'invoice_date')::date, invoice_date),
     note           = p_invoice ->> 'note',
@@ -2473,6 +2474,39 @@ update public.receipt_lines rl
   from public.products p
   join public.materials m on m.brand = p.brand and m.name = p.material
  where p.id = rl.product_id and rl.unit_cost is null and p.type = 'filament';
+
+-- ------------------------------------------------------------
+-- FACTURE ANNULÉE / SUPPRIMÉE -> sa commande ou réservation d'origine redevient
+-- « à facturer » (Historique, 2026-10-11). Commande dealer / client : « Prête » ;
+-- réservation : « Active » si elle n'est pas échue (son stock redevient gardé), sinon
+-- « Expirée » sans pénalité ni courriel. À appeler APRÈS l'annulation et AVANT la
+-- suppression (à la suppression, invoice_id passe à null : le lien serait perdu).
+-- -> [{ kind: 'dealer'|'client'|'reservation', number, status }]
+-- ------------------------------------------------------------
+create or replace function public.admin_reopen_invoice_orders(p_invoice uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v jsonb := '[]'::jsonb; r record;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  for r in update public.dealer_orders set status = 'ready', invoice_id = null, updated_at = now()
+            where invoice_id = p_invoice and status = 'invoiced' returning number loop
+    v := v || jsonb_build_object('kind', 'dealer', 'number', r.number, 'status', 'ready');
+  end loop;
+  for r in update public.customer_orders set status = 'ready', invoice_id = null, updated_at = now()
+            where invoice_id = p_invoice and status = 'invoiced' returning number loop
+    v := v || jsonb_build_object('kind', 'client', 'number', r.number, 'status', 'ready');
+  end loop;
+  for r in update public.customer_reservations
+              set status = case when expires_at > now() then 'active' else 'expired' end,
+                  invoice_id = null, penalized = false, updated_at = now(),
+                  closed_mailed_at = case when expires_at > now() then closed_mailed_at else now() end   -- échue : pas de courriel d'expiration
+            where invoice_id = p_invoice and status = 'invoiced' returning number, status loop
+    v := v || jsonb_build_object('kind', 'reservation', 'number', r.number, 'status', r.status);
+  end loop;
+  return v;
+end $$;
+revoke all on function public.admin_reopen_invoice_orders(uuid) from public, anon;
+grant execute on function public.admin_reopen_invoice_orders(uuid) to authenticated;
 
 -- ------------------------------------------------------------
 -- Vérification
