@@ -21,11 +21,16 @@
   var me = document.currentScript && document.currentScript.src || '';
   var ASSETS = me ? me.replace(/nav\.js(\?.*)?$/, '') : 'assets/';
   CA.siteRoot = ASSETS.replace(/assets\/$/, '');
-  function addScript(src) {
+  function addScript(src, integrity) {
     return new Promise(function (res, rej) {
-      var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s);
+      var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej;
+      if (integrity) { s.integrity = integrity; s.crossOrigin = 'anonymous'; }
+      document.head.appendChild(s);
     });
   }
+  // client Supabase : version FIGÉE + empreinte (même valeur que les balises <script> des pages)
+  var SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js';
+  var SUPABASE_SRI = 'sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+';
   var msgP = null;
   CA.loadMsg = function () {
     if (msgP) return msgP;
@@ -34,7 +39,7 @@
       css.setAttribute('data-msg-css', ''); document.head.appendChild(css);
     }
     var deps = Promise.resolve();
-    if (!window.supabase) deps = deps.then(function () { return addScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js'); });
+    if (!window.supabase) deps = deps.then(function () { return addScript(SUPABASE_JS, SUPABASE_SRI); });
     if (!window.CA_SUPABASE) deps = deps.then(function () { return addScript(ASSETS + 'supabase-config.js?v=1'); });
     msgP = deps.then(function () { return CA.msg || addScript(ASSETS + 'messagerie.js?v=' + MSG_V); })
       .then(function () { if (!CA.msg) throw new Error('messagerie'); return CA.msg; });

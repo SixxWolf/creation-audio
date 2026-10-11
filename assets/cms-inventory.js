@@ -845,7 +845,8 @@
   function missOf(f, kind) {
     var offers = kind === 'refill' ? offersRefill(f) : offersSpool(f);
     if (!offers) return 0;
-    // les articles promis à un client (facture « à venir ») s'ajoutent à la cible ;
+    // les articles promis à un client (facture « à venir », réservation active, commande en ligne
+    // ouverte — CA.reserved, cms-reserves.js) s'ajoutent à la cible ;
     // ceux déjà commandés chez le fournisseur (« en route », cms-en-route.js) s'en retirent
     return Math.max(0, parOf(f, kind) + reservedOf(f, kind) - stockOf(f, kind) - enRouteOf(f, kind));
   }
@@ -1051,12 +1052,14 @@
         var sw = swOf(it.f);
         var name = '<span>' + esc((it.f.material ? it.f.material + ' · ' : '') + (it.f.name || '')) +
           ' <span class="ro-code">' + kindLabel(it.kind) + (it.f.code ? ' · ' + esc(it.f.code) : '') + '</span></span>';
-        // commandé (en tout ou en partie) pour un client : étiquette cliquable -> sa facture
+        // promis (en tout ou en partie) à un client — facture « À venir », réservation ou commande en
+        // ligne : étiquette cliquable -> ouvre la facture / la réservation / la commande
         var res = window.CA.reserved ? window.CA.reserved.detail(it.f.id, it.kind) : [];
         if (res.length) {
           var resQty = res.reduce(function (s, d) { return s + d.qty; }, 0);
+          var TIP = { invoice: 'Ouvrir la facture', resv: 'Ouvrir la réservation', order: 'Ouvrir la commande' };
           name = '<span class="ro-main">' + name + '<span class="ro-fors">' + res.map(function (d) {
-            return '<button type="button" class="ro-for" data-inv="' + esc(d.invoiceId) + '" title="Ouvrir la facture">📦 ' +
+            return '<button type="button" class="ro-for" data-type="' + esc(d.type) + '" data-id="' + esc(d.id) + '" title="' + (TIP[d.type] || TIP.invoice) + '">📦 ' +
               (resQty >= it.qty && res.length === 1 ? 'Pour ' : d.qty + ' pour ') + esc(d.client) + ' · ' + esc(d.number) + '</button>';
           }).join('') + '</span></span>';
         }
@@ -1079,8 +1082,7 @@
 
     $$('.ro-for', reorderSummary).forEach(function (b) {
       b.addEventListener('click', function () {
-        if (window.CA.focusInvoice) window.CA.focusInvoice(b.getAttribute('data-inv'));
-        location.hash = '#historique';
+        if (window.CA.reserved && window.CA.reserved.open) window.CA.reserved.open(b.getAttribute('data-type'), b.getAttribute('data-id'));
       });
     });
     var copyBtn = $('#reorder-copy');
