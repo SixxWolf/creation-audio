@@ -57,8 +57,14 @@
   }
   // Prix CLIENT (public, à plat) puis prix DEALER (base + rabais quantité),
   // chacun avec sa marge. Les rabais quantité ne concernent que le dealer.
+  // coût moyen des productions (Stock › Production), sinon le coût saisi
+  function avgCostOf(r) {
+    var ac = r && r.attrs && r.attrs.avg_cost && r.attrs.avg_cost.item;
+    return (ac != null && ac !== '' && isFinite(+ac)) ? +ac : null;
+  }
+  function costOf(r) { var a = avgCostOf(r); return a != null ? a : (+r.cost_price || 0); }
   function priceBlock(r) {
-    var c = +r.cost_price || 0;
+    var c = costOf(r);
     var html = '<div class="sp-tierrow"><span class="tp"><b>Client</b> : ' + money(r.sell_price) + '</span>' + marginPill(r.sell_price, c) + '</div>';
     var dealerBase = r.dealer_price != null ? r.dealer_price : r.sell_price;
     var rows = [{ min: 1, price: +dealerBase || 0 }].concat(normalizeTiers(r.tiers).filter(function (t) { return t.min > 1; }));
@@ -83,7 +89,7 @@
       fileInput = $('#sp-file'), galleryEl = $('#sp-gallery'), galleryAdd = $('#sp-gallery-add'),
       nameI = $('#sp-name'), priceI = $('#sp-price'), costI = $('#sp-cost'),
       dealerPriceI = $('#sp-dealer-price'), marginEl = $('#sp-margin'), marginDealerEl = $('#sp-margin-dealer'),
-      qtyI = $('#sp-qty'), activeI = $('#sp-active'),
+      qtyI = $('#sp-qty'), activeI = $('#sp-active'), costLbl = $('label[for="sp-cost"]'),
       tiersEl = $('#sp-tiers'), tierAdd = $('#sp-tier-add'),
       sizeI = $('#sp-size'), linksEl = $('#sp-fiche-links'), linksField = $('#sp-fiche-field'),
       fitEl = $('#sp-fit'), fitAdd = $('#sp-fit-add'), makeList = $('#sp-make-list'),
@@ -100,6 +106,8 @@
     if (typeof prevOnTab === 'function') prevOnTab(name);
     if (name === 'spacers' && !loaded) { loaded = true; load(); }
   };
+  // Stock › Production a changé le stock / le coût moyen : liste relue si elle a déjà été affichée
+  window.CA.reloadSpacers = function () { if (loaded) load(); };
 
   /* ---- interactions ---- */
   if (newBtn) newBtn.addEventListener('click', function () { openEditor(null); });
@@ -348,7 +356,12 @@
     nameI.value = row ? (row.name || '') : '';
     priceI.value = row && row.sell_price != null ? row.sell_price : '';
     dealerPriceI.value = row && row.dealer_price != null ? row.dealer_price : '';
-    costI.value = row && row.cost_price != null ? row.cost_price : '';
+    // coût moyen des productions : affiché, non modifiable (le coût saisi ne sert plus qu'au départ)
+    var avg = avgCostOf(row);
+    costI.readOnly = avg != null;
+    costI.value = avg != null ? avg.toFixed(2) : (row && row.cost_price != null ? row.cost_price : '');
+    if (costLbl) costLbl.textContent = avg != null ? 'Coût moyen' : 'Coût payé';
+    costI.title = avg != null ? 'Calculé par Stock › Production' : '';
     qtyI.value = row && row.qty != null ? row.qty : 0;
     activeI.checked = row ? !!row.active : true;
     tiersEl.innerHTML = '';
@@ -411,7 +424,8 @@
       name: name,
       sell_price: Math.max(0, num(priceI.value) || 0),
       dealer_price: dealerPriceI.value !== '' ? Math.max(0, num(dealerPriceI.value) || 0) : null,
-      cost_price: Math.max(0, num(costI.value) || 0),
+      // coût moyen affiché (lecture seule) : le coût saisi de la base reste tel quel
+      cost_price: costI.readOnly && editingRow ? (+editingRow.cost_price || 0) : Math.max(0, num(costI.value) || 0),
       qty: Math.max(0, parseInt(qtyI.value, 10) || 0),
       qty_2: null,
       tiers: collectTiers(),
@@ -490,7 +504,8 @@
         '<div class="card-body">' +
           '<div class="card-name">' + esc(r.name) + '</div>' +
           '<div class="sp-minis">' + tags + '</div>' +
-          '<div class="card-stock"><span class="stk' + (out ? ' out' : '') + '">' + (r.qty | 0) + ' paire' + ((r.qty | 0) > 1 ? 's' : '') + ' en stock</span></div>' +
+          '<div class="card-stock"><span class="stk' + (out ? ' out' : '') + '">' + (r.qty | 0) + ' paire' + ((r.qty | 0) > 1 ? 's' : '') + ' en stock</span>' +
+            (a.loose && a.loose.n > 0 ? '<span class="stk" title="Pièce seule en réserve (Stock › Production)">+ 1 pièce</span>' : '') + '</div>' +
           '<div class="sp-tiers-break">' + priceBlock(r) + '</div>' +
           '<div class="card-actions">' +
             '<button class="btn btn-ghost card-edit" type="button">Modifier</button>' +

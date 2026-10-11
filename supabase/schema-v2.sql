@@ -2508,6 +2508,268 @@ end $$;
 revoke all on function public.admin_reopen_invoice_orders(uuid) from public, anon;
 grant execute on function public.admin_reopen_invoice_orders(uuid) to authenticated;
 
+-- ============================================================
+-- PRODUCTION DE SPACERS (Stock › Production, 2026-10-11)
+-- Bobines sorties du stock de vente pour imprimer (production_spools : −1 au stock
+-- du filament, prix payé figé), productions lues dans le G-code AutoLoop
+-- (productions + production_uses : grammes par bobine). Une production ajoute
+-- ses paires au stock du spacer et recalcule son coût moyen :
+--   products.attrs.avg_cost.item = (stock de départ × coût saisi + Σ paires × coût/paire)
+--                                  / (stock de départ + Σ paires)
+--   attrs.prod_seed {qty, cost} = stock et coût saisi au moment de la 1re production
+--   attrs.loose {n:1, cost}     = pièce seule en réserve (complétée à la production suivante)
+-- Tout est PRIVÉ (admin) ; écritures par RPC (stock + coût en une transaction).
+-- ============================================================
+create table if not exists public.production_spools (
+  id          uuid primary key default gen_random_uuid(),
+  product_id  uuid references public.products(id) on delete set null,
+  label       text not null default '',           -- « Bambu Lab · ABS · Black » (figé)
+  material    text,
+  hex         text,
+  kind        text not null default 'spool' check (kind in ('spool', 'refill')),
+  unit_cost   numeric(10,2) not null default 0,   -- [PRIVÉ] prix payé de la bobine (taxes incluses)
+  weight_g    integer not null default 1000 check (weight_g > 0),
+  stock_taken integer not null default 0,         -- 1 = retirée du stock de vente (0 : stock déjà à 0)
+  status      text not null default 'active' check (status in ('active', 'done')),
+  taken_at    date not null default current_date,
+  closed_at   timestamptz,
+  created_at  timestamptz not null default now()
+);
+create table if not exists public.productions (
+  id            uuid primary key default gen_random_uuid(),
+  made_at       date not null default current_date,
+  spacer_id     uuid references public.products(id) on delete set null,
+  spacer_label  text not null default '',
+  file_name     text,
+  loops         integer not null default 1,
+  per_plate     integer not null default 1,
+  pieces        integer not null default 0,          -- lancées (loops × pièces par plateau)
+  good          integer not null default 0,          -- sorties bonnes
+  minutes       integer not null default 0,          -- durée du batch (cooldown compris)
+  grams         numeric(10,2) not null default 0,
+  filament_cost numeric(10,2) not null default 0,
+  machine_cost  numeric(10,2) not null default 0,    -- électricité + usure
+  total_cost    numeric(10,2) not null default 0,
+  piece_cost    numeric(12,4),
+  loose_in      integer not null default 0,          -- pièce seule reprise de la réserve
+  loose_in_cost numeric(12,4),
+  loose_out     integer not null default 0,          -- pièce seule laissée en réserve
+  pairs         integer not null default 0,
+  pair_cost     numeric(12,4),
+  rates         jsonb not null default '{}'::jsonb,  -- taux $/h utilisés {elec, deprec}
+  note          text,
+  created_at    timestamptz not null default now()
+);
+create table if not exists public.production_uses (
+  id            uuid primary key default gen_random_uuid(),
+  production_id uuid not null references public.productions(id) on delete cascade,
+  spool_id      uuid not null references public.production_spools(id) on delete restrict,
+  grams         numeric(10,2) not null default 0,
+  cost          numeric(10,2) not null default 0
+);
+create index if not exists production_spools_status_idx  on public.production_spools (status, taken_at desc);
+create index if not exists production_spools_product_idx on public.production_spools (product_id);
+create index if not exists productions_spacer_idx        on public.productions (spacer_id, created_at desc);
+create index if not exists production_uses_prod_idx      on public.production_uses (production_id);
+create index if not exists production_uses_spool_idx     on public.production_uses (spool_id);
+
+alter table public.production_spools enable row level security;
+alter table public.productions       enable row level security;
+alter table public.production_uses   enable row level security;
+drop policy if exists production_spools_admin_all on public.production_spools;
+create policy production_spools_admin_all on public.production_spools for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists productions_admin_all on public.productions;
+create policy productions_admin_all on public.productions for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists production_uses_admin_all on public.production_uses;
+create policy production_uses_admin_all on public.production_uses for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.production_spools from anon;
+revoke all on public.productions       from anon;
+revoke all on public.production_uses   from anon;
+
+-- Coût moyen d'un spacer rejoué depuis son stock de départ + ses productions.
+-- Plus aucune production : avg_cost et prod_seed retirés (retour au coût saisi).
+create or replace function public._spacer_recost(p_spacer uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_seed jsonb; v_n integer; v_q numeric := 0; v_c numeric := 0; v_pq numeric; v_pc numeric;
+begin
+  select count(*) into v_n from public.productions where spacer_id = p_spacer;
+  if v_n = 0 then
+    update public.products set attrs = attrs - 'avg_cost' - 'prod_seed', updated_at = now() where id = p_spacer;
+    return;
+  end if;
+  select attrs -> 'prod_seed' into v_seed from public.products where id = p_spacer;
+  if v_seed is not null then
+    v_q := greatest(0, coalesce((v_seed ->> 'qty')::numeric, 0));
+    v_c := v_q * greatest(0, coalesce((v_seed ->> 'cost')::numeric, 0));
+  end if;
+  select coalesce(sum(pairs), 0), coalesce(sum(pairs * pair_cost), 0) into v_pq, v_pc
+    from public.productions where spacer_id = p_spacer and pairs > 0 and pair_cost is not null;
+  v_q := v_q + v_pq; v_c := v_c + v_pc;
+  update public.products
+     set attrs = case when v_pq > 0 and v_q > 0
+                      then jsonb_set(attrs, '{avg_cost}', jsonb_build_object('item', round(v_c / v_q, 2)))
+                      else attrs - 'avg_cost' end,
+         updated_at = now()
+   where id = p_spacer;
+end $$;
+revoke all on function public._spacer_recost(uuid) from public, anon, authenticated;
+
+-- Sortir une bobine du stock de vente pour la production (−1 si le stock le permet).
+-- -> { id, taken }
+create or replace function public.admin_take_spool(p_product uuid, p_kind text, p_cost numeric, p_weight integer default 1000)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_p public.products%rowtype; v_kind text; v_taken integer; v_id uuid;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  v_kind := case when p_kind = 'refill' then 'refill' else 'spool' end;
+  select * into v_p from public.products where id = p_product and type = 'filament' for update;
+  if not found then raise exception 'Filament introuvable.'; end if;
+  v_taken := least(1, greatest(0, case when v_kind = 'refill' then coalesce(v_p.qty_2, 0) else coalesce(v_p.qty, 0) end));
+  update public.products
+     set qty   = case when v_kind = 'spool'  then coalesce(qty, 0)   - v_taken else qty   end,
+         qty_2 = case when v_kind = 'refill' then coalesce(qty_2, 0) - v_taken else qty_2 end,
+         updated_at = now()
+   where id = p_product;
+  insert into public.production_spools (product_id, label, material, hex, kind, unit_cost, weight_g, stock_taken)
+  values (p_product, concat_ws(' · ', nullif(v_p.brand, ''), nullif(v_p.material, ''), v_p.name), v_p.material, v_p.hex,
+          v_kind, round(greatest(0, coalesce(p_cost, 0)), 2), greatest(1, coalesce(p_weight, 1000)), v_taken)
+  returning id into v_id;
+  return jsonb_build_object('id', v_id, 'taken', v_taken);
+end $$;
+revoke all on function public.admin_take_spool(uuid, text, numeric, integer) from public, anon;
+grant execute on function public.admin_take_spool(uuid, text, numeric, integer) to authenticated;
+
+-- Retirer une bobine jamais utilisée (erreur de saisie) : elle revient au stock de vente.
+create or replace function public.admin_spool_delete(p_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_s public.production_spools%rowtype;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into v_s from public.production_spools where id = p_id for update;
+  if not found then return; end if;
+  if exists (select 1 from public.production_uses where spool_id = p_id) then
+    raise exception 'Cette bobine a servi à une production : termine-la plutôt.';
+  end if;
+  if v_s.product_id is not null and v_s.stock_taken > 0 then
+    update public.products
+       set qty   = case when v_s.kind = 'spool'  then coalesce(qty, 0)   + v_s.stock_taken else qty   end,
+           qty_2 = case when v_s.kind = 'refill' then coalesce(qty_2, 0) + v_s.stock_taken else qty_2 end,
+           updated_at = now()
+     where id = v_s.product_id;
+  end if;
+  delete from public.production_spools where id = p_id;
+end $$;
+revoke all on function public.admin_spool_delete(uuid) from public, anon;
+grant execute on function public.admin_spool_delete(uuid) to authenticated;
+
+-- Enregistrer une production :
+-- p = { spacer_id, made_at, file_name, loops, per_plate, pieces, good, minutes,
+--       machine_cost, rates, note, uses: [{ spool_id, grams }] }
+-- Coût filament = grammes × prix de la bobine / poids (calculé ici, pas par le navigateur).
+-- -> { id, pairs, pair_cost, loose_out, total_cost, avg_cost }
+create or replace function public.admin_save_production(p jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_sp public.products%rowtype; v_s public.production_spools%rowtype; v_u jsonb; v_id uuid;
+  v_uses jsonb := '[]'::jsonb; v_g numeric; v_c numeric; v_fil numeric := 0; v_grams numeric := 0;
+  v_mach numeric := round(greatest(0, coalesce((p ->> 'machine_cost')::numeric, 0)), 2);
+  v_good integer := greatest(0, coalesce((p ->> 'good')::integer, 0));
+  v_total numeric; v_piece numeric; v_lin integer := 0; v_linc numeric := 0; v_all integer;
+  v_pairs integer; v_lout integer; v_loutc numeric := 0; v_pairc numeric; v_seed jsonb; v_attrs jsonb;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into v_sp from public.products where id = (p ->> 'spacer_id')::uuid and type = 'spacer' for update;
+  if not found then raise exception 'Spacer introuvable.'; end if;
+  if jsonb_typeof(p -> 'uses') is distinct from 'array' or jsonb_array_length(p -> 'uses') = 0 then
+    raise exception 'Choisis la bobine utilisée.';
+  end if;
+
+  for v_u in select value from jsonb_array_elements(p -> 'uses') loop
+    v_g := round(greatest(0, coalesce((v_u ->> 'grams')::numeric, 0)), 2);
+    select * into v_s from public.production_spools where id = (v_u ->> 'spool_id')::uuid for update;
+    if not found then raise exception 'Bobine de production introuvable.'; end if;
+    v_c := round(v_g * v_s.unit_cost / v_s.weight_g, 2);
+    v_fil := v_fil + v_c; v_grams := v_grams + v_g;
+    v_uses := v_uses || jsonb_build_object('spool_id', v_s.id, 'grams', v_g, 'cost', v_c);
+  end loop;
+
+  v_total := round(v_fil + v_mach, 2);
+  v_piece := case when v_good > 0 then v_total / v_good end;
+  if coalesce((v_sp.attrs -> 'loose' ->> 'n')::integer, 0) > 0 then
+    v_lin := 1; v_linc := greatest(0, coalesce((v_sp.attrs -> 'loose' ->> 'cost')::numeric, 0));
+  end if;
+  v_all := v_good + v_lin;
+  v_pairs := v_all / 2;
+  v_lout := v_all % 2;
+  if v_lout = 1 then v_loutc := case when v_good > 0 then v_piece else v_linc end; end if;
+  if v_pairs > 0 then v_pairc := (v_total + v_linc - v_loutc) / v_pairs; end if;
+
+  -- 1re production de ce spacer : son stock actuel entre dans la moyenne à son coût saisi.
+  v_seed := v_sp.attrs -> 'prod_seed';
+  if v_seed is null then
+    v_seed := jsonb_build_object('qty', case when v_sp.cost_price > 0 then greatest(0, v_sp.qty) else 0 end,
+                                 'cost', v_sp.cost_price, 'at', now());
+  end if;
+
+  insert into public.productions (made_at, spacer_id, spacer_label, file_name, loops, per_plate, pieces, good, minutes,
+         grams, filament_cost, machine_cost, total_cost, piece_cost, loose_in, loose_in_cost, loose_out, pairs, pair_cost, rates, note, created_at)
+  values (coalesce((p ->> 'made_at')::date, current_date), v_sp.id, v_sp.name, nullif(p ->> 'file_name', ''),
+          greatest(1, coalesce((p ->> 'loops')::integer, 1)), greatest(1, coalesce((p ->> 'per_plate')::integer, 1)),
+          greatest(0, coalesce((p ->> 'pieces')::integer, 0)), v_good, greatest(0, coalesce((p ->> 'minutes')::integer, 0)),
+          v_grams, round(v_fil, 2), v_mach, v_total, v_piece, v_lin, case when v_lin > 0 then v_linc end, v_lout, v_pairs, v_pairc,
+          coalesce(p -> 'rates', '{}'::jsonb), nullif(p ->> 'note', ''),
+          clock_timestamp())   -- heure exacte : ordre des productions d'un spacer (suppression de la plus récente)
+  returning id into v_id;
+
+  insert into public.production_uses (production_id, spool_id, grams, cost)
+  select v_id, (e ->> 'spool_id')::uuid, (e ->> 'grams')::numeric, (e ->> 'cost')::numeric
+    from jsonb_array_elements(v_uses) e;
+
+  v_attrs := jsonb_set(v_sp.attrs, '{prod_seed}', v_seed);
+  v_attrs := case when v_lout = 1 then jsonb_set(v_attrs, '{loose}', jsonb_build_object('n', 1, 'cost', round(v_loutc, 4)))
+                  else v_attrs - 'loose' end;
+  update public.products set qty = coalesce(qty, 0) + v_pairs, attrs = v_attrs, updated_at = now() where id = v_sp.id;
+  perform public._spacer_recost(v_sp.id);
+
+  return jsonb_build_object('id', v_id, 'pairs', v_pairs, 'pair_cost', round(v_pairc, 4), 'loose_out', v_lout,
+    'total_cost', v_total,
+    'avg_cost', (select attrs -> 'avg_cost' ->> 'item' from public.products where id = v_sp.id));
+end $$;
+revoke all on function public.admin_save_production(jsonb) from public, anon;
+grant execute on function public.admin_save_production(jsonb) to authenticated;
+
+-- Supprimer une production (la plus récente de son spacer seulement : la pièce seule
+-- en réserve s'enchaîne d'une production à l'autre). Stock −paires, réserve d'avant
+-- remise, coût moyen rejoué ; ses grammes reviennent aux bobines.
+create or replace function public.admin_delete_production(p_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_pr public.productions%rowtype;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into v_pr from public.productions where id = p_id;
+  if not found then return; end if;
+  if v_pr.spacer_id is not null then
+    perform 1 from public.products where id = v_pr.spacer_id for update;
+    if exists (select 1 from public.productions where spacer_id = v_pr.spacer_id and created_at > v_pr.created_at) then
+      raise exception 'Supprime d''abord la production plus récente de ce spacer.';
+    end if;
+    update public.products
+       set qty = greatest(0, coalesce(qty, 0) - v_pr.pairs),
+           attrs = case when v_pr.loose_in > 0
+                        then jsonb_set(attrs, '{loose}', jsonb_build_object('n', 1, 'cost', coalesce(v_pr.loose_in_cost, 0)))
+                        else attrs - 'loose' end,
+           updated_at = now()
+     where id = v_pr.spacer_id;
+  end if;
+  delete from public.productions where id = p_id;
+  if v_pr.spacer_id is not null then perform public._spacer_recost(v_pr.spacer_id); end if;
+end $$;
+revoke all on function public.admin_delete_production(uuid) from public, anon;
+grant execute on function public.admin_delete_production(uuid) to authenticated;
+
 -- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
