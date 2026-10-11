@@ -208,11 +208,20 @@ window.CA = window.CA || {};
       var name = (val || '').trim();
       if (!name || name === old) return;
       if (CA.brands.list.some(function (b) { return b.name.toLowerCase() === name.toLowerCase(); })) { caDialog.alert({ title: 'Ce nom est déjà pris.' }); return; }
-      // cascade : matériaux + produits de cette marque suivent
-      sb.from('brands').insert({ name: name, sort_order: 0 }).select()
-        .then(function (r) { if (r.error) throw r.error; return sb.from('materials').update({ brand: name }).eq('brand', old); })
+      // la marque est renommée sur place (garde son ordre, son logo et son slug), puis tout ce qui
+      // porte son NOM suit : matériaux, produits, accessoires « sur la fiche filament » de cette marque,
+      // taxe fournisseur par défaut et commandes / réceptions fournisseur (voir dependances.md § 2.6)
+      sb.from('brands').update({ name: name }).eq('name', old).select()
+        .then(function (r) { if (r.error) throw r.error; if (!r.data || !r.data.length) throw new Error('Renommage refusé (permissions).'); return sb.from('materials').update({ brand: name }).eq('brand', old); })
         .then(function (r) { if (r.error) throw r.error; return sb.from('products').update({ brand: name }).eq('brand', old); })
-        .then(function (r) { if (r.error) throw r.error; return sb.from('brands').delete().eq('name', old); })
+        .then(function (r) { if (r.error) throw r.error; return renameInAccessories(old, name); })
+        .then(function () { return renameInTaxes(old, name); })
+        .then(function () {
+          return Promise.all([
+            sb.from('supplier_orders').update({ supplier: name }).eq('supplier', old),
+            sb.from('receipts').update({ supplier: name }).eq('supplier', old)
+          ]).then(function (rs) { rs.forEach(function (r) { if (r.error) throw r.error; }); });
+        })
         .then(function () {
           CA.currentBrand = name; remember(name);
           return CA.loadBrands();
@@ -220,6 +229,30 @@ window.CA = window.CA || {};
           if (CA.loadMaterials) CA.loadMaterials();
           notify(); // recharge filaments de la marque
         }, function (err) { caDialog.error(err); });
+    });
+  }
+  // accessoires affichés sur la fiche filament de CETTE marque : attrs.fil_brands suit le nouveau nom
+  function renameInAccessories(old, name) {
+    var lo = old.toLowerCase();
+    var hit = function (a) { return Array.isArray(a && a.fil_brands) && a.fil_brands.some(function (n) { return String(n).toLowerCase() === lo; }); };
+    return sb.from('products').select('id,attrs').eq('type', 'accessory').then(function (res) {
+      if (res.error) throw res.error;
+      return Promise.all((res.data || []).filter(function (r) { return hit(r.attrs); }).map(function (r) {
+        return CA.updateProduct(r.id, { updated_at: new Date().toISOString() }, { attrs: function (a) {
+          if (Array.isArray(a.fil_brands)) a.fil_brands = a.fil_brands.map(function (n) { return String(n).toLowerCase() === lo ? name : n; });
+          return a;
+        } }).then(function (r2) { if (r2.error) throw r2.error; });
+      }));
+    });
+  }
+  // taxe fournisseur par défaut (Inventaire › En route) : admin_settings « taxes_fournisseur » { marque: % }
+  function renameInTaxes(old, name) {
+    return sb.from('admin_settings').select('value').eq('key', 'taxes_fournisseur').maybeSingle().then(function (res) {
+      var t = res && res.data && res.data.value;
+      if (res.error || !t || t[old] == null) return;
+      var next = Object.assign({}, t); next[name] = next[old]; delete next[old];
+      return sb.from('admin_settings').upsert({ key: 'taxes_fournisseur', value: next, updated_at: new Date().toISOString() })
+        .then(function (r) { if (r.error) throw r.error; });
     });
   }
 

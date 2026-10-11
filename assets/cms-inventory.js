@@ -523,14 +523,14 @@
     var code = pendingCode;
     scanLearnSave.disabled = true;
     feedback('Association…', 'warn');
-    var attrs = Object.assign({}, f.attrs || {});
-    attrs.barcodes = Object.assign({}, attrs.barcodes || {});
-    attrs.barcodes[kind] = code;
-    sb.from('products').update({ attrs: attrs, updated_at: new Date().toISOString() }).eq('id', f.id).select()
+    // fusion dans les attrs ACTUELS de la base (un autre onglet a pu les changer entre-temps)
+    CA.updateProduct(f.id, { updated_at: new Date().toISOString() }, { attrs: function (a) {
+      a.barcodes = Object.assign({}, a.barcodes || {}); a.barcodes[kind] = code; return a;
+    } })
       .then(function (res) {
         scanLearnSave.disabled = false;
         if (res.error || !res.data || !res.data.length) { feedback('Échec de l\'association (permissions ?).', 'bad'); return; }
-        f.attrs = res.data[0].attrs || attrs;   // maj en mémoire -> reconnu immédiatement ensuite
+        f.attrs = res.data[0].attrs || f.attrs;   // maj en mémoire -> reconnu immédiatement ensuite
         closeLearn();
         scanNote(addScanUnit(f, kind), f, kind, 'Associé · ');
         bumpCount();
@@ -673,17 +673,17 @@
           var f = bcProd(pid);
           if (!f) return null;
           var g = byProd[pid] || { spool: [], refill: [] };
-          var attrs = Object.assign({}, f.attrs || {});
           var ac = {}, lc = {}, v;
           // accessoire : un seul coût (lignes 'item' rangées avec 'spool' ci-dessus)
           (isAcc(f) ? [['item', g.spool]] : [['spool', g.spool], ['refill', g.refill]]).forEach(function (k) {
             v = CA.costing.avg(k[1], null); if (v != null) ac[k[0]] = v;
             v = last(k[1]); if (v != null) lc[k[0]] = v;
           });
-          if (Object.keys(ac).length) attrs.avg_cost = ac; else delete attrs.avg_cost;
-          if (Object.keys(lc).length) attrs.last_cost = lc; else delete attrs.last_cost;
-          return sb.from('products').update({ attrs: attrs, updated_at: new Date().toISOString() }).eq('id', pid).select()
-            .then(function (r) { if (r.data && r.data[0]) f.attrs = r.data[0].attrs || attrs; });
+          // fusion dans les attrs ACTUELS de la base (seuls avg_cost / last_cost changent)
+          return CA.updateProduct(pid, { updated_at: new Date().toISOString() }, { attrs: {
+            avg_cost: Object.keys(ac).length ? ac : null,
+            last_cost: Object.keys(lc).length ? lc : null
+          } }).then(function (r) { if (r.data && r.data[0]) f.attrs = r.data[0].attrs || f.attrs; });
         }));
       });
   }
@@ -855,14 +855,13 @@
   // enregistre une cible dans attrs.par_spool / attrs.par_refill
   function saveTarget(f, kind, value, cell) {
     var v = Math.max(0, parseInt(value, 10) || 0);
-    var attrs = Object.assign({}, f.attrs || {});
-    if (v > 0) attrs['par_' + kind] = v; else delete attrs['par_' + kind];
+    var change = {}; change['par_' + kind] = v > 0 ? v : null;   // fusionné dans les attrs ACTUELS de la base
     if (cell) cell.classList.add('saving');
-    sb.from('products').update({ attrs: attrs, updated_at: new Date().toISOString() }).eq('id', f.id).select()
+    CA.updateProduct(f.id, { updated_at: new Date().toISOString() }, { attrs: change })
       .then(function (res) {
         if (cell) cell.classList.remove('saving');
         if (res.error || !res.data || !res.data.length) return;
-        f.attrs = res.data[0].attrs || attrs;
+        f.attrs = res.data[0].attrs || f.attrs;
         renderReorderSummary();
         // maj visuelle de la ligne (manque + surbrillance) sans tout reconstruire
         refreshRow(f);
@@ -1376,35 +1375,32 @@
   // applique un changement : retire l'ancien emplacement (si fourni), pose le nouveau,
   // en écrivant products.attrs.barcodes pour chaque produit touché.
   function applyBarcodeChange(oldEntry, newEntry, done) {
+    // opérations par produit, rejouées sur les attrs ACTUELS de la base (CA.updateProduct)
     var work = {};
-    function ensure(f) {
-      if (!work[f.id]) {
-        var a = Object.assign({}, f.attrs || {});
-        a.barcodes = Object.assign({}, a.barcodes || {});
-        work[f.id] = { f: f, attrs: a };
-      }
-      return work[f.id];
-    }
+    function ensure(f) { return work[f.id] || (work[f.id] = { f: f, unset: [], set: {} }); }
     if (oldEntry) {
       var op = bcProd(oldEntry.productId);
-      if (op) { var wo = ensure(op); delete wo.attrs.barcodes[oldEntry.kind]; if (!Object.keys(wo.attrs.barcodes).length) delete wo.attrs.barcodes; }
+      if (op) ensure(op).unset.push(oldEntry.kind);
     }
     if (newEntry) {
       var np = bcProd(newEntry.productId);
       if (!np) { done(new Error('Article introuvable.')); return; }
-      var wn = ensure(np);
-      wn.attrs.barcodes = wn.attrs.barcodes || {};
-      wn.attrs.barcodes[newEntry.kind] = newEntry.code;
+      ensure(np).set[newEntry.kind] = newEntry.code;
     }
     var ids = Object.keys(work);
     if (!ids.length) { done(null); return; }
     Promise.all(ids.map(function (id) {
       var w = work[id];
-      return sb.from('products').update({ attrs: w.attrs, updated_at: new Date().toISOString() }).eq('id', id).select()
-        .then(function (res) {
-          if (res.error || !res.data || !res.data.length) throw (res.error || new Error('refusé (permissions ?)'));
-          w.f.attrs = res.data[0].attrs || w.attrs;   // maj mémoire -> scan reconnaît tout de suite
-        });
+      return CA.updateProduct(id, { updated_at: new Date().toISOString() }, { attrs: function (a) {
+        var bc = Object.assign({}, a.barcodes || {});
+        w.unset.forEach(function (k) { delete bc[k]; });
+        Object.keys(w.set).forEach(function (k) { bc[k] = w.set[k]; });
+        if (Object.keys(bc).length) a.barcodes = bc; else delete a.barcodes;
+        return a;
+      } }).then(function (res) {
+        if (res.error || !res.data || !res.data.length) throw (res.error || new Error('refusé (permissions ?)'));
+        w.f.attrs = res.data[0].attrs || w.f.attrs;   // maj mémoire -> scan reconnaît tout de suite
+      });
     })).then(function () { done(null); }, function (e) { done(e); });
   }
 

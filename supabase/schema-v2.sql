@@ -841,7 +841,8 @@ begin
     client_contact = p_invoice ->> 'client_contact',
     client_address = p_invoice ->> 'client_address',
     client_city    = p_invoice ->> 'client_city',
-    client_type    = case when p_invoice ->> 'client_type' = 'dealer' then 'dealer' else 'client' end,
+    -- 'internal' (Usage interne, n° INT-) doit le rester : sinon la sortie compterait dans les ventes
+    client_type    = case when p_invoice ->> 'client_type' in ('dealer', 'internal') then p_invoice ->> 'client_type' else 'client' end,
     category       = coalesce(nullif(p_invoice ->> 'category', ''), category),
     invoice_date   = coalesce((p_invoice ->> 'invoice_date')::date, invoice_date),
     note           = p_invoice ->> 'note',

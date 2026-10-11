@@ -31,6 +31,36 @@ window.CA = window.CA || {};
     return '<span class="person-av" style="--h:' + h + '" aria-hidden="true">' + ini.toUpperCase().replace(/[<>&"']/g, '') + '</span>';
   };
 
+  // Écriture d'un produit SANS écraser ce qu'un autre onglet a changé depuis l'ouverture
+  // (vente, réception, coût moyen, code-barres appris…) : relit qty / qty_2 / attrs en base
+  // juste avant d'écrire.
+  //  - o.attrs : objet { clé: valeur } fusionné dans les attrs ACTUELS (null = clé retirée),
+  //    ou fonction(copie des attrs actuels) -> attrs à écrire (objets imbriqués : barcodes…) ;
+  //  - o.opened : { qty, qty_2 } affichés à l'ouverture du formulaire -> un stock non touché
+  //    n'est pas réécrit (celui de la base est gardé).
+  // Renvoie la promesse de sb.update(...).select() (res.data[0] = ligne à jour).
+  window.CA.mergeAttrs = function (cur, changes) {
+    var a = Object.assign({}, cur || {});
+    if (typeof changes === 'function') return changes(a) || a;
+    Object.keys(changes || {}).forEach(function (k) {
+      if (changes[k] == null) delete a[k]; else a[k] = changes[k];
+    });
+    return a;
+  };
+  window.CA.updateProduct = function (id, patch, o) {
+    o = o || {};
+    return sb.from('products').select('qty,qty_2,attrs').eq('id', id).maybeSingle().then(function (cur) {
+      if (cur.error) throw cur.error;
+      if (!cur.data) throw new Error('Article introuvable (supprimé ?).');
+      var p = Object.assign({}, patch || {});
+      if (o.attrs) p.attrs = window.CA.mergeAttrs(cur.data.attrs, o.attrs);
+      if (o.opened) ['qty', 'qty_2'].forEach(function (k) {
+        if ((k in p) && (k in o.opened) && p[k] === o.opened[k]) delete p[k];
+      });
+      return sb.from('products').update(p).eq('id', id).select();
+    });
+  };
+
   var loginWrap = $('#login'), app = $('#app'),
       loginForm = $('#login-form'), emailI = $('#login-email'), passI = $('#login-pass'),
       loginBtn = $('#login-btn'), loginStatus = $('#login-status'),

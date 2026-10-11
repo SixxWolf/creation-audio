@@ -292,18 +292,18 @@
     var cat = catI.value.trim().replace(/\s+/g, ' ');
     var known = categories().filter(function (c) { return c.toLowerCase() === cat.toLowerCase(); })[0];
     if (known) cat = known;
-    // attrs : on repart des attrs existants (avg_cost, barcodes… sont conservés)
-    var attrs = Object.assign({}, attrsOf(editingRow), {
+    // attrs : seules les clés de la fiche sont gérées ici ; elles sont fusionnées dans les attrs
+    // ACTUELS de la base (CA.updateProduct) -> coût moyen, code-barres… jamais écrasés
+    var specs = collectSpecs();
+    var attrs = {
       category: cat,                       // toujours écrites (même vides) : le SQL d'amorçage n'y retouche plus
       on_filament: !!onFilI.checked,
       stock_only: !!stockOnlyI.checked,    // boutique : jamais commandé / réservé au-delà du stock
       fil_brands: selBrands.slice(),
       description: descI.value.trim() || null,
-      specs: collectSpecs(),
+      specs: specs.length ? specs : null,
       long_desc: longDescI.value.trim() || null
-    });
-    ['description', 'long_desc'].forEach(function (k) { if (attrs[k] == null) delete attrs[k]; });
-    if (!attrs.specs.length) delete attrs.specs;
+    };
     var patch = {
       type: TYPE, brand: BRAND, material: null,
       name: name,
@@ -325,10 +325,11 @@
 
     Promise.all(photos.map(function (p) { return p.path ? p.path : uploadPhoto(p.file); })).then(function (paths) {
       patch.image_path = paths[0] || null;
-      attrs.gallery = paths.slice(1);
-      if (!attrs.gallery.length) delete attrs.gallery;
-      patch.attrs = attrs;
-      if (!isNew) return sb.from('products').update(patch).eq('id', editingId).select().then(function (res) { return { res: res, paths: paths }; });
+      attrs.gallery = paths.length > 1 ? paths.slice(1) : null;
+      // stock non touché dans le formulaire -> celui de la base est gardé (vente / réception entre-temps)
+      if (!isNew) return CA.updateProduct(editingId, patch, { attrs: attrs, opened: { qty: editingRow.qty, qty_2: editingRow.qty_2 } })
+        .then(function (res) { return { res: res, paths: paths }; });
+      patch.attrs = CA.mergeAttrs({}, attrs);
       patch.sort_order = cache.length ? (Math.max.apply(null, cache.map(function (x) { return x.sort_order || 0; })) + 1) : 0;
       return sb.from('products').insert(patch).select().then(function (res) { return { res: res, paths: paths }; });
     }).then(function (out) {
