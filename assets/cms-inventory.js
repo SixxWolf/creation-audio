@@ -87,7 +87,7 @@
     Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : Promise.resolve(),
       loadFilaments(), loadAccessories()
-    ]).then(function () { renderPick(); loadHistory(); renderReorder(); renderCodes(); }, function () { loadHistory(); });
+    ]).then(function () { sortFilaments(); renderPick(); loadHistory(); renderReorder(); renderCodes(); }, function () { loadHistory(); });
   }
 
   // toutes marques confondues (une réception peut mélanger, on rattache par code-barres appris)
@@ -97,8 +97,35 @@
       .eq('type', 'filament')
       .order('brand', { ascending: true }).order('material', { ascending: true })
       .order('sort_order', { ascending: true }).order('name', { ascending: true })
-      .then(function (res) { filaments = (res.data || []); });
+      .then(function (res) { filaments = (res.data || []); sortFilaments(); });
   }
+
+  /* ---- ordre d'affichage = celui de la section Filaments : marque, matériau (PLA Basic,
+     PLA Matte, PETG…), puis couleur (sort_order) ; les accessoires ensuite ---- */
+  function sortFilaments() {
+    var deco = filaments.map(function (f, i) { return { f: f, i: i }; });
+    deco.sort(function (a, z) {
+      return (brandOrderIndex(a.f.brand) - brandOrderIndex(z.f.brand)) ||
+        (matOrderIndex(a.f.brand, a.f.material) - matOrderIndex(z.f.brand, z.f.material)) || (a.i - z.i);
+    });
+    filaments = deco.map(function (d) { return d.f; });
+  }
+  function rankOf(pid, kind) {
+    var p = bcProd(pid);
+    if (!p) return [3, 0, 0, 0, 0];
+    if (isAcc(p)) return [2, accessories.indexOf(p), 0, 0, 0];
+    return [1, brandOrderIndex(p.brand), matOrderIndex(p.brand, p.material), filaments.indexOf(p), kind === 'refill' ? 1 : 0];
+  }
+  // trie des lignes (commande, réception…) dans cet ordre ; pidOf / kindOf lisent la ligne
+  function sortByProduct(list, pidOf, kindOf) {
+    return list.map(function (x, i) { return { x: x, r: rankOf(pidOf(x), kindOf(x)), i: i }; })
+      .sort(function (a, z) {
+        for (var k = 0; k < a.r.length; k++) { if (a.r[k] !== z.r[k]) return a.r[k] - z.r[k]; }
+        return a.i - z.i;
+      }).map(function (d) { return d.x; });
+  }
+  function linePid(l) { return l.product_id || l.productId; }
+  function lineKind(l) { return l.kind; }
 
   // accessoires (bobines vides, etc.) : Codes-barres + Réception (attrs.barcodes.item, kind 'item' -> qty)
   var accessories = [];
@@ -141,6 +168,9 @@
     fitKind: function (p, k) { return fitKind(p, k); },
     cost: function (p, k) { return costOf(p, k); },
     swatch: function (p) { return swOf(p); },
+    sortLines: function (list, pidOf, kindOf) { return sortByProduct(list, pidOf || linePid, kindOf || lineKind); },
+    options: function (selected) { return filamentOptions(selected); },
+    orderLinesHtml: function (lines) { return orderLinesHtml(lines); },
     // « Recevoir » une commande en route : ouvre son pointage dans Réception
     receiveOrder: function (id) {
       if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub('reception'); else showSub('reception');
@@ -199,13 +229,35 @@
   var editingReceipt = null;   // réception de l'historique en cours de modification
   var editingOldLines = [];
 
+  // options d'un menu Article (CA.pick) : filaments groupés par marque, dans l'ordre des Filaments,
+  // chacun avec sa pastille ; accessoires à la fin
   function filamentOptions(selected) {
-    function opt(p, label) { return '<option value="' + esc(p.id) + '"' + (String(p.id) === String(selected) ? ' selected' : '') + '>' + esc(label(p)) + '</option>'; }
-    var fils = filaments.map(function (f) { return opt(f, filLabel); }).join('');
-    if (!accessories.length) return '<option value="">— choisir —</option>' + fils;
+    function opt(p, label, sw) {
+      return '<option value="' + esc(p.id) + '"' + (String(p.id) === String(selected) ? ' selected' : '') +
+        (sw ? ' data-sw="' + esc(sw) + '"' : '') + '>' + esc(label) + '</option>';
+    }
+    var groups = [], by = {};
+    filaments.forEach(function (f) {
+      var b = f.brand || 'Autres';
+      if (!by[b]) { by[b] = []; groups.push(b); }
+      by[b].push(opt(f, artName(f), swOf(f)));
+    });
     return '<option value="">— choisir —</option>' +
-      '<optgroup label="Filaments">' + fils + '</optgroup>' +
-      '<optgroup label="Accessoires">' + accessories.map(function (a) { return opt(a, accLabel); }).join('') + '</optgroup>';
+      groups.map(function (b) { return '<optgroup label="' + esc(b) + '">' + by[b].join('') + '</optgroup>'; }).join('') +
+      (accessories.length ? '<optgroup label="Accessoires">' + accessories.map(function (a) { return opt(a, accLabel(a)); }).join('') + '</optgroup>' : '');
+  }
+  // lignes d'une commande en route (Réception + À commander) : pastille, nom, format, reçu / attendu
+  function orderLinesHtml(lines) {
+    return sortByProduct(lines, linePid, lineKind).map(function (l) {
+      var p = l.product_id ? bcProd(l.product_id) : null, acc = isAcc(p);
+      var q = l.qty | 0, got = Math.min(q, l.qty_received | 0);
+      var sw = p && !acc ? '<span class="ro-sw" style="background:' + esc(swOf(p)) + '"></span>' : '<span class="ro-sw ro-sw-none"></span>';
+      var name = p ? artName(p) : (l.label || '(article retiré)');
+      var state = got >= q && q ? '<span class="ro-q ro-done">✓ ' + q + ' reçu' + (q > 1 ? 's' : '') + '</span>'
+        : '<span class="ro-q">' + (got ? got + ' / ' + q : '×' + q) + '</span>';
+      return '<li' + (got >= q && q ? ' class="is-done"' : '') + '>' + sw + '<span>' + esc(name) +
+        (acc ? '' : ' <span class="ro-code">' + kindLabel(l.kind) + '</span>') + '</span>' + state + '</li>';
+    }).join('');
   }
   // format d'une ligne selon le produit : accessoire -> 'item', filament -> bobine/recharge offert
   function fitKind(p, kind) {
@@ -229,19 +281,29 @@
     ordersEl.innerHTML = list.map(function (o) {
       var left = 0, got = 0;
       o.lines.forEach(function (l) { left += orderRemaining(l); got += Math.min(l.qty | 0, l.qty_received | 0); });
-      return '<div class="rv-order" data-id="' + esc(o.id) + '">' +
-        '<div class="rv-order-main">' +
-          '<span class="po-num">' + esc(o.order_number || 'Sans n°') + '</span>' +
-          '<span class="po-meta">' + esc([o.supplier, o.ordered_at].filter(Boolean).join(' · ')) + '</span>' +
-          '<span class="po-prog">' + left + ' attendu' + (left > 1 ? 's' : '') + (got ? ' · ' + got + ' déjà reçu' + (got > 1 ? 's' : '') : '') + '</span>' +
+      var open = openPicks[o.id];
+      return '<div class="po-order rv-order' + (open ? ' open' : '') + '" data-id="' + esc(o.id) + '">' +
+        '<div class="po-order-head">' +
+          '<button type="button" class="po-toggle" aria-expanded="' + !!open + '">' +
+            '<span class="po-num">' + esc(o.order_number || 'Sans n°') + '</span>' +
+            '<span class="po-meta">' + esc([o.supplier, o.ordered_at].filter(Boolean).join(' · ')) + '</span>' +
+            '<span class="po-prog">' + left + ' attendu' + (left > 1 ? 's' : '') + (got ? ' · ' + got + ' déjà reçu' + (got > 1 ? 's' : '') : '') + '</span>' +
+          '</button>' +
+          '<button type="button" class="btn btn-accent btn-sm rv-go" data-ic="scan">Recevoir</button>' +
         '</div>' +
-        '<button type="button" class="btn btn-accent btn-sm rv-go" data-ic="scan">Recevoir</button>' +
+        '<ul class="reorder-list po-lines"' + (open ? '' : ' hidden') + '>' + orderLinesHtml(o.lines) + '</ul>' +
       '</div>';
     }).join('');
-    $$('.rv-go', ordersEl).forEach(function (b) {
-      b.addEventListener('click', function () { receiveOrder(b.closest('.rv-order').getAttribute('data-id')); });
+    $$('.rv-order', ordersEl).forEach(function (el) {
+      var id = el.getAttribute('data-id'), tg = $('.po-toggle', el), ul = $('.po-lines', el);
+      tg.addEventListener('click', function () {
+        ul.hidden = !ul.hidden; openPicks[id] = !ul.hidden;
+        tg.setAttribute('aria-expanded', String(!ul.hidden)); el.classList.toggle('open', !ul.hidden);
+      });
+      $('.rv-go', el).addEventListener('click', function () { receiveOrder(id); });
     });
   }
+  var openPicks = {};   // commandes dépliées (gardées au rafraîchissement)
   document.addEventListener('ca:enroute', function () { if (loaded) renderPick(); });
   if (freeBtn) freeBtn.addEventListener('click', function () { startWork(null); });
 
@@ -277,6 +339,7 @@
       });
       rows.forEach(function (r) { r.unitCost = r.priced ? round2(r.sum / r.priced) : null; delete r.sum; delete r.priced; });
     }
+    rows = sortByProduct(rows, linePid, lineKind);   // les scans / ajouts suivants vont à la fin
     editorTitle.textContent = rc ? 'Modifier la réception' : (current ? 'Réception · ' + (current.order_number || 'commande sans n°') : 'Réception sans commande');
     metaEl.textContent = rc ? [rc.order_number, rc.received_at].filter(Boolean).join(' · ')
       : current ? [current.supplier, current.ordered_at].filter(Boolean).join(' · ') : '';
@@ -346,6 +409,7 @@
       var i = +tr.getAttribute('data-i'), r = rows[i];
       var sel = $('.rcp-fil-sel', tr);
       if (sel) sel.addEventListener('change', function () { r.productId = this.value; r.kind = fitKind(bcProd(this.value), r.kind); renderRows(); focusScan(); });
+      if (sel && window.CA.pick) window.CA.pick(sel);
       var kindSel = $('.rcp-kind', tr);
       if (kindSel) kindSel.addEventListener('change', function () { r.kind = this.value; renderRows(); focusScan(); });
       var qty = $('.rcp-qty', tr);
@@ -401,7 +465,7 @@
       if (!scanActive || learnOpen) return;
       var a = document.activeElement;
       if (a && a !== document.body && a.closest &&
-          a.closest('#r-rows, #scan-learn, .editor-actions, #r-date, #r-add-line, .inv-subtab')) return;
+          a.closest('#r-rows, #scan-learn, .editor-actions, #r-date, #r-add-line, .inv-subtab, .cpk-pop')) return;
       focusScan();
     }, 40);
   });
@@ -494,10 +558,11 @@
     scanLearnCode.textContent = code;
     scanLearnFil.innerHTML = learnOptions();
     scanLearnFil.value = '';
+    var pk = window.CA.pick ? window.CA.pick(scanLearnFil) : null;
     scanLearnKind.value = 'spool'; scanLearnKind.hidden = false;
     scanLearn.hidden = false;
     feedback('⚠ Code-barres inconnu — associe-le ci-dessous.', 'warn');
-    try { scanLearnFil.focus(); } catch (e) {}
+    try { if (pk) pk.focus(); else scanLearnFil.focus(); } catch (e) {}
   }
   function closeLearn() {
     learnOpen = false; pendingCode = '';
@@ -518,7 +583,7 @@
   });
   if (scanLearnSave) scanLearnSave.addEventListener('click', function () {
     var f = bcProd(scanLearnFil.value);
-    if (!f) { scanLearnFil.focus(); return; }
+    if (!f) { if (scanLearnFil._pk) scanLearnFil._pk.open(); else scanLearnFil.focus(); return; }
     var kind = isAcc(f) ? 'item' : (scanLearnKind.value === 'refill' ? 'refill' : 'spool');
     var code = pendingCode;
     scanLearnSave.disabled = true;
@@ -712,15 +777,17 @@
       var lines = byReceipt[rc.id] || [];
       var totalRolls = lines.reduce(function (s, l) { return s + (l.qty | 0); }, 0);
       var totalCost = 0, hasAnyCost = false;
-      var linesHtml = lines.map(function (l) {
+      var linesHtml = sortByProduct(lines, linePid, lineKind).map(function (l) {
         var q = l.qty | 0;
         var priced = (l.unit_cost != null && l.unit_cost !== '');
         var eff = priced ? +l.unit_cost : null;
         if (eff != null) { totalCost += eff * q; hasAnyCost = true; }
-        var priceTxt = priced
-          ? '<span class="rcp-hist-price">' + money(l.unit_cost) + '/u</span>'
-          : '<span class="rcp-hist-price muted">—</span>';
-        return '<li>' + esc(l.label || '(produit supprimé)') + ' — ' + kindLabel(l.kind) + ' × ' + q + ' · ' + priceTxt + '</li>';
+        var p = l.product_id ? bcProd(l.product_id) : null, acc = isAcc(p);
+        var sw = p && !acc ? '<span class="ro-sw" style="background:' + esc(swOf(p)) + '"></span>' : '<span class="ro-sw ro-sw-none"></span>';
+        return '<li>' + sw + '<span class="rcp-hist-nm">' + esc(p ? artName(p) : (l.label || '(produit supprimé)')) +
+          (acc ? '' : ' <span class="ro-code">' + kindLabel(l.kind) + '</span>') + '</span>' +
+          '<span class="rcp-hist-q">×' + q + '</span>' +
+          '<span class="rcp-hist-price' + (priced ? '' : ' muted') + '">' + (priced ? money(l.unit_cost) + '/u' : '—') + '</span></li>';
       }).join('');
       var costTxt = hasAnyCost ? ' · ' + money(totalCost) : '';
       return '<div class="mat-row rcp-hist" data-id="' + esc(rc.id) + '">' +

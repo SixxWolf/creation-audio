@@ -658,9 +658,7 @@ td.num input { text-align:right; }
 .rv-pick { margin-bottom:22px; }
 .rv-pick[hidden], .rv-work[hidden] { display:none; }
 .rv-orders { margin-top:6px; }
-.rv-order { display:flex; align-items:center; gap:10px 14px; padding:12px 0; border-top:1px solid var(--line); }
-.rv-order:first-child { border-top:0; }
-.rv-order-main { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 12px; flex:1; min-width:0; }
+.rv-order .po-order-head { padding:12px 0; }
 .rv-work .editor { margin-bottom:22px; }
 .rv-head { display:flex; align-items:center; flex-wrap:wrap; gap:10px 16px; margin-bottom:14px; }
 .rv-title { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 12px; flex:1; min-width:0; }
@@ -714,8 +712,53 @@ td.num input { text-align:right; }
 .rcp-hist-meta { font-size:.82rem; color:var(--muted); font-variant-numeric:tabular-nums; }
 .rcp-hist-lines { display:none; margin:10px 0 0; padding:10px 0 0 22px; font-size:.86rem; color:var(--ink-2); border-top:1px dashed var(--line-2); }
 .rcp-hist.open .rcp-hist-lines { display:block; }
-.rcp-hist-lines li { margin:3px 0; }
-.rcp-hist-price { font-weight:600; font-variant-numeric:tabular-nums; }
+.rcp-hist-lines { list-style:none; }
+.rcp-hist-lines li { display:flex; align-items:center; gap:9px; padding:5px 0; border-bottom:1px dashed var(--line); }
+.rcp-hist-lines li:last-child { border-bottom:0; }
+.rcp-hist-lines .ro-sw { flex:none; width:16px; height:16px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.15); }
+.rcp-hist-nm { flex:1; min-width:0; }
+.rcp-hist-q { flex:none; font-weight:700; font-variant-numeric:tabular-nums; }
+.rcp-hist-price { flex:none; min-width:78px; text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+/* accessoire (pas de couleur) : garde l'alignement des noms */
+span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
+.reorder-list li.is-done { color:var(--muted); }
+.reorder-list li.is-done .ro-sw { opacity:.55; }
+.reorder-list .ro-q.ro-done { font-weight:600; color:var(--good); }
+
+/* menu maison à pastilles (ca-pick.js, CA.pick) : même look que .pr-pk de Production ;
+   le <select> d'origine reste caché dans .cpk et porte la valeur */
+.cpk { position:relative; min-width:0; }
+.cpk-btn { display:flex; align-items:center; gap:9px; width:100%; min-width:0; padding:9px 34px 9px 12px; font:inherit; font-size:.94rem;
+  color:var(--ink); text-align:left; cursor:pointer; background:var(--field-bg) var(--chev) right 11px center / 15px no-repeat;
+  border:1px solid var(--field-line); border-radius:var(--radius-ctl); box-shadow:var(--field-inset);
+  transition-property:border-color, box-shadow, background-color; transition-duration:.15s; transition-timing-function:ease-out; }
+.cpk-btn:hover:not(:disabled) { border-color:color-mix(in srgb, var(--ink-2) 55%, var(--field-line)); }
+.cpk-btn:focus-visible, .cpk-btn[aria-expanded="true"] { outline:none; background-color:var(--field-bg-focus); border-color:var(--ember); box-shadow:var(--field-inset), var(--ring); }
+.cpk-btn:disabled { opacity:.55; box-shadow:none; cursor:not-allowed; }
+.cpk-txt { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cpk-txt.is-ph { color:var(--muted); }
+.cpk-sw { flex:none; width:16px; height:16px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.15); }
+.cpk-pop { position:fixed; z-index:200; display:flex; flex-direction:column; padding:6px; background:var(--paper);
+  border:1px solid var(--line-2); border-radius:12px; box-shadow:0 22px 44px -22px rgba(20,22,26,.5); }
+.cpk-search { flex:none; margin-bottom:6px; padding-left:36px !important;
+  background:var(--field-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='m20 20-4.2-4.2'/%3E%3C/svg%3E") 11px center / 16px no-repeat; }
+.cpk-list { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.cpk-grp { position:sticky; top:0; z-index:1; padding:9px 10px 5px; font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); background:var(--paper); }
+.cpk-item { display:flex; align-items:center; gap:9px; width:100%; padding:8px 10px; font:inherit; font-size:.9rem; color:var(--ink); text-align:left;
+  cursor:pointer; background:none; border:0; border-radius:9px; }
+.cpk-item > span:last-child { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+.cpk-item:hover:not(:disabled), .cpk-item.is-active { background:var(--wash); }
+.cpk-item.is-sel > span:last-child { font-weight:700; color:var(--ember-ink); }
+.cpk-item.is-ph { color:var(--muted); }
+.cpk-item:disabled { opacity:.45; cursor:not-allowed; }
+.cpk-none { padding:10px; font-size:.86rem; color:var(--muted); }
+.rcp-table .cpk-btn { padding:6px 30px 6px 10px; font-size:.9rem; border-radius:8px; background-position:right 9px center; }
+.rcp-row.unmatched .cpk-btn, .po-row.unmatched .cpk-btn { border-color:var(--ember); box-shadow:var(--ring); }
+.po-row.is-ia .cpk-btn { border-color:color-mix(in srgb, var(--ember) 60%, var(--line-2)); }
+.po-row.is-off.unmatched .cpk-btn { border-color:var(--line-2); box-shadow:none; }
+.po-table .cpk { min-width:215px; }
+.scan-learn-row .cpk { flex:1; min-width:220px; }
 
 /* ---- À commander ---- */
 .reorder-summary:empty { display:none; }
@@ -771,6 +814,7 @@ td.num input { text-align:right; }
 .po-f #po-number { width:230px; }
 .po-f #po-date { width:130px; }
 .po-f .unit { width:96px; }
+.po-f .unit input { width:100%; }
 .po-status { font-size:.86rem; font-weight:600; color:var(--muted); }
 .po-review[hidden] { display:none; }
 .po-review .rcp-table-wrap { margin-top:14px; }
@@ -781,6 +825,8 @@ td.num input { text-align:right; }
 .po-sum b { color:var(--ink); }
 .po-table .po-read { min-width:200px; }
 .po-table select.po-fil { min-width:215px; }
+.po-table .po-qty { min-width:64px; }
+.po-table .po-price { min-width:88px; }
 .po-read-in { display:flex; flex-direction:column; align-items:flex-start; gap:3px; }
 .po-lbl { font-size:.86rem; line-height:1.35; }
 .po-how { display:inline-block; padding:1px 8px; font-size:.7rem; font-weight:700; white-space:nowrap; border-radius:100px;
@@ -815,6 +861,9 @@ td.num input { text-align:right; }
   .po-f, .po-f input, .po-f #po-number, .po-f #po-date { width:100%; }
   .po-f { flex-wrap:wrap; }
   .po-acts { width:100%; justify-content:flex-end; }
+  /* chevron collé au n° de commande (sinon il reste seul sur sa ligne quand le n° est long) */
+  .po-toggle { position:relative; padding-left:17px; }
+  .po-toggle::before { position:absolute; left:0; top:.42em; }
 }
 
 /* filtres marque → matériau */
