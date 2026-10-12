@@ -278,7 +278,10 @@
     renderLinks();
     updateMargin();
     statusEl.textContent = '';
+    // grand écran : éditeur collé à droite, la liste reste visible (CA.dockEditor) ; sinon en haut, comme avant
+    var docked = !!(window.CA.dockEditor && window.CA.dockEditor(editor));
     editor.hidden = false;
+    if (docked) { nameI.focus({ preventScroll: true }); editor.parentNode.scrollTop = 0; return; }
     nameI.focus();
     editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=85">
+<link rel="stylesheet" href="assets/admin.css?v=86">
 <link rel="stylesheet" href="assets/facture.css?v=26">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
@@ -875,6 +875,8 @@
 
     <!-- ---------------- Autres onglets (à venir) ---------------- -->
     <section class="tabpanel" data-panel="spacers" role="tabpanel" hidden>
+     <!-- Grand écran (≥ 1600 px) : liste (.dock-main) + éditeur ouvert collé à droite (.dock, CA.dockEditor) -->
+     <div class="dock-main">
       <div class="panel-head">
         <div>
           <h1>Spacers</h1>
@@ -1012,10 +1014,14 @@
 
       <!-- Liste des spacers -->
       <div class="cards" id="sp-list"></div>
+     </div><!-- /.dock-main -->
+     <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
 
     <!-- ---------------- ACCESSOIRES (bobines vides…) ---------------- -->
     <section class="tabpanel" data-panel="accessoires" role="tabpanel" hidden>
+     <!-- Grand écran (≥ 1600 px) : liste (.dock-main) + éditeur ouvert collé à droite (.dock, CA.dockEditor) -->
+     <div class="dock-main">
       <div class="panel-head">
         <div>
           <h1>Accessoires</h1>
@@ -1113,6 +1119,8 @@
 
       <!-- Liste des accessoires -->
       <div class="ac-list" id="ac-list"></div>
+     </div><!-- /.dock-main -->
+     <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
 
     <!-- ---------------- DEALERS ---------------- -->
@@ -1970,8 +1978,8 @@
 <script src="assets/cms-materials.js?v=14"></script>
 <script src="assets/cms-filaments.js?v=18"></script>
 <script src="assets/cms-linkbuilder.js?v=3"></script>
-<script src="assets/cms-spacers.js?v=15"></script>
-<script src="assets/cms-accessories.js?v=8"></script>
+<script src="assets/cms-spacers.js?v=16"></script>
+<script src="assets/cms-accessories.js?v=9"></script>
 <script src="assets/ca-pick.js?v=1"></script>
 <script src="assets/cms-inventory.js?v=37"></script>
 <script src="assets/cms-attente.js?v=6"></script>
