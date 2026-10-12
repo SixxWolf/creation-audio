@@ -93,7 +93,8 @@
        afficher « couche x / total » → multiplié par le nombre de loops.       */
   var RE_M73 = /^M73 (?:P(\d+) R(\d+)|L(\d+))[^\r\n]*/gm;
   var RE_TOTAL_LAYERS = /^(; total layer number: )(\d+)/m;
-  var COOL_WAITS = 6;  // M190 répétés au cooldown (voir buildTransition)
+  var COOL_WAITS = 6;      // M190 répétés au cooldown (voir buildTransition)
+  var COOL_TOLERANCE = 5;  // le M190 Bambu relâche à cible + 5 °C
   var EJECT_MIN = 1;  // flexion + push + balayages + parking ≈ 1 min (hors cooldown)
 
   // Remplace la ligne de purge native par une purge en goulotte. Séquence reprise
@@ -343,11 +344,12 @@
       L.push('');
       L.push(';Cooldown Start');
       if (opts.coolMode === 'temp') {
-        // Le M190 du firmware Bambu abandonne au bout d'un délai quand il attend un
-        // refroidissement (relâchait ~5-10 °C trop chaud près de l'ambiante) : on le
-        // répète — un M190 déjà atteint passe aussitôt, sinon il relance l'attente.
+        // Le M190 du firmware Bambu relâche à cible + 5 °C (constaté : 45 → 50, 50 → 55)
+        // et abandonne au bout d'un délai près de l'ambiante (35 → 45). On vise donc
+        // cible − 5 et on le répète — un M190 atteint passe aussitôt, sinon il relance l'attente.
+        var coolT = Math.round(opts.coolTemp), coolS = coolT - COOL_TOLERANCE;
         for (var w = 0; w < COOL_WAITS; w++) {
-          L.push('M190 S' + Math.round(opts.coolTemp) + ' ; attendre température plateau (' + (w + 1) + '/' + COOL_WAITS + ')');
+          L.push('M190 S' + coolS + ' ; plateau à ' + coolT + ' °C (firmware relâche à +' + COOL_TOLERANCE + ') ' + (w + 1) + '/' + COOL_WAITS);
         }
       } else {
         L.push('G4 S' + Math.round(opts.coolSec) + ' ; délai fixe');
