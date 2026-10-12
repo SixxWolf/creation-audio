@@ -1263,7 +1263,40 @@ td.num input { text-align:right; }
 .pr-done-n { color:var(--muted); font-weight:500; }
 
 .pr-take { margin:12px 0 4px; padding:14px 16px; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
-.pr-take-grid { display:grid; grid-template-columns:minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap:12px 14px; }
+.pr-take-grid { display:grid; grid-template-columns:minmax(0, 2.4fr) auto minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1fr); gap:12px 14px; }
+/* format Bobine / Recharge : boutons segmentés (facture.css .fx-seg) à la hauteur des champs */
+.pr-seg { display:flex; }
+.pr-seg .fx-seg-btn { flex:1; min-height:35px; padding:0 14px; white-space:nowrap; }
+.pr-seg .fx-seg-btn em { margin-left:4px; font-style:normal; font-weight:500; color:var(--muted); font-variant-numeric:tabular-nums; }
+
+/* menu maison (cms-production.js Picker) : bouton au style des champs « Creusés » + liste en popover */
+.pr-pk { position:relative; min-width:0; }
+.pr-pk-btn { display:flex; align-items:center; gap:9px; width:100%; min-width:0; padding:9px 34px 9px 12px; font:inherit; font-size:.94rem;
+  color:var(--ink); text-align:left; cursor:pointer; background:var(--field-bg) var(--chev) right 11px center / 15px no-repeat;
+  border:1px solid var(--field-line); border-radius:var(--radius-ctl); box-shadow:var(--field-inset);
+  transition-property:border-color, box-shadow, background-color; transition-duration:.15s; transition-timing-function:ease-out; }
+.pr-pk-btn:hover { border-color:color-mix(in srgb, var(--ink-2) 55%, var(--field-line)); }
+.pr-pk-btn:focus-visible, .pr-pk-btn[aria-expanded="true"] { outline:none; background-color:var(--field-bg-focus); border-color:var(--ember); box-shadow:var(--field-inset), var(--ring); }
+.pr-pk-btn .pr-pk-l { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pr-pk-btn .pr-pk-m { flex:none; margin-left:auto; padding-left:6px; font-size:.84rem; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.pr-pk-ph { color:var(--muted); }
+.pr-pk-pop { position:absolute; z-index:40; left:0; right:0; top:calc(100% + 6px); min-width:min(320px, calc(100vw - 32px)); padding:6px; background:var(--paper);
+  border:1px solid var(--line-2); border-radius:12px; box-shadow:0 22px 44px -22px rgba(20,22,26,.5); }
+.pr-pk-pop[hidden] { display:none; }
+.pr-pk-q { margin-bottom:6px; padding-left:36px !important;
+  background:var(--field-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='m20 20-4.2-4.2'/%3E%3C/svg%3E") 11px center / 16px no-repeat; }
+.pr-pk-list { max-height:min(320px, 50vh); overflow:auto; overscroll-behavior:contain; }
+.pr-pk-g { position:sticky; top:0; z-index:1; padding:9px 10px 5px; font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); background:var(--paper); }
+.pr-pk-it { display:flex; align-items:center; gap:9px; width:100%; padding:8px 10px; font:inherit; font-size:.9rem; color:var(--ink); text-align:left;
+  cursor:pointer; background:none; border:0; border-radius:9px; }
+.pr-pk-it.is-active { background:var(--wash); }
+.pr-pk-it .pr-pk-l { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+.pr-pk-it .pr-pk-m { flex:none; font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.pr-pk-it.is-sel .pr-pk-l { font-weight:700; color:var(--ember-ink); }
+.pr-pk-it.is-dim { color:var(--muted); }
+.pr-pk-it.is-dim .pr-sw { opacity:.5; }
+.pr-pk-empty { margin:0; padding:10px; font-size:.86rem; color:var(--muted); }
 .pr-take .editor-actions { position:static; margin:12px 0 0; padding:0; background:none; border:0; border-radius:0;
   -webkit-backdrop-filter:none; backdrop-filter:none; }
 
@@ -1298,9 +1331,14 @@ td.num input { text-align:right; }
   .al-cols.pr-cols { grid-template-columns:minmax(0, 1fr); }
   .al-cols.pr-cols .al-side { position:static; }
 }
-@media (max-width:900px) {
+@media (max-width:1280px) {
+  /* 2 lignes : filament + format, puis quantité · prix · poids */
+  .pr-take-grid { grid-template-columns:minmax(0, 1fr) minmax(0, 1fr) max-content; }   /* 3e colonne = largeur du format */
+  .pr-take-grid .pr-take-fil { grid-column:span 2; }
+}
+@media (max-width:640px) {
   .pr-take-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-  .pr-take-grid .pr-take-fil { grid-column:1 / -1; }
+  .pr-take-grid .pr-take-fil, .pr-take-grid .pr-take-kind { grid-column:1 / -1; }
 }
 @media (max-width:640px) {
   .pr-spool, .pr-spool.is-done { grid-template-columns:auto minmax(0, 1fr) auto; }
@@ -1314,6 +1352,7 @@ td.num input { text-align:right; }
   .pr-use .pr-use-spool { grid-column:2 / 4; grid-row:1; }
   .pr-use .pr-x { grid-column:4; grid-row:1; }
   .pr-use .unit { grid-column:2; grid-row:2; max-width:140px; }
+  .pr-use .pr-pk-btn .pr-pk-m { display:none; }   /* grammes restants : dans la liste seulement */
   .pr-use-cost { grid-column:3 / 5; grid-row:2; }
   .pr-use-warn { grid-column:2 / -1; }
 }

@@ -2617,30 +2617,42 @@ begin
 end $$;
 revoke all on function public._spacer_recost(uuid) from public, anon, authenticated;
 
--- Sortir une bobine du stock de vente pour la production (−1 si le stock le permet).
--- -> { id, taken }
-create or replace function public.admin_take_spool(p_product uuid, p_kind text, p_cost numeric, p_weight integer default 1000)
+-- Sortir des bobines du stock de vente pour la production : p_count bobines d'un coup
+-- (une ligne production_spools chacune, 1000 g par défaut) ; −1 au stock par bobine tant
+-- qu'il en reste (au-delà : bobine « hors stock », stock_taken = 0). p_date = date locale
+-- de l'admin (current_date est en UTC : le soir au Québec, ce serait déjà demain).
+-- -> { ids: [...], taken }
+drop function if exists public.admin_take_spool(uuid, text, numeric, integer);
+create or replace function public.admin_take_spool(p_product uuid, p_kind text, p_cost numeric,
+  p_weight integer default 1000, p_count integer default 1, p_date date default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_p public.products%rowtype; v_kind text; v_taken integer; v_id uuid;
+declare v_p public.products%rowtype; v_kind text; v_n integer; v_stock integer; v_taken integer; v_id uuid;
+        v_ids jsonb := '[]'::jsonb; i integer;
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   v_kind := case when p_kind = 'refill' then 'refill' else 'spool' end;
+  v_n := least(50, greatest(1, coalesce(p_count, 1)));
   select * into v_p from public.products where id = p_product and type = 'filament' for update;
   if not found then raise exception 'Filament introuvable.'; end if;
-  v_taken := least(1, greatest(0, case when v_kind = 'refill' then coalesce(v_p.qty_2, 0) else coalesce(v_p.qty, 0) end));
+  v_stock := greatest(0, case when v_kind = 'refill' then coalesce(v_p.qty_2, 0) else coalesce(v_p.qty, 0) end);
+  v_taken := least(v_n, v_stock);
   update public.products
      set qty   = case when v_kind = 'spool'  then coalesce(qty, 0)   - v_taken else qty   end,
          qty_2 = case when v_kind = 'refill' then coalesce(qty_2, 0) - v_taken else qty_2 end,
          updated_at = now()
    where id = p_product;
-  insert into public.production_spools (product_id, label, material, hex, kind, unit_cost, weight_g, stock_taken)
-  values (p_product, concat_ws(' · ', nullif(v_p.brand, ''), nullif(v_p.material, ''), v_p.name), v_p.material, v_p.hex,
-          v_kind, round(greatest(0, coalesce(p_cost, 0)), 2), greatest(1, coalesce(p_weight, 1000)), v_taken)
-  returning id into v_id;
-  return jsonb_build_object('id', v_id, 'taken', v_taken);
+  for i in 1 .. v_n loop
+    insert into public.production_spools (product_id, label, material, hex, kind, unit_cost, weight_g, stock_taken, taken_at, created_at)
+    values (p_product, concat_ws(' · ', nullif(v_p.brand, ''), nullif(v_p.material, ''), v_p.name), v_p.material, v_p.hex,
+            v_kind, round(greatest(0, coalesce(p_cost, 0)), 2), greatest(1, coalesce(p_weight, 1000)),
+            case when i <= v_taken then 1 else 0 end, coalesce(p_date, current_date), clock_timestamp())
+    returning id into v_id;
+    v_ids := v_ids || to_jsonb(v_id);
+  end loop;
+  return jsonb_build_object('ids', v_ids, 'taken', v_taken);
 end $$;
-revoke all on function public.admin_take_spool(uuid, text, numeric, integer) from public, anon;
-grant execute on function public.admin_take_spool(uuid, text, numeric, integer) to authenticated;
+revoke all on function public.admin_take_spool(uuid, text, numeric, integer, integer, date) from public, anon;
+grant execute on function public.admin_take_spool(uuid, text, numeric, integer, integer, date) to authenticated;
 
 -- Retirer une bobine jamais utilisée (erreur de saisie) : elle revient au stock de vente.
 create or replace function public.admin_spool_delete(p_id uuid)

@@ -49,6 +49,102 @@
   function isHex(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v); }
   function errText(e) { return e && e.message ? e.message : String(e || 'erreur inconnue'); }
   function toast(t, k) { if (window.caDialog && caDialog.toast) caDialog.toast(t, k); }
+  function normTxt(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+
+  /* ---- Pastille d'un filament : sa couleur (dégradé si multicolore) + paillettes Sparkle / Galaxy ---- */
+  function filBg(f, hex) {
+    var cs = (f && f.attrs && Array.isArray(f.attrs.colors) ? f.attrs.colors : []).filter(isHex), bg;
+    if (cs.length >= 2) {
+      var n = cs.length, parts = [];
+      for (var i = 0; i < n; i++) parts.push(cs[i] + ' ' + (100 * i / n) + '%', cs[i] + ' ' + (100 * (i + 1) / n) + '%');
+      bg = 'linear-gradient(90deg,' + parts.join(',') + ')';
+    } else bg = cs[0] || (isHex(f && f.hex) ? f.hex : isHex(hex) ? hex : 'var(--line-2)');
+    return f && /sparkle|galaxy|glitter|paillet/i.test(f.material || '') ? 'var(--sparkle), ' + bg : bg;
+  }
+  function swatchBg(bg) { return '<span class="pr-sw" style="background:' + esc(bg) + '"></span>'; }
+
+  /* =========================================================
+     MENU MAISON (remplace <select> : pastille + nom + détail, recherche, groupes)
+     new Picker(hôte, { placeholder, search, items() -> [{ id, group, label, btn, meta, bg, dim }], onPick(id) })
+     ========================================================= */
+  var openPk = null;
+  document.addEventListener('mousedown', function (e) { if (openPk && !openPk.root.contains(e.target)) openPk.close(); });
+  function Picker(root, o) {
+    var self = this;
+    this.root = root; this.o = o; this.value = '';
+    root.classList.add('pr-pk');
+    root.innerHTML = '<button type="button" class="pr-pk-btn" aria-haspopup="listbox" aria-expanded="false"></button>' +
+      '<div class="pr-pk-pop" hidden>' + (o.search ? '<input type="search" class="pr-pk-q" placeholder="Rechercher…" autocomplete="off" aria-label="Rechercher">' : '') +
+      '<div class="pr-pk-list" role="listbox"></div></div>';
+    this.btn = $('.pr-pk-btn', root); this.pop = $('.pr-pk-pop', root); this.list = $('.pr-pk-list', root); this.q = $('.pr-pk-q', root);
+    if (root.getAttribute('aria-labelledby')) this.btn.setAttribute('aria-labelledby', root.getAttribute('aria-labelledby'));
+    this.btn.addEventListener('click', function () { if (self.pop.hidden) self.open(); else self.close(); });
+    this.btn.addEventListener('keydown', function (e) {
+      if (self.pop.hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); self.open(); }
+    });
+    root.addEventListener('keydown', function (e) {
+      if (self.pop.hidden) return;
+      if (e.key === 'Escape') { e.preventDefault(); self.close(); self.btn.focus(); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); self.move(e.key === 'ArrowDown' ? 1 : -1); }
+      else if (e.key === 'Enter') { var a = $('.pr-pk-it.is-active', self.list); if (a) { e.preventDefault(); self.pick(a.getAttribute('data-id')); } }
+      else if (e.key === 'Tab') self.close();
+    });
+    if (this.q) this.q.addEventListener('input', function () { self.renderList(); });
+    this.list.addEventListener('click', function (e) { var it = e.target.closest('.pr-pk-it'); if (it) self.pick(it.getAttribute('data-id')); });
+    this.list.addEventListener('mousemove', function (e) {
+      var it = e.target.closest('.pr-pk-it');
+      if (it && !it.classList.contains('is-active')) { $$('.pr-pk-it.is-active', self.list).forEach(function (x) { x.classList.remove('is-active'); }); it.classList.add('is-active'); }
+    });
+    this.render();
+  }
+  Picker.prototype.items = function () { return this.o.items() || []; };
+  Picker.prototype.find = function (id) { return this.items().filter(function (x) { return String(x.id) === String(id); })[0] || null; };
+  Picker.prototype.set = function (id) { this.value = id ? String(id) : ''; this.render(); };
+  Picker.prototype.render = function () {
+    var it = this.value ? this.find(this.value) : null;
+    if (this.value && !it) this.value = '';
+    this.btn.innerHTML = it
+      ? (it.bg ? swatchBg(it.bg) : '') + '<span class="pr-pk-l">' + esc(it.btn || it.label) + '</span>' + (it.meta ? '<span class="pr-pk-m">' + esc(it.meta) + '</span>' : '')
+      : '<span class="pr-pk-l pr-pk-ph">' + esc(this.o.placeholder || 'Choisir…') + '</span>';
+    if (!this.pop.hidden) this.renderList();
+  };
+  Picker.prototype.renderList = function () {
+    var qv = this.q ? normTxt(this.q.value).trim() : '', self = this, last = null, html = '';
+    var list = this.items().filter(function (x) { return !qv || normTxt([x.group, x.label, x.meta, x.find].join(' ')).indexOf(qv) !== -1; });
+    list.forEach(function (x) {
+      if (x.group && x.group !== last) { html += '<div class="pr-pk-g">' + esc(x.group) + '</div>'; last = x.group; }
+      var sel = String(x.id) === self.value;
+      html += '<button type="button" tabindex="-1" role="option" aria-selected="' + sel + '" class="pr-pk-it' + (x.dim ? ' is-dim' : '') + (sel ? ' is-sel is-active' : '') +
+        '" data-id="' + esc(x.id) + '">' + (x.bg ? swatchBg(x.bg) : '') + '<span class="pr-pk-l">' + esc(x.label) + '</span>' +
+        (x.meta ? '<span class="pr-pk-m">' + esc(x.meta) + '</span>' : '') + '</button>';
+    });
+    this.list.innerHTML = html || '<p class="pr-pk-empty">Aucun résultat.</p>';
+    if (!$('.pr-pk-it.is-active', this.list)) { var f = $('.pr-pk-it', this.list); if (f) f.classList.add('is-active'); }
+  };
+  Picker.prototype.open = function () {
+    if (openPk && openPk !== this) openPk.close();
+    openPk = this;
+    if (this.q) this.q.value = '';
+    this.pop.hidden = false; this.btn.setAttribute('aria-expanded', 'true');
+    this.renderList();
+    var a = $('.pr-pk-it.is-active', this.list); if (a) a.scrollIntoView({ block: 'nearest' });
+    (this.q || this.btn).focus();
+  };
+  Picker.prototype.close = function () {
+    this.pop.hidden = true; this.btn.setAttribute('aria-expanded', 'false');
+    if (openPk === this) openPk = null;
+  };
+  Picker.prototype.move = function (d) {
+    var its = $$('.pr-pk-it', this.list); if (!its.length) return;
+    var i = its.indexOf($('.pr-pk-it.is-active', this.list));
+    if (i >= 0) its[i].classList.remove('is-active');
+    i = Math.max(0, Math.min(its.length - 1, i + d));
+    its[i].classList.add('is-active'); its[i].scrollIntoView({ block: 'nearest' });
+  };
+  Picker.prototype.pick = function (id) {
+    this.value = String(id); this.close(); this.render(); this.btn.focus();
+    if (this.o.onPick) this.o.onPick(this.value);
+  };
 
   var loaded = false, saving = false;
   var spacers = [], filaments = [], spools = [], uses = [], prods = [];
@@ -59,7 +155,7 @@
   var lastLoops = 1;
 
   var el = {
-    takeOpen: $('#pr-take-open'), take: $('#pr-take'), takeFil: $('#pr-take-fil'), takeKind: $('#pr-take-kind'),
+    takeOpen: $('#pr-take-open'), take: $('#pr-take'), takeFil: $('#pr-take-fil'), takeKind: $('#pr-take-kind'), takeQty: $('#pr-take-qty'),
     takeCost: $('#pr-take-cost'), takeWeight: $('#pr-take-weight'), takeSave: $('#pr-take-save'),
     takeCancel: $('#pr-take-cancel'), takeStatus: $('#pr-take-status'),
     spools: $('#pr-spools'), doneWrap: $('#pr-done-wrap'), doneN: $('#pr-done-n'), done: $('#pr-done'),
@@ -134,7 +230,9 @@
   function leftOf(s) { return (+s.weight_g || 0) - usedOf(s.id); }
   function activeSpools() { return spools.filter(function (s) { return s.status === 'active'; }); }
   function kindTxt(k) { return k === 'refill' ? 'Recharge' : 'Bobine'; }
-  function swatch(hex) { return '<span class="pr-sw" style="background:' + (isHex(hex) ? hex : 'var(--line-2)') + '"></span>'; }
+  function swatch(hex) { return swatchBg(isHex(hex) ? hex : 'var(--line-2)'); }
+  // pastille d'une bobine de production : celle de son filament (multicolore, paillettes), sinon sa couleur figée
+  function spoolBg(s) { return s ? filBg(filById(s.product_id), s.hex) : 'var(--line-2)'; }
   // « Bambu Lab · PETG Basic · Black » -> « PETG Basic · Black » (la marque prend de la place)
   function shortLabel(s) { var p = String(s.label || '').split(' · '); return p.length > 2 ? p.slice(1).join(' · ') : (s.label || ''); }
 
@@ -154,7 +252,7 @@
         ? '<button class="btn btn-ghost btn-sm" type="button" data-act="close">Terminer</button>'
         : '<button class="btn btn-ghost btn-sm" type="button" data-act="remove" title="Remettre au stock de vente">Retirer</button>';
     return '<div class="pr-spool' + (done ? ' is-done' : '') + '" data-id="' + esc(s.id) + '">' +
-      swatch(s.hex) +
+      swatchBg(spoolBg(s)) +
       '<div class="pr-sp-main"><b>' + esc(s.label) + '</b><span class="pr-sp-meta">' + esc(meta.join(' · ')) + '</span></div>' +
       (done
         ? '<span class="pr-sp-left">' + grams(used) + ' · ' + n + ' prod.' + (left > 0.5 ? ' · perte ' + grams(left) : '') + '</span>'
@@ -203,60 +301,82 @@
     });
   }
 
-  // --- Sortir une bobine du stock de vente ---
-  function renderTakeOptions() {
-    var cur = el.takeFil.value;
-    var groups = {}, order = [];
-    filaments.forEach(function (f) {
-      var g = (f.brand || '') + ' · ' + (f.material || '');
-      if (!groups[g]) { groups[g] = []; order.push(g); }
-      groups[g].push(f);
-    });
-    el.takeFil.innerHTML = '<option value="">— Choisir le filament —</option>' + order.map(function (g) {
-      return '<optgroup label="' + esc(g) + '">' + groups[g].map(function (f) {
+  // --- Sortir des bobines du stock de vente (une ou plusieurs d'un coup) ---
+  function stockOf(f, kind) { return Math.max(0, (kind === 'refill' ? f.qty_2 : f.qty) | 0); }
+  // en stock d'abord dans chaque marque · matière ; rupture grisée (reste choisissable)
+  var takePk = new Picker(el.takeFil, {
+    placeholder: 'Choisir le filament', search: true,
+    items: function () {
+      return filaments.map(function (f) {
         var st = [];
         if ((f.qty | 0) > 0) st.push((f.qty | 0) + ' bob.');
         if ((f.qty_2 | 0) > 0) st.push((f.qty_2 | 0) + ' rech.');
-        return '<option value="' + esc(f.id) + '">' + esc(f.name) + (st.length ? ' — ' + st.join(' · ') : ' — rupture') + '</option>';
-      }).join('') + '</optgroup>';
-    }).join('');
-    if (cur && filById(cur)) el.takeFil.value = cur;
+        return { id: f.id, group: (f.brand || '') + ' · ' + (f.material || ''), label: f.name || '(sans nom)',
+          btn: (f.material ? f.material + ' · ' : '') + (f.name || ''), meta: st.length ? st.join(' · ') : 'rupture',
+          bg: filBg(f), dim: !st.length, find: f.brand };
+      });
+    },
+    onPick: function () { takeDefaults(true); }
+  });
+  function takeKind() { var b = $('.fx-seg-btn.is-active', el.takeKind); return b ? b.getAttribute('data-kind') : 'spool'; }
+  function setTakeKind(k) {
+    $$('.fx-seg-btn', el.takeKind).forEach(function (b) {
+      var on = b.getAttribute('data-kind') === k;
+      b.classList.toggle('is-active', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+  // libellés du format avec le stock (« Bobine · 3 ») + bouton « Sortir 4 bobines »
+  function takeLabels() {
+    var f = filById(takePk.value), n = Math.max(1, num(el.takeQty.value) | 0), k = takeKind();
+    $$('.fx-seg-btn', el.takeKind).forEach(function (b) {
+      var kk = b.getAttribute('data-kind');
+      b.innerHTML = kindTxt(kk) + (f ? ' <em>' + stockOf(f, kk) + '</em>' : '');
+    });
+    var word = k === 'refill' ? 'recharge' : 'bobine';
+    el.takeSave.textContent = 'Sortir ' + (n > 1 ? n + ' ' + word + 's' : '1 ' + word);
+    var over = f ? n - stockOf(f, k) : 0;
+    el.takeStatus.textContent = over > 0 ? over + ' hors stock' : '';
   }
   function takeDefaults(kindToo) {
-    var f = filById(el.takeFil.value);
-    if (!f) { el.takeCost.value = ''; return; }
-    if (kindToo) el.takeKind.value = (f.qty | 0) > 0 ? 'spool' : (f.qty_2 | 0) > 0 ? 'refill' : 'spool';
-    var c = window.CA.costing ? window.CA.costing.costOf(f, el.takeKind.value, filaments) : null;
+    var f = filById(takePk.value);
+    if (f && kindToo) setTakeKind(stockOf(f, 'spool') > 0 ? 'spool' : stockOf(f, 'refill') > 0 ? 'refill' : 'spool');
+    var c = f && window.CA.costing ? window.CA.costing.costOf(f, takeKind(), filaments) : null;
     el.takeCost.value = c != null ? (+c).toFixed(2) : '';
+    takeLabels();
   }
+  function renderTakeOptions() { takePk.render(); takeLabels(); }
+  el.takeKind.addEventListener('click', function (e) {
+    var b = e.target.closest('.fx-seg-btn'); if (!b) return;
+    setTakeKind(b.getAttribute('data-kind')); takeDefaults(false);
+  });
+  el.takeQty.addEventListener('input', takeLabels);
   el.takeOpen.addEventListener('click', function () {
     el.take.hidden = !el.take.hidden;
     if (!el.take.hidden) {
       var last = null;
       try { last = localStorage.getItem('pr-last-fil'); } catch (e) {}
-      if (!el.takeFil.value && last && filById(last)) el.takeFil.value = last;
+      if (!takePk.value && last && filById(last)) takePk.set(last);
+      el.takeQty.value = 1;
       takeDefaults(true);
-      el.takeStatus.textContent = '';
-      el.takeFil.focus();
+      takePk.btn.focus();
     }
   });
   el.takeCancel.addEventListener('click', function () { el.take.hidden = true; });
-  el.takeFil.addEventListener('change', function () { takeDefaults(true); });
-  el.takeKind.addEventListener('change', function () { takeDefaults(false); });
   el.take.addEventListener('submit', function (e) {
     e.preventDefault();
-    var f = filById(el.takeFil.value);
+    var f = filById(takePk.value);
     if (!f) { el.takeStatus.textContent = 'Choisis le filament.'; return; }
-    var cost = num(el.takeCost.value), w = Math.round(num(el.takeWeight.value) || 0);
+    var cost = num(el.takeCost.value), w = Math.round(num(el.takeWeight.value) || 0), n = Math.max(1, Math.min(50, num(el.takeQty.value) | 0));
     if (cost == null || cost < 0) { el.takeStatus.textContent = 'Indique le prix payé.'; return; }
     if (w < 1) { el.takeStatus.textContent = 'Indique le poids.'; return; }
     el.takeSave.disabled = true; el.takeStatus.textContent = 'Enregistrement…';
-    sb.rpc('admin_take_spool', { p_product: f.id, p_kind: el.takeKind.value, p_cost: round2(cost), p_weight: w }).then(function (res) {
+    sb.rpc('admin_take_spool', { p_product: f.id, p_kind: takeKind(), p_cost: round2(cost), p_weight: w, p_count: n, p_date: todayISO() }).then(function (res) {
       el.takeSave.disabled = false;
       if (res.error) { el.takeStatus.textContent = 'Erreur : ' + res.error.message; return; }
       try { localStorage.setItem('pr-last-fil', f.id); } catch (e) {}
       el.take.hidden = true; el.takeStatus.textContent = '';
-      toast(res.data && res.data.taken ? 'Bobine sortie du stock' : 'Bobine ajoutée · stock déjà à 0');
+      var taken = (res.data && res.data.taken) | 0, word = takeKind() === 'refill' ? 'recharge' : 'bobine';
+      toast(n + ' ' + word + (n > 1 ? 's' : '') + ' en production' + (taken < n ? ' · ' + (n - taken) + ' hors stock' : ''));
       reloadAfterChange();
     }, function (err) { el.takeSave.disabled = false; el.takeStatus.textContent = 'Erreur : ' + errText(err); });
   });
@@ -367,7 +487,7 @@
     el.loops.value = info.loops; lastLoops = info.loops;
     el.timeH.value = Math.floor(info.minutes / 60); el.timeM.value = info.minutes % 60;
     var guess = detectSpacer(name);
-    if (guess) el.spacer.value = guess.id;
+    if (guess) spacerPk.set(guess.id);
     applyPerPlate();
     rows = buildRows();
     renderRows(); recalc();
@@ -390,7 +510,7 @@
   // Pièces par plateau : dernière production de ce spacer, sinon les objets du plateau
   function applyPerPlate() {
     if (edited.perPlate) return;
-    var sp = spacerById(el.spacer.value);
+    var sp = spacerById(spacerPk.value);
     var last = sp ? prods.filter(function (p) { return String(p.spacer_id) === String(sp.id); })[0] : null;
     var v = last ? last.per_plate : (file && file.objects > 0 ? file.objects : (num(el.perPlate.value) || 1));
     el.perPlate.value = Math.max(1, v | 0);
@@ -435,12 +555,13 @@
     });
     return rows;
   }
-  function spoolOptions(sel) {
-    return '<option value="">— Choisir la bobine —</option>' + activeSpools().map(function (s) {
-      // court (le menu est étroit) : matière · couleur · grammes restants
-      return '<option value="' + esc(s.id) + '"' + (String(sel) === String(s.id) ? ' selected' : '') + '>' +
-        esc(shortLabel(s)) + ' · ' + grams(leftOf(s)) + '</option>';
-    }).join('');
+  // bobines en production pour le menu d'une rangée : marque · matière, couleur, grammes restants
+  function spoolItems() {
+    return activeSpools().map(function (s) {
+      var p = String(s.label || '').split(' · '), left = leftOf(s);
+      return { id: s.id, group: p.length > 2 ? p.slice(0, 2).join(' · ') : '', label: (p.length > 2 ? p.slice(2).join(' · ') : s.label) + (s.kind === 'refill' ? ' · recharge' : ''),
+        btn: shortLabel(s), meta: grams(left), bg: spoolBg(s), dim: left <= 0.05, find: s.label };
+    });
   }
   function renderRows() {
     if (!rows.length) {
@@ -449,14 +570,24 @@
     }
     el.uses.innerHTML = rows.map(function (r, i) {
       return '<div class="pr-use" data-i="' + i + '">' +
-        '<span class="pr-use-sw" title="' + esc(r.type ? 'Fichier : ' + r.type : '') + '">' + swatch(r.hex) + '</span>' +
-        '<select class="pr-use-spool" aria-label="Bobine">' + spoolOptions(r.spool) + '</select>' +
+        // pastille de gauche = couleur demandée par le G-code (la bobine choisie a la sienne dans le menu)
+        '<span class="pr-use-sw" title="' + esc(r.type ? 'G-code : ' + r.type : '') + '"' + (r.hex ? '' : ' style="visibility:hidden"') + '>' + swatch(r.hex) + '</span>' +
+        '<div class="pr-use-spool"></div>' +
         '<span class="unit unit-sm" data-unit="g"><input type="number" class="pr-use-g num" min="0" step="0.1" value="' + esc(r.grams) + '" aria-label="Grammes"></span>' +
         '<span class="pr-use-cost"></span>' +
         '<button class="pr-x" type="button" aria-label="Retirer cette rangée"' + (rows.length > 1 ? '' : ' hidden') + '>×</button>' +
         '<p class="pr-use-warn" hidden></p>' +
       '</div>';
     }).join('');
+    $$('.pr-use', el.uses).forEach(function (row) {
+      var i = +row.getAttribute('data-i');
+      var pk = new Picker($('.pr-use-spool', row), {
+        placeholder: 'Choisir la bobine', search: activeSpools().length > 6, items: spoolItems,
+        onPick: function (id) { rows[i].spool = id; refreshRows(); recalc(); }
+      });
+      pk.btn.setAttribute('aria-label', 'Bobine');
+      pk.set(rows[i].spool);
+    });
     refreshRows();
   }
   // coûts et alertes de chaque rangée (sans reconstruire les champs en cours de saisie)
@@ -472,18 +603,12 @@
       }
       var w = $('.pr-use-warn', row);
       w.innerHTML = warn; w.hidden = !warn;
-      var hex = s ? s.hex : r.hex;
-      $('.pr-sw', row).style.background = isHex(hex) ? hex : 'var(--line-2)';
     });
   }
   function rowCost(r) {
     var s = spoolById(r.spool);
     return s ? round2((+r.grams || 0) * (+s.unit_cost || 0) / (+s.weight_g || 1000)) : 0;
   }
-  el.uses.addEventListener('change', function (e) {
-    var row = e.target.closest('.pr-use'); if (!row) return;
-    if (e.target.classList.contains('pr-use-spool')) { rows[+row.getAttribute('data-i')].spool = e.target.value; refreshRows(); recalc(); }
-  });
   el.uses.addEventListener('input', function (e) {
     var row = e.target.closest('.pr-use'); if (!row) return;
     if (e.target.classList.contains('pr-use-g')) { rows[+row.getAttribute('data-i')].grams = num(e.target.value) || 0; refreshRows(); recalc(); }
@@ -508,11 +633,23 @@
   el.useAdd.addEventListener('click', function () {
     rows.push({ spool: '', grams: 0, type: '', hex: '' });
     renderRows(); recalc();
-    var last = $$('.pr-use-spool', el.uses).pop(); if (last) last.focus();
+    var last = $$('.pr-use-spool .pr-pk-btn', el.uses).pop(); if (last) last.focus();
   });
 
   /* ---- champs ---- */
-  el.spacer.addEventListener('change', function () { applyPerPlate(); recalc(); });
+  // spacer : code maison + n° remplacés + stock ; recherche aussi par anciens noms
+  function refsOf(sp) { return ((sp.attrs && sp.attrs.replaces) || []).map(function (r) { return r && r.ref; }).filter(Boolean); }
+  var spacerPk = new Picker(el.spacer, {
+    placeholder: 'Choisir le spacer', search: true,
+    items: function () {
+      return spacers.map(function (sp) {
+        var refs = refsOf(sp), n = sp.qty | 0;
+        return { id: sp.id, label: sp.name, meta: (refs.length ? refs.join(', ') + ' · ' : '') + n + ' paire' + (n > 1 ? 's' : ''),
+          find: ((sp.attrs && sp.attrs.aliases) || []).join(' ') + ' ' + (sp.slug || '') };
+      });
+    },
+    onPick: function () { applyPerPlate(); recalc(); }
+  });
   el.loops.addEventListener('input', function () {
     var n = Math.max(1, num(el.loops.value) | 0);
     // les grammes suivent le nombre de loops
@@ -524,14 +661,7 @@
   el.good.addEventListener('input', function () { edited.good = true; recalc(); });
   [el.timeH, el.timeM, el.date].forEach(function (x) { x.addEventListener('input', recalc); });
 
-  function renderSpacerOptions() {
-    var cur = el.spacer.value;
-    el.spacer.innerHTML = '<option value="">— Choisir le spacer —</option>' + spacers.map(function (sp) {
-      var refs = ((sp.attrs && sp.attrs.replaces) || []).map(function (r) { return r && r.ref; }).filter(Boolean);
-      return '<option value="' + esc(sp.id) + '">' + esc(sp.name) + (refs.length ? ' — ' + esc(refs.join(', ')) : '') + '</option>';
-    }).join('');
-    if (cur && spacerById(cur)) el.spacer.value = cur;
-  }
+  function renderSpacerOptions() { spacerPk.render(); }
 
   /* ---- calcul (même règle que admin_save_production) ---- */
   function minutesOf() { return Math.max(0, (num(el.timeH.value) || 0) * 60 + (num(el.timeM.value) || 0)); }
@@ -540,7 +670,7 @@
     return (ac != null && ac !== '' && isFinite(+ac)) ? +ac : (+(sp && sp.cost_price) || 0);
   }
   function calc() {
-    var sp = spacerById(el.spacer.value);
+    var sp = spacerById(spacerPk.value);
     var used = rows.filter(function (r) { return r.spool && (+r.grams || 0) > 0; });
     var g = used.reduce(function (s, r) { return s + (+r.grams || 0); }, 0);
     var fil = used.reduce(function (s, r) { return s + rowCost(r); }, 0);
@@ -645,7 +775,7 @@
       '</tr></thead><tbody>' + prods.map(function (p) {
         var fil = (byProd[p.id] || []).map(function (u) {
           var s = spoolById(u.spool_id);
-          return '<span class="pr-hfil">' + swatch(s && s.hex) + esc(s ? shortLabel(s) : 'Bobine retirée') + ' <em>' + grams(u.grams) + '</em></span>';
+          return '<span class="pr-hfil">' + swatchBg(spoolBg(s)) + esc(s ? shortLabel(s) : 'Bobine retirée') + ' <em>' + grams(u.grams) + '</em></span>';
         }).join('');
         var canDel = latest[String(p.spacer_id)] === p.id;
         return '<tr data-id="' + esc(p.id) + '">' +

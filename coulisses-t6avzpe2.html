@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=69">
+<link rel="stylesheet" href="assets/admin.css?v=70">
 <link rel="stylesheet" href="assets/facture.css?v=25">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
@@ -721,18 +721,22 @@
         <form class="pr-take" id="pr-take" hidden>
           <div class="pr-take-grid">
             <div class="field pr-take-fil">
-              <label class="lbl" for="pr-take-fil">Filament</label>
-              <select id="pr-take-fil"></select>
+              <label class="lbl" id="pr-take-fil-l">Filament</label>
+              <div id="pr-take-fil" aria-labelledby="pr-take-fil-l"></div>
+            </div>
+            <div class="field pr-take-kind">
+              <label class="lbl" id="pr-take-kind-l">Format</label>
+              <div class="fx-seg pr-seg" id="pr-take-kind" role="radiogroup" aria-labelledby="pr-take-kind-l">
+                <button type="button" class="fx-seg-btn is-active" data-kind="spool" role="radio" aria-checked="true">Bobine</button>
+                <button type="button" class="fx-seg-btn" data-kind="refill" role="radio" aria-checked="false">Recharge</button>
+              </div>
             </div>
             <div class="field">
-              <label class="lbl" for="pr-take-kind">Format</label>
-              <select id="pr-take-kind">
-                <option value="spool">Bobine</option>
-                <option value="refill">Recharge</option>
-              </select>
+              <label class="lbl" for="pr-take-qty">Quantité</label>
+              <input type="number" id="pr-take-qty" min="1" max="50" step="1" value="1" class="num">
             </div>
             <div class="field">
-              <label class="lbl" for="pr-take-cost">Prix payé</label>
+              <label class="lbl" for="pr-take-cost">Prix / unité</label>
               <span class="unit" data-unit="$"><input type="number" id="pr-take-cost" min="0" step="0.01" class="money"></span>
             </div>
             <div class="field">
@@ -770,8 +774,8 @@
             <div class="al-card-head"><span class="al-ic al-step">2</span> Production</div>
             <div class="grid pr-grid">
               <div class="field col-2">
-                <label class="lbl" for="pr-spacer">Spacer</label>
-                <select id="pr-spacer"></select>
+                <label class="lbl" id="pr-spacer-l">Spacer</label>
+                <div id="pr-spacer" aria-labelledby="pr-spacer-l"></div>
               </div>
               <div class="field">
                 <label class="lbl" for="pr-loops">Loops</label>
@@ -1919,6 +1923,6 @@
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
 <script src="assets/cms-autoloop.js?v=41"></script>
-<script src="assets/cms-production.js?v=2"></script>
+<script src="assets/cms-production.js?v=3"></script>
 </body>
 </html>
