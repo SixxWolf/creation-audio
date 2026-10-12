@@ -180,8 +180,9 @@
   function loadAll() {
     return Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : null,
-      loadSpacers(), loadFilaments(), loadSpools(), loadProds(), loadRates()
+      loadSpacers(), loadFilaments(), loadSpools(), loadProds(), loadRates(), loadBrandOrder()
     ]).then(function () {
+      sortAll();
       renderSpools(); renderTakeOptions(); renderSpacerOptions(); renderRows(); recalc(); renderHistory();
     }, function (err) {
       el.spools.innerHTML = '<p class="empty">Impossible de charger : ' + esc(errText(err)) + '</p>';
@@ -223,6 +224,39 @@
     }, function () {});
   }
 
+  /* ---- Ordre de la section Filaments (peu importe quand la bobine a été sortie) :
+     marque (brands.sort_order) → matériau (materials.sort_order) → couleur (sort_order) ;
+     bobine avant recharge ; à filament égal, la plus vieille d'abord (consommée en premier). ---- */
+  var brandOrder = [];
+  function loadBrandOrder() {
+    return sb.from('brands').select('name,sort_order').order('sort_order', { ascending: true }).order('name', { ascending: true })
+      .then(function (res) { if (!res.error) brandOrder = (res.data || []).map(function (b) { return b.name; }); }, function () {});
+  }
+  function brandIdx(name) { var i = brandOrder.indexOf(name); return i < 0 ? 9999 : i; }
+  function matIdx(brand, mat) {
+    var list = (window.CA.materials && window.CA.materials.list) || [];
+    for (var i = 0; i < list.length; i++) { if (list[i].brand === brand && list[i].name === mat) return i; }
+    return 9999;
+  }
+  function stableSort(arr, cmp) {
+    return arr.map(function (x, i) { return { x: x, i: i }; })
+      .sort(function (a, z) { return cmp(a.x, z.x) || (a.i - z.i); }).map(function (d) { return d.x; });
+  }
+  function sortAll() {
+    // filaments : chargés par marque/matériau alphabétiques puis sort_order -> réordonnés marque/matériau seulement
+    filaments = stableSort(filaments, function (a, z) {
+      return (brandIdx(a.brand) - brandIdx(z.brand)) || (matIdx(a.brand, a.material) - matIdx(z.brand, z.material));
+    });
+    var rank = {};
+    filaments.forEach(function (f, i) { rank[f.id] = i; });
+    var rk = function (s) { return rank[s.product_id] != null ? rank[s.product_id] : 1e6; };
+    // bobines : chargées par date de sortie -> l'ordre d'origine départage les bobines du même filament
+    spools = stableSort(spools, function (a, z) {
+      return (rk(a) - rk(z)) || ((a.kind === 'refill' ? 1 : 0) - (z.kind === 'refill' ? 1 : 0)) ||
+        (rk(a) === 1e6 ? String(a.label).localeCompare(String(z.label), 'fr') : 0);
+    });
+  }
+
   function spoolById(id) { return spools.filter(function (s) { return String(s.id) === String(id); })[0] || null; }
   function spacerById(id) { return spacers.filter(function (s) { return String(s.id) === String(id); })[0] || null; }
   function filById(id) { return filaments.filter(function (f) { return String(f.id) === String(id); })[0] || null; }
@@ -262,7 +296,7 @@
     '</div>';
   }
   function renderSpools() {
-    var act = activeSpools(), done = spools.filter(function (s) { return s.status === 'done'; }).reverse();
+    var act = activeSpools(), done = spools.filter(function (s) { return s.status === 'done'; });
     el.spools.innerHTML = act.length ? act.map(function (s) { return spoolRow(s, false); }).join('')
       : '<p class="muted pr-empty">Aucune bobine en production.</p>';
     el.doneWrap.hidden = !done.length;
@@ -773,7 +807,7 @@
     el.history.innerHTML = '<div class="rcp-table-wrap"><table class="rcp-table pr-table"><thead><tr>' +
       '<th>Date</th><th>Spacer</th><th>Filament</th><th class="num">Pièces</th><th class="num">Paires</th><th class="num">Coût / paire</th><th></th>' +
       '</tr></thead><tbody>' + prods.map(function (p) {
-        var fil = (byProd[p.id] || []).map(function (u) {
+        var fil = (byProd[p.id] || []).slice().sort(function (a, z) { return spools.indexOf(spoolById(a.spool_id)) - spools.indexOf(spoolById(z.spool_id)); }).map(function (u) {
           var s = spoolById(u.spool_id);
           return '<span class="pr-hfil">' + swatchBg(spoolBg(s)) + esc(s ? shortLabel(s) : 'Bobine retirée') + ' <em>' + grams(u.grams) + '</em></span>';
         }).join('');
