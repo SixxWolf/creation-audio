@@ -58,9 +58,14 @@
       var on = b.getAttribute('data-sub') === curSub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on));
     });
-    if (bodyEl) bodyEl.hidden = (curSub !== 'apercu');
-    if (soldEl) soldEl.hidden = (curSub !== 'produits');
+    // grand écran (≥ 1600 px, CA.wideLayout) : Vue d'ensemble et Produits vendus côte à côte
+    var both = !!(panelEl && panelEl.classList.contains('is-wide'));
+    if (bodyEl) bodyEl.hidden = !both && (curSub !== 'apercu');
+    if (soldEl) soldEl.hidden = !both && (curSub !== 'produits');
   }
+  var panelEl = bodyEl && bodyEl.closest('.tabpanel');
+  if (panelEl) panelEl.addEventListener('ca:wide', function () { showSub(curSub); });
+  if (window.CA.wideLayout && panelEl) window.CA.wideLayout(panelEl);
   $$('.stat-subtab').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var sub = btn.getAttribute('data-sub');

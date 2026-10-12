@@ -518,6 +518,21 @@
 .stat-chip { display:inline-block; flex:none; width:14px; height:14px; margin-right:8px; vertical-align:-2px; border-radius:50%;
   box-shadow:inset 0 0 0 1px rgba(0,0,0,.16); }
 
+/* Grand écran (≥ 1600 px — 2026-10-12) : Vue d'ensemble | Produits vendus côte à côte, sans sous-onglets */
+@media screen and (min-width:1600px) {
+  .tabpanel[data-panel="statistiques"].is-wide:not([hidden]) { display:grid; grid-template-columns:minmax(0, 1fr) minmax(560px, .8fr);
+    column-gap:20px; align-items:start; grid-template-areas:"head head" "filt filt" "body sold"; }
+  .tabpanel[data-panel="statistiques"].is-wide > .panel-head { grid-area:head; }
+  .tabpanel[data-panel="statistiques"].is-wide > .stat-subtabs { display:none; }
+  .tabpanel[data-panel="statistiques"].is-wide > .stat-filters { grid-area:filt; }
+  .tabpanel[data-panel="statistiques"].is-wide > #stat-body { grid-area:body; min-width:0; }
+  .tabpanel[data-panel="statistiques"].is-wide > #stat-sold { grid-area:sold; min-width:0; }
+  /* colonne plus étroite : les noms passent à la ligne plutôt que d'être coupés (comme sur mobile) */
+  .tabpanel[data-panel="statistiques"].is-wide .stat-soldname { align-items:flex-start; }
+  .tabpanel[data-panel="statistiques"].is-wide .stat-soldlabel { white-space:normal; line-height:1.35; }
+  .tabpanel[data-panel="statistiques"].is-wide .stat-soldname .stat-chip { margin-top:2px; }
+}
+
 /* onglet Produits vendus */
 .stat-soldpanel + .stat-soldpanel { margin-top:16px; }
 .stat-soldhead { display:flex; align-items:baseline; flex-wrap:wrap; gap:12px; margin-bottom:8px; }
