@@ -93,7 +93,8 @@
        afficher « couche x / total » → multiplié par le nombre de loops.       */
   var RE_M73 = /^M73 (?:P(\d+) R(\d+)|L(\d+))[^\r\n]*/gm;
   var RE_TOTAL_LAYERS = /^(; total layer number: )(\d+)/m;
-  var EJECT_MIN = 1;   // flexion + push + balayages + parking ≈ 1 min (hors cooldown)
+  var COOL_WAITS = 6;  // M190 répétés au cooldown (voir buildTransition)
+  var EJECT_MIN = 1;  // flexion + push + balayages + parking ≈ 1 min (hors cooldown)
 
   // Remplace la ligne de purge native par une purge en goulotte. Séquence reprise
   // du fichier FarmLoop qui imprimait déjà ; la température M109 est celle du bloc
@@ -341,8 +342,16 @@
       L.push('M106 P2 S255 ; turn on remote part cooling fan');
       L.push('');
       L.push(';Cooldown Start');
-      L.push(opts.coolMode === 'temp' ? ('M190 S' + Math.round(opts.coolTemp) + ' ; attendre température plateau')
-                                       : ('G4 S' + Math.round(opts.coolSec) + ' ; délai fixe'));
+      if (opts.coolMode === 'temp') {
+        // Le M190 du firmware Bambu abandonne au bout d'un délai quand il attend un
+        // refroidissement (relâchait ~5-10 °C trop chaud près de l'ambiante) : on le
+        // répète — un M190 déjà atteint passe aussitôt, sinon il relance l'attente.
+        for (var w = 0; w < COOL_WAITS; w++) {
+          L.push('M190 S' + Math.round(opts.coolTemp) + ' ; attendre température plateau (' + (w + 1) + '/' + COOL_WAITS + ')');
+        }
+      } else {
+        L.push('G4 S' + Math.round(opts.coolSec) + ' ; délai fixe');
+      }
       L.push(';Cooldown End');
     }
     // Flexion (bending motion)
