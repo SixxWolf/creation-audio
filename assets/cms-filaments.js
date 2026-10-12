@@ -280,8 +280,13 @@
     });
     syncMaterialUI();
     statusEl.textContent = '';
-    // position : sous la carte cliquée (édition) ou en haut (nouveau filament)
-    if (cardEl && cardEl.parentNode) {
+    // position : grand écran = colonne collée à droite (CA.dockEditor, la liste reste visible) ;
+    // sinon sous la carte cliquée (édition) ou en haut (nouveau filament)
+    var docked = false;
+    if (CA.dockEditor) { moveEditorHome(); docked = CA.dockEditor(editor); }
+    if (docked) {
+      // rien à faire : la colonne est collée à l'écran
+    } else if (cardEl && cardEl.parentNode) {
       cardEl.insertAdjacentElement('afterend', editor);
       editor.classList.add('is-inline');
     } else {
@@ -289,7 +294,8 @@
     }
     editor.hidden = false;
     nameI.focus({ preventScroll: true });
-    editor.scrollIntoView({ behavior: 'smooth', block: cardEl ? 'nearest' : 'start' });
+    if (docked) editor.parentNode.scrollTop = 0;
+    else editor.scrollIntoView({ behavior: 'smooth', block: cardEl ? 'nearest' : 'start' });
   }
   function closeEditor() { moveEditorHome(); editor.hidden = true; editingId = null; pendingFile = null; }
 

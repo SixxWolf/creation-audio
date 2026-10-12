@@ -285,8 +285,13 @@ window.CA = window.CA || {};
     syncFormatUI();
     statusEl.textContent = '';
     section.hidden = false; if (toggleBtn) { toggleBtn.textContent = 'Masquer'; toggleBtn.setAttribute('aria-expanded', 'true'); }
-    // position : sous la ligne cliquée (modification) ou en haut (nouveau matériau)
-    if (rowEl && rowEl.parentNode) {
+    // position : grand écran = colonne collée à droite (CA.dockEditor, la liste reste visible) ;
+    // sinon sous la ligne cliquée (modification) ou en haut (nouveau matériau)
+    var docked = false;
+    if (window.CA.dockEditor) { moveEditorHome(); docked = window.CA.dockEditor(editor); }
+    if (docked) {
+      // rien à faire : la colonne est collée à l'écran
+    } else if (rowEl && rowEl.parentNode) {
       rowEl.insertAdjacentElement('afterend', editor);
       editor.classList.add('is-inline');
     } else {
@@ -294,7 +299,8 @@ window.CA = window.CA || {};
     }
     editor.hidden = false;
     nameI.focus({ preventScroll: true });
-    editor.scrollIntoView({ behavior: 'smooth', block: rowEl ? 'nearest' : 'start' });
+    if (docked) editor.parentNode.scrollTop = 0;
+    else editor.scrollIntoView({ behavior: 'smooth', block: rowEl ? 'nearest' : 'start' });
   }
   function closeEditor() { moveEditorHome(); editor.hidden = true; editingName = null; }
 

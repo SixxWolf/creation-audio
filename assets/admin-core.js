@@ -326,6 +326,34 @@ window.CA = window.CA || {};
     if (mq.addEventListener) mq.addEventListener('change', apply); else mq.addListener(apply);
   };
 
+  // --- Grand écran : « liste + éditeur côte à côte » ------------------------------------------
+  // CA.dockEditor(editor) : dès 1600 px, l'éditeur (formulaire .editor) rejoint la colonne collée à droite
+  // de son onglet ([data-dock], affichée seulement quand un éditeur visible s'y trouve) et renvoie true ;
+  // en dessous, renvoie false et le module le place comme avant (sous la carte, en haut…).
+  // Repassé sous 1600 px pendant qu'il est ouvert : l'éditeur revient à sa place d'origine (repère).
+  var docked = [];
+  window.CA.dockEditor = function (editor) {
+    if (!editor || !WIDE_MQ.matches) return false;
+    var panel = editor.closest('.tabpanel'), dock = panel && panel.querySelector('[data-dock]');
+    if (!dock) return false;
+    if (!editor.__dockMark) {
+      editor.__dockMark = document.createComment('dock');
+      editor.parentNode.insertBefore(editor.__dockMark, editor);
+      docked.push(editor);
+    }
+    if (editor.parentNode !== dock) dock.appendChild(editor);
+    editor.classList.remove('is-inline');
+    return true;
+  };
+  function undock() {
+    if (WIDE_MQ.matches) return;
+    docked.forEach(function (ed) {
+      if (ed.parentNode && ed.parentNode.hasAttribute('data-dock') && ed.__dockMark.parentNode)
+        ed.__dockMark.parentNode.insertBefore(ed, ed.__dockMark.nextSibling);
+    });
+  }
+  if (WIDE_MQ.addEventListener) WIDE_MQ.addEventListener('change', undock); else WIDE_MQ.addListener(undock);
+
   // API pour les sous-onglets d'un module (ex. Inventaire : réception / à commander).
   window.CA.route = {
     get: parseHash,
