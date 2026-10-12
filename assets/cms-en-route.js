@@ -354,6 +354,7 @@
         return { label: l.label || '', productId: l.product_id ? String(l.product_id) : '', kind: kindOf(l.kind), qty: l.qty | 0,
           unitCost: l.unit_cost != null ? +l.unit_cost : null, how: 'saisi', picked: false };
       });
+      sortRows();
       renderRows();
     } else {
       pasteI.value = ''; numberI.value = ''; dateI.value = todayISO();
@@ -422,6 +423,7 @@
       // garde les lignes ajoutées à la main, remplace ce qui avait été lu
       rows = rows.filter(function (r) { return r.how === 'saisi'; }).concat(res.rows);
       if (taxI && !taxI.dataset.touched) taxI.value = fmtTax(taxDefault(supplierOf(rows)));
+      sortRows();
       renderRows();
       var miss = rows.filter(function (r) { return !r.productId && r.how !== 'hors'; }).length;
       var off = rows.filter(function (r) { return !r.productId && r.how === 'hors'; }).length;
@@ -453,20 +455,9 @@
     }, function () { return { error: 'erreur' }; });
   }
 
-  // menu Article groupé par marque : la valeur affichée reste courte (« PLA Basic · Black »)
-  function options(selected) {
-    function opt(p, txt) { return '<option value="' + esc(p.id) + '"' + (String(p.id) === String(selected) ? ' selected' : '') + '>' + esc(txt) + '</option>'; }
-    var groups = [], by = {};
-    inv().filaments().forEach(function (f) {
-      var b = f.brand || 'Autres';
-      if (!by[b]) { by[b] = []; groups.push(b); }
-      by[b].push(opt(f, (f.material ? f.material + ' · ' : '') + (f.name || '(sans nom)')));
-    });
-    var acc = inv().accessories();
-    return '<option value="">— choisir —</option>' +
-      groups.map(function (b) { return '<optgroup label="' + esc(b) + '">' + by[b].join('') + '</optgroup>'; }).join('') +
-      (acc.length ? '<optgroup label="Accessoires">' + acc.map(function (a) { return opt(a, inv().label(a)); }).join('') + '</optgroup>' : '');
-  }
+  // menu Article (CA.pick) groupé par marque, ordre des Filaments, pastilles ; valeur courte (« PLA Basic · Black »)
+  function options(selected) { return inv().options(selected); }
+  function sortRows() { rows = inv().sortLines(rows, function (r) { return r.productId; }, function (r) { return r.kind; }); }
 
   var HOW = { code: ['ok', 'Reconnu'], nom: ['ok', 'Reconnu'], appris: ['ok', 'Appris'], proche: ['ia', 'Nom proche'], ia: ['ia', 'IA'],
     aucun: ['miss', 'À choisir'], hors: ['off', 'Hors catalogue'] };
@@ -507,6 +498,7 @@
       $('.po-qty', tr).addEventListener('input', function () { r.qty = Math.max(0, parseInt(this.value, 10) || 0); renderSum(); });
       $('.po-price', tr).addEventListener('input', function () { r.unitCost = this.value === '' ? null : Math.max(0, parseFloat(this.value) || 0); renderSum(); });
       $('.po-del', tr).addEventListener('click', function () { rows.splice(i, 1); renderRows(); });
+      if (window.CA.pick) window.CA.pick($('.po-fil', tr));
     });
     renderSum();
   }
@@ -594,7 +586,6 @@
   /* =========================================================
      LISTE DES COMMANDES EN ROUTE
      ========================================================= */
-  function kindTxt(k) { return k === 'refill' ? 'recharge' : (k === 'item' ? 'article' : 'bobine'); }
   function renderList(err) {
     if (!listEl) return;
     var units = 0;
@@ -606,13 +597,7 @@
     listEl.innerHTML = orders.map(function (o) {
       var tot = 0, got = 0;
       o.lines.forEach(function (l) { tot += l.qty | 0; got += Math.min(l.qty | 0, l.qty_received | 0); });
-      var lis = o.lines.filter(remaining).map(function (l) {
-        var p = l.product_id && inv() ? inv().prod(l.product_id) : null;
-        var name = p ? ((p.material ? p.material + ' · ' : '') + (p.name || '')) : (l.label || '(article retiré)');
-        var sw = p && !inv().isAcc(p) ? '<span class="ro-sw" style="background:' + esc(inv().swatch(p)) + '"></span>' : '';
-        return '<li>' + sw + '<span>' + esc(name) + ' <span class="ro-code">' + kindTxt(kindOf(l.kind)) + '</span></span>' +
-          '<span class="ro-q">×' + remaining(l) + '</span></li>';
-      }).join('');
+      var lis = inv() ? inv().orderLinesHtml(o.lines) : '';
       return '<div class="po-order" data-id="' + esc(o.id) + '">' +
         '<div class="po-order-head">' +
           '<button type="button" class="po-toggle" aria-expanded="false">' +
