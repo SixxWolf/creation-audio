@@ -140,7 +140,7 @@ window.CA = window.CA || {};
   /* ---- éléments ---- */
   var editor = $('#m-editor'), editorTitle = $('#m-editor-title'),
       nameI = $('#m-name'), hasSpoolI = $('#m-has-spool'), hasRefillI = $('#m-has-refill'),
-      sellSpoolI = $('#m-sell-spool'), sellRefillI = $('#m-sell-refill'),
+      sellSpoolI = $('#m-sell-spool'), sellRefillI = $('#m-sell-refill'), emptyI = $('#m-empty'),
       tiersSpoolEl = $('#m-tiers-spool'), tierAddSpool = $('#m-tier-add-spool'),
       tiersRefillEl = $('#m-tiers-refill'), tierAddRefill = $('#m-tier-add-refill'),
       descI = $('#m-desc'),
@@ -154,6 +154,32 @@ window.CA = window.CA || {};
       saveBtn = $('#m-save'), cancelBtn = $('#m-cancel');
 
   var editingName = null, pendingFile = null;
+
+  // Menu « Bobine vide » : accessoires de la catégorie « Bobines vides » (sinon tous) + celui déjà lié
+  var emptySeq = 0;
+  function fillEmptySelect(cur) {
+    if (!emptyI) return;
+    var seq = ++emptySeq;
+    // valeur actuelle gardée pendant le chargement (enregistrer tout de suite ne doit pas effacer le lien)
+    emptyI.innerHTML = '<option value="">Aucune</option>' + (cur ? '<option value="' + esc(cur) + '">…</option>' : '');
+    emptyI.value = cur || '';
+    if (window.CA.pick) window.CA.pick(emptyI);
+    sb.from('products').select('id,name,attrs,sort_order').eq('type', 'accessory')
+      .order('sort_order', { ascending: true }).order('name', { ascending: true }).then(function (res) {
+        if (res.error || seq !== emptySeq) return;   // erreur, ou un autre matériau a été ouvert entre-temps
+        var all = res.data || [];
+        var cat = all.filter(function (a) { return a.attrs && a.attrs.category === 'Bobines vides'; });
+        var list = (cat.length ? cat : all).slice();
+        if (cur && !list.some(function (a) { return String(a.id) === String(cur); })) {
+          list = list.concat(all.filter(function (a) { return String(a.id) === String(cur); }));
+        }
+        emptyI.innerHTML = '<option value="">Aucune</option>' + list.map(function (a) {
+          return '<option value="' + esc(a.id) + '">' + esc(a.name) + '</option>';
+        }).join('');
+        emptyI.value = cur || '';
+        if (window.CA.pick) window.CA.pick(emptyI);
+      });
+  }
   // galerie en cours d'édition : chaque item = { path } (déjà en base) ou { file, url } (nouveau)
   var galleryItems = [], oldGalleryPaths = [];
 
@@ -271,6 +297,7 @@ window.CA = window.CA || {};
     renderGallery();
     sellSpoolI.value = row && row.sell_spool != null ? row.sell_spool : '';
     sellRefillI.value = row && row.sell_refill != null ? row.sell_refill : '';
+    fillEmptySelect(row ? row.empty_spool_id : null);
     tiersSpoolEl.innerHTML = '';
     normalizeTiers(row ? row.tiers_spool : []).forEach(function (t) { addTierRow(tiersSpoolEl, 'bobines', t.min, t.price); });
     tiersRefillEl.innerHTML = '';
@@ -319,6 +346,7 @@ window.CA = window.CA || {};
       // l'écraser à l'upsert (ON CONFLICT DO UPDATE ne touche que les colonnes fournies).
       tiers_spool: hasS ? collectTiers(tiersSpoolEl) : [],
       tiers_refill: hasR ? collectTiers(tiersRefillEl) : [],
+      empty_spool_id: hasS && emptyI && emptyI.value ? emptyI.value : null,   // recharge seulement : pas de bobine vide
       description: descI.value.trim() || null,
       slug: (slugI && CA.slugify(slugI.value)) || null,   // vide => auto (slug du nom) côté boutique
       long_desc: longDescI.value.trim() || null,

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=90">
+<link rel="stylesheet" href="assets/admin.css?v=91">
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
@@ -271,6 +271,12 @@
                   <input type="number" id="m-sell-refill" min="0" step="0.01" placeholder="20.00" class="money">
                 </div>
               </div>
+            </div>
+
+            <!-- Bobine vide laissée par une bobine de ce matériau (Production / Interne -> accessoire) -->
+            <div class="field spool-only">
+              <label class="lbl" for="m-empty">Bobine vide</label>
+              <select id="m-empty" aria-label="Bobine vide"><option value="">Aucune</option></select>
             </div>
 
             <div class="field col-2">
@@ -755,6 +761,7 @@
         </div>
       </div>
 
+      <div class="pr-left">
       <div class="reorder-card pr-spools">
         <div class="reorder-card-head">
           <h2>Bobines en production</h2>
@@ -798,6 +805,15 @@
           <summary>Terminées <span class="pr-done-n" id="pr-done-n"></span></summary>
           <div class="pr-spool-list" id="pr-done"></div>
         </details>
+      </div>
+
+      <!-- Bobines vides : bobines terminées (production) + bobines en usage interne -> à libérer pour la vente -->
+      <div class="reorder-card pr-empties" id="pr-empties-card" hidden>
+        <div class="reorder-card-head">
+          <h2>Bobines vides</h2>
+        </div>
+        <div class="pr-empty-list" id="pr-empties"></div>
+      </div>
       </div>
 
       <div class="al-cols pr-cols">
@@ -1985,7 +2001,7 @@
 <script src="assets/cms-securite.js?v=2"></script>
 <script src="assets/cms-costing.js?v=3"></script>
 <script src="assets/cms-brands.js?v=7"></script>
-<script src="assets/cms-materials.js?v=14"></script>
+<script src="assets/cms-materials.js?v=15"></script>
 <script src="assets/cms-filaments.js?v=18"></script>
 <script src="assets/cms-linkbuilder.js?v=3"></script>
 <script src="assets/cms-spacers.js?v=16"></script>
@@ -2007,7 +2023,7 @@
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
 <script src="assets/cms-autoloop.js?v=41"></script>
-<script src="assets/cms-production.js?v=7"></script>
+<script src="assets/cms-production.js?v=8"></script>
 <script src="assets/cms-aujourdhui.js?v=1"></script>
 <script src="assets/cms-recherche.js?v=1"></script>
 </body>

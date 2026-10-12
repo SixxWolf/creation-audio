@@ -1586,6 +1586,22 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .pr-done > summary { display:inline-flex; align-items:center; gap:6px; font-size:.86rem; font-weight:600; color:var(--ember-ink); cursor:pointer; }
 .pr-done-n { color:var(--muted); font-weight:500; }
 
+/* bobines vides : à libérer (production + interne) -> stock de l'accessoire */
+.pr-empties { margin-bottom:18px; }
+.pr-empty-list { display:flex; flex-direction:column; margin-top:6px; }
+.pr-e { display:grid; grid-template-columns:auto minmax(0, 1fr) minmax(120px, 210px) 206px; align-items:center; gap:6px 14px; padding:11px 0; border-top:1px solid var(--line); }
+.pr-empty-list > .pr-e:first-child { border-top:0; }
+.pr-e-img { display:block; flex:none; width:40px; height:40px; overflow:hidden; background:var(--wash); border:1px solid var(--line); border-radius:10px; }
+.pr-e-img img { display:block; width:100%; height:100%; object-fit:contain; }
+.pr-e .pr-sp-meta .is-warn { color:var(--bad); }
+.pr-e-n { display:flex; flex-direction:column; min-width:0; }
+.pr-e-n b { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2); }
+.pr-e-n b.is-on { color:var(--ember-ink); }
+.pr-e-n span { font-size:.8rem; color:var(--muted); white-space:nowrap; }
+.pr-e-last { font-size:.8rem; color:var(--muted); }
+.pr-e-undo { padding:0; font:inherit; font-weight:600; color:var(--ember-ink); background:none; border:0; text-decoration:underline; cursor:pointer; }
+.pr-e-undo:disabled { opacity:.5; cursor:default; }
+
 .pr-take { margin:12px 0 4px; padding:14px 16px; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
 .pr-take-grid { display:grid; grid-template-columns:minmax(0, 2.4fr) auto minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1fr); gap:12px 14px; }
 /* format Bobine / Recharge : boutons segmentés (facture.css .fx-seg) à la hauteur des champs */
@@ -1673,6 +1689,10 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .pr-spool .pr-sp-act:empty { display:none; }
   .pr-detail { grid-column:1 / -1; }
   .pr-sline { grid-template-columns:auto minmax(0, 1fr) auto; }
+  .pr-e { grid-template-columns:auto minmax(0, 1fr); }
+  .pr-e .pr-e-n { grid-column:2; grid-row:2; }
+  .pr-e .pr-sp-act { grid-column:2; grid-row:3; justify-content:flex-start; }
+  .pr-e .pr-sp-act:empty { display:none; }
 }
 /* colonne étroite (1025-1280 px, téléphone) : bobine sur la 1re ligne, grammes + coût sur la 2e */
 @container pr-uses (max-width:520px) {
@@ -1691,7 +1711,9 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
     grid-template-columns:420px minmax(0, 1fr) 400px;
     grid-template-areas:"head head head" "spools main side" "hist hist hist"; }
   .tabpanel[data-panel="production"] > .panel-head { grid-area:head; margin:0; }
-  .tabpanel[data-panel="production"] > .pr-spools { grid-area:spools; margin:0; }
+  .tabpanel[data-panel="production"] > .pr-left { grid-area:spools; }
+  .pr-left > .pr-spools { margin:0; }
+  .pr-left > .pr-empties { margin:18px 0 0; }
   .pr-spools .reorder-card-head .grow { display:none; }   /* titre + « Sortir une bobine » sur une ligne */
   .pr-spools #pr-take-open { margin-left:auto; }
   .tabpanel[data-panel="production"] > .pr-cols { display:contents; }
@@ -1709,4 +1731,8 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .pr-sline { grid-template-columns:auto minmax(0, 1fr) auto; }
   .pr-take-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .pr-take-grid .pr-take-fil, .pr-take-grid .pr-take-kind { grid-column:1 / -1; }
+  .pr-e { grid-template-columns:auto minmax(0, 1fr); }
+  .pr-e .pr-e-n { grid-column:2; grid-row:2; }
+  .pr-e .pr-sp-act { grid-column:2; grid-row:3; justify-content:flex-start; }
+  .pr-e .pr-sp-act:empty { display:none; }
 }

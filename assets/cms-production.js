@@ -169,8 +169,10 @@
     timeH: $('#pr-time-h'), timeM: $('#pr-time-m'), date: $('#pr-date'),
     uses: $('#pr-uses'), useAdd: $('#pr-use-add'),
     save: $('#pr-save'), report: $('#pr-report'), status: $('#pr-status'),
-    history: $('#pr-history'), refresh: $('#pr-refresh')
+    history: $('#pr-history'), refresh: $('#pr-refresh'),
+    emptiesCard: $('#pr-empties-card'), empties: $('#pr-empties')
   };
+  var empties = [];         // bobines vides (admin_empty_spools) : à libérer, en cours, dernier lot
   if (!el.spools) return;
 
   /* ---- activation à l'ouverture de l'onglet ---- */
@@ -185,10 +187,10 @@
   function loadAll() {
     return Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : null,
-      loadSpacers(), loadFilaments(), loadSpools(), loadProds(), loadRates(), loadBrandOrder()
+      loadSpacers(), loadFilaments(), loadSpools(), loadProds(), loadRates(), loadBrandOrder(), loadEmpties()
     ]).then(function () {
       sortAll();
-      renderSpools(); renderTakeOptions(); renderSpacerOptions(); renderRows(); recalc(); renderHistory();
+      renderSpools(); renderEmpties(); renderTakeOptions(); renderSpacerOptions(); renderRows(); recalc(); renderHistory();
     }, function (err) {
       el.spools.innerHTML = '<p class="empty">Impossible de charger : ' + esc(errText(err)) + '</p>';
     });
@@ -210,6 +212,9 @@
       sb.from('production_spools').select('*').order('taken_at', { ascending: true }).order('created_at', { ascending: true }),
       sb.from('production_uses').select('production_id,spool_id,grams,cost')
     ]).then(function (r) { spools = q(r[0]); uses = q(r[1]); });
+  }
+  function loadEmpties() {
+    return sb.rpc('admin_empty_spools').then(function (res) { empties = res.error ? [] : (res.data || []); }, function () { empties = []; });
   }
   function loadProds() {
     return sb.from('productions').select('*').order('created_at', { ascending: false })
@@ -467,6 +472,121 @@
       toast(act === 'close' ? 'Bobine terminée' : 'Bobine rouverte');
       Object.assign(s, patch);
       renderSpools(); renderRows(); recalc();
+      loadEmpties().then(renderEmpties);   // terminée / rouverte : compte « à libérer »
+    });
+  }
+
+  /* =========================================================
+     BOBINES VIDES (2026-10-12) — une bobine terminée (format bobine) laisse une bobine
+     vide réutilisable, vendue en accessoire ; aussi les bobines sorties en usage interne.
+     Rien n'entre au stock sans confirmation : Libérer (vente) / Garder (sorties du compte).
+     Lien filament -> bobine vide : fiche du matériau (materials.empty_spool_id).
+     ========================================================= */
+  // valeur d'une bobine vide = prix payé − coût de la recharge (miroir de public._empty_value) ;
+  // figée en base au 1er usage (empty_cost)
+  function emptyValOf(s) {
+    if (!s) return 0;
+    if (s.empty_cost != null) return +s.empty_cost || 0;
+    if (s.kind === 'refill') return 0;
+    var f = filById(s.product_id), m = f && window.CA.materialOf ? window.CA.materialOf(f.brand, f.material) : null;
+    if (!m || !m.empty_spool_id) return 0;
+    var c = Math.max(0, +s.unit_cost || 0), a = (f.attrs || {});
+    var r = num(a.avg_cost && a.avg_cost.refill);
+    if (r == null) r = num(a.last_cost && a.last_cost.refill);
+    if (r == null) r = num(m.cost_refill);
+    if (r == null || r <= 0 || r >= c) {
+      var acc = empties.filter(function (e) { return String(e.id) === String(m.empty_spool_id); })[0];
+      return round2(Math.min(c, Math.max(0, acc ? +acc.cost_price || 0 : 0)));
+    }
+    return round2(c - r);
+  }
+  function emptyImg(e) {
+    if (!e.image_path) return '<span class="pr-e-img is-none" aria-hidden="true"></span>';
+    var url = sb.storage.from('products').getPublicUrl(e.image_path).data.publicUrl;
+    return '<span class="pr-e-img"><img src="' + esc(url) + '" alt="" loading="lazy"></span>';
+  }
+  function emptyRow(e) {
+    var prod = +e.prod || 0, intl = +e.internal || 0, pend = prod + intl, act = +e.active || 0;
+    var cost = e.avg_cost != null ? +e.avg_cost : +e.cost_price || 0;
+    var mats = (e.materials || []).map(function (x) { var p = String(x).split(' · '); return p[p.length - 1]; });
+    var meta = ['Stock ' + (e.qty | 0), money(cost)];
+    if (act) meta.push(act + ' en cours');
+    var metaHtml = esc(meta.join(' · ')) + ' · ' + (mats.length ? esc(mats.join(', ')) : '<span class="is-warn">aucun matériau lié</span>');
+    var src = [];
+    if (prod) src.push(prod + ' production');
+    if (intl) src.push(intl + ' interne');
+    var last = '';
+    if (e.last && e.last.batch) {
+      var bits = [];
+      if (+e.last.released) bits.push('+' + e.last.released + ' en vente');
+      if (+e.last.kept) bits.push(e.last.kept + ' gardée' + (e.last.kept > 1 ? 's' : ''));
+      last = '<span class="pr-e-last">' + esc(shortDay(String(e.last.at).slice(0, 10))) + ' · ' + esc(bits.join(' · ')) +
+        ' <button class="pr-e-undo" type="button" data-act="undo">Annuler</button></span>';
+    }
+    return '<div class="pr-e" data-id="' + esc(e.id) + '">' + emptyImg(e) +
+      '<div class="pr-sp-main"><b>' + esc(e.name) + '</b><span class="pr-sp-meta">' + metaHtml + '</span>' + last + '</div>' +
+      '<div class="pr-e-n"><b class="' + (pend ? 'is-on' : '') + '">' + pend + ' à libérer</b>' +
+        (src.length ? '<span>' + esc(src.join(' · ')) + '</span>' : '') + '</div>' +
+      '<div class="pr-sp-act">' +
+        (pend ? '<button class="btn btn-accent btn-sm" type="button" data-act="release" data-ic="check">Libérer</button>' +
+                '<button class="btn btn-ghost btn-sm" type="button" data-act="keep">Garder</button>' : '') +
+      '</div></div>';
+  }
+  function renderEmpties() {
+    if (!el.empties) return;
+    el.emptiesCard.hidden = !empties.length;
+    el.empties.innerHTML = empties.map(emptyRow).join('');
+  }
+  function emptyById(id) { return empties.filter(function (e) { return String(e.id) === String(id); })[0] || null; }
+  if (el.empties) el.empties.addEventListener('click', function (ev) {
+    var btn = ev.target.closest('[data-act]'); if (!btn) return;
+    var e = emptyById(btn.closest('.pr-e').getAttribute('data-id')); if (!e) return;
+    var act = btn.getAttribute('data-act'), pend = (+e.prod || 0) + (+e.internal || 0);
+    if (act === 'undo') { undoEmpty(e, btn); return; }
+    var rel = act === 'release';
+    caDialog.prompt({
+      title: rel ? 'Combien en vente ?' : 'Combien en garder ?',
+      message: e.name + ' : ' + pend + ' à libérer.' + (rel ? ' Elles entrent au stock de la boutique.' : ' Elles sortent du compte, sans stock.'),
+      value: String(pend), ok: rel ? 'Libérer' : 'Garder', icon: rel ? 'plus' : 'info'
+    }).then(function (v) {
+      if (v == null) return;
+      var n = parseInt(v, 10);
+      if (!isFinite(n) || n <= 0) return;
+      n = Math.min(n, pend);
+      btn.disabled = true;
+      sb.rpc('admin_release_empty', { p_acc: e.id, p_release: rel ? n : 0, p_keep: rel ? 0 : n }).then(function (res) {
+        btn.disabled = false;
+        if (res.error) { caDialog.error(res.error); return; }
+        toast(rel ? n + ' bobine' + (n > 1 ? 's' : '') + ' vide' + (n > 1 ? 's' : '') + ' en vente' : n + ' gardée' + (n > 1 ? 's' : ''));
+        if (rel) waitlistCheck(e);
+        loadEmpties().then(renderEmpties);
+      });
+    });
+  });
+  // le stock remonte : quelqu'un attendait cette bobine vide ? (alerte de la liste d'attente)
+  function waitlistCheck(e) {
+    var wl = window.CA.waitlist;
+    if (!wl) return;
+    wl.reload().then(function () {
+      var n = wl.count(e.id, 'item');
+      if (!n) return;
+      wl.onScan(e.id, 'item');
+      caDialog.alert({ title: n > 1 ? n + ' personnes l\'attendent' : 'Quelqu\'un l\'attend',
+        message: e.name + ' — Inventaire › Liste d\'attente pour aviser.', icon: 'info' });
+    }, function () {});
+  }
+  function undoEmpty(e, btn) {
+    var l = e.last || {};
+    caDialog.confirm({ title: 'Annuler ce lot ?',
+      message: e.name + (+l.released ? ' perd ' + l.released + ' de stock ; ' : ' : ') + 'les bobines redeviennent à libérer.',
+      ok: 'Annuler le lot', cancel: 'Retour', danger: !!+l.released, icon: 'warn' }).then(function (ok) {
+      if (!ok) return;
+      btn.disabled = true;
+      sb.rpc('admin_empty_undo', { p_batch: l.batch }).then(function (res) {
+        if (res.error) { btn.disabled = false; caDialog.error(res.error); return; }
+        toast('Lot annulé');
+        loadEmpties().then(renderEmpties);
+      });
     });
   }
 
@@ -752,8 +872,12 @@
       return { parts: parts, over: need };
     });
   }
-  function partsCost(parts) {
-    return parts.reduce(function (sum, p) { return sum + round2(p.g * (+p.s.unit_cost || 0) / (+p.s.weight_g || 1000)); }, 0);
+  // gross = prix payé complet ; sinon net de la bobine vide (revendue) — comme admin_save_production
+  function partsCost(parts, gross) {
+    return parts.reduce(function (sum, p) {
+      var c = (+p.s.unit_cost || 0) - (gross ? 0 : emptyValOf(p.s));
+      return sum + round2(p.g * c / (+p.s.weight_g || 1000));
+    }, 0);
   }
   // blocs en production pour le menu d'une rangée : marque · matière, couleur ×N, grammes restants
   function blockItems() {
@@ -796,7 +920,7 @@
     var al = allocate();
     $$('.pr-use', el.uses).forEach(function (row) {
       var i = +row.getAttribute('data-i'), r = rows[i], b = blockByKey(r.block);
-      $('.pr-use-cost', row).textContent = b ? money(partsCost(al[i].parts)) : '—';
+      $('.pr-use-cost', row).textContent = b ? money(partsCost(al[i].parts, true)) : '—';
       var warn = '';
       if (b) {
         if (al[i].over > 0.05) {
@@ -874,6 +998,7 @@
     var al = allocate(), used = rows.filter(function (r) { return r.block && (+r.grams || 0) > 0; });
     var g = used.reduce(function (s, r) { return s + (+r.grams || 0); }, 0);
     var fil = al.reduce(function (s, a) { return s + partsCost(a.parts); }, 0);
+    var filGross = al.reduce(function (s, a) { return s + partsCost(a.parts, true); }, 0);
     // grammes par bobine (rangées fusionnées) -> envoyés tels quels à admin_save_production
     var bySpool = {}, spoolUses = [];
     al.forEach(function (a) {
@@ -903,7 +1028,7 @@
       Q += pairs; C += pairs * pairc;
       next = round2(C / Q);
     }
-    return { sp: sp, used: used, spoolUses: spoolUses, g: g, fil: round2(fil), minutes: minutes, rate: rate, mach: mach, total: total, good: good,
+    return { sp: sp, used: used, spoolUses: spoolUses, g: g, fil: round2(fil), filGross: round2(filGross), minutes: minutes, rate: rate, mach: mach, total: total, good: good,
       lin: lin, lout: lout, pairs: pairs, pairc: pairc, cur: cur, next: next,
       missing: rows.filter(function (r) { return !r.block && (+r.grams || 0) > 0; }).length };
   }
@@ -922,7 +1047,8 @@
     el.status.textContent = problem;
     if (!file && !rows.length) { el.report.innerHTML = '<p class="muted">Glisse un G-code pour commencer.</p>'; return; }
     var html = '';
-    html += srow('Filament <em>' + grams(r.g) + '</em>', money(r.fil));
+    html += srow('Filament <em>' + grams(r.g) + '</em>', money(r.filGross));
+    if (r.filGross - r.fil > 0.004) html += srow('Bobine vide <em>revendue</em>', '− ' + money(r.filGross - r.fil));
     html += srow('Électricité + usure <em>' + fmtHm(r.minutes) + ' × ' + money(r.rate) + '/h</em>', money(r.mach));
     html += srow('Total', money(r.total));
     html += '<div class="al-cost"><span>COÛT / PAIRE</span><b>' + (r.pairc != null ? money(r.pairc) : '—') + '</b></div>';
