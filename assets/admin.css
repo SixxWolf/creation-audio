@@ -142,7 +142,8 @@ body[data-tab="production"] main { max-width:none; }   /* essai grand écran (20
    L'éditeur ouvert rejoint .dock (collé à droite, défile seul) ; sans éditeur ouvert, la liste prend toute la largeur. */
 .dock { display:none; }
 @media screen and (min-width:1600px) {
-  body[data-tab="filaments"] main, body[data-tab="spacers"] main, body[data-tab="accessoires"] main { max-width:none; }
+  body[data-tab="filaments"] main, body[data-tab="spacers"] main, body[data-tab="accessoires"] main,
+  body[data-tab="clients"] main, body[data-tab="dealers"] main { max-width:none; }
   .tabpanel:has(> .dock > .editor:not([hidden])) { display:grid; grid-template-columns:minmax(0, 1fr) 620px; gap:20px; align-items:start; }
   .tabpanel:has(> .dock > .editor:not([hidden])) > .dock { display:flex; flex-direction:column; gap:16px; position:sticky;
     top:calc(var(--top-h, 60px) + 16px); max-height:calc(100vh - var(--top-h, 60px) - 32px); overflow-y:auto; scrollbar-width:thin;

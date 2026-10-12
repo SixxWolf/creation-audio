@@ -54,7 +54,10 @@
     addressI.value = row && row.address ? row.address : '';
     cityI.value = row && row.city ? row.city : '';
     statusEl.textContent = '';
+    // grand écran : éditeur collé à droite, la liste reste visible (CA.dockEditor) ; sinon en haut, comme avant
+    var docked = !!(window.CA.dockEditor && window.CA.dockEditor(editor));
     editor.hidden = false;
+    if (docked) { emailI.focus({ preventScroll: true }); editor.parentNode.scrollTop = 0; return; }
     emailI.focus();
     editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }

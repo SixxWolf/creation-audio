@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=88">
+<link rel="stylesheet" href="assets/admin.css?v=89">
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
@@ -1125,6 +1125,8 @@
 
     <!-- ---------------- DEALERS ---------------- -->
     <section class="tabpanel" data-panel="dealers" role="tabpanel" hidden>
+     <!-- Grand écran (≥ 1600 px) : liste (.dock-main) + éditeur ouvert collé à droite (.dock, CA.dockEditor) -->
+     <div class="dock-main">
       <div class="panel-head">
         <div>
           <h1>Dealers</h1>
@@ -1167,6 +1169,8 @@
       </form>
 
       <div id="dl-list" class="mat-rows"><p class="muted">Chargement…</p></div>
+     </div><!-- /.dock-main -->
+     <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
 
     <!-- ---------------- MESSAGES (messagerie du site public) : cms-messages.js ---------------- -->
@@ -1194,6 +1198,8 @@
 
     <!-- ---------------- CLIENTS (carnet de facturation) ---------------- -->
     <section class="tabpanel" data-panel="clients" role="tabpanel" hidden>
+     <!-- Grand écran (≥ 1600 px) : liste (.dock-main) + éditeur ouvert collé à droite (.dock, CA.dockEditor) -->
+     <div class="dock-main">
       <div class="panel-head">
         <div>
           <h1>Clients</h1>
@@ -1242,6 +1248,8 @@
       <h2 class="cl-sec" id="cl-cards-title" hidden>Fiches clients</h2>
 
       <div id="cl-list" class="mat-rows"><p class="muted">Chargement…</p></div>
+     </div><!-- /.dock-main -->
+     <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
 
     <!-- ---------------- FACTURATION ---------------- -->
@@ -1987,8 +1995,8 @@
 <script src="assets/cms-attente.js?v=6"></script>
 <script src="assets/cms-reserves.js?v=2"></script>
 <script src="assets/cms-en-route.js?v=6"></script>
-<script src="assets/cms-dealers.js?v=5"></script>
-<script src="assets/cms-clients.js?v=8"></script>
+<script src="assets/cms-dealers.js?v=6"></script>
+<script src="assets/cms-clients.js?v=9"></script>
 <script src="assets/cms-messages.js?v=3"></script>
 <script src="assets/cms-facturation.js?v=46"></script>
 <script src="assets/cms-historique.js?v=15"></script>

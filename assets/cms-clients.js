@@ -127,11 +127,16 @@ window.CA = window.CA || {};
     addressI.value = row && row.address ? row.address : '';
     cityI.value = row && row.city ? row.city : '';
     statusEl.textContent = '';
-    if (rowEl && rowEl.parentNode) { rowEl.insertAdjacentElement('afterend', editor); editor.classList.add('is-inline'); }
+    // grand écran : éditeur collé à droite, la liste reste visible (CA.dockEditor) ; sinon sous la ligne / en haut
+    var docked = false;
+    if (window.CA.dockEditor) { moveEditorHome(); docked = window.CA.dockEditor(editor); }
+    if (docked) { /* colonne collée à l'écran */ }
+    else if (rowEl && rowEl.parentNode) { rowEl.insertAdjacentElement('afterend', editor); editor.classList.add('is-inline'); }
     else moveEditorHome();
     editor.hidden = false;
     nameI.focus({ preventScroll: true });
-    editor.scrollIntoView({ behavior: 'smooth', block: rowEl ? 'nearest' : 'start' });
+    if (docked) editor.parentNode.scrollTop = 0;
+    else editor.scrollIntoView({ behavior: 'smooth', block: rowEl ? 'nearest' : 'start' });
   }
   function closeEditor() { moveEditorHome(); editor.hidden = true; editingId = null; }
 
