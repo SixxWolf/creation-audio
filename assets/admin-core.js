@@ -289,6 +289,37 @@ window.CA = window.CA || {};
     t.addEventListener('click', function () { go(t.dataset.tab, null); });
   });
 
+  // --- Grand écran (pleine largeur, ordinateur seulement) ------------------------------------
+  // Un onglet refait en pleine largeur range certains blocs dans ses colonnes : chaque élément
+  // data-wide="<colonne>" (ordre : data-wide-order) rejoint le conteneur data-wide-slot="<colonne>"
+  // du même onglet dès 1600 px. En dessous, chacun revient EXACTEMENT à sa place d'origine (repère
+  // laissé dans le DOM) : petit portable, tablette et mobile inchangés. On déplace les nœuds (jamais
+  // recréés) : écouteurs et valeurs restent. Même seuil que les @media (min-width:1600px) des CSS.
+  var WIDE_MQ = window.matchMedia('(min-width:1600px)'), PRINT_MQ = window.matchMedia('print');
+  window.CA.wideLayout = function (root) {
+    if (!root) return;
+    var items = $$('[data-wide]', root).map(function (el, i) {
+      var mark = document.createComment('wide');
+      el.parentNode.insertBefore(mark, el);
+      return { el: el, mark: mark, slot: el.getAttribute('data-wide'), order: +el.getAttribute('data-wide-order') || 0, i: i };
+    }).sort(function (a, b) { return a.order - b.order || a.i - b.i; });
+    var cur = null;
+    function apply() {
+      if (PRINT_MQ.matches) return;   // impression : rien ne bouge
+      var wide = WIDE_MQ.matches;
+      if (wide === cur) return;
+      cur = wide;
+      items.forEach(function (it) {
+        if (!wide) { it.mark.parentNode.insertBefore(it.el, it.mark.nextSibling); return; }
+        var slot = root.querySelector('[data-wide-slot="' + it.slot + '"]');
+        if (slot) slot.appendChild(it.el);
+      });
+      root.classList.toggle('is-wide', wide);
+    }
+    apply();
+    if (WIDE_MQ.addEventListener) WIDE_MQ.addEventListener('change', apply); else WIDE_MQ.addListener(apply);
+  };
+
   // API pour les sous-onglets d'un module (ex. Inventaire : réception / à commander).
   window.CA.route = {
     get: parseHash,

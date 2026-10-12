@@ -99,6 +99,8 @@
   var elEditBanner = $('#fx-edit-banner'), elEditNum = $('#fx-edit-num'), elEditCancel = $('#fx-edit-cancel');
   // bandeau « facture de la commande dealer D-0007 »
   var elOrderBanner = $('#fx-order-banner'), elOrderNum = $('#fx-order-num'), elOrderDetach = $('#fx-order-detach');
+  // grand écran (≥ 1600 px) : 3 colonnes — gabarit + catalogue | facture | client, taxes, marge, actions
+  if (window.CA.wideLayout) window.CA.wideLayout($('.tabpanel[data-panel="facturation"]'));
 
   /* ---------- entreprise (localStorage) ---------- */
   var DEFAULT_CO = {
@@ -106,13 +108,17 @@
     address: '', city: 'Québec, QC', email: 'contact@creationaudio.ca', phone: '',
     gst: '', qst: '', gstRate: 5, qstRate: 9.975, logo: ''
   };
-  var logoData = '';
+  var logoData = '', companyFilled = false;
+  // formulaire (Réglages › Entreprise) rempli une seule fois : un retour sur l'onglet ne doit pas
+  // effacer une saisie pas encore enregistrée
+  function ensureCompanyForm() { if (!companyFilled) fillCompanyForm(loadCompany()); }
   function loadCompany() {
     var co = {}; try { co = JSON.parse(localStorage.getItem(LS_CO)) || {}; } catch (e) {}
     var m = {}; for (var k in DEFAULT_CO) m[k] = (co[k] != null && co[k] !== '') ? co[k] : DEFAULT_CO[k];
     return m;
   }
   function fillCompanyForm(co) {
+    companyFilled = true;
     $('#co-name').value = co.name; $('#co-tagline').value = co.tagline;
     $('#co-address').value = co.address; $('#co-city').value = co.city;
     $('#co-email').value = co.email; $('#co-phone').value = co.phone;
@@ -208,11 +214,12 @@
   window.CA.onTab = function (name) {
     if (typeof prevOnTab === 'function') prevOnTab(name);
     if (name === 'facturation') ensureLoad();
+    else if (name === 'entreprise') ensureCompanyForm();
   };
   function ensureLoad() {
     if (loaded) return;
     loaded = true;
-    fillCompanyForm(loadCompany());
+    ensureCompanyForm();
     if (!elDate.value) elDate.value = todayISO();
     setCat('filament');
     loadNextNumberHint();

@@ -44,7 +44,6 @@
 .fx-company > summary::before { content:''; display:inline-block; width:16px; height:16px; margin-right:8px; vertical-align:-3px;
   background:var(--chev) center / 14px no-repeat; transform:rotate(-90deg); transition:transform .2s; }
 .fx-company[open] > summary::before { transform:none; }
-.fx-company .editor-actions { position:static; margin:16px 0 0; padding:12px 0 0; background:none; border-radius:0; -webkit-backdrop-filter:none; backdrop-filter:none; }
 .fx-details .grid { align-items:end; }   /* champs alignés même si un libellé porte un indice */
 .fx-logo-prev img { max-height:44px; max-width:150px; padding:4px; object-fit:contain; background:var(--thumb-bg);
   border:1px solid var(--line); border-radius:8px; }
@@ -247,6 +246,47 @@
 .fx-actions-2 { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-left:auto; }
 .fx-actions .status { flex-basis:100%; }
 .fx-actions .status:empty { display:none; }
+
+/* ---- Grand écran (≥ 1600 px, pleine largeur — 2026-10-11) ----
+   3 colonnes : gabarit + catalogue | facture | client, taxes, marge, actions. CA.wideLayout (admin-core)
+   y range les blocs data-wide ; sous 1600 px, tout reprend sa place et ces règles ne s'appliquent pas. */
+.fx-side-head, .fx-rail { display:none; }
+@media screen and (min-width:1600px) {
+  .tabpanel[data-panel="facturation"] { container:fx-page / inline-size; }
+  .fx-bar { display:none; }   /* vidée : ses réglages sont dans les colonnes */
+  /* facture ≈ 60 % de la place à côté de la colonne de droite (560 → 980 px ; sous ~546 px ses lignes
+     s'empilent) ; le catalogue prend le reste. Minimums : tiennent à 1600 px avec la barre de défilement. */
+  .fx-layout { grid-template-columns:minmax(260px, 1fr) clamp(560px, (100cqw - 420px) * .6, 980px) 380px; gap:20px; }
+  /* catalogue et colonne de droite restent à l'écran pendant qu'on fait défiler une longue facture */
+  .fx-side, .fx-rail { position:sticky; top:calc(var(--top-h, 60px) + 16px); max-height:calc(100vh - var(--top-h, 60px) - 32px); }
+  .fx-side > * { flex-shrink:0; }
+  .fx-side-head { display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; }
+  .fx-side-head .fx-seg { min-width:0; }
+  .fx-side-head .fx-seg-btn { padding:0 12px; }   /* tient dans le catalogue le plus étroit (1600 px) */
+  .fx-side-head .fx-scan-feedback { min-width:0; max-width:100%; }
+  .fx-side > .fx-picker { display:flex; flex-direction:column; flex:0 1 auto; min-height:0; }
+  .fx-picker-head { flex:none; }
+  .fx-catalog { flex:1 1 auto; min-height:0; max-height:none; }
+  /* colonne de droite : défile seule si elle dépasse (coordonnées ouvertes sur un portable) ;
+     chaque bloc a son rembourrage -> les anneaux de focus restent entiers */
+  .fx-rail { display:flex; flex-direction:column; gap:12px; overflow-y:auto; scrollbar-width:thin; }
+  .fx-rail > * { flex:none; }
+  .fx-rail .fx-cli-seg { display:flex; margin-left:0; }
+  .fx-rail .fx-cli-btn { flex:1; padding:0 10px; }
+  .fx-rail .fx-meta { margin:0; padding:18px; box-shadow:none; }
+  .fx-rail .fx-meta .grid { grid-template-columns:minmax(0, 1fr); gap:14px; }
+  .fx-rail .fx-details { margin-top:16px; padding-top:14px; }
+  .fx-rail > .fx-check { justify-content:flex-start; background:var(--paper); }
+  .fx-rail > .fx-check:hover { background:var(--wash); }
+  .fx-rail .fx-margin { margin:0; }
+  .fx-rail .fx-actions { position:static; flex-direction:column; align-items:stretch; gap:10px; margin:0; box-shadow:none; }
+  .fx-rail .fx-actions #fx-save { width:100%; justify-content:center; }
+  .fx-rail .fx-actions .fx-check { justify-content:center; }
+  .fx-rail .fx-actions-2 { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); grid-auto-flow:dense; margin-left:0; }
+  .fx-rail .fx-actions-2 .btn { justify-content:center; min-width:0; }
+  .fx-rail #fx-email { grid-column:1 / -1; }
+  .fx-rail .fx-actions .status { flex-basis:auto; }
+}
 
 @media (max-width:900px) {
   .fx-layout { grid-template-columns:1fr; }

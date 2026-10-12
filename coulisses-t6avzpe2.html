@@ -15,8 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=76">
-<link rel="stylesheet" href="assets/facture.css?v=25">
+<link rel="stylesheet" href="assets/admin.css?v=77">
+<link rel="stylesheet" href="assets/facture.css?v=26">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
@@ -118,6 +118,7 @@
       <p class="side-group" aria-hidden="true">Réglages</p>
       <button class="tab" type="button" data-tab="apparence" data-group="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9.5 9.5 0 0 0 0 19c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.7-1.7h2a5.5 5.5 0 0 0 5.5-5.5c0-4.3-4.3-7.7-9.8-7.7z"/><circle cx="7.5" cy="11.5" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/></svg><span>Apparence</span></button>
       <button class="tab" type="button" data-tab="securite" data-group="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.1 8.2 7.5 9.5 4.4-1.3 7.5-4.9 7.5-9.5V5.6z"/><path d="m8.8 12 2.2 2.2 4.3-4.4"/></svg><span>Sécurité</span></button>
+      <button class="tab" type="button" data-tab="entreprise" data-group="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 20.5V5A1.5 1.5 0 0 1 6 3.5h7A1.5 1.5 0 0 1 14.5 5v15.5"/><path d="M14.5 9.5H18a1.5 1.5 0 0 1 1.5 1.5v9.5"/><path d="M3 20.5h18"/><path d="M8 7.5h3M8 11h3M8 14.5h3"/></svg><span>Entreprise</span></button>
     </nav>
     <div class="side-foot">
       <a class="side-site" href="./" target="_blank" rel="noopener">
@@ -1298,17 +1299,19 @@
         <button class="btn btn-ghost btn-sm" id="fx-order-detach" type="button">Détacher</button>
       </div>
 
-      <!-- Barre de gabarit + taxes + type de client -->
+      <!-- Barre de gabarit + taxes + type de client.
+           Grand écran (≥ 1600 px, CA.wideLayout) : chaque réglage rejoint sa colonne (data-wide) —
+           gabarit + scanner au-dessus du catalogue, client / taxes / marge / actions dans la colonne de droite. -->
       <div class="fx-bar">
-        <div class="fx-seg" role="tablist" aria-label="Type de facture">
+        <div class="fx-seg" role="tablist" aria-label="Type de facture" data-wide="fx-left" data-wide-order="1">
           <button type="button" class="fx-seg-btn is-active" data-cat="filament">Filament</button>
           <button type="button" class="fx-seg-btn" data-cat="spacer">Spacer</button>
           <button type="button" class="fx-seg-btn" data-cat="accessory">Accessoire</button>
         </div>
-        <label class="fx-check"><input type="checkbox" id="fx-tax"> Taxes (TPS/TVQ)</label>
-        <span class="fx-scan-feedback no-print" id="fx-scan-feedback" aria-live="polite"
+        <label class="fx-check" data-wide="fx-right" data-wide-order="3"><input type="checkbox" id="fx-tax"> Taxes (TPS/TVQ)</label>
+        <span class="fx-scan-feedback no-print" id="fx-scan-feedback" aria-live="polite" data-wide="fx-left" data-wide-order="2"
               title="Dans cet onglet, le scanner est toujours à l'écoute : scanne un article, il s'ajoute à la facture."></span>
-        <div class="fx-seg fx-cli-seg" role="group" aria-label="Type de client">
+        <div class="fx-seg fx-cli-seg" role="group" aria-label="Type de client" data-wide="fx-right" data-wide-order="1">
           <button type="button" class="fx-cli-btn is-active" data-cli="client">Client</button>
           <button type="button" class="fx-cli-btn" data-cli="dealer">Dealer</button>
           <button type="button" class="fx-cli-btn" data-cli="internal" title="Ce que tu prends dans ton stock : prix à 0 $">Interne</button>
@@ -1316,7 +1319,7 @@
       </div>
 
       <!-- Infos client + facture -->
-      <div class="editor fx-meta">
+      <div class="editor fx-meta" data-wide="fx-right" data-wide-order="2">
         <div class="grid">
           <div class="field" id="fx-dealer-field" hidden>
             <label class="lbl" for="fx-dealer-select">Dealer</label>
@@ -1369,45 +1372,7 @@
             </div>
           </div>
         </details>
-
-        <!-- Entreprise (repliable) -->
-        <details class="fx-company" id="fx-company">
-          <summary>Coordonnées de l'entreprise &amp; taxes</summary>
-          <div class="grid" style="margin-top:14px">
-            <div class="field col-2"><label class="lbl" for="co-name">Nom</label><input type="text" id="co-name" autocomplete="off"></div>
-            <div class="field col-2"><label class="lbl" for="co-tagline">Slogan</label><textarea id="co-tagline" class="fx-oneline" rows="2" autocomplete="off"></textarea></div>
-            <div class="field"><label class="lbl" for="co-email">Courriel</label><input type="text" id="co-email" autocomplete="off"></div>
-            <div class="field"><label class="lbl" for="co-phone">Téléphone</label><input type="text" id="co-phone" autocomplete="off"></div>
-            <div class="field"><label class="lbl" for="co-address">Adresse</label><input type="text" id="co-address" autocomplete="off"></div>
-            <div class="field"><label class="lbl" for="co-city">Ville</label><input type="text" id="co-city" autocomplete="off"></div>
-            <div class="field">
-              <label class="lbl" for="co-gst">N° TPS · TVQ</label>
-              <div class="row-2">
-                <input type="text" id="co-gst" placeholder="TPS" aria-label="N° TPS" autocomplete="off">
-                <input type="text" id="co-qst" placeholder="TVQ" aria-label="N° TVQ" autocomplete="off">
-              </div>
-            </div>
-            <div class="field">
-              <label class="lbl" for="gst-rate">Taux TPS · TVQ</label>
-              <div class="row-2">
-                <span class="unit unit-sm" data-unit="%"><input type="number" id="gst-rate" step="0.001" placeholder="5" aria-label="Taux TPS"></span>
-                <span class="unit unit-sm" data-unit="%"><input type="number" id="qst-rate" step="0.001" placeholder="9.975" aria-label="Taux TVQ"></span>
-              </div>
-            </div>
-            <div class="field col-2">
-              <label class="lbl">Logo</label>
-              <div class="inline" style="gap:12px; flex-wrap:wrap">
-                <input type="file" id="co-logo-file" accept="image/*">
-                <span class="fx-logo-prev" id="co-logo-preview" hidden><img id="co-logo-img" alt="logo"></span>
-                <button type="button" class="btn btn-ghost btn-sm" id="co-logo-remove">Retirer</button>
-              </div>
-            </div>
-          </div>
-          <div class="editor-actions">
-            <button type="button" class="btn btn-ghost btn-sm" id="co-save" data-ic="save">Enregistrer l'entreprise</button>
-            <span class="status" id="co-msg"></span>
-          </div>
-        </details>
+        <!-- Coordonnées de l'entreprise & taxes : déplacées dans Réglages › Entreprise (2026-10-11) -->
       </div>
 
       <!-- Scanner toujours à l'écoute : ce panneau n'apparaît que pour associer un code inconnu -->
@@ -1426,10 +1391,11 @@
         </div>
       </div>
 
-      <!-- Corps : catalogue (gauche) + facture (droite) -->
+      <!-- Corps : catalogue (gauche) + facture (droite) ; grand écran : + colonne client/actions (fx-rail) -->
       <div class="fx-layout">
         <!-- Colonne gauche : catalogue -->
         <aside class="fx-side">
+          <div class="fx-side-head no-print" data-wide-slot="fx-left"></div>
           <!-- Catalogue produits (filament / spacer) -->
           <div class="fx-picker" id="fx-picker">
             <div class="fx-picker-head">
@@ -1455,9 +1421,9 @@
           <div class="fx-invoice" id="fx-invoice"></div>
 
           <!-- Résumé marge (privé, non imprimé) — masqué par défaut, bouton pour afficher -->
-          <div class="fx-margin no-print" id="fx-margin" hidden></div>
+          <div class="fx-margin no-print" id="fx-margin" hidden data-wide="fx-right" data-wide-order="4"></div>
 
-          <div class="fx-actions no-print">
+          <div class="fx-actions no-print" data-wide="fx-right" data-wide-order="5">
             <button class="btn btn-accent" id="fx-save" type="button" data-ic="save">Enregistrer la facture</button>
             <label class="fx-check" id="fx-deduct-wrap"><input type="checkbox" id="fx-deduct" checked> Déduire le stock</label>
             <div class="fx-actions-2">
@@ -1468,6 +1434,9 @@
             <span class="status" id="fx-status"></span>
           </div>
         </div>
+
+        <!-- Grand écran seulement : client + taxes + marge + actions, collés à droite (remplie par CA.wideLayout) -->
+        <aside class="fx-rail no-print" data-wide-slot="fx-right" aria-label="Client et enregistrement"></aside>
       </div>
 
     </section>
@@ -1885,6 +1854,51 @@
         <div class="sec-actions"><button class="btn btn-ghost btn-sm" id="sec-new" type="button" data-ic="plus">Ajouter un appareil</button></div>
       </div>
     </section>
+
+    <!-- ---------------- RÉGLAGES › ENTREPRISE ---------------- -->
+    <!-- Coordonnées imprimées sur les factures + taux de taxes (ex. repliable de la Facturation) :
+         cms-facturation.js (localStorage + admin_settings « entreprise », relu par compte.js) -->
+    <section class="tabpanel" data-panel="entreprise" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Entreprise</h1>
+        </div>
+      </div>
+      <div class="set-card">
+        <div class="set-head"><b>Coordonnées &amp; taxes</b> <span class="set-msg is-ok" id="co-msg" aria-live="polite"></span></div>
+        <div class="grid">
+          <div class="field col-2"><label class="lbl" for="co-name">Nom</label><input type="text" id="co-name" autocomplete="off"></div>
+          <div class="field col-2"><label class="lbl" for="co-tagline">Slogan</label><textarea id="co-tagline" class="fx-oneline" rows="2" autocomplete="off"></textarea></div>
+          <div class="field"><label class="lbl" for="co-email">Courriel</label><input type="text" id="co-email" autocomplete="off"></div>
+          <div class="field"><label class="lbl" for="co-phone">Téléphone</label><input type="text" id="co-phone" autocomplete="off"></div>
+          <div class="field"><label class="lbl" for="co-address">Adresse</label><input type="text" id="co-address" autocomplete="off"></div>
+          <div class="field"><label class="lbl" for="co-city">Ville</label><input type="text" id="co-city" autocomplete="off"></div>
+          <div class="field">
+            <label class="lbl" for="co-gst">N° TPS · TVQ</label>
+            <div class="row-2">
+              <input type="text" id="co-gst" placeholder="TPS" aria-label="N° TPS" autocomplete="off">
+              <input type="text" id="co-qst" placeholder="TVQ" aria-label="N° TVQ" autocomplete="off">
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl" for="gst-rate">Taux TPS · TVQ</label>
+            <div class="row-2">
+              <span class="unit unit-sm" data-unit="%"><input type="number" id="gst-rate" step="0.001" placeholder="5" aria-label="Taux TPS"></span>
+              <span class="unit unit-sm" data-unit="%"><input type="number" id="qst-rate" step="0.001" placeholder="9.975" aria-label="Taux TVQ"></span>
+            </div>
+          </div>
+          <div class="field col-2">
+            <label class="lbl">Logo</label>
+            <div class="inline" style="gap:12px; flex-wrap:wrap">
+              <input type="file" id="co-logo-file" accept="image/*">
+              <span class="fx-logo-prev" id="co-logo-preview" hidden><img id="co-logo-img" alt="logo"></span>
+              <button type="button" class="btn btn-ghost btn-sm" id="co-logo-remove">Retirer</button>
+            </div>
+          </div>
+        </div>
+        <div class="co-actions"><button type="button" class="btn btn-accent btn-sm" id="co-save" data-ic="save">Enregistrer</button></div>
+      </div>
+    </section>
   </main>
   </div><!-- /.adm-main -->
 
@@ -1897,7 +1911,7 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/auth-gate.js?v=2"></script>
-<script src="assets/admin-core.js?v=8"></script>
+<script src="assets/admin-core.js?v=9"></script>
 <script src="assets/admin-accent.js?v=1"></script>
 <script src="assets/cms-securite.js?v=2"></script>
 <script src="assets/cms-costing.js?v=3"></script>
@@ -1915,7 +1929,7 @@
 <script src="assets/cms-dealers.js?v=5"></script>
 <script src="assets/cms-clients.js?v=8"></script>
 <script src="assets/cms-messages.js?v=2"></script>
-<script src="assets/cms-facturation.js?v=45"></script>
+<script src="assets/cms-facturation.js?v=46"></script>
 <script src="assets/cms-historique.js?v=14"></script>
 <script src="assets/cms-commandes-clients.js?v=4"></script>
 <script src="assets/cms-reservations.js?v=2"></script>

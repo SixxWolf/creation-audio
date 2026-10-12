@@ -125,6 +125,10 @@ body[data-tab="filaments"] .mat-nav:not(:empty) { display:flex; flex-direction:c
 
 main { width:100%; max-width:1280px; margin:0 auto; padding:26px clamp(16px, 2.4vw, 28px) 90px; }
 body[data-tab="production"] main { max-width:none; }   /* essai grand écran (2026-10-11) : Production pleine largeur */
+/* Pleine largeur (ordinateur ≥ 1600 px) : onglets refaits un à un — voir CA.wideLayout (admin-core.js) */
+@media screen and (min-width:1600px) {
+  body[data-tab="facturation"] main { max-width:none; }
+}
 .tabpanel[hidden] { display:none; }
 
 /* =========================================================
@@ -1200,6 +1204,8 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .sec-add-row .field { margin:0; }
 .sec-add-row input.mfa-code { width:200px; min-width:200px; }
 .sec-actions { margin-top:14px; }
+/* Réglages › Entreprise (coordonnées imprimées sur les factures, ex. repliable de la Facturation) */
+.co-actions { display:flex; align-items:center; gap:10px; margin-top:20px; }
 
 /* ==================================================
    ONGLET MESSAGES (messagerie du site — cms-messages.js)
