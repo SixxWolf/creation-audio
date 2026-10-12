@@ -66,7 +66,7 @@
   if (CA.onAdminReady) CA.onAdminReady(refreshBadge);
   setInterval(function () {
     if (document.visibilityState !== 'visible') return;
-    if (!wrap.hidden) load(); else refreshBadge();
+    if (wrap.offsetParent !== null) load(); else refreshBadge();   // affichée (grand écran : colonne toujours là, mais pas hors de l'onglet)
   }, 60000);
 
   $$('.cr-filter').forEach(function (b) {

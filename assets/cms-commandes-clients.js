@@ -60,17 +60,28 @@
   if (!wrap || !listEl) return;
   var orders = [], stock = {}, filter = 'open', loaded = false, pending = null, sub = 'dealers', tabOpen = false;
 
+  // Grand écran (≥ 1880 px, CA.wideLayout) : plus de sous-onglets, les 3 sources en colonnes (toutes affichées
+  // et chargées) ; « Nouvelle commande » en bandeau au-dessus. En dessous : sous-onglets comme avant.
+  // 1880 et pas 1600 : sous 1880 px, 3 colonnes pleines rendent les tableaux des cartes trop étroits.
+  var panel = wrap.closest('.tabpanel');
+  function isWide() { return !!(panel && panel.classList.contains('is-wide')); }
+  function loadAll() { load(); if (CA.loadReservations) CA.loadReservations(); }
+  if (panel) panel.addEventListener('ca:wide', function () { showSub(sub); });   // avant wideLayout : reçoit l'état initial
+  if (CA.wideLayout) CA.wideLayout(panel, { min: 1880 });
+
   /* ---- sous-onglets Dealers / Clients en ligne / Réservations (#commandes/clients, #commandes/reservations) ---- */
   function showSub(s) {
     sub = s === 'clients' || s === 'reservations' ? s : 'dealers';
+    var all = isWide();
     $$('[data-cosub]').forEach(function (b) {
       var on = b.getAttribute('data-cosub') === sub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on);
     });
-    if (dealersEl) dealersEl.hidden = sub !== 'dealers';
-    wrap.hidden = sub !== 'clients';
-    if (resvEl) resvEl.hidden = sub !== 'reservations';
-    $$('[data-co-dealer]').forEach(function (el) { el.hidden = sub !== 'dealers'; });
+    if (dealersEl) dealersEl.hidden = !all && sub !== 'dealers';
+    wrap.hidden = !all && sub !== 'clients';
+    if (resvEl) resvEl.hidden = !all && sub !== 'reservations';
+    $$('[data-co-dealer]').forEach(function (el) { el.hidden = !all && sub !== 'dealers'; });
+    if (all) { if (tabOpen) loadAll(); return; }
     if (sub === 'clients' && tabOpen) load();
     if (sub === 'reservations' && tabOpen && CA.loadReservations) CA.loadReservations();
   }
@@ -87,7 +98,7 @@
     tabOpen = name === 'commandes';
     if (!tabOpen) return;
     var m = /^#commandes\/(clients|reservations)\b/.exec(location.hash), want = m ? m[1] : 'dealers';   // lien direct
-    if (want !== sub) showSub(want); else if (sub === 'clients') load();
+    if (want !== sub) showSub(want); else if (isWide()) loadAll(); else if (sub === 'clients') load();
     else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
   };
   $$('.cc-filter').forEach(function (b) {
@@ -99,7 +110,8 @@
   });
   var refreshBtn = $('#co-refresh');
   if (refreshBtn) refreshBtn.addEventListener('click', function () {
-    if (sub === 'clients') load(); else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
+    if (isWide()) loadAll();
+    else if (sub === 'clients') load(); else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
   });
   CA.reloadCustomerOrders = function () { if (loaded) load(); else refreshBadge(); };
 
@@ -111,7 +123,7 @@
   if (CA.onAdminReady) CA.onAdminReady(refreshBadge);
   setInterval(function () {
     if (document.visibilityState !== 'visible') return;
-    if (tabOpen && sub === 'clients') load(); else refreshBadge();
+    if (tabOpen && (sub === 'clients' || isWide())) load(); else refreshBadge();
   }, 60000);
 
   /* ---- chargement ---- */

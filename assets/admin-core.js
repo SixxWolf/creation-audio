@@ -296,8 +296,10 @@ window.CA = window.CA || {};
   // laissé dans le DOM) : petit portable, tablette et mobile inchangés. On déplace les nœuds (jamais
   // recréés) : écouteurs et valeurs restent. Même seuil que les @media (min-width:1600px) des CSS.
   var WIDE_MQ = window.matchMedia('(min-width:1600px)'), PRINT_MQ = window.matchMedia('print');
-  window.CA.wideLayout = function (root) {
+  // opts.min : seuil propre à un onglet (ex. Commandes : 1880 px, 3 colonnes de cartes) — CSS au même seuil.
+  window.CA.wideLayout = function (root, opts) {
     if (!root) return;
+    var mq = opts && opts.min ? window.matchMedia('(min-width:' + opts.min + 'px)') : WIDE_MQ;
     var items = $$('[data-wide]', root).map(function (el, i) {
       var mark = document.createComment('wide');
       el.parentNode.insertBefore(mark, el);
@@ -306,7 +308,7 @@ window.CA = window.CA || {};
     var cur = null;
     function apply() {
       if (PRINT_MQ.matches) return;   // impression : rien ne bouge
-      var wide = WIDE_MQ.matches;
+      var wide = mq.matches;
       if (wide === cur) return;
       cur = wide;
       items.forEach(function (it) {
@@ -319,7 +321,7 @@ window.CA = window.CA || {};
       root.dispatchEvent(new CustomEvent('ca:wide', { bubbles: true, detail: { wide: wide } }));
     }
     apply();
-    if (WIDE_MQ.addEventListener) WIDE_MQ.addEventListener('change', apply); else WIDE_MQ.addListener(apply);
+    if (mq.addEventListener) mq.addEventListener('change', apply); else mq.addListener(apply);
   };
 
   // API pour les sous-onglets d'un module (ex. Inventaire : réception / à commander).

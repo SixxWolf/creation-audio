@@ -129,6 +129,9 @@ body[data-tab="production"] main { max-width:none; }   /* essai grand écran (20
 @media screen and (min-width:1600px) {
   body[data-tab="facturation"] main, body[data-tab="inventaire"] main { max-width:none; }
 }
+@media screen and (min-width:1880px) {   /* Commandes : 3 colonnes de cartes à partir de 1880 px seulement */
+  body[data-tab="commandes"] main { max-width:none; }
+}
 .tabpanel[hidden] { display:none; }
 
 /* =========================================================
@@ -1230,6 +1233,41 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .co-actions .btn { flex:1 1 auto; }
 }
 .co-src { font-size:.8rem; font-weight:600; color:var(--muted); }
+
+/* ---- Commandes pleine largeur (ordinateur ≥ 1880 px — 2026-10-12) ----
+   Sous-onglets remplacés par 3 colonnes Dealers | Clients en ligne | Réservations (.co-cols) : chacune défile
+   seule, titre + filtre collés en haut ; une colonne vide se réduit ; « Nouvelle commande » en bandeau (.co-top).
+   CA.wideLayout(panel, { min: 1880 }) + cms-commandes-clients.js (toutes les sources affichées et chargées).
+   Seuil 1880 (pas 1600) : en dessous, 3 colonnes pleines rendent les tableaux des cartes trop étroits.
+   Sous 1880 px : sous-onglets inchangés. */
+.co-top, .co-col-head, .co-col-title { display:none; }
+@media screen and (min-width:1880px) {
+  .tabpanel[data-panel="commandes"].is-wide .inv-subtabs { display:none; }
+  .co-top { display:block; }
+  .co-cols { display:flex; gap:20px; align-items:flex-start; }
+  .co-cols > #co-dealers, .co-cols > #cc-wrap, .co-cols > #cr-wrap { flex:1 1 0; min-width:0;
+    position:sticky; top:calc(var(--top-h, 60px) + 16px); max-height:calc(100vh - var(--top-h, 60px) - 32px);
+    overflow-y:auto; scrollbar-width:thin; padding:0 10px 10px; --lane:color-mix(in srgb, var(--paper) 45%, var(--wash));
+    background:var(--lane); border:1px solid var(--line); border-radius:16px; }
+  /* colonne vide (rien à afficher avec ce filtre) : réduite à son titre + le message */
+  .co-cols > #co-dealers:has(> #co-list > .empty:only-child), .co-cols > #cc-wrap:has(> #cc-list > .empty:only-child),
+  .co-cols > #cr-wrap:has(> #cr-list > .empty:only-child) { flex:0 0 280px; }
+  /* en-tête de colonne : titre + filtre, collé en haut pendant que la colonne défile */
+  .co-col-head, .co-cols .cc-bar { position:sticky; top:0; z-index:3; display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:8px 12px; margin:0 -10px 10px; padding:12px; background:var(--lane); border-bottom:1px solid var(--line);
+    border-radius:16px 16px 0 0; }
+  .co-col-title { display:flex; align-items:center; gap:8px; margin:0; font-family:var(--display); font-size:1.08rem; letter-spacing:-.01em; }
+  .co-cols .co-print { margin-bottom:12px; }
+  .co-cols .co-list { gap:12px; }
+  .co-cols .co-card { padding:14px 12px; }
+  .co-cols .co-list > .empty { margin:0; }
+  /* tableau des cartes resserré pour tenir dans une colonne (portable 1920 px avec les 3 colonnes pleines) :
+     en-têtes sur 2 lignes permis (« À / IMPRIMER »), vignettes un peu plus petites */
+  .co-cols .co-table th, .co-cols .co-table td { padding-left:7px; padding-right:7px; }
+  .co-cols .co-table th { white-space:normal; }
+  .co-cols .co-prod { gap:8px; }
+  .co-cols .co-prod img, .co-cols .co-noimg { width:32px; height:32px; }
+}
 .co-card.is-flash { animation:co-flash 1.8s ease-out; }
 @keyframes co-flash { from { box-shadow:0 0 0 6px color-mix(in srgb, var(--ember) 40%, transparent); } }
 @media (prefers-reduced-motion:reduce) { .co-card.is-flash { animation:none; } }
