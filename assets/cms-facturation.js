@@ -532,6 +532,11 @@
   function isInternal() { return clientType === 'internal'; }
   // spacer : prix client (à plat) OU prix dealer (+ rabais quantité) selon le type de client
   function spacerDual(p) { return { client: +p.sell_price || 0, dealer: +(p.dealer_price != null ? p.dealer_price : p.sell_price) || 0, tiers: p.tiers || [] }; }
+  // coût d'un accessoire ou d'un spacer : coût moyen (réceptions / productions) prioritaire sur le coût saisi
+  function itemCost(p) {
+    var ac = p && p.attrs && p.attrs.avg_cost && p.attrs.avg_cost.item;
+    return +((ac != null && ac !== '') ? ac : (p && p.cost_price)) || 0;
+  }
 
   // c : gabarit du produit (par défaut le gabarit courant ; le scanner le force)
   function addProduct(id, c) {
@@ -549,16 +554,14 @@
       kind = 'unit';
       base = p.sell_price; tiers = p.tiers || [];
       tierKey = accTierKey(p);   // rabais quantité cumulé par catégorie
-      // coût moyen réel (réceptions) prioritaire sur le coût catalogue
-      var acI = p.attrs && p.attrs.avg_cost && p.attrs.avg_cost.item;
-      cost = (acI != null && acI !== '') ? +acI : p.cost_price;
+      cost = itemCost(p);
       label = p.name; meta = 'Accessoire';
     } else { // spacer : deux tarifs (client / dealer)
       kind = 'unit';
       sp = spacerDual(p);
       base = isDealer() ? sp.dealer : sp.client;
       tiers = isDealer() ? sp.tiers : [];
-      cost = p.cost_price; label = p.name; meta = 'Spacer · paire';
+      cost = itemCost(p); label = p.name; meta = 'Spacer · paire';
     }
     // fusion si même produit + même format et prix non modifié à la main
     var ex = lines.filter(function (l) { return l.productId === String(id) && l.kind === kind && !l.manual; })[0];
@@ -1186,7 +1189,7 @@
     }
     var sp = spacerDual(p);
     var ln = { id: uid(), productId: String(p.id), ptype: 'spacer', kind: 'unit', label: p.name, meta: 'Spacer · paire',
-      hex: null, qty: qty, base: sp.dealer, tiers: sp.tiers, cost: +p.cost_price || 0, tierKey: null, price: price, manual: false, sp: sp };
+      hex: null, qty: qty, base: sp.dealer, tiers: sp.tiers, cost: itemCost(p), tierKey: null, price: price, manual: false, sp: sp };
     // tarif changé depuis la commande : on garde le prix que le dealer a vu
     if (Math.abs(tierPrice(ln.base, ln.tiers, qty) - price) > 0.005) ln.manual = true;
     return ln;
@@ -1245,9 +1248,7 @@
               qty: l.qty, unit_price: l.unit_price, unit_cost: 0,
               // ce qui manque encore en stock part « À venir » (remis plus tard, Historique › Remis)
               qty_pending: st == null ? (l.qty_to_order | 0) : Math.max(0, (l.qty | 0) - (st | 0)) });
-            if (hit) ln.cost = hit.c === 'filament' ? (+filCost(hit.p, l.kind) || 0)
-              : hit.c === 'accessory' ? (+((hit.p.attrs && hit.p.attrs.avg_cost && hit.p.attrs.avg_cost.item) || hit.p.cost_price) || 0)
-              : (+hit.p.cost_price || 0);
+            if (hit) ln.cost = hit.c === 'filament' ? (+filCost(hit.p, l.kind) || 0) : itemCost(hit.p);
             return ln;
           });
           settleLoadedPrices();
