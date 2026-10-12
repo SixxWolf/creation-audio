@@ -173,6 +173,15 @@
     sortLines: function (list, pidOf, kindOf) { return sortByProduct(list, pidOf || linePid, kindOf || lineKind); },
     options: function (selected) { return filamentOptions(selected); },
     orderLinesHtml: function (lines) { return orderLinesHtml(lines); },
+    // résumé de la Liste à commander (page Aujourd'hui) : même calcul (cible + réservés − stock − en route).
+    // À appeler après ready() + CA.enRoute.reload() + CA.reserved.reload().
+    missing: function () {
+      var lines = 0, units = 0;
+      filaments.forEach(function (f) {
+        ['spool', 'refill'].forEach(function (kind) { var m = missOf(f, kind); if (m > 0) { lines++; units += m; } });
+      });
+      return { lines: lines, units: units };
+    },
     // « Recevoir » une commande en route : ouvre son pointage dans Réception
     receiveOrder: function (id) {
       if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub('reception'); else showSub('reception');

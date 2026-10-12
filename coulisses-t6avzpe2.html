@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=81">
+<link rel="stylesheet" href="assets/admin.css?v=82">
 <link rel="stylesheet" href="assets/facture.css?v=26">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
@@ -90,6 +90,11 @@
       <button class="side-close" id="nav-close" type="button" aria-label="Fermer le menu">&times;</button>
     </div>
     <nav class="side-nav" aria-label="Sections admin">
+      <!-- Accueil (grand écran ≥ 1600 px seulement) : page Aujourd'hui (cms-aujourdhui.js) -->
+      <div class="side-today">
+        <p class="side-group" aria-hidden="true">Accueil</p>
+        <button class="tab" type="button" data-tab="aujourdhui" data-group="Accueil"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="4.5" rx="1.5"/><rect x="13.5" y="11" width="7" height="9.5" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/></svg><span>Aujourd'hui</span></button>
+      </div>
       <p class="side-group" aria-hidden="true">Catalogue</p>
       <button class="tab" type="button" data-tab="filaments" data-group="Catalogue" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 3.5v5.5M12 15v5.5"/></svg><span>Filaments</span></button>
       <!-- Sous-liste « Aller au matériau » (remplie par cms-materials.js, visible sur l'onglet Filaments) -->
@@ -146,6 +151,27 @@
 
   <main>
     <!-- ---------------- FILAMENTS ---------------- -->
+    <!-- ---------------- AUJOURD'HUI (tableau de bord, grand écran) ---------------- -->
+    <!-- Ce qui demande ton attention, en lecture seule ; chaque élément mène à son onglet (cms-aujourdhui.js).
+         Page d'accueil dès 1600 px (admin-core DEFAULT_TAB) ; entrée du menu cachée en dessous. -->
+    <section class="tabpanel" data-panel="aujourdhui" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Aujourd'hui</h1>
+          <p class="muted td-date" id="td-date"></p>
+        </div>
+        <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm" id="td-refresh" type="button" data-ic="refresh">Actualiser</button>
+      </div>
+      <div class="td-tiles" id="td-tiles"><p class="muted">Chargement…</p></div>
+      <div class="td-grid">
+        <section class="td-card" id="td-sales"></section>
+        <section class="td-card" id="td-orders"></section>
+        <section class="td-card" id="td-msgs"></section>
+        <section class="td-card" id="td-invoices"></section>
+      </div>
+    </section>
+
     <section class="tabpanel" data-panel="filaments" role="tabpanel">
 
       <!-- ===== MARQUES (Bambu Lab, Elegoo, Anycubic…) ===== -->
@@ -1932,7 +1958,7 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/auth-gate.js?v=2"></script>
-<script src="assets/admin-core.js?v=11"></script>
+<script src="assets/admin-core.js?v=12"></script>
 <script src="assets/admin-accent.js?v=1"></script>
 <script src="assets/cms-securite.js?v=2"></script>
 <script src="assets/cms-costing.js?v=3"></script>
@@ -1943,7 +1969,7 @@
 <script src="assets/cms-spacers.js?v=15"></script>
 <script src="assets/cms-accessories.js?v=8"></script>
 <script src="assets/ca-pick.js?v=1"></script>
-<script src="assets/cms-inventory.js?v=36"></script>
+<script src="assets/cms-inventory.js?v=37"></script>
 <script src="assets/cms-attente.js?v=6"></script>
 <script src="assets/cms-reserves.js?v=2"></script>
 <script src="assets/cms-en-route.js?v=6"></script>
@@ -1960,5 +1986,6 @@
 <script src="assets/autoloop-3mf.js?v=2"></script>
 <script src="assets/cms-autoloop.js?v=41"></script>
 <script src="assets/cms-production.js?v=7"></script>
+<script src="assets/cms-aujourdhui.js?v=1"></script>
 </body>
 </html>

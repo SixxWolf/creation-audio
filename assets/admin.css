@@ -78,6 +78,13 @@ html, body { overflow-x:hidden; overscroll-behavior-x:none; }
 .side-nav { flex:1; display:flex; flex-direction:column; gap:2px; padding:6px 10px 14px; overflow-y:auto; scrollbar-width:thin; }
 .side-group { margin:16px 12px 6px; font-size:.64rem; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
 .side-group:first-child { margin-top:10px; }
+/* « Aujourd'hui » (Accueil) : grand écran seulement ; en dessous, le menu reste exactement comme avant */
+.side-today { display:none; }
+.side-today + .side-group { margin-top:10px; }
+@media screen and (min-width:1600px) {
+  .side-today { display:flex; flex-direction:column; gap:2px; }
+  .side-today + .side-group { margin-top:16px; }
+}
 .tab { position:relative; display:flex; align-items:center; gap:11px; width:100%; min-height:40px; padding:0 12px;
   font:inherit; font-weight:600; font-size:.92rem; text-align:left; color:var(--ink-2); cursor:pointer;
   background:none; border:none; border-radius:10px; transition:background .15s, color .15s; }
@@ -127,7 +134,52 @@ main { width:100%; max-width:1280px; margin:0 auto; padding:26px clamp(16px, 2.4
 body[data-tab="production"] main { max-width:none; }   /* essai grand écran (2026-10-11) : Production pleine largeur */
 /* Pleine largeur (ordinateur ≥ 1600 px) : onglets refaits un à un — voir CA.wideLayout (admin-core.js) */
 @media screen and (min-width:1600px) {
-  body[data-tab="facturation"] main, body[data-tab="inventaire"] main, body[data-tab="messages"] main { max-width:none; }
+  body[data-tab="facturation"] main, body[data-tab="inventaire"] main, body[data-tab="messages"] main,
+  body[data-tab="aujourdhui"] main { max-width:none; }
+}
+/* ---- Aujourd'hui (tableau de bord, cms-aujourdhui.js — entrée du menu en grand écran seulement) ---- */
+@media screen {
+  .td-date::first-letter { text-transform:uppercase; }
+  .td-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-bottom:20px; }
+  .td-tile { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; padding:16px 18px;
+    font:inherit; color:var(--ink); text-align:left; cursor:pointer; background:var(--paper); border:1px solid var(--line); border-radius:16px;
+    transition:border-color .15s, box-shadow .15s, transform .1s; }
+  .td-tile:hover { border-color:var(--line-2); box-shadow:0 14px 30px -22px rgba(20,22,26,.45); }
+  .td-tile:active { transform:translateY(1px); }
+  .td-tile:focus-visible, .td-row:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
+  .td-tile.is-hot { border-color:color-mix(in srgb, var(--ember) 55%, var(--line)); }
+  .td-tile.is-hot::before { content:''; position:absolute; left:0; top:14px; bottom:14px; width:3px; border-radius:0 3px 3px 0; background:var(--ember); }
+  .td-n { font-family:var(--display); font-size:1.9rem; font-weight:700; line-height:1.05; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+  .td-tile.is-hot .td-n { color:var(--ember-ink); }
+  .td-l { font-size:.86rem; font-weight:600; color:var(--ink-2); }
+  .td-s { font-size:.78rem; color:var(--muted); }
+  .td-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(440px, 1fr)); gap:16px; align-items:start; }
+  .td-card { min-width:0; padding:16px 18px; background:var(--paper); border:1px solid var(--line); border-radius:16px; }
+  .td-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+  .td-card-head h2 { margin:0; font-family:var(--display); font-size:1.1rem; letter-spacing:-.01em; }
+  .td-sale { display:grid; grid-template-columns:minmax(0, 1fr) auto auto; align-items:baseline; gap:12px; padding:10px 0; border-top:1px solid var(--line); }
+  .td-sale:first-of-type { border-top:0; }
+  .td-sale span { font-size:.9rem; color:var(--ink-2); }
+  .td-sale b { font-family:var(--display); font-size:1.2rem; font-variant-numeric:tabular-nums; }
+  .td-sale small { min-width:80px; text-align:right; font-size:.8rem; color:var(--muted); }
+  .td-row { display:flex; align-items:center; gap:12px; width:100%; padding:10px 8px; font:inherit; color:var(--ink); text-align:left; cursor:pointer;
+    background:none; border:0; border-top:1px solid var(--line); border-radius:0; transition:background .15s; }
+  .td-card-head + .td-row { border-top:0; }
+  .td-row:hover { background:color-mix(in srgb, var(--wash) 70%, transparent); }
+  .td-row .person-av { width:34px; height:34px; font-size:.78rem; flex:none; }
+  .td-row-tx { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .td-row-tx b { font-size:.92rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .td-row-tx small { font-size:.8rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .td-row-end { flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:2px; font-variant-numeric:tabular-nums; }
+  .td-row-end b { font-size:.92rem; }
+  .td-row-end small { font-size:.76rem; color:var(--muted); }
+  .td-row-end .nav-count { margin:0; }
+  .td-st { flex:none; padding:2px 9px; font-size:.72rem; font-weight:700; border-radius:100px; color:var(--muted); background:var(--wash); }
+  .td-st.is-new { color:var(--on-ember); background:var(--ember); }
+  .td-st.is-preparing { color:#1D5FA8; background:#E8F1FB; }
+  .td-st.is-ready, .td-st.is-active { color:var(--good); background:var(--good-wash); }
+  .td-st.is-cancelled { color:var(--bad); background:var(--bad-wash); }
+  .td-none { margin:4px 0; font-size:.88rem; color:var(--muted); }
 }
 @media screen and (min-width:1880px) {   /* Commandes : 3 colonnes de cartes à partir de 1880 px seulement */
   body[data-tab="commandes"] main { max-width:none; }

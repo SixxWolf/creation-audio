@@ -70,7 +70,9 @@ window.CA = window.CA || {};
       whoEmail = $('#who-email'), logoutBtn = $('#logout-btn');
 
   var readyCbs = [], isReady = false;
-  var DEFAULT_TAB = 'filaments', curTab = null;   // onglet courant (routing par hash)
+  // onglet d'accueil : « Aujourd'hui » sur grand écran (≥ 1600 px, cms-aujourdhui.js), Filaments en dessous
+  var DEFAULT_TAB = window.matchMedia('(min-width:1600px)').matches && document.querySelector('.tab[data-tab="aujourdhui"]')
+    ? 'aujourdhui' : 'filaments', curTab = null;   // onglet courant (routing par hash)
   window.CA.onAdminReady = function (cb) {
     if (isReady) { try { cb(); } catch (e) {} }
     else readyCbs.push(cb);
@@ -103,10 +105,10 @@ window.CA = window.CA || {};
     }
     isReady = true;
     readyCbs.splice(0).forEach(function (cb) { try { cb(); } catch (e) {} });
-    // Lien direct vers un onglet autre que le défaut (ex. #historique) : on déclenche
-    // son chargement paresseux maintenant que l'admin est authentifié. Le défaut
-    // ('filaments') se charge déjà via onAdminReady — on ne le rejoue pas.
-    if (curTab && curTab !== DEFAULT_TAB && window.CA.onTab) {
+    // Lien direct vers un onglet (ex. #historique) ou accueil « Aujourd'hui » : on déclenche
+    // son chargement paresseux maintenant que l'admin est authentifié. Filaments se
+    // charge déjà via onAdminReady — on ne le rejoue pas.
+    if (curTab && curTab !== 'filaments' && window.CA.onTab) {
       try { window.CA.onTab(curTab); } catch (e) {}
     }
   }
