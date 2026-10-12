@@ -1474,24 +1474,37 @@
 
   /* ----- apprentissage d'un code inconnu (mémorisé dans attrs.barcodes) ----- */
   // valeurs : "filament:<id>" ou "accessory:<id>"
+  // filaments groupés par marque dans l'ordre de la section Filaments (marque -> matériau -> couleur),
+  // chacun avec sa pastille (menu maison CA.pick) ; accessoires à la fin
   function learnOptions() {
-    var fils = (catalog.filament || []).slice().sort(function (a, b) {
-      return ((a.brand || '') + (a.material || '') + (a.name || '')).localeCompare((b.brand || '') + (b.material || '') + (b.name || ''));
-    });
-    var accs = (catalog.accessory || []).slice().sort(function (a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    var bl = (CA.brands && CA.brands.list) || [], ml = (CA.materials && CA.materials.list) || [];
+    var bIdx = function (b) { for (var i = 0; i < bl.length; i++) { if (bl[i].name === b) return i; } return 9999; };
+    var mIdx = function (b, m) { for (var i = 0; i < ml.length; i++) { if (ml[i].brand === b && ml[i].name === m) return i; } return 9999; };
+    var fils = (catalog.filament || []).map(function (p, i) { return { p: p, i: i }; }).sort(function (a, z) {
+      return (bIdx(a.p.brand) - bIdx(z.p.brand)) || (mIdx(a.p.brand, a.p.material) - mIdx(z.p.brand, z.p.material)) || (a.i - z.i);
+    }).map(function (d) { return d.p; });
+    var accs = catalog.accessory || [];
+    var sw = function (p) {
+      var bg = CA.inv && CA.inv.swatch ? CA.inv.swatch(p) : p.hex;
+      return bg ? ' data-sw="' + esc(bg) + '"' : '';
+    };
     function accLabel(p) {
       // deux accessoires peuvent porter le même nom : on ajoute la description pour les distinguer
       var d = p.attrs && p.attrs.description;
       var dup = accs.some(function (x) { return x !== p && x.name === p.name; });
       return p.name + (dup && d ? ' — ' + d : '');
     }
+    var groups = [], by = {};
+    fils.forEach(function (p) {
+      var b = p.brand || 'Autres';
+      if (!by[b]) { by[b] = []; groups.push(b); }
+      by[b].push('<option value="filament:' + esc(p.id) + '"' + sw(p) + '>' + esc([p.material, p.name].filter(Boolean).join(' · ')) + '</option>');
+    });
     return '<option value="">— choisir l\'article —</option>' +
+      groups.map(function (b) { return '<optgroup label="' + esc(b) + '">' + by[b].join('') + '</optgroup>'; }).join('') +
       (accs.length ? '<optgroup label="Accessoires">' + accs.map(function (p) {
         return '<option value="accessory:' + esc(p.id) + '">' + esc(accLabel(p)) + '</option>';
-      }).join('') + '</optgroup>' : '') +
-      '<optgroup label="Filaments">' + fils.map(function (p) {
-        return '<option value="filament:' + esc(p.id) + '">' + esc([p.brand, p.material, p.name].filter(Boolean).join(' · ')) + '</option>';
-      }).join('') + '</optgroup>';
+      }).join('') + '</optgroup>' : '');
   }
   function learnPick() {
     var v = elScanLearnFil.value || '', i = v.indexOf(':');
@@ -1506,10 +1519,11 @@
     pendingCode = code; learnOpen = true;
     elScanLearnCode.textContent = code;
     elScanLearnFil.innerHTML = learnOptions(); elScanLearnFil.value = '';
+    var pk = CA.pick ? CA.pick(elScanLearnFil) : null;
     elScanLearnKind.value = 'spool'; elScanLearnKind.hidden = false;
     elScanLearn.hidden = false; if (elPosStation) elPosStation.hidden = false;
     scanFeedback('⚠ Code inconnu — associe-le une fois.', 'warn');
-    try { elScanLearnFil.focus(); } catch (e) {}
+    try { if (pk) pk.focus(); else elScanLearnFil.focus(); } catch (e) {}
   }
   function closeLearn() { learnOpen = false; pendingCode = ''; if (elScanLearn) elScanLearn.hidden = true; if (elPosStation) elPosStation.hidden = true; }
   if (elScanLearnFil) elScanLearnFil.addEventListener('change', function () {
@@ -1526,7 +1540,7 @@
   if (elScanLearnCancel) elScanLearnCancel.addEventListener('click', function () { closeLearn(); scanFeedback('Code ignoré.', 'warn'); });
   if (elScanLearnSave) elScanLearnSave.addEventListener('click', function () {
     var pick = learnPick();
-    if (!pick) { elScanLearnFil.focus(); return; }
+    if (!pick) { if (elScanLearnFil._pk) elScanLearnFil._pk.open(); else elScanLearnFil.focus(); return; }
     var p = pick.p;
     var kind = pick.c === 'accessory' ? 'item' : (elScanLearnKind.value === 'refill' ? 'refill' : 'spool');
     var code = pendingCode;
