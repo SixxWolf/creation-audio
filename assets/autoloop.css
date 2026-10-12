@@ -74,6 +74,12 @@
 .al-cols-gen > .al-side { grid-area:side; }
 .al-cols-gen > .al-more { grid-area:more; align-self:start; }
 .al-step { font-family:var(--display); font-weight:700; font-size:.95rem; }
+/* Grand écran (≥ 1600 px — 2026-10-12) : cartes des étapes côte à côte (① plateau | ② batch, et celles du
+   calculateur), rapport + boutons collés à droite ; réglages machine dessous. Sous 1600 px : inchangé. */
+@media screen and (min-width:1600px) {
+  .al-cols, .al-cols-gen { grid-template-columns:minmax(0, 1fr) 460px; }
+  .al-main { display:grid; grid-template-columns:repeat(auto-fit, minmax(520px, 1fr)); gap:16px; align-items:start; }
+}
 
 /* ② Batch : loops + « tous les X » (flow, bed leveling) + nombre de loops calibrés */
 .al-batch { display:grid; grid-template-columns:max-content max-content 1fr; align-items:center; gap:10px 16px; }
