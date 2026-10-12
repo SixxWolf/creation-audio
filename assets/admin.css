@@ -124,6 +124,7 @@ body[data-tab="filaments"] .mat-nav:not(:empty) { display:flex; flex-direction:c
 .nav-backdrop { position:fixed; inset:0; z-index:40; background:rgba(20,22,26,.45); -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px); }
 
 main { width:100%; max-width:1280px; margin:0 auto; padding:26px clamp(16px, 2.4vw, 28px) 90px; }
+body[data-tab="production"] main { max-width:1680px; }   /* essai grand écran (2026-10-11) : Production seulement */
 .tabpanel[hidden] { display:none; }
 
 /* =========================================================
