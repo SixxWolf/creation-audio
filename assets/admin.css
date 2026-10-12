@@ -1406,3 +1406,24 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .pr-use-cost { grid-column:3 / 5; grid-row:2; }
   .pr-use-warn { grid-column:2 / -1; }
 }
+/* grand écran (contenu 1680 px) : 3 colonnes — bobines en production | étapes | résumé */
+@media (min-width:1760px) {
+  .tabpanel[data-panel="production"]:not([hidden]) { display:grid; gap:18px; align-items:start;
+    grid-template-columns:420px minmax(0, 1fr) 400px;
+    grid-template-areas:"head head head" "spools main side" "hist hist hist"; }
+  .tabpanel[data-panel="production"] > .panel-head { grid-area:head; margin:0; }
+  .tabpanel[data-panel="production"] > .pr-spools { grid-area:spools; margin:0; }
+  .pr-spools .reorder-card-head .grow { display:none; }   /* titre + « Sortir une bobine » sur une ligne */
+  .pr-spools #pr-take-open { margin-left:auto; }
+  .tabpanel[data-panel="production"] > .pr-cols { display:contents; }
+  .pr-cols > .al-main { grid-area:main; }
+  .pr-cols > .al-side { grid-area:side; }
+  .tabpanel[data-panel="production"] > .pr-hist { grid-area:hist; }
+  /* colonne étroite : nom sur toute la ligne, jauge + bouton dessous ; sortie en 2 colonnes */
+  .pr-spool, .pr-spool.is-done { grid-template-columns:auto minmax(0, 1fr) 96px; }
+  .pr-spool .pr-sp-main { grid-column:2 / -1; grid-row:1; }
+  .pr-spool .pr-sp-gauge, .pr-spool.is-done .pr-sp-left { grid-column:2; grid-row:2; }
+  .pr-spool .pr-sp-act { grid-column:3; grid-row:2; }
+  .pr-take-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .pr-take-grid .pr-take-fil, .pr-take-grid .pr-take-kind { grid-column:1 / -1; }
+}
