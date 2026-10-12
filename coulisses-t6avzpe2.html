@@ -15,8 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=86">
-<link rel="stylesheet" href="assets/facture.css?v=26">
+<link rel="stylesheet" href="assets/admin.css?v=87">
+<link rel="stylesheet" href="assets/facture.css?v=27">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
@@ -1531,6 +1531,8 @@
       </div>
 
       <div id="hist-list" class="hist-list"><p class="muted">Chargement…</p></div>
+      <!-- Grand écran (≥ 1600 px) : facture ouverte affichée ici, collée à droite (cms-historique.js) -->
+      <aside class="hist-preview" id="hist-preview" aria-label="Facture ouverte"></aside>
     </section>
 
     <!-- ---------------- STATISTIQUES ---------------- -->
@@ -1989,7 +1991,7 @@
 <script src="assets/cms-clients.js?v=8"></script>
 <script src="assets/cms-messages.js?v=3"></script>
 <script src="assets/cms-facturation.js?v=46"></script>
-<script src="assets/cms-historique.js?v=14"></script>
+<script src="assets/cms-historique.js?v=15"></script>
 <script src="assets/cms-commandes-clients.js?v=5"></script>
 <script src="assets/cms-reservations.js?v=3"></script>
 <script src="assets/cms-commandes.js?v=10"></script>

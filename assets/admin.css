@@ -135,7 +135,7 @@ body[data-tab="production"] main { max-width:none; }   /* essai grand écran (20
 /* Pleine largeur (ordinateur ≥ 1600 px) : onglets refaits un à un — voir CA.wideLayout (admin-core.js) */
 @media screen and (min-width:1600px) {
   body[data-tab="facturation"] main, body[data-tab="inventaire"] main, body[data-tab="messages"] main,
-  body[data-tab="aujourdhui"] main { max-width:none; }
+  body[data-tab="aujourdhui"] main, body[data-tab="historique"] main { max-width:none; }
 }
 /* ---- « Liste + éditeur côte à côte » (CA.dockEditor, admin-core) : grand écran seulement ----
    L'éditeur ouvert rejoint .dock (collé à droite, défile seul) ; sans éditeur ouvert, la liste prend toute la largeur. */

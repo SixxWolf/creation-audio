@@ -402,6 +402,28 @@
 .hist-total { min-width:96px; text-align:right; font-family:var(--display); font-weight:700; font-size:1.05rem; font-variant-numeric:tabular-nums; }
 .hist-detail { display:none; padding:0 16px; }
 .hist-row.open .hist-detail { display:block; padding:8px 16px 16px; border-top:1px solid var(--line); }
+/* Grand écran (≥ 1600 px — 2026-10-12) : liste à gauche, facture ouverte dans le panneau collé à droite */
+.hist-preview { display:none; }
+@media screen and (min-width:1600px) {
+  .tabpanel[data-panel="historique"].is-wide:not([hidden]) { display:grid; grid-template-columns:minmax(0, 1fr) 640px; column-gap:20px; align-items:start;
+    grid-template-areas:"head head" "bar prev" "cats prev" "list prev" ". prev"; grid-template-rows:auto auto auto auto 1fr; }
+  .tabpanel[data-panel="historique"].is-wide > .panel-head { grid-area:head; }
+  .tabpanel[data-panel="historique"].is-wide > .hist-bar { grid-area:bar; }
+  .tabpanel[data-panel="historique"].is-wide > .hist-cats { grid-area:cats; }
+  .tabpanel[data-panel="historique"].is-wide > .hist-list { grid-area:list; min-width:0; }
+  .is-wide .hist-preview { grid-area:prev; display:block; position:sticky; top:calc(var(--top-h, 60px) + 16px);
+    max-height:calc(100vh - var(--top-h, 60px) - 32px); overflow-y:auto; scrollbar-width:thin;
+    background:var(--paper); border:1px solid var(--line); border-radius:14px; }
+  .is-wide .hist-preview:empty { display:flex; align-items:center; justify-content:center; min-height:220px; }
+  .is-wide .hist-preview:empty::before { content:'Choisis une facture'; font-size:.92rem; color:var(--muted); }
+  .hist-preview > .hist-pv-head { cursor:default; padding:14px 16px; border-bottom:1px solid var(--line); }
+  .hist-preview > .hist-pv-head::after { display:none; }
+  .hist-preview > .hist-pv-head:hover { background:none; }
+  .hist-preview > .hist-detail { display:block; padding:8px 16px 16px; }
+  /* la ligne ouverte reste repérée dans la liste (son détail est à droite) */
+  .is-wide .hist-row.open { border-color:var(--ember); box-shadow:var(--ring); }
+  .is-wide .hist-row.open .hist-head::after { transform:rotate(-90deg); }
+}
 
 .hist-lines { width:100%; margin:8px 0 10px; font-size:.88rem; border-collapse:separate; border-spacing:0;
   border:1px solid var(--line); border-radius:12px; overflow:hidden; }

@@ -58,6 +58,14 @@
 
   var listEl = $('#hist-list'), searchEl = $('#hist-search'), refreshBtn = $('#hist-refresh'), printBox = $('#hist-print');
 
+  // Grand écran (≥ 1600 px, CA.wideLayout) : la facture ouverte s'affiche dans le panneau collé à droite
+  // (#hist-preview) au lieu de se déplier dans la liste ; une seule à la fois. Son bloc .hist-detail y est
+  // déplacé tel quel (boutons et écouteurs gardés). En dessous : dépliée dans la liste, comme avant.
+  var previewEl = $('#hist-preview'), panelEl = listEl && listEl.closest('.tabpanel');
+  function isWide() { return !!(previewEl && panelEl && panelEl.classList.contains('is-wide')); }
+  if (panelEl) panelEl.addEventListener('ca:wide', function () { if (loaded) render(); });
+  if (window.CA.wideLayout && panelEl) window.CA.wideLayout(panelEl);
+
   var prevOnTab = window.CA.onTab;
   window.CA.onTab = function (name) {
     if (typeof prevOnTab === 'function') prevOnTab(name);
@@ -145,6 +153,7 @@
   }
 
   function render() {
+    if (previewEl) previewEl.innerHTML = '';   // la liste est refaite : plus de facture ouverte
     updateCatCounts();
     var rows = visible();
     if (!rows.length) {
@@ -197,8 +206,14 @@
   }
 
   function toggleDetail(el, inv) {
-    var box = $('.hist-detail', el);
-    if (el.classList.contains('open')) { el.classList.remove('open'); box.innerHTML = ''; return; }
+    var box = el.__box || (el.__box = $('.hist-detail', el));
+    if (el.classList.contains('open')) {
+      el.classList.remove('open'); box.innerHTML = '';
+      if (box.parentNode !== el) { el.appendChild(box); if (previewEl) previewEl.innerHTML = ''; }   // revient du panneau de droite
+      return;
+    }
+    // grand écran : une seule facture ouverte (celle du panneau de droite)
+    if (isWide()) $$('.hist-row.open', listEl).forEach(function (r) { if (r !== el) toggleDetail(r); });
     el.classList.add('open');
     var lines = linesByInv[inv.id] || [];
     var cancelled = inv.status === 'cancelled';
@@ -237,6 +252,12 @@
       b.addEventListener('click', function (e) { e.stopPropagation(); deliver(inv, b.getAttribute('data-line'), b); });
     });
     var ga = $('.hd-give-all', box); if (ga) ga.addEventListener('click', function (e) { e.stopPropagation(); deliver(inv, null, ga); });
+    // grand écran : la facture s'affiche dans le panneau de droite, sous un rappel de son en-tête (n°, client, date, total)
+    if (isWide()) {
+      var head = $('.hist-head', el).cloneNode(true);
+      head.className = 'hist-head hist-pv-head';
+      previewEl.innerHTML = ''; previewEl.appendChild(head); previewEl.appendChild(box); previewEl.scrollTop = 0;
+    }
   }
 
   /* ---------- remettre les articles « à venir » (stock déduit à ce moment-là si la facture déduit) ---------- */
