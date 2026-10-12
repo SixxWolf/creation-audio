@@ -34,7 +34,12 @@
   function round2(n) { return Math.round((+n || 0) * 100) / 100; }
   function round1(n) { return Math.round((+n || 0) * 10) / 10; }   // grammes : au dixième
   function money(n) { return round2(n).toFixed(2).replace('.', ',') + ' $'; }
-  function grams(n) { var v = Math.round((+n || 0) * 10) / 10; return String(v).replace('.', ',') + ' g'; }
+  // « 11 420 g », « 588,5 g » (espace des milliers : les blocs dépassent souvent 10 000 g)
+  function grams(n) {
+    var v = Math.round((+n || 0) * 10) / 10, neg = v < 0, a = Math.abs(v);
+    var int = String(Math.floor(a)).replace(/\B(?=(\d{3})+(?!\d))/g, ' '), dec = Math.round((a % 1) * 10);
+    return (neg ? '−' : '') + int + (dec ? ',' + dec : '') + ' g';
+  }
   function fmtHm(min) {
     min = Math.max(0, Math.round(+min || 0));
     var h = Math.floor(min / 60), m = min % 60;
@@ -150,7 +155,7 @@
   var spacers = [], filaments = [], spools = [], uses = [], prods = [];
   var rates = { elec: 0.2, deprec: 0.25 };
   var file = null;          // G-code lu : { name, isAuto, loops, minutes, objects, fils: [{ type, hex, perLoop }] }
-  var rows = [];            // filament utilisé : [{ spool: id|'', grams, type, hex }]
+  var rows = [];            // filament utilisé : [{ block: clé du bloc|'', grams, type, hex }]
   var edited = { good: false, perPlate: false };
   var lastLoops = 1;
 
@@ -271,46 +276,175 @@
   function shortLabel(s) { var p = String(s.label || '').split(' · '); return p.length > 2 ? p.slice(1).join(' · ') : (s.label || ''); }
 
   /* =========================================================
-     1) BOBINES EN PRODUCTION
+     1) BOBINES EN PRODUCTION — regroupées en BLOCS (2026-10-11) :
+     un bloc = même filament + même format (« Black ×10 »), une jauge pour le total ;
+     dans le bloc, des LOTS = même date de sortie + même prix + même poids. On déplie
+     (chevron) pour voir les lots et chaque bobine. En base, une ligne par bobine.
      ========================================================= */
-  function spoolRow(s, done) {
+  function blockKey(s) { return (s.product_id ? String(s.product_id) : 'x:' + s.label) + '|' + (s.kind === 'refill' ? 'refill' : 'spool'); }
+  function lotKey(s) { return s.taken_at + '|' + (+s.unit_cost || 0).toFixed(2) + '|' + s.weight_g; }
+  // blocs dans l'ordre de `spools` (déjà trié : ordre des Filaments, puis la plus vieille d'abord)
+  function blocksOf(list) {
+    var map = {}, out = [];
+    list.forEach(function (s) {
+      var k = blockKey(s), b = map[k];
+      if (!b) { b = map[k] = { key: k, spools: [], lots: [], lotMap: {} }; out.push(b); }
+      b.spools.push(s);
+      var lk = lotKey(s), l = b.lotMap[lk];
+      if (!l) { l = b.lotMap[lk] = { key: lk, spools: [] }; b.lots.push(l); }
+      l.spools.push(s);
+    });
+    return out;
+  }
+  var openBlocks = {};   // blocs dépliés (clé -> true), gardés d'un rendu à l'autre
+  function isUsed(s) { return usedOf(s.id) > 0.05; }
+  function priceRange(b) {
+    var ps = b.lots.map(function (l) { return +l.spools[0].unit_cost || 0; });
+    var lo = Math.min.apply(null, ps), hi = Math.max.apply(null, ps);
+    return lo === hi ? money(lo) : money(lo).replace(' $', '') + '–' + money(hi);
+  }
+  function blockMeta(b, done) {
+    var s = b.spools[0], m = [kindTxt(s.kind)];
+    if (b.lots.length === 1) m.push(money(s.unit_cost), 'sortie' + (b.spools.length > 1 ? 's' : '') + ' le ' + shortDay(s.taken_at));
+    else m.push(b.lots.length + ' lots', priceRange(b));
+    if (!done) {
+      var ent = b.spools.filter(isUsed).length;
+      if (ent && b.spools.length > 1) m.push(ent + ' entamée' + (ent > 1 ? 's' : ''));
+    }
+    var hs = b.spools.filter(function (x) { return !x.stock_taken; }).length;
+    if (hs) m.push(b.spools.length > 1 ? hs + ' hors stock' : 'hors stock');
+    return m.join(' · ');
+  }
+  function chevron(b) {
+    return b.spools.length > 1
+      ? '<button class="pr-chev" type="button" data-act="toggle" aria-expanded="' + (!!openBlocks[b.key]) + '" aria-label="Voir les bobines"></button>' : '';
+  }
+  // une bobine (dans le détail d'un bloc déplié)
+  function spoolLine(s, i, done) {
     var used = usedOf(s.id), w = +s.weight_g || 1000, left = w - used;
-    var pct = Math.max(0, Math.min(100, left / w * 100));
-    var n = Object.keys(uses.filter(function (u) { return String(u.spool_id) === String(s.id); })
+    var st = done ? grams(used) + ' utilisés' + (left > 0.5 ? ' · perte ' + grams(left) : '') + (s.closed_auto ? ' · vidée' : '')
+      : used > 0.05 ? grams(left) + ' <em>/ ' + grams(w) + '</em> · entamée' : 'pleine';
+    var act = done ? '<button class="btn btn-ghost btn-sm" type="button" data-act="reopen">Rouvrir</button>'
+      : used > 0.05 ? '<button class="btn btn-ghost btn-sm" type="button" data-act="close">Terminer</button>'
+      : '<button class="btn btn-ghost btn-sm" type="button" data-act="remove" title="Remettre au stock de vente">Retirer</button>';
+    return '<div class="pr-sline" data-id="' + esc(s.id) + '"><span class="pr-sline-n">' + kindTxt(s.kind) + ' ' + (i + 1) + '</span>' +
+      '<span class="pr-sline-st">' + st + (s.stock_taken ? '' : ' · hors stock') + '</span>' + act + '</div>';
+  }
+  // détail d'un bloc déplié : par lot, chaque bobine entamée (ou terminée) + UNE ligne pour les pleines
+  function blockDetail(b, done) {
+    if (b.spools.length < 2 || !openBlocks[b.key]) return '';
+    return '<div class="pr-detail">' + b.lots.map(function (l) {
+      var s = l.spools[0], full = done ? [] : l.spools.filter(function (x) { return !isUsed(x); });
+      var lines = l.spools.filter(function (x) { return done || isUsed(x); }).map(function (x, i) { return spoolLine(x, i, done); }).join('');
+      if (full.length) {
+        lines += '<div class="pr-sline" data-lot="' + esc(l.key) + '"><span class="pr-sline-n">' + full.length + ' pleine' + (full.length > 1 ? 's' : '') + '</span>' +
+          '<span class="pr-sline-st">' + grams(full.length * (+s.weight_g || 1000)) + '</span>' +
+          '<button class="btn btn-ghost btn-sm" type="button" data-act="remove-lot" title="Remettre au stock de vente">Retirer</button></div>';
+      }
+      return '<div class="pr-lot"><div class="pr-lot-h">' + esc(shortDay(s.taken_at)) + ' · ' + money(s.unit_cost) + ' · ×' + l.spools.length +
+        (+s.weight_g !== 1000 ? ' · ' + grams(s.weight_g) : '') + '</div>' + lines + '</div>';
+    }).join('') + '</div>';
+  }
+  function blockRow(b, done) {
+    var s = b.spools[0], n = b.spools.length;
+    var W = b.spools.reduce(function (t, x) { return t + (+x.weight_g || 1000); }, 0);
+    var U = b.spools.reduce(function (t, x) { return t + usedOf(x.id); }, 0), L = W - U;
+    var pct = Math.max(0, Math.min(100, L / W * 100));
+    var act = '';
+    if (done) {
+      if (n === 1) act = '<button class="btn btn-ghost btn-sm" type="button" data-act="reopen">Rouvrir</button>';
+    } else {
+      var ent = b.spools.filter(isUsed).length, full = n - ent;
+      if (ent) act += '<button class="btn btn-ghost btn-sm" type="button" data-act="close-block">Terminer</button>';
+      if (full) act += '<button class="btn btn-ghost btn-sm" type="button" data-act="remove-block" title="Remettre au stock de vente">Retirer</button>';
+    }
+    var nprod = Object.keys(uses.filter(function (u) { return b.spools.some(function (x) { return String(x.id) === String(u.spool_id); }); })
       .reduce(function (acc, u) { acc[u.production_id] = 1; return acc; }, {})).length;
-    var meta = [kindTxt(s.kind), money(s.unit_cost), 'sortie le ' + shortDay(s.taken_at)];
-    if (!s.stock_taken) meta.push('hors stock');
-    var act = done
-      ? '<button class="btn btn-ghost btn-sm" type="button" data-act="reopen">Rouvrir</button>'
-      : used > 0
-        ? '<button class="btn btn-ghost btn-sm" type="button" data-act="close">Terminer</button>'
-        : '<button class="btn btn-ghost btn-sm" type="button" data-act="remove" title="Remettre au stock de vente">Retirer</button>';
-    return '<div class="pr-spool' + (done ? ' is-done' : '') + '" data-id="' + esc(s.id) + '">' +
+    return '<div class="pr-spool' + (done ? ' is-done' : '') + (openBlocks[b.key] && n > 1 ? ' is-open' : '') + '" data-block="' + esc(b.key) + '">' +
       swatchBg(spoolBg(s)) +
-      '<div class="pr-sp-main"><b>' + esc(s.label) + '</b><span class="pr-sp-meta">' + esc(meta.join(' · ')) + '</span></div>' +
+      '<div class="pr-sp-main"><b>' + esc(s.label) + (n > 1 ? ' <span class="pr-n">×' + n + '</span>' : '') + '</b>' +
+        '<span class="pr-sp-meta">' + esc(blockMeta(b, done)) + '</span></div>' +
       (done
-        ? '<span class="pr-sp-left">' + grams(used) + ' · ' + n + ' prod.' + (left > 0.5 ? ' · perte ' + grams(left) : '') + '</span>'
+        ? '<span class="pr-sp-left">' + grams(U) + ' · ' + nprod + ' prod.' + (L > 0.5 ? ' · perte ' + grams(L) : '') + '</span>'
         : '<div class="pr-sp-gauge"><div class="pr-bar"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
-          '<span class="pr-sp-left' + (left < 0 ? ' is-neg' : '') + '">' + grams(left) + ' <em>/ ' + grams(w) + '</em></span></div>') +
-      '<div class="pr-sp-act">' + act + '</div>' +
+          '<span class="pr-sp-left' + (L < 0 ? ' is-neg' : '') + '">' + grams(L) + ' <em>/ ' + grams(W) + '</em></span></div>') +
+      '<div class="pr-sp-act">' + act + chevron(b) + '</div>' +
+      blockDetail(b, done) +
     '</div>';
   }
   function renderSpools() {
-    var act = activeSpools(), done = spools.filter(function (s) { return s.status === 'done'; });
-    el.spools.innerHTML = act.length ? act.map(function (s) { return spoolRow(s, false); }).join('')
+    var act = blocksOf(activeSpools()), doneSp = spools.filter(function (s) { return s.status === 'done'; }), done = blocksOf(doneSp);
+    el.spools.innerHTML = act.length ? act.map(function (b) { return blockRow(b, false); }).join('')
       : '<p class="muted pr-empty">Aucune bobine en production.</p>';
-    el.doneWrap.hidden = !done.length;
-    el.doneN.textContent = done.length ? '(' + done.length + ')' : '';
-    el.done.innerHTML = done.map(function (s) { return spoolRow(s, true); }).join('');
+    el.doneWrap.hidden = !doneSp.length;
+    el.doneN.textContent = doneSp.length ? '(' + doneSp.length + ')' : '';
+    el.done.innerHTML = done.map(function (b) { return blockRow(b, true); }).join('');
+  }
+  function blockOf(key, done) {
+    return blocksOf(spools.filter(function (s) { return done ? s.status === 'done' : s.status === 'active'; }))
+      .filter(function (b) { return b.key === key; })[0] || null;
   }
   [el.spools, el.done].forEach(function (box) {
     box.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-act]');
-      if (!b) return;
-      var s = spoolById(b.closest('.pr-spool').getAttribute('data-id'));
-      if (s) spoolAction(s, b.getAttribute('data-act'), b);
+      var btn = e.target.closest('[data-act]');
+      if (!btn) return;
+      var act = btn.getAttribute('data-act'), row = btn.closest('.pr-spool'), done = box === el.done;
+      var b = row ? blockOf(row.getAttribute('data-block'), done) : null;
+      if (act === 'toggle' && b) { openBlocks[b.key] = !openBlocks[b.key]; renderSpools(); return; }
+      if (act === 'close-block' && b) { closeBlock(b, btn); return; }
+      if (act === 'remove-block' && b) { removeBlock(b.spools); return; }
+      if (act === 'remove-lot' && b) {
+        var lk = btn.closest('.pr-sline').getAttribute('data-lot'), lot = b.lotMap[lk];
+        if (lot) removeBlock(lot.spools);
+        return;
+      }
+      // action sur une bobine : ligne du détail, ou bloc d'une seule bobine
+      var line = btn.closest('.pr-sline');
+      var s = line ? spoolById(line.getAttribute('data-id')) : (b && b.spools.length === 1 ? b.spools[0] : null);
+      if (s) spoolAction(s, act, btn);
     });
   });
+  // Terminer : la bobine entamée du bloc (le reste éventuel compte comme perte)
+  function closeBlock(b, btn) {
+    var ent = b.spools.filter(isUsed);
+    if (!ent.length) return;
+    var left = ent.reduce(function (t, s) { return t + Math.max(0, leftOf(s)); }, 0);
+    caDialog.confirm({ title: ent.length > 1 ? 'Terminer les ' + ent.length + ' bobines entamées ?' : 'Terminer la bobine entamée ?',
+      message: shortLabel(b.spools[0]) + (left > 0.5 ? ' — il reste ' + grams(left) + ', compté comme perte.' : '.'), ok: 'Terminer' }).then(function (ok) {
+      if (!ok) return;
+      btn.disabled = true;
+      var ids = ent.map(function (s) { return s.id; });
+      sb.from('production_spools').update({ status: 'done', closed_at: new Date().toISOString(), closed_auto: false }).in('id', ids).select().then(function (res) {
+        btn.disabled = false;
+        if (res.error) { caDialog.error(res.error); return; }
+        toast(ent.length > 1 ? ent.length + ' bobines terminées' : 'Bobine terminée');
+        reloadAfterChange();
+      });
+    });
+  }
+  // Retirer : n bobines pleines d'un bloc ou d'un lot (les plus récentes) retournent au stock de vente
+  function removeBlock(list) {
+    var full = list.filter(function (s) { return !isUsed(s); });
+    if (!full.length) return;
+    var ask = full.length === 1
+      ? caDialog.confirm({ title: 'Retirer cette bobine ?', message: shortLabel(full[0]) + (full[0].stock_taken ? ' retourne au stock de vente.' : ' est retirée de la production.'),
+          ok: 'Retirer', danger: true, icon: 'trash' }).then(function (ok) { return ok ? 1 : 0; })
+      : caDialog.prompt({ title: 'Retirer combien de bobines ?', message: shortLabel(full[0]) + ' : ' + full.length + ' pleines. Elles retournent au stock de vente.',
+          value: String(full.length), ok: 'Retirer', icon: 'trash' }).then(function (v) {
+          var n = parseInt(v, 10);
+          return isFinite(n) ? Math.max(0, Math.min(full.length, n)) : 0;
+        });
+    ask.then(function (n) {
+      if (!n) return;
+      var pick = full.slice(-n);
+      Promise.all(pick.map(function (s) { return sb.rpc('admin_spool_delete', { p_id: s.id }); })).then(function (res) {
+        var err = res.filter(function (r) { return r.error; })[0];
+        if (err) caDialog.error(err.error);
+        else toast(n > 1 ? n + ' bobines remises au stock' : 'Bobine remise au stock');
+        reloadAfterChange();
+      });
+    });
+  }
   function spoolAction(s, act, btn) {
     if (act === 'remove') {
       caDialog.confirm({ title: 'Retirer cette bobine ?', message: s.label + (s.stock_taken ? ' retourne au stock de vente.' : ' est retirée de la production.'),
@@ -325,7 +459,8 @@
       return;
     }
     btn.disabled = true;
-    var patch = act === 'close' ? { status: 'done', closed_at: new Date().toISOString() } : { status: 'active', closed_at: null };
+    var patch = act === 'close' ? { status: 'done', closed_at: new Date().toISOString(), closed_auto: false }
+                                : { status: 'active', closed_at: null, closed_auto: false };
     sb.from('production_spools').update(patch).eq('id', s.id).select().then(function (res) {
       btn.disabled = false;
       if (res.error) { caDialog.error(res.error); return; }
@@ -555,46 +690,78 @@
     el.good.value = Math.max(1, num(el.loops.value) | 0) * Math.max(1, num(el.perPlate.value) | 0);
   }
 
-  /* ---- Bobines utilisées : une rangée par filament du fichier, bobine pré-choisie ---- */
+  /* ---- Bobines utilisées : une rangée par filament du fichier, BLOC pré-choisi.
+     On choisit un bloc (ex. PETG Basic · Black ×10) ; les grammes sont répartis sur ses
+     bobines, la plus vieille d'abord (comme l'imprimante les vide) : allocate(). ---- */
   function typeMatch(s, type) {
     if (!type) return false;
     var words = ' ' + String(s.material || s.label || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ') + ' ';
     return words.indexOf(' ' + type.toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim() + ' ') !== -1;
   }
-  // grammes encore libres sur une bobine, sans compter la rangée `skip`
-  function availOf(s, skip) {
-    return leftOf(s) - rows.reduce(function (sum, r, i) { return sum + (i !== skip && String(r.spool) === String(s.id) ? (+r.grams || 0) : 0); }, 0);
+  function activeBlocks() { return blocksOf(activeSpools()); }
+  function blockByKey(k) { return activeBlocks().filter(function (b) { return b.key === k; })[0] || null; }
+  function blockLeft(b) { return b.spools.reduce(function (s, x) { return s + Math.max(0, leftOf(x)); }, 0); }
+  // grammes encore libres dans un bloc, sans compter la rangée `skip`
+  function availOfBlock(b, skip) {
+    return blockLeft(b) - rows.reduce(function (sum, r, i) { return sum + (i !== skip && r.block === b.key ? (+r.grams || 0) : 0); }, 0);
   }
   function candidates(type, hex) {
-    return activeSpools().map(function (s) {
+    return activeBlocks().map(function (b) {
+      var s = b.spools[0];
       var sc = (typeMatch(s, type) ? 2 : 0) + (isHex(hex) && isHex(s.hex) && s.hex.toLowerCase() === hex.toLowerCase() ? 1 : 0);
-      return { s: s, sc: sc };
+      return { b: b, sc: sc };
     }).filter(function (c) { return !type || c.sc >= 2; })
-      .sort(function (a, b) { return b.sc - a.sc; })   // tri stable : les plus vieilles bobines d'abord
-      .map(function (c) { return c.s; });
+      .sort(function (a, z) { return z.sc - a.sc; })   // tri stable : ordre des Filaments à score égal
+      .map(function (c) { return c.b; });
   }
   function buildRows() {
     rows = [];
     var loops = Math.max(1, num(el.loops.value) | 0);
     (file ? file.fils : []).forEach(function (f) {
       var need = round1(f.perLoop * loops), cands = candidates(f.type, f.hex);
-      // remplit la meilleure bobine, la suite sur la suivante si elle ne suffit pas
+      // remplit le meilleur bloc, la suite sur le suivant s'il ne suffit pas
       while (need > 0) {
-        var free = cands.filter(function (s) { return availOf(s, -1) > 0.05; });
-        if (!free.length) { rows.push({ spool: '', grams: need, type: f.type, hex: f.hex }); break; }
-        var pick = free[0], g = free.length === 1 ? need : Math.min(need, round1(availOf(pick, -1)));
-        rows.push({ spool: pick.id, grams: g, type: f.type, hex: f.hex });
+        var free = cands.filter(function (b) { return availOfBlock(b, -1) > 0.05; });
+        if (!free.length) { rows.push({ block: '', grams: need, type: f.type, hex: f.hex }); break; }
+        var pick = free[0], g = free.length === 1 ? need : Math.min(need, round1(availOfBlock(pick, -1)));
+        rows.push({ block: pick.key, grams: g, type: f.type, hex: f.hex });
         need = round1(need - g);
       }
     });
     return rows;
   }
-  // bobines en production pour le menu d'une rangée : marque · matière, couleur, grammes restants
-  function spoolItems() {
-    return activeSpools().map(function (s) {
-      var p = String(s.label || '').split(' · '), left = leftOf(s);
-      return { id: s.id, group: p.length > 2 ? p.slice(0, 2).join(' · ') : '', label: (p.length > 2 ? p.slice(2).join(' · ') : s.label) + (s.kind === 'refill' ? ' · recharge' : ''),
-        btn: shortLabel(s), meta: grams(left), bg: spoolBg(s), dim: left <= 0.05, find: s.label };
+  // Répartition réelle : chaque rangée sur les bobines de son bloc, dans l'ordre (plus vieille d'abord).
+  // -> [{ parts: [{ s, g }], over }] (over = grammes qui ne tiennent pas dans le bloc, mis sur sa dernière bobine)
+  function allocate() {
+    var free = {}, bmap = {};
+    activeSpools().forEach(function (s) { free[s.id] = Math.max(0, leftOf(s)); });
+    activeBlocks().forEach(function (b) { bmap[b.key] = b; });
+    return rows.map(function (r) {
+      var b = bmap[r.block], need = round2(+r.grams || 0), parts = [];
+      if (!b || need <= 0) return { parts: parts, over: 0 };
+      b.spools.forEach(function (s) {
+        if (need <= 0) return;
+        var g = round2(Math.min(need, free[s.id]));
+        if (g <= 0) return;
+        parts.push({ s: s, g: g }); free[s.id] = round2(free[s.id] - g); need = round2(need - g);
+      });
+      if (need > 0) {
+        var last = b.spools[b.spools.length - 1], p = parts.filter(function (x) { return x.s === last; })[0];
+        if (p) p.g = round2(p.g + need); else parts.push({ s: last, g: need });
+      }
+      return { parts: parts, over: need };
+    });
+  }
+  function partsCost(parts) {
+    return parts.reduce(function (sum, p) { return sum + round2(p.g * (+p.s.unit_cost || 0) / (+p.s.weight_g || 1000)); }, 0);
+  }
+  // blocs en production pour le menu d'une rangée : marque · matière, couleur ×N, grammes restants
+  function blockItems() {
+    return activeBlocks().map(function (b) {
+      var s = b.spools[0], p = String(s.label || '').split(' · '), left = blockLeft(b), n = b.spools.length;
+      var nm = (p.length > 2 ? p.slice(2).join(' · ') : s.label) + (s.kind === 'refill' ? ' · recharge' : '');
+      return { id: b.key, group: p.length > 2 ? p.slice(0, 2).join(' · ') : '', label: nm + (n > 1 ? ' ×' + n : ''),
+        btn: shortLabel(s) + (n > 1 ? ' ×' + n : ''), meta: grams(left), bg: spoolBg(s), dim: left <= 0.05, find: s.label };
     });
   }
   function renderRows() {
@@ -604,7 +771,7 @@
     }
     el.uses.innerHTML = rows.map(function (r, i) {
       return '<div class="pr-use" data-i="' + i + '">' +
-        // pastille de gauche = couleur demandée par le G-code (la bobine choisie a la sienne dans le menu)
+        // pastille de gauche = couleur demandée par le G-code (le bloc choisi a la sienne dans le menu)
         '<span class="pr-use-sw" title="' + esc(r.type ? 'G-code : ' + r.type : '') + '"' + (r.hex ? '' : ' style="visibility:hidden"') + '>' + swatch(r.hex) + '</span>' +
         '<div class="pr-use-spool"></div>' +
         '<span class="unit unit-sm" data-unit="g"><input type="number" class="pr-use-g num" min="0" step="0.1" value="' + esc(r.grams) + '" aria-label="Grammes"></span>' +
@@ -616,32 +783,31 @@
     $$('.pr-use', el.uses).forEach(function (row) {
       var i = +row.getAttribute('data-i');
       var pk = new Picker($('.pr-use-spool', row), {
-        placeholder: 'Choisir la bobine', search: activeSpools().length > 6, items: spoolItems,
-        onPick: function (id) { rows[i].spool = id; refreshRows(); recalc(); }
+        placeholder: 'Choisir la bobine', search: activeBlocks().length > 6, items: blockItems,
+        onPick: function (k) { rows[i].block = k; refreshRows(); recalc(); }
       });
       pk.btn.setAttribute('aria-label', 'Bobine');
-      pk.set(rows[i].spool);
+      pk.set(rows[i].block);
     });
     refreshRows();
   }
   // coûts et alertes de chaque rangée (sans reconstruire les champs en cours de saisie)
   function refreshRows() {
+    var al = allocate();
     $$('.pr-use', el.uses).forEach(function (row) {
-      var i = +row.getAttribute('data-i'), r = rows[i], s = spoolById(r.spool);
-      $('.pr-use-cost', row).textContent = s ? money(rowCost(r)) : '—';
+      var i = +row.getAttribute('data-i'), r = rows[i], b = blockByKey(r.block);
+      $('.pr-use-cost', row).textContent = b ? money(partsCost(al[i].parts)) : '—';
       var warn = '';
-      if (s) {
-        var over = round2((+r.grams || 0) - availOf(s, i));
-        if (over > 0.05) warn = 'Dépasse la bobine de ' + grams(over) + (activeSpools().length > 1 ? ' · <button type="button" class="al-link" data-split>Répartir</button>' : '');
-        if (r.type && !typeMatch(s, r.type)) warn = (warn ? warn + ' · ' : '') + 'Le fichier dit ' + esc(r.type);
+      if (b) {
+        if (al[i].over > 0.05) {
+          var other = candidates(r.type, b.spools[0].hex).some(function (x) { return x !== b && availOfBlock(x, -1) > 0.05; });
+          warn = 'Il manque ' + grams(al[i].over) + (other ? ' · <button type="button" class="al-link" data-split>Répartir</button>' : '');
+        }
+        if (r.type && !typeMatch(b.spools[0], r.type)) warn = (warn ? warn + ' · ' : '') + 'Le fichier dit ' + esc(r.type);
       }
       var w = $('.pr-use-warn', row);
       w.innerHTML = warn; w.hidden = !warn;
     });
-  }
-  function rowCost(r) {
-    var s = spoolById(r.spool);
-    return s ? round2((+r.grams || 0) * (+s.unit_cost || 0) / (+s.weight_g || 1000)) : 0;
   }
   el.uses.addEventListener('input', function (e) {
     var row = e.target.closest('.pr-use'); if (!row) return;
@@ -652,20 +818,20 @@
     var i = +row.getAttribute('data-i');
     if (e.target.closest('.pr-x')) { rows.splice(i, 1); renderRows(); recalc(); return; }
     if (e.target.closest('[data-split]')) {
-      var r = rows[i], s = spoolById(r.spool);
-      if (!s) return;
-      var free = Math.max(0, round1(availOf(s, i))), over = round1(r.grams - free);
+      var r = rows[i], b = blockByKey(r.block);
+      if (!b) return;
+      var free = Math.max(0, round1(availOfBlock(b, i))), over = round1(r.grams - free);
       r.grams = free;
-      var next = candidates(r.type, s.hex).filter(function (x) { return x !== s && availOf(x, -1) > 0.05; })[0];
-      // la bobine suivante a déjà sa rangée : le surplus s'y ajoute
-      var same = next ? rows.filter(function (x) { return String(x.spool) === String(next.id); })[0] : null;
+      var next = candidates(r.type, b.spools[0].hex).filter(function (x) { return x !== b && availOfBlock(x, -1) > 0.05; })[0];
+      // le bloc suivant a déjà sa rangée : le surplus s'y ajoute
+      var same = next ? rows.filter(function (x) { return x.block === next.key; })[0] : null;
       if (same) same.grams = round1((+same.grams || 0) + over);
-      else rows.splice(i + 1, 0, { spool: next ? next.id : '', grams: over, type: r.type, hex: r.hex });
+      else rows.splice(i + 1, 0, { block: next ? next.key : '', grams: over, type: r.type, hex: r.hex });
       renderRows(); recalc();
     }
   });
   el.useAdd.addEventListener('click', function () {
-    rows.push({ spool: '', grams: 0, type: '', hex: '' });
+    rows.push({ block: '', grams: 0, type: '', hex: '' });
     renderRows(); recalc();
     var last = $$('.pr-use-spool .pr-pk-btn', el.uses).pop(); if (last) last.focus();
   });
@@ -705,9 +871,17 @@
   }
   function calc() {
     var sp = spacerById(spacerPk.value);
-    var used = rows.filter(function (r) { return r.spool && (+r.grams || 0) > 0; });
+    var al = allocate(), used = rows.filter(function (r) { return r.block && (+r.grams || 0) > 0; });
     var g = used.reduce(function (s, r) { return s + (+r.grams || 0); }, 0);
-    var fil = used.reduce(function (s, r) { return s + rowCost(r); }, 0);
+    var fil = al.reduce(function (s, a) { return s + partsCost(a.parts); }, 0);
+    // grammes par bobine (rangées fusionnées) -> envoyés tels quels à admin_save_production
+    var bySpool = {}, spoolUses = [];
+    al.forEach(function (a) {
+      a.parts.forEach(function (p) {
+        if (!bySpool[p.s.id]) { bySpool[p.s.id] = { spool_id: p.s.id, grams: 0 }; spoolUses.push(bySpool[p.s.id]); }
+        bySpool[p.s.id].grams = round2(bySpool[p.s.id].grams + p.g);
+      });
+    });
     var minutes = minutesOf(), rate = rates.elec + rates.deprec;
     var mach = round2(minutes / 60 * rate);
     var total = round2(fil + mach), good = Math.max(0, num(el.good.value) | 0);
@@ -729,9 +903,9 @@
       Q += pairs; C += pairs * pairc;
       next = round2(C / Q);
     }
-    return { sp: sp, used: used, g: g, fil: round2(fil), minutes: minutes, rate: rate, mach: mach, total: total, good: good,
+    return { sp: sp, used: used, spoolUses: spoolUses, g: g, fil: round2(fil), minutes: minutes, rate: rate, mach: mach, total: total, good: good,
       lin: lin, lout: lout, pairs: pairs, pairc: pairc, cur: cur, next: next,
-      missing: rows.filter(function (r) { return !r.spool && (+r.grams || 0) > 0; }).length };
+      missing: rows.filter(function (r) { return !r.block && (+r.grams || 0) > 0; }).length };
   }
   function srow(k, v, cls) { return '<div class="al-srow"><span>' + k + '</span><span' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</span></div>'; }
   function marginTxt(price, cost) {
@@ -774,7 +948,7 @@
       loops: loops, per_plate: per, pieces: loops * per,
       good: r.good, minutes: Math.round(r.minutes), machine_cost: r.mach,
       rates: { elec: rates.elec, deprec: rates.deprec },
-      uses: r.used.map(function (u) { return { spool_id: u.spool, grams: round2(u.grams) }; })
+      uses: r.spoolUses
     };
     sb.rpc('admin_save_production', { p: payload }).then(function (res) {
       saving = false;
@@ -807,9 +981,18 @@
     el.history.innerHTML = '<div class="rcp-table-wrap"><table class="rcp-table pr-table"><thead><tr>' +
       '<th>Date</th><th>Spacer</th><th>Filament</th><th class="num">Pièces</th><th class="num">Paires</th><th class="num">Coût / paire</th><th></th>' +
       '</tr></thead><tbody>' + prods.map(function (p) {
-        var fil = (byProd[p.id] || []).slice().sort(function (a, z) { return spools.indexOf(spoolById(a.spool_id)) - spools.indexOf(spoolById(z.spool_id)); }).map(function (u) {
-          var s = spoolById(u.spool_id);
-          return '<span class="pr-hfil">' + swatchBg(spoolBg(s)) + esc(s ? shortLabel(s) : 'Bobine retirée') + ' <em>' + grams(u.grams) + '</em></span>';
+        // filaments de la production, regroupés par bloc (même filament + format), dans l'ordre des Filaments
+        var grp = {}, order = [];
+        (byProd[p.id] || []).slice().sort(function (a, z) { return spools.indexOf(spoolById(a.spool_id)) - spools.indexOf(spoolById(z.spool_id)); })
+          .forEach(function (u) {
+            var s = spoolById(u.spool_id), k = s ? blockKey(s) : '?';
+            if (!grp[k]) { grp[k] = { s: s, g: 0, n: 0 }; order.push(k); }
+            grp[k].g += +u.grams || 0; grp[k].n++;
+          });
+        var fil = order.map(function (k) {
+          var x = grp[k];
+          return '<span class="pr-hfil">' + swatchBg(spoolBg(x.s)) + esc(x.s ? shortLabel(x.s) : 'Bobine retirée') +
+            (x.n > 1 ? ' ×' + x.n : '') + ' <em>' + grams(x.g) + '</em></span>';
         }).join('');
         var canDel = latest[String(p.spacer_id)] === p.id;
         return '<tr data-id="' + esc(p.id) + '">' +

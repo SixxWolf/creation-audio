@@ -2567,6 +2567,8 @@ create table if not exists public.production_uses (
   grams         numeric(10,2) not null default 0,
   cost          numeric(10,2) not null default 0
 );
+-- terminée toute seule (vidée par une production) : rouverte si cette production est supprimée
+alter table public.production_spools add column if not exists closed_auto boolean not null default false;
 create index if not exists production_spools_status_idx  on public.production_spools (status, taken_at desc);
 create index if not exists production_spools_product_idx on public.production_spools (product_id);
 create index if not exists productions_spacer_idx        on public.productions (spacer_id, created_at desc);
@@ -2740,6 +2742,13 @@ begin
   select v_id, (e ->> 'spool_id')::uuid, (e ->> 'grams')::numeric, (e ->> 'cost')::numeric
     from jsonb_array_elements(v_uses) e;
 
+  -- bobine vidée par ce G-code (≤ 5 g restants) : terminée toute seule (closed_auto -> rouverte si on supprime la production)
+  update public.production_spools s
+     set status = 'done', closed_at = now(), closed_auto = true
+   where s.status = 'active'
+     and s.id in (select (e ->> 'spool_id')::uuid from jsonb_array_elements(v_uses) e)
+     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id) <= 5;
+
   v_attrs := jsonb_set(v_sp.attrs, '{prod_seed}', v_seed);
   v_attrs := case when v_lout = 1 then jsonb_set(v_attrs, '{loose}', jsonb_build_object('n', 1, 'cost', round(v_loutc, 4)))
                   else v_attrs - 'loose' end;
@@ -2758,7 +2767,7 @@ grant execute on function public.admin_save_production(jsonb) to authenticated;
 -- remise, coût moyen rejoué ; ses grammes reviennent aux bobines.
 create or replace function public.admin_delete_production(p_id uuid)
 returns void language plpgsql security definer set search_path = '' as $$
-declare v_pr public.productions%rowtype;
+declare v_pr public.productions%rowtype; v_spools uuid[];
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   select * into v_pr from public.productions where id = p_id;
@@ -2776,7 +2785,13 @@ begin
            updated_at = now()
      where id = v_pr.spacer_id;
   end if;
+  select array_agg(distinct spool_id) into v_spools from public.production_uses where production_id = p_id;
   delete from public.productions where id = p_id;
+  -- bobines terminées toutes seules par cette production : rouvertes si elles ont de nouveau du filament
+  update public.production_spools s
+     set status = 'active', closed_at = null, closed_auto = false
+   where s.id = any(coalesce(v_spools, '{}')) and s.status = 'done' and s.closed_auto
+     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id) > 5;
   if v_pr.spacer_id is not null then perform public._spacer_recost(v_pr.spacer_id); end if;
 end $$;
 revoke all on function public.admin_delete_production(uuid) from public, anon;

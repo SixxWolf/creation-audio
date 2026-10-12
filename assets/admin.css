@@ -1244,8 +1244,24 @@ td.num input { text-align:right; }
 
 /* bobines en production */
 .pr-spool-list { display:flex; flex-direction:column; margin-top:6px; }
-.pr-spool { display:grid; grid-template-columns:auto minmax(0, 1fr) minmax(150px, 230px) 96px; align-items:center; gap:6px 14px; padding:11px 0; border-top:1px solid var(--line); }
-.pr-sp-act { display:flex; justify-content:flex-end; }   /* colonne fixe : jauges alignées quel que soit le bouton */
+.pr-spool { display:grid; grid-template-columns:auto minmax(0, 1fr) minmax(150px, 230px) 206px; align-items:center; gap:6px 14px; padding:11px 0; border-top:1px solid var(--line); }
+/* colonne fixe (Terminer · Retirer · chevron) : jauges alignées quels que soient les boutons */
+.pr-sp-act { display:flex; align-items:center; justify-content:flex-end; gap:6px; }
+.pr-n { margin-left:4px; font-weight:700; color:var(--ember-ink); font-variant-numeric:tabular-nums; }
+/* chevron : déplier un bloc (lots + bobines une par une) */
+.pr-chev { flex:none; width:30px; height:30px; padding:0; cursor:pointer; background:var(--chev) center / 15px no-repeat;
+  border:1px solid var(--line); border-radius:8px; transition:transform .2s, border-color .15s; }
+.pr-chev:hover { border-color:var(--line-2); }
+.pr-chev[aria-expanded="true"] { transform:rotate(180deg); }
+.pr-chev:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
+.pr-detail { grid-column:2 / -1; display:flex; flex-direction:column; gap:10px; margin-top:4px; padding:10px 12px;
+  background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+.pr-lot-h { margin-bottom:4px; font-size:.7rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.pr-sline { display:grid; grid-template-columns:96px minmax(0, 1fr) auto; align-items:center; gap:4px 12px; padding:5px 0; border-top:1px dashed var(--line); }
+.pr-lot-h + .pr-sline { border-top:0; }
+.pr-sline-n { font-size:.84rem; font-weight:600; color:var(--ink-2); white-space:nowrap; }
+.pr-sline-st { font-size:.84rem; color:var(--ink-2); font-variant-numeric:tabular-nums; }
+.pr-sline-st em { font-style:normal; color:var(--muted); }
 .pr-spool-list > .pr-spool:first-child { border-top:0; }
 .pr-sp-main { display:flex; flex-direction:column; min-width:0; }
 .pr-sp-main b { font-weight:600; overflow-wrap:anywhere; }
@@ -1256,7 +1272,7 @@ td.num input { text-align:right; }
 .pr-sp-left { font-size:.84rem; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink); }
 .pr-sp-left em { font-style:normal; font-weight:500; color:var(--muted); }
 .pr-sp-left.is-neg { color:var(--bad); }
-.pr-spool.is-done { grid-template-columns:auto minmax(0, 1fr) auto 96px; }
+.pr-spool.is-done { grid-template-columns:auto minmax(0, 1fr) auto 206px; }
 .pr-spool.is-done .pr-sp-left { font-weight:500; color:var(--ink-2); }
 .pr-done { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
 .pr-done > summary { display:inline-flex; align-items:center; gap:6px; font-size:.86rem; font-weight:600; color:var(--ember-ink); cursor:pointer; }
@@ -1341,9 +1357,14 @@ td.num input { text-align:right; }
   .pr-take-grid .pr-take-fil, .pr-take-grid .pr-take-kind { grid-column:1 / -1; }
 }
 @media (max-width:640px) {
-  .pr-spool, .pr-spool.is-done { grid-template-columns:auto minmax(0, 1fr) auto; }
+  /* téléphone : nom, puis jauge, puis boutons, sur toute la largeur */
+  .pr-spool, .pr-spool.is-done { grid-template-columns:auto minmax(0, 1fr); }
   .pr-spool .pr-sp-gauge { grid-column:2 / -1; grid-row:2; }
   .pr-spool.is-done .pr-sp-left { grid-column:2 / -1; grid-row:2; white-space:normal; }
+  .pr-spool .pr-sp-act { grid-column:2 / -1; grid-row:3; justify-content:flex-start; }
+  .pr-spool .pr-sp-act:empty { display:none; }
+  .pr-detail { grid-column:1 / -1; }
+  .pr-sline { grid-template-columns:auto minmax(0, 1fr) auto; }
 }
 /* colonne étroite (1025-1280 px, téléphone) : bobine sur la 1re ligne, grammes + coût sur la 2e */
 @container pr-uses (max-width:520px) {
