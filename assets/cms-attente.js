@@ -374,6 +374,23 @@
   var refreshBtn = $('#wl-refresh');
   if (refreshBtn) refreshBtn.addEventListener('click', function () { load().then(fillProdSelect); });
 
+  // Grand écran (Inventaire en colonnes, CA.wideLayout) : le formulaire reste ouvert dans la colonne de
+  // droite (son titre ne le replie plus) ; de retour en petit écran, il reprend son état d'avant.
+  var addBox = $('#wl-add'), addWasOpen = null;
+  function wideAdd(wide) {
+    if (!addBox) return;
+    if (wide) { if (addWasOpen === null) addWasOpen = addBox.open; addBox.open = true; }
+    else if (addWasOpen !== null) { addBox.open = addWasOpen; addWasOpen = null; }
+  }
+  document.addEventListener('ca:wide', function (e) {
+    if (addBox && e.target && e.target.contains && e.target.contains(addBox)) wideAdd(e.detail.wide);
+  });
+  if (addBox) {
+    if (addBox.closest('.is-wide')) wideAdd(true);   // mise en page déjà appliquée avant ce script
+    var addSum = $('summary', addBox);
+    if (addSum) addSum.addEventListener('click', function (e) { if (addBox.closest('.is-wide')) e.preventDefault(); });
+  }
+
   /* ---------- chargement : à chaque ouverture de l'Inventaire ---------- */
   var prevOnTab = window.CA.onTab;
   window.CA.onTab = function (name) {

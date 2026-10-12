@@ -127,7 +127,7 @@ main { width:100%; max-width:1280px; margin:0 auto; padding:26px clamp(16px, 2.4
 body[data-tab="production"] main { max-width:none; }   /* essai grand écran (2026-10-11) : Production pleine largeur */
 /* Pleine largeur (ordinateur ≥ 1600 px) : onglets refaits un à un — voir CA.wideLayout (admin-core.js) */
 @media screen and (min-width:1600px) {
-  body[data-tab="facturation"] main { max-width:none; }
+  body[data-tab="facturation"] main, body[data-tab="inventaire"] main { max-width:none; }
 }
 .tabpanel[hidden] { display:none; }
 
@@ -1015,6 +1015,98 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 }
 @media (prefers-reduced-motion:reduce) {
   .scan-station.is-armed .scan-inputwrap::after, .wl-alert, .rcp-row.rv-flash td { animation:none; }
+}
+
+/* ---- Inventaire pleine largeur (ordinateur ≥ 1600 px — 2026-10-12) ----
+   CA.wideLayout (admin-core) range les blocs data-wide dans leurs colonnes ; sous 1600 px tout reprend sa
+   place et ces règles ne s'appliquent pas. Réception « comme la Facturation » (commandes | pointage |
+   scanner collé), À commander (liste collée | cibles sur 2 colonnes), Codes-barres et Liste d'attente en colonnes. */
+.rv-rail, .ro-left, .ro-main { display:none; }
+/* commande en cours de pointage (la liste reste visible à côté en grand écran) */
+.rv-cur { flex:none; padding:4px 12px; font-size:.8rem; font-weight:700; color:var(--on-ember); background:var(--ember); border-radius:100px; }
+.rv-order.is-current .po-num { color:var(--ember-ink); }
+@media screen and (min-width:1600px) {
+  /* Réception : commandes en route (collées à gauche) | pointage, ou l'historique si rien n'est en cours */
+  #inv-sub-reception:not([hidden]) { display:grid; grid-template-columns:340px minmax(0, 1fr); gap:20px; align-items:start; }
+  #inv-sub-reception > .rv-pick { position:sticky; top:calc(var(--top-h, 60px) + 16px); max-height:calc(100vh - var(--top-h, 60px) - 32px);
+    margin:0; overflow-y:auto; scrollbar-width:thin; }
+  .tabpanel.is-wide #rv-pick[hidden] { display:block !important; }   /* reste visible pendant un pointage (bat [hidden] !important de tokens.css) */
+  #inv-sub-reception > .rv-work, #inv-sub-reception > .rv-hist { grid-column:2; grid-row:1; min-width:0; }
+  #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-hist { display:none; }
+  .rv-hist > .panel-head { margin-top:0 !important; }   /* marge en ligne prévue pour le bas de page */
+  /* pointage : tableau | scanner, progression, alertes, date et Confirmer collés à droite */
+  #r-editor { display:grid; grid-template-columns:minmax(0, 1fr) 360px; gap:20px; align-items:start;
+    margin:0; padding:0; background:none; border:0; border-radius:0; box-shadow:none; }
+  #r-editor > .rv-main { min-width:0; padding:22px 24px; background:var(--paper); border:1px solid var(--line); border-radius:16px;
+    box-shadow:0 22px 44px -30px rgba(20,22,26,.4); }
+  #r-editor > .rv-rail { display:flex; flex-direction:column; gap:12px; position:sticky; top:calc(var(--top-h, 60px) + 16px);
+    max-height:calc(100vh - var(--top-h, 60px) - 32px); overflow-y:auto; scrollbar-width:thin; }
+  .rv-rail > * { flex:none; margin:0; }
+  .rv-rail .scan-station { padding:16px; }
+  .rv-rail .scan-head { flex-wrap:nowrap; gap:10px; }
+  .rv-rail .scan-toggle { flex:1; min-width:0; padding:0 12px; font-size:.92rem; }
+  .rv-rail .scan-count { flex:none; padding:6px 10px; }
+  .rv-rail .scan-count-num { font-size:1.6rem; }
+  .rv-rail .scan-input { padding-left:48px; padding-right:36px; font-size:1.05rem; }
+  .rv-rail .scan-inputwrap::before { left:14px; width:22px; height:22px; margin-top:-11px; }
+  .rv-rail .scan-learn-fil, .rv-rail .scan-learn-row .cpk { flex:1 1 100%; min-width:0; }
+  .rv-rail .scan-learn-kind { flex:1; min-width:0; }
+  .rv-rail .rv-bar { height:8px; }
+  .rv-rail .rv-date { justify-content:space-between; padding:10px 14px; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
+  .rv-rail .editor-actions { position:static; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:14px;
+    background:var(--paper); border:1px solid var(--line); border-radius:14px; -webkit-backdrop-filter:none; backdrop-filter:none; }
+  .rv-rail .editor-actions .btn { justify-content:center; }
+  .rv-rail .editor-actions .status:empty { display:none; }
+  #r-editor .rcp-table th, #r-editor .rcp-table td { padding-left:10px; padding-right:10px; }
+
+  /* À commander : En route + Liste à commander collés à gauche | éditeur « J'ai commandé » + cibles */
+  #inv-sub-commander:not([hidden]) { display:grid; grid-template-columns:400px minmax(0, 1fr); gap:20px; align-items:start; }
+  #inv-sub-commander > .ro-left { display:flex; flex-direction:column; gap:16px; position:sticky; top:calc(var(--top-h, 60px) + 16px);
+    max-height:calc(100vh - var(--top-h, 60px) - 32px); overflow-y:auto; scrollbar-width:thin; }
+  #inv-sub-commander > .ro-main { display:block; min-width:0; }
+  .ro-left > * { flex:none; margin:0; }
+  .ro-left .reorder-list { columns:1; }
+  /* colonne étroite : n° de commande sur toute la ligne, boutons dessous (comme sur mobile) */
+  .ro-left .po-acts { width:100%; justify-content:flex-end; }
+  .ro-main > .po-editor { margin:0 0 22px; padding:18px 20px; background:var(--paper); border:1px solid var(--line); border-radius:16px;
+    box-shadow:0 22px 44px -30px rgba(20,22,26,.4); }
+  .ro-main > .ro-targets-head { margin-top:0 !important; }   /* marge en ligne prévue sous la liste */
+  /* cibles par matériau : 2 colonnes dès qu'il y a la place (≥ 2 × 720 px : écran principal ; le portable
+     garde 1 colonne, 7 colonnes de chiffres n'entrent pas dans 590 px), dans l'ordre des Filaments (de haut en bas) */
+  .ro-main #reorder-body { columns:720px 2; column-gap:20px; }
+  .ro-main .reorder-group { margin:0; padding-bottom:20px; break-inside:avoid; }
+  .ro-main .reorder-table th, .ro-main .reorder-table td { padding-left:9px; padding-right:9px; }
+  /* nom + étiquettes (en attente, réservés, en route) peuvent passer à la ligne : le tableau tient dans sa colonne */
+  .ro-main .reorder-table td.l { min-width:190px; padding-right:12px; white-space:normal; }
+  .ro-main .reorder-table input.reorder-par { width:56px; }
+
+  /* Codes-barres : vérification au scanner collée à gauche (500 px : texte d'aide du champ entier) | liste des codes */
+  #inv-sub-codes:not([hidden]) { display:grid; grid-template-columns:500px minmax(0, 1fr); column-gap:20px; align-items:start;
+    grid-template-areas:"head head" "scan bar" "scan body"; }
+  #inv-sub-codes > .panel-head { grid-area:head; }
+  #inv-sub-codes > .bc-scan { grid-area:scan; position:sticky; top:calc(var(--top-h, 60px) + 16px); flex-direction:column; align-items:stretch; margin:0; }
+  #inv-sub-codes .bc-scan-toggle, #inv-sub-codes .bc-scan-input { width:100%; min-width:0; }
+  #inv-sub-codes > .bc-bar { grid-area:bar; }
+  #inv-sub-codes > #bc-body { grid-area:body; min-width:0; }
+
+  /* Liste d'attente : demandes | « Ajouter une demande » (toujours ouvert, cms-attente) + « Les plus demandés » */
+  #inv-sub-attente:not([hidden]) { display:grid; grid-template-columns:minmax(0, 1fr) 420px; column-gap:20px; align-items:start;
+    grid-template-areas:"head head" "list add" "list stats" "list ."; grid-template-rows:auto auto auto 1fr; }
+  #inv-sub-attente > .panel-head { grid-area:head; }
+  #inv-sub-attente > #wl-list { grid-area:list; min-width:0; }
+  #inv-sub-attente > .wl-add { grid-area:add; margin:0 0 16px; }
+  #inv-sub-attente > #wl-stats { grid-area:stats; }
+  #inv-sub-attente .wl-stats { margin-top:0; }
+  #inv-sub-attente .wl-add > summary { color:var(--ink); cursor:default; }
+  #inv-sub-attente .wl-add-form { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  #inv-sub-attente .wl-f-prod, #inv-sub-attente .wl-f-contact, #inv-sub-attente .wl-add-actions { grid-column:1 / -1; }
+}
+/* 1600–1799 px (ex. portable avec onglets verticaux) : 3 colonnes trop serrées pour le tableau de pointage ->
+   pendant une réception, la liste des commandes se range comme en petit écran ; elle revient à la fin. */
+@media screen and (min-width:1600px) and (max-width:1799px) {
+  .tabpanel.is-wide #rv-pick[hidden] { display:none !important; }
+  #inv-sub-reception:has(> .rv-work:not([hidden])) { grid-template-columns:minmax(0, 1fr); }
+  #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-work { grid-column:1; }
 }
 
 /* =========================================================

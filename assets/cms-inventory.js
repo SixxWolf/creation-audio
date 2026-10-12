@@ -51,6 +51,8 @@
       historyEl = $('#r-history'), refreshBtn = $('#r-refresh'),
       pickEl = $('#rv-pick'), ordersEl = $('#rv-orders'), freeBtn = $('#rv-free'), workEl = $('#rv-work'),
       metaEl = $('#rv-meta'), barEl = $('#rv-bar'), barFill = $('#rv-bar-fill');
+  // grand écran (≥ 1600 px) : chaque sous-onglet en colonnes (data-wide -> data-wide-slot, voir admin-core)
+  if (window.CA.wideLayout) window.CA.wideLayout($('.tabpanel[data-panel="inventaire"]'));
 
   function num(v) { if (v == null || v === '') return null; var n = +v; return isFinite(n) ? n : null; }
   function round2(n) { return Math.round((+n || 0) * 100) / 100; }
@@ -278,18 +280,21 @@
       ordersEl.innerHTML = '<p class="po-none">Aucune commande en route. Ajoute-les dans « À commander ».</p>';
       return;
     }
+    // commande en cours de pointage (grand écran : la liste reste visible à gauche pendant la réception)
+    var curId = current && workEl && !workEl.hidden ? String(current.id) : null;
     ordersEl.innerHTML = list.map(function (o) {
       var left = 0, got = 0;
       o.lines.forEach(function (l) { left += orderRemaining(l); got += Math.min(l.qty | 0, l.qty_received | 0); });
-      var open = openPicks[o.id];
-      return '<div class="po-order rv-order' + (open ? ' open' : '') + '" data-id="' + esc(o.id) + '">' +
+      var open = openPicks[o.id], isCur = String(o.id) === curId;
+      return '<div class="po-order rv-order' + (open ? ' open' : '') + (isCur ? ' is-current' : '') + '" data-id="' + esc(o.id) + '">' +
         '<div class="po-order-head">' +
           '<button type="button" class="po-toggle" aria-expanded="' + !!open + '">' +
             '<span class="po-num">' + esc(o.order_number || 'Sans n°') + '</span>' +
             '<span class="po-meta">' + esc([o.supplier, o.ordered_at].filter(Boolean).join(' · ')) + '</span>' +
             '<span class="po-prog">' + left + ' attendu' + (left > 1 ? 's' : '') + (got ? ' · ' + got + ' déjà reçu' + (got > 1 ? 's' : '') : '') + '</span>' +
           '</button>' +
-          '<button type="button" class="btn btn-accent btn-sm rv-go" data-ic="scan">Recevoir</button>' +
+          (isCur ? '<span class="rv-cur">En cours</span>'
+                 : '<button type="button" class="btn btn-accent btn-sm rv-go" data-ic="scan">Recevoir</button>') +
         '</div>' +
         '<ul class="reorder-list po-lines"' + (open ? '' : ' hidden') + '>' + orderLinesHtml(o.lines) + '</ul>' +
       '</div>';
@@ -300,19 +305,29 @@
         ul.hidden = !ul.hidden; openPicks[id] = !ul.hidden;
         tg.setAttribute('aria-expanded', String(!ul.hidden)); el.classList.toggle('open', !ul.hidden);
       });
-      $('.rv-go', el).addEventListener('click', function () { receiveOrder(id); });
+      var goBtn = $('.rv-go', el);
+      if (goBtn) goBtn.addEventListener('click', function () { receiveOrder(id); });
     });
   }
   var openPicks = {};   // commandes dépliées (gardées au rafraîchissement)
   document.addEventListener('ca:enroute', function () { if (loaded) renderPick(); });
-  if (freeBtn) freeBtn.addEventListener('click', function () { startWork(null); });
+  if (freeBtn) freeBtn.addEventListener('click', function () { leaveWork(function () { startWork(null); }); });
+
+  // Grand écran : la liste des commandes reste cliquable pendant un pointage -> changer de commande
+  // ne doit pas jeter des articles déjà comptés sans le demander. (Petit écran : liste cachée, rien ne change.)
+  function leaveWork(then) {
+    var busy = workEl && !workEl.hidden && rows.some(function (r) { return (r.qty | 0) > 0; });
+    if (!busy) { then(); return; }
+    caDialog.confirm({ title: 'Abandonner la réception en cours ?', message: 'Les articles déjà comptés ne seront pas enregistrés.', ok: 'Abandonner' })
+      .then(function (ok) { if (ok) then(); });
+  }
 
   function receiveOrder(id) {
     var go = function () {
       var o = enRouteList().filter(function (x) { return String(x.id) === String(id); })[0];
       if (o) startWork(o);
     };
-    if (!loaded) { ensureLoad(); setTimeout(go, 600); } else go();
+    leaveWork(function () { if (!loaded) { ensureLoad(); setTimeout(go, 600); } else go(); });
   }
 
   // ouvre le pointage : une commande (o), sans commande (null), ou la modification d'une réception (rc)
@@ -349,6 +364,7 @@
     feedback('', ''); closeLearn();
     if (pickEl) pickEl.hidden = true;
     if (workEl) workEl.hidden = false;
+    renderPick();   // grand écran : la liste (restée visible) marque la commande « En cours »
     renderRows();
     setScanActive(true);
     setTimeout(function () { (workEl || editor).scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 40);

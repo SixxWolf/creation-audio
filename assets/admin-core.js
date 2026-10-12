@@ -315,6 +315,8 @@ window.CA = window.CA || {};
         if (slot) slot.appendChild(it.el);
       });
       root.classList.toggle('is-wide', wide);
+      // les modules qui ajustent autre chose que la place (ex. ouvrir un repliable) écoutent « ca:wide »
+      root.dispatchEvent(new CustomEvent('ca:wide', { bubbles: true, detail: { wide: wide } }));
     }
     apply();
     if (WIDE_MQ.addEventListener) WIDE_MQ.addEventListener('change', apply); else WIDE_MQ.addListener(apply);

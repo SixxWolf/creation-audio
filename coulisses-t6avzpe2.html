@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=77">
+<link rel="stylesheet" href="assets/admin.css?v=78">
 <link rel="stylesheet" href="assets/facture.css?v=26">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
@@ -492,20 +492,23 @@
           <div class="rv-orders" id="rv-orders"></div>
         </div>
 
-        <!-- Pointage : scanner + reçu / attendu -->
+        <!-- Pointage : scanner + reçu / attendu.
+             Grand écran (≥ 1600 px, CA.wideLayout) : commandes en route à gauche | tableau (.rv-main) |
+             scanner, progression, alertes, date et Confirmer collés à droite (.rv-rail, dans le formulaire). -->
         <div class="rv-work" id="rv-work" hidden>
           <form class="editor" id="r-editor">
+           <div class="rv-main">
             <div class="rv-head">
               <div class="rv-title">
                 <h2 id="r-editor-title">Réception</h2>
                 <span class="rv-meta" id="rv-meta"></span>
               </div>
-              <label class="po-f">Date <input type="text" id="r-date" placeholder="AAAA-MM-JJ" autocomplete="off"></label>
+              <label class="po-f rv-date" data-wide="rv-right" data-wide-order="5">Date <input type="text" id="r-date" placeholder="AAAA-MM-JJ" autocomplete="off"></label>
             </div>
-            <div class="rv-bar" id="rv-bar" hidden><span id="rv-bar-fill"></span></div>
+            <div class="rv-bar" id="rv-bar" hidden data-wide="rv-right" data-wide-order="2"><span id="rv-bar-fill"></span></div>
 
             <!-- Poste de scan -->
-            <div class="scan-station" id="scan-station">
+            <div class="scan-station" id="scan-station" data-wide="rv-right" data-wide-order="1">
               <div class="scan-head">
                 <button type="button" class="btn btn-accent scan-toggle" id="scan-toggle" aria-pressed="false" data-ic="scan">Reprendre le scan</button>
                 <div class="scan-count" id="scan-count" aria-live="polite"></div>
@@ -534,9 +537,9 @@
             </div>
 
             <!-- Alerte liste d'attente : quelqu'un attend un article qu'on vient de scanner / recevoir -->
-            <div class="wl-alert" id="wl-alert" hidden aria-live="polite"></div>
+            <div class="wl-alert" id="wl-alert" hidden aria-live="polite" data-wide="rv-right" data-wide-order="3"></div>
             <!-- Alerte réservés : article facturé « à venir » à un client (cms-reserves.js) -->
-            <div class="wl-alert" id="res-alert" hidden aria-live="polite"></div>
+            <div class="wl-alert" id="res-alert" hidden aria-live="polite" data-wide="rv-right" data-wide-order="4"></div>
 
             <div class="rcp-table-wrap">
               <table class="rcp-table rv-table" id="r-table">
@@ -548,29 +551,37 @@
               <p class="hint" id="r-empty-hint">Scanne un article ou ajoute une ligne.</p>
             </div>
             <button type="button" class="btn btn-ghost btn-sm rv-add" id="r-add-line" data-ic="plus">Ajouter une ligne</button>
+           </div>
 
-            <div class="editor-actions">
+            <div class="editor-actions" data-wide="rv-right" data-wide-order="6">
               <button class="btn btn-accent" type="submit" id="r-confirm" data-ic="check">Confirmer la réception</button>
               <button class="btn btn-ghost" type="button" id="r-reset">Annuler</button>
               <span class="status" id="r-status"></span>
             </div>
+            <div class="rv-rail" data-wide-slot="rv-right"></div>
           </form>
         </div>
 
-        <!-- Historique des réceptions -->
-        <div class="panel-head" style="margin-top:26px">
-          <div><h1 style="font-size:1.1rem">Historique des réceptions</h1></div>
-          <span class="grow"></span>
-          <button class="btn btn-ghost btn-sm" id="r-refresh" type="button" data-ic="refresh">Actualiser</button>
+        <!-- Historique des réceptions (grand écran : au centre quand aucune réception n'est en cours) -->
+        <div class="rv-hist">
+          <div class="panel-head" style="margin-top:26px">
+            <div><h1 style="font-size:1.1rem">Historique des réceptions</h1></div>
+            <span class="grow"></span>
+            <button class="btn btn-ghost btn-sm" id="r-refresh" type="button" data-ic="refresh">Actualiser</button>
+          </div>
+          <div id="r-history" class="mat-rows"></div>
         </div>
-        <div id="r-history" class="mat-rows"></div>
       </div>
 
       <!-- ============ SOUS-ONGLET : À COMMANDER ============ -->
       <div class="inv-subpanel" id="inv-sub-commander" role="tabpanel" hidden>
+        <!-- Grand écran (CA.wideLayout) : En route + Liste à commander collés à gauche (.ro-left) ;
+             éditeur « J'ai commandé » + cibles de stock sur 2 colonnes dans la grande zone (.ro-main) -->
+        <div class="ro-left" data-wide-slot="ro-left"></div>
+        <div class="ro-main" data-wide-slot="ro-main"></div>
 
         <!-- Commandes fournisseur « en route » (cms-en-route.js) -->
-        <div class="reorder-card po-card" id="po-card">
+        <div class="reorder-card po-card" id="po-card" data-wide="ro-left" data-wide-order="1">
           <div class="reorder-card-head">
             <h2>En route</h2>
             <span class="grow"></span>
@@ -578,7 +589,7 @@
             <button class="btn btn-accent btn-sm" id="po-new" type="button" data-ic="plus">J'ai commandé</button>
           </div>
 
-          <div class="po-editor" id="po-editor" hidden>
+          <div class="po-editor" id="po-editor" hidden data-wide="ro-main" data-wide-order="1">
             <textarea id="po-paste" rows="6" aria-label="Texte de la commande" placeholder="Colle ici ta commande : courriel de confirmation, page de commande…"></textarea>
             <div class="po-bar">
               <label class="po-f">N° de commande <input type="text" id="po-number" autocomplete="off"></label>
@@ -608,10 +619,10 @@
         </div>
 
         <!-- Liste à commander (calculée) -->
-        <div class="reorder-summary" id="reorder-summary" aria-live="polite"></div>
+        <div class="reorder-summary" id="reorder-summary" aria-live="polite" data-wide="ro-left" data-wide-order="2"></div>
 
 
-        <div class="panel-head" style="margin-top:22px">
+        <div class="panel-head ro-targets-head" style="margin-top:22px" data-wide="ro-main" data-wide-order="2">
           <div>
             <h1 style="font-size:1.1rem">Cibles de stock</h1>
             <p class="muted">Quantité à garder en tout temps, par format.</p>
@@ -622,7 +633,7 @@
         </div>
 
         <!-- Filtre marque → matériau (pour saisir les cibles tranquillement) -->
-        <div class="reorder-filters">
+        <div class="reorder-filters" data-wide="ro-main" data-wide-order="3">
           <label class="reorder-flabel">Marque
             <select id="reorder-brand"></select>
           </label>
@@ -631,7 +642,7 @@
           </label>
         </div>
 
-        <div id="reorder-body"></div>
+        <div id="reorder-body" data-wide="ro-main" data-wide-order="4"></div>
       </div>
 
       <!-- ============ SOUS-ONGLET : CODES-BARRES ASSOCIÉS ============ -->
@@ -672,6 +683,7 @@
           <button class="btn btn-ghost btn-sm" id="wl-refresh" type="button" data-ic="refresh">Actualiser</button>
         </div>
 
+        <!-- grand écran : demandes à gauche ; ce formulaire (toujours ouvert, cms-attente.js) + « Les plus demandés » à droite -->
         <details class="wl-add" id="wl-add">
           <summary>+ Ajouter une demande (Marketplace, téléphone…)</summary>
           <form class="wl-add-form" id="wl-add-form">
@@ -1911,7 +1923,7 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/auth-gate.js?v=2"></script>
-<script src="assets/admin-core.js?v=9"></script>
+<script src="assets/admin-core.js?v=10"></script>
 <script src="assets/admin-accent.js?v=1"></script>
 <script src="assets/cms-securite.js?v=2"></script>
 <script src="assets/cms-costing.js?v=3"></script>
@@ -1922,10 +1934,10 @@
 <script src="assets/cms-spacers.js?v=15"></script>
 <script src="assets/cms-accessories.js?v=8"></script>
 <script src="assets/ca-pick.js?v=1"></script>
-<script src="assets/cms-inventory.js?v=35"></script>
-<script src="assets/cms-attente.js?v=5"></script>
+<script src="assets/cms-inventory.js?v=36"></script>
+<script src="assets/cms-attente.js?v=6"></script>
 <script src="assets/cms-reserves.js?v=2"></script>
-<script src="assets/cms-en-route.js?v=5"></script>
+<script src="assets/cms-en-route.js?v=6"></script>
 <script src="assets/cms-dealers.js?v=5"></script>
 <script src="assets/cms-clients.js?v=8"></script>
 <script src="assets/cms-messages.js?v=2"></script>

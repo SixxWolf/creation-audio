@@ -624,7 +624,8 @@
         inv().receiveOrder(o.id);
       });
       $('.po-edit', el).addEventListener('click', function () {
-        inv().ready().then(function () { openEditor(o); card.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+        // grand écran : l'éditeur est dans la grande zone (CA.wideLayout), pas dans la carte En route
+        inv().ready().then(function () { openEditor(o); (card.closest('.is-wide') ? editorEl : card).scrollIntoView({ behavior: 'smooth', block: 'start' }); });
       });
       $('.po-rm', el).addEventListener('click', function () {
         caDialog.confirm({ title: 'Supprimer la commande ' + (o.order_number || 'sans n°') + ' ?',
