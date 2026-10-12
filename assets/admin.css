@@ -137,6 +137,36 @@ body[data-tab="production"] main { max-width:none; }   /* essai grand écran (20
   body[data-tab="facturation"] main, body[data-tab="inventaire"] main, body[data-tab="messages"] main,
   body[data-tab="aujourdhui"] main { max-width:none; }
 }
+/* ---- Recherche globale Ctrl+K (cms-recherche.js) : raccourci partout, bouton de la barre du haut en grand écran ---- */
+.topbar .ck-open { display:none; }   /* .topbar : plus fort que .btn (déclaré plus loin) */
+@media screen and (min-width:1600px) {
+  .topbar .ck-open { display:inline-flex; align-items:center; gap:8px; min-width:240px; color:var(--muted); }
+}
+.ck-open svg { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+.ck-open span { flex:1; text-align:left; }
+.ck kbd, .ck-open kbd { padding:1px 6px; font:600 .7rem/1.5 var(--font); color:var(--muted); background:var(--wash); border:1px solid var(--line-2); border-radius:6px; }
+.ck { position:fixed; inset:0; z-index:300; display:flex; justify-content:center; align-items:flex-start; padding:12vh 16px 16px;
+  background:rgba(20,22,26,.45); -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px); }
+.ck-box { display:flex; flex-direction:column; width:min(680px, 100%); max-height:72vh; overflow:hidden; background:var(--paper);
+  border:1px solid var(--line-2); border-radius:16px; box-shadow:0 30px 60px -20px rgba(20,22,26,.5); }
+.ck .ck-in { flex:none; margin:0; padding:16px 18px 16px 48px; font-size:1.05rem; border:0; border-bottom:1px solid var(--line); border-radius:0;
+  box-shadow:none; background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='m20 20-4.2-4.2'/%3E%3C/svg%3E") 16px center / 20px no-repeat; }
+.ck .ck-in:focus { border-color:var(--line); box-shadow:none; }
+.ck-list { flex:1 1 auto; min-height:0; overflow-y:auto; padding:6px; overscroll-behavior:contain; }
+.ck-grp { padding:10px 10px 4px; font-size:.66rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+.ck-item { display:flex; align-items:baseline; gap:12px; width:100%; padding:9px 10px; font:inherit; color:var(--ink); text-align:left;
+  cursor:pointer; background:none; border:0; border-radius:10px; }
+.ck-item.is-cur { background:color-mix(in srgb, var(--ember) 12%, var(--paper)); }
+.ck-t { flex:1; min-width:0; font-size:.92rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ck-m { flex:none; max-width:45%; font-size:.8rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ck-none { margin:0; padding:22px; font-size:.9rem; text-align:center; color:var(--muted); }
+.ck-foot { flex:none; display:flex; flex-wrap:wrap; gap:6px 16px; padding:9px 14px; font-size:.76rem; color:var(--muted); background:var(--wash); border-top:1px solid var(--line); }
+.ck-foot kbd { margin-right:3px; }
+/* élément trouvé : mis en évidence 2 s dans son onglet */
+.ck-flash { animation:ckFlash 2.2s ease-out; }
+@keyframes ckFlash { 0%, 35% { box-shadow:0 0 0 3px var(--ember); } 100% { box-shadow:0 0 0 3px transparent; } }
+@media (prefers-reduced-motion:reduce) { .ck-flash { animation:none; outline:3px solid var(--ember); } }
+
 /* ---- Aujourd'hui (tableau de bord, cms-aujourdhui.js — entrée du menu en grand écran seulement) ---- */
 @media screen {
   .td-date::first-letter { text-transform:uppercase; }
