@@ -1297,7 +1297,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .sec-add-row input.mfa-code { width:200px; min-width:200px; }
 .sec-actions { margin-top:14px; }
 /* Réglages › Entreprise (coordonnées imprimées sur les factures, ex. repliable de la Facturation) */
-.co-actions { display:flex; align-items:center; gap:10px; margin-top:20px; }
+.ent-actions { display:flex; align-items:center; gap:10px; margin-top:20px; }   /* ⚠ pas .co-actions : déjà pris par les cartes de Commandes */
 
 /* ==================================================
    ONGLET MESSAGES (messagerie du site — cms-messages.js)
