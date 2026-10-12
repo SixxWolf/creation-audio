@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=80">
+<link rel="stylesheet" href="assets/admin.css?v=81">
 <link rel="stylesheet" href="assets/facture.css?v=26">
 <link rel="stylesheet" href="assets/autoloop.css?v=27">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
@@ -1149,6 +1149,8 @@
       <div class="ms-wrap" id="ms-wrap">
         <div class="ms-list" id="ms-list"><p class="muted">Chargement…</p></div>
         <div class="ms-thread" id="ms-thread"><p class="ms-none">Choisis une conversation.</p></div>
+        <!-- Grand écran (≥ 1600 px) : fiche du client de la conversation (commandes, réservations, factures) — cms-messages.js -->
+        <aside class="ms-side" id="ms-side" aria-label="Fiche du client"></aside>
       </div>
     </section>
 
@@ -1947,7 +1949,7 @@
 <script src="assets/cms-en-route.js?v=6"></script>
 <script src="assets/cms-dealers.js?v=5"></script>
 <script src="assets/cms-clients.js?v=8"></script>
-<script src="assets/cms-messages.js?v=2"></script>
+<script src="assets/cms-messages.js?v=3"></script>
 <script src="assets/cms-facturation.js?v=46"></script>
 <script src="assets/cms-historique.js?v=14"></script>
 <script src="assets/cms-commandes-clients.js?v=5"></script>

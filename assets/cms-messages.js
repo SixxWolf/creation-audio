@@ -98,7 +98,66 @@
     });
   });
   var refreshBtn = $('#ms-refresh');
-  if (refreshBtn) refreshBtn.addEventListener('click', function () { load(); if (curId) loadThread(false); });
+  if (refreshBtn) refreshBtn.addEventListener('click', function () { load(); if (curId) loadThread(false); sideFor = null; renderSide(); });
+
+  /* ---- grand écran (≥ 1600 px) : fiche du client à droite du fil ----
+     Ses 5 dernières commandes en ligne, réservations (customer_id de la conversation) et factures (fiche reliée,
+     customers.client_id) ; un clic mène à l'onglet concerné. Rien n'est chargé sous 1600 px (colonne cachée). */
+  var sideEl = $('#ms-side'), panel = wrap.closest('.tabpanel'), sideFor = null;
+  var C_ST = { 'new': 'Nouvelle', preparing: 'En préparation', ready: 'Prête', invoiced: 'Facturée', cancelled: 'Annulée' };
+  var R_ST = { active: 'Active', invoiced: 'Facturée', cancelled: 'Annulée', expired: 'Expirée' };
+  function isWide() { return !!(panel && panel.classList.contains('is-wide')); }
+  function money(n) { return (Number(n) || 0).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD' }); }
+  function dateFr(s) {   // 'AAAA-MM-JJ' (date locale, pas UTC) ou horodatage
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || '')), d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(s);
+    return isNaN(d) ? '' : d.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  function sideRows(sel, q, row, none) {
+    var token = sideFor;
+    q.then(function (res) {
+      var box = sideEl && $(sel, sideEl);
+      if (!box || sideFor !== token) return;   // autre conversation entre-temps
+      if (!res || res.error) { box.innerHTML = '<p class="ms-sd-none">Indisponible.</p>'; return; }
+      var list = res.data || [];
+      box.innerHTML = list.length ? list.map(row).join('') : '<p class="ms-sd-none">' + none + '</p>';
+    }, function () { var box = sideEl && $(sel, sideEl); if (box && sideFor === token) box.innerHTML = '<p class="ms-sd-none">Indisponible.</p>'; });
+  }
+  function sdRow(attrs, num, st, amt, when) {
+    return '<button type="button" class="ms-sd-row" ' + attrs + '><b>' + esc(num || '—') + '</b>' +
+      '<span class="ms-sd-st">' + esc(st || '') + '</span><span class="ms-sd-amt">' + esc(amt) + '</span>' +
+      (when ? '<small>' + esc(when) + '</small>' : '') + '</button>';
+  }
+  function renderSide() {
+    if (!sideEl) return;
+    var c = curId ? conv() : null;
+    if (!isWide() || !c) { sideEl.innerHTML = ''; sideFor = null; return; }
+    if (sideFor === c.id) return;
+    sideFor = c.id;
+    var k = c.customers || {};
+    sideEl.innerHTML =
+      '<div class="ms-sd-who">' + CA.avatar(who(c)) + '<div><b>' + esc(who(c)) + '</b>' +
+        (k.phone ? '<small>' + esc(k.phone) + '</small>' : '') + '</div></div>' +
+      '<section class="ms-sd"><h3>Commandes en ligne</h3><div id="ms-sd-co"><p class="ms-sd-none">Chargement…</p></div></section>' +
+      '<section class="ms-sd"><h3>Réservations</h3><div id="ms-sd-re"><p class="ms-sd-none">Chargement…</p></div></section>' +
+      '<section class="ms-sd"><h3>Factures</h3><div id="ms-sd-in"><p class="ms-sd-none">' + (k.client_id ? 'Chargement…' : 'Fiche client pas encore reliée.') + '</p></div></section>';
+    sideRows('#ms-sd-co', sb.from('customer_orders').select('id,number,status,total,created_at').eq('customer_id', c.customer_id)
+      .order('created_at', { ascending: false }).limit(5),
+      function (o) { return sdRow('data-go="#commandes/clients"', o.number, C_ST[o.status] || o.status, money(o.total), dateFr(o.created_at)); }, 'Aucune commande.');
+    sideRows('#ms-sd-re', sb.from('customer_reservations').select('id,number,status,total,created_at').eq('customer_id', c.customer_id)
+      .order('created_at', { ascending: false }).limit(5),
+      function (r) { return sdRow('data-go="#commandes/reservations"', r.number, R_ST[r.status] || r.status, money(r.total), dateFr(r.created_at)); }, 'Aucune réservation.');
+    if (k.client_id) sideRows('#ms-sd-in', sb.from('invoices').select('id,number,status,total,invoice_date').eq('client_id', k.client_id)
+      .order('invoice_date', { ascending: false }).limit(5),
+      function (f) { return sdRow('data-inv="' + esc(f.id) + '"', f.number, f.status === 'cancelled' ? 'Annulée' : '', money(f.total), dateFr(f.invoice_date)); }, 'Aucune facture.');
+  }
+  if (sideEl) sideEl.addEventListener('click', function (e) {
+    var b = e.target.closest('.ms-sd-row'); if (!b) return;
+    var inv = b.getAttribute('data-inv');
+    if (inv) { if (CA.focusInvoice) CA.focusInvoice(inv); location.hash = '#historique'; return; }
+    var to = b.getAttribute('data-go'); if (to) location.hash = to;
+  });
+  if (panel) panel.addEventListener('ca:wide', function () { sideFor = null; renderSide(); });
+  if (CA.wideLayout) CA.wideLayout(panel);
 
   /* ---- chargement de la liste ---- */
   function load() {
@@ -140,7 +199,7 @@
     if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
       curId = null; wrap.classList.remove('has-conv'); clearPhotos();
       threadEl.innerHTML = '<p class="ms-none">Choisis une conversation.</p>';
-      renderList(); return;
+      renderList(); renderSide(); return;
     }
     if (id === curId && threadEl.querySelector('.ms-msgs')) return;
     curId = id; msgs = []; clearPhotos();
@@ -187,6 +246,7 @@
     ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } });
     form.addEventListener('submit', function (e) { e.preventDefault(); send(); });
     loadThread(true);
+    renderSide();
   }
   function conv() { return convs.filter(function (c) { return c.id === curId; })[0]; }
   function loadThread(scroll) {
