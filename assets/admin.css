@@ -124,7 +124,7 @@ body[data-tab="filaments"] .mat-nav:not(:empty) { display:flex; flex-direction:c
 .nav-backdrop { position:fixed; inset:0; z-index:40; background:rgba(20,22,26,.45); -webkit-backdrop-filter:blur(2px); backdrop-filter:blur(2px); }
 
 main { width:100%; max-width:1280px; margin:0 auto; padding:26px clamp(16px, 2.4vw, 28px) 90px; }
-body[data-tab="production"] main { max-width:1680px; }   /* essai grand écran (2026-10-11) : Production seulement */
+body[data-tab="production"] main { max-width:none; }   /* essai grand écran (2026-10-11) : Production pleine largeur */
 .tabpanel[hidden] { display:none; }
 
 /* =========================================================
@@ -1406,7 +1406,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .pr-use-cost { grid-column:3 / 5; grid-row:2; }
   .pr-use-warn { grid-column:2 / -1; }
 }
-/* grand écran (contenu 1680 px) : 3 colonnes — bobines en production | étapes | résumé */
+/* grand écran (pleine largeur) : 3 colonnes — bobines en production | étapes | résumé */
 @media (min-width:1760px) {
   .tabpanel[data-panel="production"]:not([hidden]) { display:grid; gap:18px; align-items:start;
     grid-template-columns:420px minmax(0, 1fr) 400px;
