@@ -11,6 +11,9 @@
    - Filtre « Comptes » : tous les comptes clients (customers) + recherche ; un clic
      ouvre sa conversation ouverte, sinon un brouillon (#messages/c-<customer_id>) :
      la conversation (sujet « Mon compte ») n'est créée qu'au premier envoi.
+   - Bouton « Modèles » : texte pré-rempli ({prénom}, {dernière commande}…), modèles
+     éditables (admin_settings « msg_modeles ») ; un modèle « réservation » coche
+     customers.can_reserve à l'envoi.
    - Pastille #nav-msgs-n = conversations avec des messages non lus.
    - Loi 25 : conversations sans message depuis 12 mois effacées (photos
      comprises) au premier chargement de l'onglet.
@@ -62,7 +65,8 @@
   if (!wrap || !listEl || !threadEl) return;
   var convs = [], filter = 'open', curId = null, msgs = [], photos = [], urlCache = {};
   var tabOpen = false, loaded = false, pending = null, purged = false, busy = false;
-  var accounts = null, accQ = '', draft = null, flash = '';   // filtre Comptes ; brouillon = conversation pas encore créée
+  var accounts = null, accQ = '', draft = null, flash = '';
+  var tplGrant = null;   // modèle choisi qui active la réservation à l'envoi   // filtre Comptes ; brouillon = conversation pas encore créée
 
   /* ---- pastille de la barre latérale ---- */
   function paintBadge(n) {
@@ -170,7 +174,7 @@
   function load() {
     if (pending) return pending;
     if (!loaded) listEl.innerHTML = '<p class="muted">Chargement…</p>';
-    pending = sb.from('conversations').select('*, customers(name, email, phone, client_id)')
+    pending = sb.from('conversations').select('*, customers(name, email, phone, client_id, can_reserve)')
       .order('updated_at', { ascending: false }).limit(300)
       .then(function (res) {
         if (res.error) { listEl.innerHTML = '<p class="empty">Impossible de charger les messages.<br>' + esc(res.error.message) + '</p>'; return; }
@@ -184,7 +188,7 @@
   /* ---- filtre Comptes : tous les comptes clients ---- */
   function loadAccounts() {
     listEl.innerHTML = '<p class="muted">Chargement…</p>';
-    return sb.from('customers').select('id, name, email, phone, client_id, created_at')
+    return sb.from('customers').select('id, name, email, phone, client_id, can_reserve, created_at')
       .order('created_at', { ascending: false }).limit(1000)
       .then(function (res) {
         if (res.error) { listEl.innerHTML = '<p class="empty">Impossible de charger les comptes.<br>' + esc(res.error.message) + '</p>'; return; }
@@ -311,6 +315,9 @@
         '<div class="ms-reply-row">' +
           '<label class="btn btn-ghost ms-attach" title="Joindre des photos"><input type="file" accept="image/*" multiple hidden aria-label="Joindre des photos">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg></label>' +
+          '<div class="ms-tpl"><button type="button" class="btn btn-ghost ms-tpl-btn" aria-haspopup="menu" aria-expanded="false" title="Modèles de message">' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>' +
+            '<span>Modèles</span></button><div class="ms-tpl-menu" role="menu" hidden></div></div>' +
           '<textarea id="ms-reply-in" rows="2" maxlength="4000" placeholder="' + (c._draft ? 'Ton message…' : 'Ta réponse…') + '" aria-label="Réponse"></textarea>' +
           '<button type="submit" class="btn btn-accent ms-send" data-ic="mail">Envoyer</button>' +
         '</div>' +
@@ -330,6 +337,9 @@
       paintThumbs();
     });
     ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } });
+    ta.addEventListener('input', function () { if (!ta.value.trim()) tplGrant = null; });
+    tplGrant = null;
+    mountTpl(form, ta);
     form.addEventListener('submit', function (e) { e.preventDefault(); send(); });
     if (flash) { $('#ms-status', form).textContent = flash; flash = ''; }
     loadThread(true);
@@ -466,15 +476,209 @@
     }).then(function (res) {
       if (res.error) throw new Error(res.error.message);
       busy = false; btn.disabled = false; ta.value = ''; clearPhotos();
-      return sb.functions.invoke('message-notify', { body: { message_id: res.data.id } }).then(function (r) {
+      var grant = tplGrant ? grantReserve(c) : Promise.resolve('');
+      tplGrant = null;
+      return Promise.all([grant, sb.functions.invoke('message-notify', { body: { message_id: res.data.id } }).then(function (r) {
         var d = (r && r.data) || {};
-        st.textContent = d.result === 'sent' ? 'Envoyé · client avisé par courriel' : 'Envoyé';
-      }, function () { st.textContent = 'Envoyé · avis courriel non parti'; });
+        return d.result === 'sent' ? 'Envoyé · client avisé par courriel' : 'Envoyé';
+      }, function () { return 'Envoyé · avis courriel non parti'; })]).then(function (r) {
+        st.textContent = r[1] + (r[0] ? ' · ' + r[0] : '');
+      });
     }).then(function () {
       return load().then(function () { return loadThread(true); });
     }).catch(function (err) {
       busy = false; btn.disabled = false;
       st.textContent = 'Erreur : ' + ((err && err.message) || err);
+    });
+  }
+
+  /* ---- modèles de message ----
+     admin_settings « msg_modeles » : { list: [{ id, title, body, grant }], at } (synchro entre appareils).
+     Variables remplacées au choix du modèle ; celles sans valeur restent visibles {…} à compléter.
+     grant = l'envoi coche aussi « Peut réserver » (customers.can_reserve). */
+  var TPL_KEY = 'msg_modeles', tpls = null, tplLoading = null;
+  var VARS = ['prénom', 'nom', 'dernière commande', 'nombre de commandes'];
+  var TPL_DEFAULT = [
+    { id: 'reserver', title: 'Accès aux réservations', grant: true, body:
+      'Bonjour {prénom},\n\n' +
+      'Vous avez déjà commandé chez nous le {dernière commande}, merci de votre confiance ! ' +
+      'Vous avez prouvé que vous étiez fiable : vous pouvez désormais réserver du stock directement sur le site ' +
+      '(connecté à votre compte, panier → « Réserver 72 h »).\n\n' +
+      'Conditions :\n' +
+      '• Articles en stock seulement, gardés 72 h, sans dépôt\n' +
+      '• 2 réservations non récupérées = réservations suspendues 60 jours\n\n' +
+      'Au plaisir,\nCréation Audio' },
+    { id: 'merci', title: 'Merci pour votre commande', grant: false, body:
+      'Bonjour {prénom},\n\n' +
+      'Merci pour votre commande du {dernière commande} ! Si vous avez la moindre question, écrivez-nous ici.\n\n' +
+      'Création Audio' }
+  ];
+  function loadTpls() {
+    if (tpls) return Promise.resolve(tpls);
+    if (tplLoading) return tplLoading;
+    tplLoading = sb.from('admin_settings').select('value').eq('key', TPL_KEY).maybeSingle().then(function (res) {
+      var v = res && !res.error && res.data && res.data.value;
+      tpls = v && Array.isArray(v.list) ? v.list : JSON.parse(JSON.stringify(TPL_DEFAULT));
+      return tpls;
+    }, function () { tpls = JSON.parse(JSON.stringify(TPL_DEFAULT)); return tpls; })
+      .then(function (t) { tplLoading = null; return t; });
+    return tplLoading;
+  }
+  function saveTpls(list) {
+    var at = new Date().toISOString();
+    return sb.from('admin_settings').upsert({ key: TPL_KEY, value: { list: list, at: at }, updated_at: at }).then(function (res) {
+      if (res && res.error) throw new Error(res.error.message);
+      tpls = list;
+    });
+  }
+  // valeurs du client : prénom/nom + factures (fiche reliée), sans les annulées
+  function custVals(c) {
+    var k = c.customers || {}, name = String(k.name || '').trim();
+    var vals = { 'prénom': name.split(/\s+/)[0] || '', 'nom': name };
+    var acc = accounts && accounts.filter(function (a) { return a.id === c.customer_id; })[0];
+    var inv = acc && acc._inv !== undefined ? Promise.resolve(acc._inv)
+      : !k.client_id ? Promise.resolve(null)
+      : sb.from('invoices').select('invoice_date, status').eq('client_id', k.client_id).then(function (r) {
+        var list = ((!r.error && r.data) || []).filter(function (f) { return f.status !== 'cancelled'; });
+        if (!list.length) return null;
+        return { n: list.length, last: list.map(function (f) { return String(f.invoice_date || ''); }).sort().pop() };
+      }, function () { return null; });
+    return inv.then(function (s) {
+      if (s && s.n) { vals['dernière commande'] = dateLong(s.last); vals['nombre de commandes'] = String(s.n); }
+      return vals;
+    });
+  }
+  function dateLong(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s || ''));
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  }
+  function fill(body, vals) {
+    return String(body || '').replace(/\{([^{}]+)\}/g, function (all, v) { return vals[v.trim()] ? vals[v.trim()] : all; });
+  }
+  function mountTpl(form, ta) {
+    var btn = $('.ms-tpl-btn', form), menu = $('.ms-tpl-menu', form);
+    function close() { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', outside, true); }
+    function outside(e) { if (!e.target.closest || !e.target.closest('.ms-tpl')) close(); }
+    btn.addEventListener('click', function () {
+      if (!menu.hidden) { close(); return; }
+      loadTpls().then(function (list) {
+        menu.innerHTML = list.map(function (t, i) {
+          return '<button type="button" class="ms-tpl-it" role="menuitem" data-i="' + i + '">' + esc(t.title || 'Sans titre') +
+            (t.grant ? '<small>+ réservation</small>' : '') + '</button>';
+        }).join('') + '<button type="button" class="ms-tpl-it ms-tpl-manage" role="menuitem">Gérer les modèles</button>';
+        menu.hidden = false; btn.setAttribute('aria-expanded', 'true');
+        var first = $('.ms-tpl-it', menu); if (first) first.focus();
+        document.addEventListener('click', outside, true);
+      });
+    });
+    menu.addEventListener('keydown', function (e) {
+      var items = $$('.ms-tpl-it', menu), i = items.indexOf(document.activeElement);
+      if (e.key === 'Escape') { close(); btn.focus(); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+      }
+    });
+    menu.addEventListener('click', function (e) {
+      var it = e.target.closest('.ms-tpl-it'); if (!it) return;
+      close();
+      if (it.classList.contains('ms-tpl-manage')) { manageTpls(); return; }
+      var t = tpls[+it.getAttribute('data-i')], c = conv(); if (!t || !c) return;
+      var st = $('#ms-status', form);
+      var ask = ta.value.trim() ? caDialog.confirm({ title: 'Remplacer le texte en cours ?', ok: 'Remplacer', icon: 'edit' }) : Promise.resolve(true);
+      ask.then(function (ok) {
+        if (!ok) return;
+        return custVals(c).then(function (vals) {
+          if (conv() !== c) return;
+          ta.value = fill(t.body, vals);
+          ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, 320) + 'px';
+          tplGrant = t.grant ? t : null;
+          var left = ta.value.match(/\{[^{}]+\}/g);
+          st.textContent = left ? 'À compléter : ' + left.join(', ') :
+            t.grant ? ((c.customers || {}).can_reserve ? 'Réservation déjà active' : 'L\'envoi active la réservation') : '';
+          ta.focus();
+          var p = ta.value.search(/\{[^{}]+\}/);
+          if (p >= 0) ta.setSelectionRange(p, ta.value.indexOf('}', p) + 1);
+        });
+      });
+    });
+  }
+  function grantReserve(c) {
+    var k = c.customers || {};
+    if (k.can_reserve) return Promise.resolve('');
+    return sb.from('customers').update({ can_reserve: true }).eq('id', c.customer_id).select('id').then(function (res) {
+      if (res.error || !(res.data || []).length) return 'réservation NON activée';
+      k.can_reserve = true;
+      (accounts || []).forEach(function (a) { if (a.id === c.customer_id) a.can_reserve = true; });
+      convs.forEach(function (x) { if (x.customer_id === c.customer_id && x.customers) x.customers.can_reserve = true; });
+      return 'réservation activée';
+    }, function () { return 'réservation NON activée'; });
+  }
+
+  // fenêtre « Gérer les modèles » : liste à gauche, titre + texte à droite ; enregistrée d'un bloc
+  function manageTpls() {
+    loadTpls().then(function (cur) {
+      var list = JSON.parse(JSON.stringify(cur)), sel = list.length ? 0 : -1;
+      var d = document.createElement('dialog');
+      d.className = 'ca-dlg ms-tpl-dlg';
+      d.setAttribute('aria-labelledby', 'ms-tpl-t');
+      d.innerHTML =
+        '<div class="ms-tpl-in">' +
+          '<h2 class="dlg-t" id="ms-tpl-t">Modèles de message</h2>' +
+          '<div class="ms-tpl-cols">' +
+            '<div class="ms-tpl-side"><div class="ms-tpl-list"></div>' +
+              '<button type="button" class="btn btn-ghost btn-sm ms-tpl-add" data-ic="plus">Nouveau</button></div>' +
+            '<div class="ms-tpl-ed">' +
+              '<label>Titre<input type="text" class="ms-tpl-title" maxlength="60"></label>' +
+              '<label>Texte<textarea class="ms-tpl-body" rows="12" maxlength="4000"></textarea></label>' +
+              '<div class="ms-tpl-vars">' + VARS.map(function (v) { return '<button type="button" class="ms-tpl-var" data-v="' + esc(v) + '">{' + esc(v) + '}</button>'; }).join('') + '</div>' +
+              '<label class="inline ms-tpl-grant"><input type="checkbox"> Active la réservation à l\'envoi</label>' +
+              '<button type="button" class="btn btn-ghost btn-sm ms-tpl-del" data-ic="trash">Supprimer ce modèle</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="dlg-f"><span class="status ms-tpl-st"></span>' +
+            '<button type="button" class="btn btn-ghost ms-tpl-cancel">Annuler</button>' +
+            '<button type="button" class="btn btn-accent ms-tpl-save" data-ic="save">Enregistrer</button></div>' +
+        '</div>';
+      document.body.appendChild(d);
+      var listBox = $('.ms-tpl-list', d), ed = $('.ms-tpl-ed', d), ti = $('.ms-tpl-title', d), bo = $('.ms-tpl-body', d),
+        gr = $('.ms-tpl-grant input', d), st = $('.ms-tpl-st', d);
+      function paintList() {
+        listBox.innerHTML = list.length ? list.map(function (t, i) {
+          return '<button type="button" class="ms-tpl-li' + (i === sel ? ' is-current' : '') + '" data-i="' + i + '">' + esc(t.title || 'Sans titre') + '</button>';
+        }).join('') : '<p class="ms-sd-none">Aucun modèle.</p>';
+      }
+      function paintEd() {
+        ed.hidden = sel < 0;
+        if (sel < 0) return;
+        var t = list[sel]; ti.value = t.title || ''; bo.value = t.body || ''; gr.checked = !!t.grant;
+      }
+      ti.addEventListener('input', function () { if (sel >= 0) { list[sel].title = ti.value; paintList(); } });
+      bo.addEventListener('input', function () { if (sel >= 0) list[sel].body = bo.value; });
+      gr.addEventListener('change', function () { if (sel >= 0) list[sel].grant = gr.checked; });
+      listBox.addEventListener('click', function (e) { var b = e.target.closest('.ms-tpl-li'); if (!b) return; sel = +b.getAttribute('data-i'); paintList(); paintEd(); });
+      $('.ms-tpl-add', d).addEventListener('click', function () {
+        list.push({ id: uuid(), title: 'Nouveau modèle', body: 'Bonjour {prénom},\n\n\n\nCréation Audio', grant: false });
+        sel = list.length - 1; paintList(); paintEd(); ti.focus(); ti.select();
+      });
+      $('.ms-tpl-del', d).addEventListener('click', function () {
+        if (sel < 0) return;
+        list.splice(sel, 1); sel = Math.min(sel, list.length - 1); paintList(); paintEd();
+      });
+      $('.ms-tpl-vars', d).addEventListener('click', function (e) {
+        var b = e.target.closest('.ms-tpl-var'); if (!b || sel < 0) return;
+        var tag = '{' + b.getAttribute('data-v') + '}', a = bo.selectionStart, z = bo.selectionEnd;
+        bo.setRangeText(tag, a, z, 'end'); bo.focus(); list[sel].body = bo.value;
+      });
+      function shut() { try { d.close(); } catch (x) {} d.remove(); }
+      $('.ms-tpl-cancel', d).addEventListener('click', shut);
+      d.addEventListener('cancel', function (e) { e.preventDefault(); shut(); });
+      $('.ms-tpl-save', d).addEventListener('click', function () {
+        var b = this; b.disabled = true; st.textContent = 'Enregistrement…';
+        saveTpls(list.map(function (t) { return { id: t.id || uuid(), title: String(t.title || '').trim() || 'Sans titre', body: t.body || '', grant: !!t.grant }; }))
+          .then(shut, function (err) { b.disabled = false; st.textContent = 'Erreur : ' + err.message; });
+      });
+      paintList(); paintEd();
+      d.showModal();
     });
   }
 

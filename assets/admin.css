@@ -1512,8 +1512,52 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 
 .ms-reply { flex:none; display:flex; flex-direction:column; gap:6px; padding:12px 14px; border-top:1px solid var(--line); }
 .ms-reply-row { display:flex; align-items:flex-end; gap:8px; }
-.ms-reply textarea { flex:1; min-width:0; min-height:46px; max-height:200px; resize:vertical; }
+.ms-reply textarea { flex:1; min-width:0; min-height:46px; max-height:320px; resize:vertical; }
 .ms-attach { flex:none; width:46px; height:46px; padding:0; justify-content:center; cursor:pointer; }
+/* Modèles de message : bouton + menu au-dessus, fenêtre « Gérer les modèles » (cms-messages.js) */
+.ms-tpl { position:relative; flex:none; }
+.ms-tpl-btn { height:46px; gap:6px; }
+.ms-tpl-btn svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.ms-tpl-menu { position:absolute; left:0; bottom:calc(100% + 6px); z-index:20; min-width:240px; max-width:min(340px, calc(100vw - 40px));
+  display:flex; flex-direction:column; padding:6px; background:var(--paper); border:1px solid var(--line-2, var(--line)); border-radius:12px;
+  box-shadow:0 12px 32px -10px rgba(0,0,0,.35); }
+.ms-tpl-menu[hidden] { display:none; }
+.ms-tpl-it { display:flex; align-items:baseline; justify-content:space-between; gap:10px; width:100%; padding:9px 10px; font:inherit; font-size:.9rem;
+  color:var(--ink); text-align:left; background:none; border:none; border-radius:8px; cursor:pointer; }
+.ms-tpl-it:hover, .ms-tpl-it:focus-visible { background:color-mix(in srgb, var(--ember) 10%, var(--paper)); outline:none; }
+.ms-tpl-it small { flex:none; font-size:.74rem; font-weight:600; color:var(--ember-ink); }
+.ms-tpl-manage { margin-top:4px; border-top:1px solid var(--line); border-radius:0 0 8px 8px; color:var(--muted); }
+.ca-dlg.ms-tpl-dlg { width:min(860px, calc(100vw - 32px)); }
+.ms-tpl-in { padding:var(--dlg-pad); }
+.ms-tpl-in .dlg-t { padding-top:0; }
+.ms-tpl-cols { display:grid; grid-template-columns:220px minmax(0, 1fr); gap:18px; margin-top:16px; }
+.ms-tpl-side { display:flex; flex-direction:column; gap:8px; min-width:0; }
+.ms-tpl-list { display:flex; flex-direction:column; gap:4px; }
+.ms-tpl-li { width:100%; padding:9px 10px; font:inherit; font-size:.9rem; color:var(--ink); text-align:left; background:none; cursor:pointer;
+  border:1px solid transparent; border-radius:9px; overflow-wrap:anywhere; }
+.ms-tpl-li:hover { border-color:var(--line); }
+.ms-tpl-li.is-current { border-color:var(--ember); background:color-mix(in srgb, var(--ember) 8%, var(--paper)); }
+.ms-tpl-side .ms-tpl-add { align-self:flex-start; }
+.ms-tpl-ed { display:flex; flex-direction:column; gap:12px; min-width:0; }
+.ms-tpl-ed[hidden] { display:none; }
+.ms-tpl-ed > label:not(.inline) { display:flex; flex-direction:column; gap:6px; font-weight:600; font-size:.88rem; }
+.ms-tpl-body { min-height:240px; resize:vertical; font-weight:400; }
+.ms-tpl-vars { display:flex; flex-wrap:wrap; gap:6px; }
+.ms-tpl-var { padding:4px 10px; font:inherit; font-size:.8rem; color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 8%, var(--paper));
+  border:1px solid color-mix(in srgb, var(--ember) 30%, var(--line)); border-radius:999px; cursor:pointer; }
+.ms-tpl-ed .ms-tpl-del { align-self:flex-start; }
+.ms-tpl-in .dlg-f { align-items:center; }
+.ms-tpl-in .dlg-f .status { margin-right:auto; }
+/* fil étroit (< 720 px) : le champ prend toute la ligne, boutons dessous (Envoyer à droite) */
+.ms-reply { container-type:inline-size; }
+@container (max-width:720px) {
+  .ms-reply-row { flex-wrap:wrap; }
+  .ms-reply-row textarea { order:-1; flex-basis:100%; }
+  .ms-reply-row .ms-send { margin-left:auto; }
+}
+@media (max-width:700px) {
+  .ms-tpl-cols { grid-template-columns:minmax(0, 1fr); }
+}
 .ms-attach svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
 .ms-send { flex:none; height:46px; }
 .ms-reply .status:empty { display:none; }
