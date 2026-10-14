@@ -146,21 +146,20 @@ Deno.serve(async (req) => {
   const { count: fromClient } = await db.from("messages").select("id", { count: "exact", head: true })
     .eq("conversation_id", conv.id).eq("sender", "client");
   if (!fromClient) {
+    // le texte (souvent un modèle vouvoyé) porte déjà sa salutation : rien d'ajouté autour
     const subject = "Message de Création Audio";
     const text =
-      "Bonjour" + (first ? " " + first : "") + ",\n\n" +
       (body || "(photo)") + "\n" +
       (photos.length ? "\n" + nPhotos(photos.length) + " dans la conversation.\n" : "") +
-      "\nVoir et répondre : " + threadUrl + "\n\nCréation Audio\n" + SITE;
+      "\nVoir et répondre : " + threadUrl + "\n\n" + SITE;
     const html = box(
       eyebrow("Création Audio") +
-      '<h1 style="font-size:22px;margin:0 0 10px">Un message pour toi</h1>' +
-      '<p style="margin:0 0 14px">Bonjour' + (first ? " " + esc(first) : "") + ",</p>" +
+      '<h1 style="font-size:22px;margin:0 0 14px">Nouveau message</h1>' +
       quote(body) +
       (photos.length ? '<p style="margin:8px 0 0;color:#6C727C;font-size:13px">' + nPhotos(photos.length) + " dans la conversation.</p>" : "") +
       button(threadUrl, "Voir et répondre") +
       '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-      '<p style="font-size:12px;color:#6C727C">Réponds dans la messagerie pour garder tout le fil au même endroit. ' +
+      '<p style="font-size:12px;color:#6C727C">Répondez dans la messagerie pour garder tout le fil au même endroit. ' +
       '<a href="' + SITE + '" style="color:#6C727C">creationaudio.ca</a></p>');
     try {
       await send(resendKey, from, { to: [cust.email], reply_to: REPLY_TO, subject, html, text });
