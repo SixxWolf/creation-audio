@@ -1466,6 +1466,8 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .ms-sd-none { margin:0; font-size:.84rem; color:var(--muted); }
 }
 .ms-list { min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding:2px; }
+.ms-acc-q { flex:none; min-width:0; position:sticky; top:0; z-index:1; margin-bottom:4px; }   /* filtre Comptes */
+.ms-acc-rows { display:flex; flex-direction:column; gap:6px; }
 .ms-empty, .ms-none { margin:0; padding:28px 16px; text-align:center; color:var(--muted); font-size:.92rem; }
 .ms-none { margin:auto; }
 .ms-row { display:flex; align-items:flex-start; gap:12px; width:100%; padding:12px; font:inherit; color:var(--ink); text-align:left; cursor:pointer;
@@ -1536,6 +1538,8 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .ms-head { align-items:flex-start; }
   .ms-acts { flex-basis:100%; }
   .ms-b { max-width:88%; }
+  [data-panel="messages"] .panel-head .fx-seg { flex-basis:100%; display:flex; }   /* 4 filtres tiennent à 375 px */
+  [data-panel="messages"] .panel-head .fx-seg-btn { flex:1; min-width:0; padding:0 4px; }
 }
 /* Fenêtres (dialog.css) : l'action non destructive prend la couleur d'accent choisie */
 .dlg-go:not(.is-danger) { color:var(--on-ember); background:var(--ember); border-color:color-mix(in srgb, var(--ember) 80%, #000); }

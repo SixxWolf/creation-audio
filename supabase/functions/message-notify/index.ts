@@ -142,6 +142,32 @@ Deno.serve(async (req) => {
   // ---- réponse de l'admin -> avis au client ----
   if (conv.client_notified_at) return json({ result: "skipped", reason: "client déjà avisé" });
   const threadUrl = SITE + "/compte.html#/messages/" + conv.id;
+  // conversation lancée par l'admin (aucun message du client) : « message », pas « réponse »
+  const { count: fromClient } = await db.from("messages").select("id", { count: "exact", head: true })
+    .eq("conversation_id", conv.id).eq("sender", "client");
+  if (!fromClient) {
+    const subject = "Message de Création Audio";
+    const text =
+      "Bonjour" + (first ? " " + first : "") + ",\n\n" +
+      (body || "(photo)") + "\n" +
+      (photos.length ? "\n" + nPhotos(photos.length) + " dans la conversation.\n" : "") +
+      "\nVoir et répondre : " + threadUrl + "\n\nCréation Audio\n" + SITE;
+    const html = box(
+      eyebrow("Création Audio") +
+      '<h1 style="font-size:22px;margin:0 0 10px">Un message pour toi</h1>' +
+      '<p style="margin:0 0 14px">Bonjour' + (first ? " " + esc(first) : "") + ",</p>" +
+      quote(body) +
+      (photos.length ? '<p style="margin:8px 0 0;color:#6C727C;font-size:13px">' + nPhotos(photos.length) + " dans la conversation.</p>" : "") +
+      button(threadUrl, "Voir et répondre") +
+      '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
+      '<p style="font-size:12px;color:#6C727C">Réponds dans la messagerie pour garder tout le fil au même endroit. ' +
+      '<a href="' + SITE + '" style="color:#6C727C">creationaudio.ca</a></p>');
+    try {
+      await send(resendKey, from, { to: [cust.email], reply_to: REPLY_TO, subject, html, text });
+    } catch (e) { return json({ error: String((e as Error).message || e) }, 502); }
+    await db.from("conversations").update({ client_notified_at: new Date().toISOString() }).eq("id", conv.id);
+    return json({ result: "sent", to: "client" });
+  }
   const subject = "Création Audio t'a répondu — " + about;
   const text =
     "Bonjour" + (first ? " " + first : "") + ",\n\n" +

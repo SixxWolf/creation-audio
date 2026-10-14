@@ -8,6 +8,9 @@
    - Répondre (texte + photos, Ctrl+Entrée) -> Edge Function message-notify :
      courriel au client (1 par série de réponses non lues).
    - Marquer réglée / rouvrir ; Supprimer (photos effacées par l'API Storage).
+   - Filtre « Comptes » : tous les comptes clients (customers) + recherche ; un clic
+     ouvre sa conversation ouverte, sinon un brouillon (#messages/c-<customer_id>) :
+     la conversation (sujet « Mon compte ») n'est créée qu'au premier envoi.
    - Pastille #nav-msgs-n = conversations avec des messages non lus.
    - Loi 25 : conversations sans message depuis 12 mois effacées (photos
      comprises) au premier chargement de l'onglet.
@@ -59,6 +62,7 @@
   if (!wrap || !listEl || !threadEl) return;
   var convs = [], filter = 'open', curId = null, msgs = [], photos = [], urlCache = {};
   var tabOpen = false, loaded = false, pending = null, purged = false, busy = false;
+  var accounts = null, accQ = '', draft = null, flash = '';   // filtre Comptes ; brouillon = conversation pas encore créée
 
   /* ---- pastille de la barre latérale ---- */
   function paintBadge(n) {
@@ -94,11 +98,14 @@
     b.addEventListener('click', function () {
       filter = b.getAttribute('data-f');
       $$('.ms-filter').forEach(function (x) { x.classList.toggle('is-active', x === b); });
-      renderList();
+      if (filter === 'accounts' && !accounts) loadAccounts(); else renderList();
     });
   });
   var refreshBtn = $('#ms-refresh');
-  if (refreshBtn) refreshBtn.addEventListener('click', function () { load(); if (curId) loadThread(false); sideFor = null; renderSide(); });
+  if (refreshBtn) refreshBtn.addEventListener('click', function () {
+    load(); if (curId) loadThread(false); sideFor = null; renderSide();
+    if (filter === 'accounts') loadAccounts();
+  });
 
   /* ---- grand écran (≥ 1600 px) : fiche du client à droite du fil ----
      Ses 5 dernières commandes en ligne, réservations (customer_id de la conversation) et factures (fiche reliée,
@@ -174,7 +181,76 @@
       .then(function () { pending = null; });
     return pending;
   }
+  /* ---- filtre Comptes : tous les comptes clients ---- */
+  function loadAccounts() {
+    listEl.innerHTML = '<p class="muted">Chargement…</p>';
+    return sb.from('customers').select('id, name, email, phone, client_id, created_at')
+      .order('created_at', { ascending: false }).limit(1000)
+      .then(function (res) {
+        if (res.error) { listEl.innerHTML = '<p class="empty">Impossible de charger les comptes.<br>' + esc(res.error.message) + '</p>'; return; }
+        var list = res.data || [];
+        var ids = list.map(function (k) { return k.client_id; }).filter(Boolean);
+        if (!ids.length) return list;
+        // factures par fiche reliée : nombre + dernière date
+        return sb.from('invoices').select('client_id, invoice_date, status').in('client_id', ids).then(function (r) {
+          var by = {};
+          ((!r.error && r.data) || []).forEach(function (f) {
+            if (f.status === 'cancelled') return;
+            var s = by[f.client_id] || (by[f.client_id] = { n: 0, last: '' });
+            s.n++; if (String(f.invoice_date || '') > s.last) s.last = String(f.invoice_date);
+          });
+          list.forEach(function (k) { k._inv = by[k.client_id] || null; });
+          return list;
+        });
+      }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau — réessaie.</p>'; })
+      .then(function (list) { if (list) { accounts = list; if (filter === 'accounts') renderList(); } });
+  }
+  function custName(k) { return k.name || k.email || 'Client'; }
+  function openConvOf(custId) {
+    return convs.filter(function (c) { return c.customer_id === custId && c.status === 'open'; })[0] || null;
+  }
+  function renderAccounts() {
+    if (!$('#ms-acc-q', listEl)) {
+      listEl.innerHTML = '<input type="search" id="ms-acc-q" class="ms-acc-q" placeholder="Chercher un compte…" aria-label="Chercher un compte" autocomplete="off">' +
+        '<div class="ms-acc-rows" id="ms-acc-rows"></div>';
+      var q = $('#ms-acc-q', listEl);
+      q.value = accQ;
+      q.addEventListener('input', function () { accQ = q.value; renderAccounts(); });
+    }
+    var box = $('#ms-acc-rows', listEl);
+    if (!accounts) { box.innerHTML = '<p class="muted">Chargement…</p>'; return; }
+    var needle = accQ.trim().toLowerCase(), digits = needle.replace(/\D/g, '');
+    var rows = accounts.filter(function (k) {
+      if (!needle) return true;
+      return [k.name, k.email].join(' ').toLowerCase().indexOf(needle) !== -1 ||
+        (digits.length >= 3 && String(k.phone || '').replace(/\D/g, '').indexOf(digits) !== -1);
+    });
+    if (!rows.length) {
+      box.innerHTML = '<p class="ms-empty">' + (accounts.length ? 'Aucun compte trouvé.' : 'Aucun compte pour l\'instant.') + '</p>';
+      return;
+    }
+    var curCust = (conv() || {}).customer_id;
+    box.innerHTML = rows.map(function (k) {
+      var inv = k._inv, oc = openConvOf(k.id);
+      var buys = inv ? plural(inv.n, 'facture', 'factures') + ' · dernière ' + dateFr(inv.last) : (k.client_id ? 'Aucune facture' : 'Fiche non reliée');
+      return '<button type="button" class="ms-row ms-acc' + (k.id === curCust ? ' is-current' : '') + '" data-cust="' + esc(k.id) + '">' +
+        CA.avatar(custName(k)) +
+        '<span class="ms-row-tx">' +
+          '<span class="ms-row-top"><b>' + esc(custName(k)) + '</b>' + (oc ? '<time>Conversation ouverte</time>' : '') + '</span>' +
+          '<span class="ms-row-prev">' + esc([k.name ? k.email : '', k.phone].filter(Boolean).join(' · ')) + '</span>' +
+          '<span class="ms-row-about">' + esc(buys) + '</span>' +
+        '</span></button>';
+    }).join('');
+    $$('.ms-acc', box).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-cust'), oc = openConvOf(id);
+        go(oc ? oc.id : 'c-' + id);
+      });
+    });
+  }
+
   function renderList() {
+    if (filter === 'accounts') { renderAccounts(); return; }
     var rows = convs.filter(function (c) { return filter === 'all' || c.status === filter || c.id === curId; });
     if (!rows.length) {
       listEl.innerHTML = '<p class="ms-empty">' + (filter === 'open' ? 'Aucune conversation ouverte.' : filter === 'closed' ? 'Aucune conversation réglée.' : 'Aucun message pour l\'instant.') + '</p>';
@@ -196,17 +272,25 @@
 
   /* ---- fil d'une conversation ---- */
   function open(id) {
-    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-      curId = null; wrap.classList.remove('has-conv'); clearPhotos();
+    var dm = /^c-([0-9a-f-]{36})$/i.exec(id || '');
+    if (!id || (!dm && !/^[0-9a-f-]{36}$/i.test(id))) {
+      curId = null; draft = null; wrap.classList.remove('has-conv'); clearPhotos();
       threadEl.innerHTML = '<p class="ms-none">Choisis une conversation.</p>';
       renderList(); renderSide(); return;
     }
     if (id === curId && threadEl.querySelector('.ms-msgs')) return;
+    if (dm) {   // brouillon : conversation ouverte existante -> on la reprend
+      var oc = openConvOf(dm[1]);
+      if (oc) { go(oc.id); return; }
+      if (!accounts) { loadAccounts().then(function () { if (accounts) open(id); }); return; }
+      var k0 = accounts.filter(function (k) { return k.id === dm[1]; })[0];
+      draft = k0 ? { id: id, customer_id: k0.id, customers: k0, topic: 'compte', status: 'open', _draft: true } : null;
+    } else draft = null;
     curId = id; msgs = []; clearPhotos();
     wrap.classList.add('has-conv');
     renderList();
     var c = conv();
-    if (!c) { threadEl.innerHTML = '<p class="ms-none">Conversation introuvable.</p>'; return; }
+    if (!c) { threadEl.innerHTML = '<p class="ms-none">' + (dm ? 'Compte introuvable.' : 'Conversation introuvable.') + '</p>'; return; }
     var k = c.customers || {};
     threadEl.innerHTML =
       '<header class="ms-head">' +
@@ -215,11 +299,11 @@
         '<div class="ms-head-tx"><h2>' + esc(who(c)) + '</h2>' +
           '<p class="person-meta">' + (k.email ? '<a class="pm pm-mail" href="mailto:' + esc(k.email) + '">' + esc(k.email) + '</a>' : '') +
             (k.phone ? '<a class="pm pm-tel" href="tel:' + esc(String(k.phone).replace(/[^\d+]/g, '')) + '">' + esc(k.phone) + '</a>' : '') + '</p>' +
-          '<p class="ms-about">' + esc(about(c)) + (c.page ? ' · <a href="' + esc(c.page) + '" target="_blank" rel="noopener">page</a>' : '') + '</p></div>' +
-        '<div class="ms-acts">' +
+          '<p class="ms-about">' + (c._draft ? 'Nouvelle conversation' : esc(about(c)) + (c.page ? ' · <a href="' + esc(c.page) + '" target="_blank" rel="noopener">page</a>' : '')) + '</p></div>' +
+        (c._draft ? '' : '<div class="ms-acts">' +
           '<button type="button" class="btn btn-ghost btn-sm ms-close" data-ic="check">' + (c.status === 'closed' ? 'Rouvrir' : 'Réglée') + '</button>' +
           '<button type="button" class="btn btn-ghost btn-sm ms-del" data-ic="trash">Supprimer</button>' +
-        '</div>' +
+        '</div>') +
       '</header>' +
       '<div class="ms-msgs" id="ms-msgs"><p class="muted">Chargement…</p></div>' +
       '<form class="ms-reply" id="ms-reply" novalidate>' +
@@ -227,14 +311,16 @@
         '<div class="ms-reply-row">' +
           '<label class="btn btn-ghost ms-attach" title="Joindre des photos"><input type="file" accept="image/*" multiple hidden aria-label="Joindre des photos">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg></label>' +
-          '<textarea id="ms-reply-in" rows="2" maxlength="4000" placeholder="Ta réponse…" aria-label="Réponse"></textarea>' +
+          '<textarea id="ms-reply-in" rows="2" maxlength="4000" placeholder="' + (c._draft ? 'Ton message…' : 'Ta réponse…') + '" aria-label="Réponse"></textarea>' +
           '<button type="submit" class="btn btn-accent ms-send" data-ic="mail">Envoyer</button>' +
         '</div>' +
         '<span class="status" id="ms-status"></span>' +
       '</form>';
     $('.ms-back', threadEl).addEventListener('click', function () { go(''); });
-    $('.ms-close', threadEl).addEventListener('click', toggleClosed);
-    $('.ms-del', threadEl).addEventListener('click', removeConv);
+    if (!c._draft) {
+      $('.ms-close', threadEl).addEventListener('click', toggleClosed);
+      $('.ms-del', threadEl).addEventListener('click', removeConv);
+    }
     var form = $('#ms-reply', threadEl), ta = $('#ms-reply-in', form), inp = $('.ms-attach input', form);
     inp.addEventListener('change', function () { addFiles(inp.files); inp.value = ''; });
     $('.ms-thumbs', form).addEventListener('click', function (e) {
@@ -245,12 +331,21 @@
     });
     ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } });
     form.addEventListener('submit', function (e) { e.preventDefault(); send(); });
+    if (flash) { $('#ms-status', form).textContent = flash; flash = ''; }
     loadThread(true);
     renderSide();
   }
-  function conv() { return convs.filter(function (c) { return c.id === curId; })[0]; }
+  function conv() {
+    if (draft && draft.id === curId) return draft;
+    return convs.filter(function (c) { return c.id === curId; })[0];
+  }
   function loadThread(scroll) {
     var id = curId; if (!id) return Promise.resolve();
+    if (draft && draft.id === id) {
+      var box0 = $('#ms-msgs', threadEl);
+      if (box0 && scroll) box0.innerHTML = '<p class="ms-none">Aucun message encore.</p>';
+      return Promise.resolve();
+    }
     return sb.from('messages').select('*').eq('conversation_id', id).order('created_at').then(function (res) {
       if (curId !== id) return;
       var box = $('#ms-msgs', threadEl); if (!box) return;
@@ -342,7 +437,24 @@
       return sendNow(c, body, ta, btn, st);
     });
   }
+  // brouillon : la conversation n'existe qu'au premier envoi ; ensuite on bascule sur elle
   function sendNow(c, body, ta, btn, st) {
+    if (!c._draft) return sendTo(c, body, ta, btn, st);
+    return sb.from('conversations').insert({ customer_id: c.customer_id, topic: 'compte', status: 'open' }).select('*').single()
+      .then(function (res) {
+        if (res.error) throw new Error(res.error.message);
+        var made = res.data; made.customers = c.customers;
+        return sendTo(made, body, ta, btn, st).then(function () {
+          if (!(draft && draft.id === curId)) return;
+          if (!convs.some(function (x) { return x.id === made.id; })) convs.unshift(made);
+          flash = st.textContent; draft = null; go(made.id);
+        });
+      }).catch(function (err) {
+        busy = false; btn.disabled = false;
+        st.textContent = 'Erreur : ' + ((err && err.message) || err);
+      });
+  }
+  function sendTo(c, body, ta, btn, st) {
     return Promise.all(photos.map(function (p) {
       var path = c.customer_id + '/' + uuid() + '.jpg';
       return sb.storage.from('messages').upload(path, p.blob, { contentType: 'image/jpeg', upsert: false }).then(function (r) {
