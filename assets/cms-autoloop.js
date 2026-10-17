@@ -192,6 +192,15 @@
     return res;
   }
 
+  /* - RE_SWEEP : calibration des vibrations du start gcode P2S (« mech mode sweep » :
+       M970.x / M974 sur X et Y). Faite au loop 1 ; la machine ne change pas entre deux
+       loops, on la retire donc des suivants (M975 S1 gardé : suppression active). */
+  var RE_SWEEP = /^;=+ mech mode sweep start =+[^\r\n]*\r?\n[\s\S]*?^;=+ mech mode sweep end =+[^\r\n]*\r?\n/m;
+  function dropSweep(head, eol) {
+    return head.replace(RE_SWEEP, ';===== mech mode sweep (AutoLoop : faite au loop 1 seulement) =====' + eol +
+                                  '  M975 S1' + eol + ';===== mech mode sweep end =====' + eol);
+  }
+
   // Motif « tous les N loops » (champ de chaque ligne de la grille) : loop 1, puis 1+N, 1+2N…
   // interval 0 = loop 1 seulement.
   function calibrateLoop(i, interval) {
@@ -453,6 +462,7 @@
     var unload = pb ? pb[1].split(/\r?\n/) : null;
     var transLast = buildTransition(opts, push, maxZ, eol, { unload: unload });   // …sauf le dernier : retrait AMS + 100 %
     report.amsUnload = !!unload;
+    report.sweep = RE_SWEEP.test(head);
 
     // Total de couches annoncé à l'imprimante = couches par pièce × loops.
     var tl = RE_TOTAL_LAYERS.exec(head);
@@ -487,7 +497,9 @@
     for (var i = 1; i <= N; i++) {
       // Le header du loop 1 est écrit ici ; ceux des loops suivants viennent du séparateur.
       if (i === 1) parts.push('; === LOOP 1 OF ' + N + ' ===' + eol);
-      parts.push(insertFlags(progressHead(seg, i, N, transMin), i, !!opts.cal.flow[i - 1], !!opts.cal.bed[i - 1], eol));
+      var ph = progressHead(seg, i, N, transMin);
+      if (i > 1) ph = dropSweep(ph, eol);
+      parts.push(insertFlags(ph, i,!!opts.cal.flow[i - 1], !!opts.cal.bed[i - 1], eol));
       parts.push(i === N ? transLast : trans);
       if (i < N) parts.push(buildSeparator(i + 1, N, eol));
     }
@@ -646,6 +658,7 @@
       '<div class="al-rsec">' +
         rrow('Flow', rep.flow.length + ' loop' + (rep.flow.length > 1 ? 's' : '')) +
         rrow('Bed leveling', rep.bed.length + ' loop' + (rep.bed.length > 1 ? 's' : '')) +
+        rrow('Vibrations', rep.sweep ? 'loop 1 seulement' : 'introuvable') +
         rrow('Push', z(rep.pushZ) + ' mm' + (rep.pushHalf ? ' · mi-hauteur' : ''), rep.pushHalf ? 'al-caution-t' : '') +
         rrow('Purge', rep.loadLineReplaced ? 'en goulotte' : 'introuvable', rep.loadLineReplaced ? '' : 'al-bad') +
         (w && w.changes
