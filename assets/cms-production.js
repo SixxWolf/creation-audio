@@ -214,7 +214,8 @@
     ]).then(function (r) { spools = q(r[0]); uses = q(r[1]); });
   }
   function loadEmpties() {
-    return sb.rpc('admin_empty_spools').then(function (res) { empties = res.error ? [] : (res.data || []); }, function () { empties = []; });
+    var costs = window.CA.costing && window.CA.costing.loadEmptyCosts ? window.CA.costing.loadEmptyCosts(true) : null;
+    return Promise.all([sb.rpc('admin_empty_spools'), costs]).then(function (all) { var res = all[0]; empties = res.error ? [] : (res.data || []); }, function () { empties = []; });
   }
   function loadProds() {
     return sb.from('productions').select('*').order('created_at', { ascending: false })
@@ -482,23 +483,11 @@
      Rien n'entre au stock sans confirmation : Libérer (vente) / Garder (sorties du compte).
      Lien filament -> bobine vide : fiche du matériau (materials.empty_spool_id).
      ========================================================= */
-  // valeur d'une bobine vide = prix payé − coût de la recharge (miroir de public._empty_value) ;
-  // figée en base au 1er usage (empty_cost)
-  function emptyValOf(s) {
-    if (!s) return 0;
-    if (s.empty_cost != null) return +s.empty_cost || 0;
-    if (s.kind === 'refill') return 0;
-    var f = filById(s.product_id), m = f && window.CA.materialOf ? window.CA.materialOf(f.brand, f.material) : null;
-    if (!m || !m.empty_spool_id) return 0;
-    var c = Math.max(0, +s.unit_cost || 0), a = (f.attrs || {});
-    var r = num(a.avg_cost && a.avg_cost.refill);
-    if (r == null) r = num(a.last_cost && a.last_cost.refill);
-    if (r == null) r = num(m.cost_refill);
-    if (r == null || r <= 0 || r >= c) {
-      var acc = empties.filter(function (e) { return String(e.id) === String(m.empty_spool_id); })[0];
-      return round2(Math.min(c, Math.max(0, acc ? +acc.cost_price || 0 : 0)));
-    }
-    return round2(c - r);
+  // Depuis le 2026-10-19 : la production paie la bobine au complet ; la bobine vide n'a de coût
+  // qu'à la vente (bobine − recharge aux prix du jour, cms-costing.js) -> affiché ici à titre indicatif.
+  function emptyCostOf(e) {
+    var v = window.CA.costing && window.CA.costing.emptySpoolCost ? window.CA.costing.emptySpoolCost(e) : null;
+    return v != null ? v : (+e.cost_price || 0);
   }
   function emptyImg(e) {
     if (!e.image_path) return '<span class="pr-e-img is-none" aria-hidden="true"></span>';
@@ -507,7 +496,7 @@
   }
   function emptyRow(e) {
     var prod = +e.prod || 0, intl = +e.internal || 0, pend = prod + intl, act = +e.active || 0;
-    var cost = e.avg_cost != null ? +e.avg_cost : +e.cost_price || 0;
+    var cost = emptyCostOf(e);
     var mats = (e.materials || []).map(function (x) { var p = String(x).split(' · '); return p[p.length - 1]; });
     var meta = ['Stock ' + (e.qty | 0), money(cost)];
     if (act) meta.push(act + ' en cours');
@@ -872,11 +861,10 @@
       return { parts: parts, over: need };
     });
   }
-  // gross = prix payé complet ; sinon net de la bobine vide (revendue) — comme admin_save_production
-  function partsCost(parts, gross) {
+  // prix payé complet de la bobine (la bobine vide ne réduit plus le coût — comme admin_save_production)
+  function partsCost(parts) {
     return parts.reduce(function (sum, p) {
-      var c = (+p.s.unit_cost || 0) - (gross ? 0 : emptyValOf(p.s));
-      return sum + round2(p.g * c / (+p.s.weight_g || 1000));
+      return sum + round2(p.g * (+p.s.unit_cost || 0) / (+p.s.weight_g || 1000));
     }, 0);
   }
   // blocs en production pour le menu d'une rangée : marque · matière, couleur ×N, grammes restants
@@ -920,7 +908,7 @@
     var al = allocate();
     $$('.pr-use', el.uses).forEach(function (row) {
       var i = +row.getAttribute('data-i'), r = rows[i], b = blockByKey(r.block);
-      $('.pr-use-cost', row).textContent = b ? money(partsCost(al[i].parts, true)) : '—';
+      $('.pr-use-cost', row).textContent = b ? money(partsCost(al[i].parts)) : '—';
       var warn = '';
       if (b) {
         if (al[i].over > 0.05) {
@@ -998,7 +986,6 @@
     var al = allocate(), used = rows.filter(function (r) { return r.block && (+r.grams || 0) > 0; });
     var g = used.reduce(function (s, r) { return s + (+r.grams || 0); }, 0);
     var fil = al.reduce(function (s, a) { return s + partsCost(a.parts); }, 0);
-    var filGross = al.reduce(function (s, a) { return s + partsCost(a.parts, true); }, 0);
     // grammes par bobine (rangées fusionnées) -> envoyés tels quels à admin_save_production
     var bySpool = {}, spoolUses = [];
     al.forEach(function (a) {
@@ -1028,7 +1015,7 @@
       Q += pairs; C += pairs * pairc;
       next = round2(C / Q);
     }
-    return { sp: sp, used: used, spoolUses: spoolUses, g: g, fil: round2(fil), filGross: round2(filGross), minutes: minutes, rate: rate, mach: mach, total: total, good: good,
+    return { sp: sp, used: used, spoolUses: spoolUses, g: g, fil: round2(fil), minutes: minutes, rate: rate, mach: mach, total: total, good: good,
       lin: lin, lout: lout, pairs: pairs, pairc: pairc, cur: cur, next: next,
       missing: rows.filter(function (r) { return !r.block && (+r.grams || 0) > 0; }).length };
   }
@@ -1047,8 +1034,7 @@
     el.status.textContent = problem;
     if (!file && !rows.length) { el.report.innerHTML = '<p class="muted">Glisse un G-code pour commencer.</p>'; return; }
     var html = '';
-    html += srow('Filament <em>' + grams(r.g) + '</em>', money(r.filGross));
-    if (r.filGross - r.fil > 0.004) html += srow('Bobine vide <em>revendue</em>', '− ' + money(r.filGross - r.fil));
+    html += srow('Filament <em>' + grams(r.g) + '</em>', money(r.fil));
     html += srow('Électricité + usure <em>' + fmtHm(r.minutes) + ' × ' + money(r.rate) + '/h</em>', money(r.mach));
     html += srow('Total', money(r.total));
     html += '<div class="al-cost"><span>COÛT / PAIRE</span><b>' + (r.pairc != null ? money(r.pairc) : '—') + '</b></div>';

@@ -62,7 +62,11 @@
   // accessoire : son coût moyen, sinon le coût saisi sur sa fiche
   function costOf(f, kind) {
     if (!f) return null;
-    if (isAcc(f)) { var ai = f.attrs && f.attrs.avg_cost && f.attrs.avg_cost.item; return num(ai != null ? ai : f.cost_price); }
+    if (isAcc(f)) {
+      var ev = window.CA.costing.emptySpoolCost ? window.CA.costing.emptySpoolCost(f) : null;   // bobine vide : calculé
+      if (ev != null) return ev;
+      var ai = f.attrs && f.attrs.avg_cost && f.attrs.avg_cost.item; return num(ai != null ? ai : f.cost_price);
+    }
     return window.CA.costing.costOf(f, kind, filaments);
   }
   // estimé de la liste à commander : le dernier prix payé, sinon le coût connu
@@ -132,9 +136,11 @@
   // accessoires (bobines vides, etc.) : Codes-barres + Réception (attrs.barcodes.item, kind 'item' -> qty)
   var accessories = [];
   function loadAccessories() {
-    return sb.from('products').select('id,name,attrs,qty,cost_price,sell_price').eq('type', 'accessory')
-      .order('sort_order', { ascending: true }).order('name', { ascending: true })
-      .then(function (res) { accessories = (res.data || []); });
+    // coût du jour des bobines vides (suit les réceptions : rechargé avec les accessoires)
+    var costs = window.CA.costing.loadEmptyCosts ? window.CA.costing.loadEmptyCosts(true).then(null, function () {}) : null;
+    return Promise.all([sb.from('products').select('id,name,attrs,qty,cost_price,sell_price').eq('type', 'accessory')
+      .order('sort_order', { ascending: true }).order('name', { ascending: true }), costs])
+      .then(function (all) { accessories = (all[0].data || []); });
   }
 
   function filProd(id) { return filaments.filter(function (x) { return String(x.id) === String(id); })[0] || null; }

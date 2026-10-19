@@ -226,6 +226,7 @@
     Promise.resolve(window.CA.loadMaterials ? window.CA.loadMaterials() : null)
       .then(function () { loadCatalog('filament'); }, function () { loadCatalog('filament'); });
     loadCatalog('accessory', true);   // pour le scanner (bobines vides, etc.)
+    if (window.CA.costing && window.CA.costing.loadEmptyCosts) window.CA.costing.loadEmptyCosts(true);   // coût du jour des bobines vides
     // carnet clients (autocomplétion) + dealers (menu) — chargés et tenus à jour
     if (window.CA.loadClients) window.CA.loadClients().then(buildClientList, function () {}); else buildClientList();
     if (window.CA.loadDealers) window.CA.loadDealers().then(buildDealerSelect, function () {}); else buildDealerSelect();
@@ -539,8 +540,11 @@
   function isInternal() { return clientType === 'internal'; }
   // spacer : prix client (à plat) OU prix dealer (+ rabais quantité) selon le type de client
   function spacerDual(p) { return { client: +p.sell_price || 0, dealer: +(p.dealer_price != null ? p.dealer_price : p.sell_price) || 0, tiers: p.tiers || [] }; }
-  // coût d'un accessoire ou d'un spacer : coût moyen (réceptions / productions) prioritaire sur le coût saisi
+  // coût d'un accessoire ou d'un spacer : coût moyen (réceptions / productions) prioritaire sur le coût saisi ;
+  // bobine vide : bobine − recharge aux prix du jour (cms-costing.js), figé sur la ligne à l'enregistrement
   function itemCost(p) {
+    var ev = p && window.CA.costing && window.CA.costing.emptySpoolCost ? window.CA.costing.emptySpoolCost(p) : null;
+    if (ev != null) return ev;
     var ac = p && p.attrs && p.attrs.avg_cost && p.attrs.avg_cost.item;
     return +((ac != null && ac !== '') ? ac : (p && p.cost_price)) || 0;
   }

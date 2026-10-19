@@ -2705,12 +2705,8 @@ begin
     v_g := round(greatest(0, coalesce((v_u ->> 'grams')::numeric, 0)), 2);
     select * into v_s from public.production_spools where id = (v_u ->> 'spool_id')::uuid for update;
     if not found then raise exception 'Bobine de production introuvable.'; end if;
-    -- valeur de la bobine vide figée au 1er usage, retirée du coût du filament (elle sera revendue)
-    if v_s.empty_cost is null then
-      v_s.empty_cost := case when v_s.kind = 'spool' then public._empty_value(v_s.product_id, v_s.unit_cost) else 0 end;
-      update public.production_spools set empty_cost = v_s.empty_cost where id = v_s.id;
-    end if;
-    v_c := round(v_g * (v_s.unit_cost - v_s.empty_cost) / v_s.weight_g, 2);
+    -- prix payé complet (depuis le 2026-10-19 : la bobine vide n'est plus déduite, elle n'a de coût qu'à la vente)
+    v_c := round(v_g * v_s.unit_cost / v_s.weight_g, 2);
     v_fil := v_fil + v_c; v_grams := v_grams + v_g;
     v_uses := v_uses || jsonb_build_object('spool_id', v_s.id, 'grams', v_g, 'cost', v_c);
   end loop;
@@ -2806,14 +2802,15 @@ grant execute on function public.admin_delete_production(uuid) to authenticated;
 -- BOBINES VIDES ← PRODUCTION / USAGE INTERNE (2026-10-12)
 -- Les bobines vides (accessoires « Bobines vides ») ne viennent que des bobines
 -- que Théo vide lui-même. Lien dans la fiche du matériau (materials.empty_spool_id).
--- Valeur d'une bobine vide = prix payé de la bobine − coût de la recharge du même
--- filament (sinon le coût saisi sur l'accessoire) : figée au 1er usage en production
--- (production_spools.empty_cost) et retirée du coût filament des spacers.
+-- Coût (révisé le 2026-10-19) : la production paie la bobine au complet ; la bobine
+-- vide n'a de coût qu'à la vente = prix bobine − prix recharge du jour, calculé dans
+-- l'admin (CA.costing.emptySpoolCost) et figé sur la ligne de facture. Les libérations
+-- ne portent donc plus de valeur (unit_cost 0) et ne touchent plus attrs.avg_cost.
+-- (_empty_value / _empty_recost / production_spools.empty_cost : restes de l'ancien
+-- calcul, plus appelés.)
 -- « À libérer » : bobines terminées en production (empty_state null) + bobines (pas
 -- les recharges) des factures Interne depuis le 2026-10-12. Rien n'entre au stock
 -- sans confirmation : admin_release_empty (combien libérer / garder).
--- Coût moyen de l'accessoire (attrs.avg_cost.item) = stock de départ au coût saisi
--- (attrs.empty_seed) + libérations (empty_spool_moves).
 -- ============================================================
 alter table public.materials add column if not exists empty_spool_id uuid references public.products(id) on delete set null;
 alter table public.production_spools add column if not exists empty_cost  numeric(10,2);   -- [PRIVÉ] valeur de la bobine vide (figée au 1er usage)
@@ -2912,6 +2909,49 @@ begin
 end $$;
 revoke all on function public._empty_recost(uuid) from public, anon, authenticated;
 
+-- Coût du jour de chaque bobine vide (2026-10-19) -> { "<accessory_id>": coût }.
+-- = écart bobine − recharge de la COMMANDE REÇUE la plus récente qui contient les deux
+-- formats d'un même matériau (même marque, matériaux qui donnent une bobine vide) : les deux
+-- prix datent de la même époque (palier, hausse, taxes). Médiane si plusieurs matériaux dans
+-- cette commande. Repli : anciens coûts du matériau lié (cost_spool − cost_refill).
+-- Lu par l'admin (CA.costing.loadEmptyCosts) et figé sur la ligne de facture à la vente.
+create or replace function public.admin_empty_spool_costs()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  return coalesce((
+    with acc as (
+      select distinct m.empty_spool_id id, m.brand from public.materials m where m.empty_spool_id is not null
+    ), g as (   -- écart par commande reçue et par matériau (les deux formats présents)
+      select r.id rid, r.received_at, r.created_at, p.brand,
+             avg(l.unit_cost) filter (where l.kind = 'spool') - avg(l.unit_cost) filter (where l.kind = 'refill') gap
+        from public.receipt_lines l
+        join public.receipts r on r.id = l.receipt_id
+        join public.products p on p.id = l.product_id
+        join public.materials m on m.brand = p.brand and m.name = p.material and m.empty_spool_id is not null
+       where p.type = 'filament' and l.unit_cost > 0
+       group by r.id, r.received_at, r.created_at, p.brand, p.material
+      having count(*) filter (where l.kind = 'spool') > 0 and count(*) filter (where l.kind = 'refill') > 0
+    ), last_r as (   -- commande la plus récente par marque
+      select distinct on (brand) brand, rid from g where gap > 0
+       order by brand, received_at desc nulls last, created_at desc
+    ), by_brand as (
+      select g.brand, percentile_cont(0.5) within group (order by g.gap) gap
+        from g join last_r lr on lr.rid = g.rid and lr.brand = g.brand where g.gap > 0 group by g.brand
+    ), fallback as (
+      select m.empty_spool_id id, percentile_cont(0.5) within group (order by m.cost_spool - m.cost_refill) gap
+        from public.materials m
+       where m.empty_spool_id is not null and m.cost_spool > m.cost_refill group by m.empty_spool_id
+    )
+    select jsonb_object_agg(a.id, round(coalesce(
+             (select percentile_cont(0.5) within group (order by b.gap) from acc a2 join by_brand b on b.brand = a2.brand where a2.id = a.id),
+             (select f.gap from fallback f where f.id = a.id))::numeric, 2))
+      from (select distinct id from acc) a
+  ), '{}'::jsonb);
+end $$;
+revoke all on function public.admin_empty_spool_costs() from public, anon;
+grant execute on function public.admin_empty_spool_costs() to authenticated;
+
 -- Carte « Bobines vides » (Production) : une ligne par bobine vide liée à un matériau
 -- (ou de la catégorie « Bobines vides ») -> à libérer (production / interne), en cours, dernier mouvement.
 create or replace function public.admin_empty_spools()
@@ -2952,7 +2992,7 @@ grant execute on function public.admin_empty_spools() to authenticated;
 create or replace function public.admin_release_empty(p_acc uuid, p_release integer, p_keep integer default 0)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_a public.products%rowtype; v_rel integer; v_keep integer; v_q uuid[]; v_np integer; v_int jsonb; v_ni integer;
-        v_relp uuid[]; v_keepp uuid[]; v_reli integer; v_keepi integer; v_cost numeric; v_ival numeric;
+        v_relp uuid[]; v_keepp uuid[]; v_reli integer; v_keepi integer;
         v_b uuid := gen_random_uuid();
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
@@ -2973,18 +3013,16 @@ begin
   v_reli  := v_rel - coalesce(array_length(v_relp, 1), 0);
   v_keepp := v_q[coalesce(array_length(v_relp, 1), 0) + 1 : least(coalesce(array_length(v_relp, 1), 0) + v_keep, v_np)];
   v_keepi := v_keep - coalesce(array_length(v_keepp, 1), 0);
-  v_ival  := coalesce((v_int ->> 'value')::numeric, v_a.cost_price, 0);
 
+  -- stock seulement : le coût se calcule à la vente (2026-10-19)
   if coalesce(array_length(v_relp, 1), 0) > 0 then
-    select sum(coalesce(s.empty_cost, public._empty_value(s.product_id, s.unit_cost))) into v_cost
-      from public.production_spools s where s.id = any(v_relp);
     insert into public.empty_spool_moves (accessory_id, source, action, n, unit_cost, spool_ids, batch)
-    values (p_acc, 'production', 'released', array_length(v_relp, 1), coalesce(v_cost, 0) / array_length(v_relp, 1), v_relp, v_b);
+    values (p_acc, 'production', 'released', array_length(v_relp, 1), 0, v_relp, v_b);
     update public.production_spools set empty_state = 'released', empty_at = now() where id = any(v_relp);
   end if;
   if v_reli > 0 then
     insert into public.empty_spool_moves (accessory_id, source, action, n, unit_cost, batch)
-    values (p_acc, 'internal', 'released', v_reli, v_ival, v_b);
+    values (p_acc, 'internal', 'released', v_reli, 0, v_b);
   end if;
   if coalesce(array_length(v_keepp, 1), 0) > 0 then
     insert into public.empty_spool_moves (accessory_id, source, action, n, unit_cost, spool_ids, batch)
@@ -2996,15 +3034,7 @@ begin
   end if;
 
   if v_rel > 0 then
-    update public.products
-       set qty = coalesce(qty, 0) + v_rel,
-           attrs = case when attrs ? 'empty_seed' then attrs
-                        else jsonb_set(attrs, '{empty_seed}', jsonb_build_object(
-                               'qty', case when cost_price > 0 then greatest(0, coalesce(qty, 0)) else 0 end,
-                               'cost', cost_price, 'at', now())) end,
-           updated_at = now()
-     where id = p_acc;
-    perform public._empty_recost(p_acc);
+    update public.products set qty = coalesce(qty, 0) + v_rel, updated_at = now() where id = p_acc;
   end if;
   return (select jsonb_build_object('qty', qty, 'avg_cost', attrs -> 'avg_cost' ->> 'item', 'released', v_rel, 'kept', v_keep)
             from public.products where id = p_acc);
@@ -3030,7 +3060,6 @@ begin
   update public.production_spools set empty_state = null, empty_at = null
    where id in (select unnest(spool_ids) from public.empty_spool_moves where batch = p_batch);
   delete from public.empty_spool_moves where batch = p_batch;
-  perform public._empty_recost(v_acc);
   return (select jsonb_build_object('qty', qty, 'avg_cost', attrs -> 'avg_cost' ->> 'item', 'released', v_rel)
             from public.products where id = v_acc);
 end $$;

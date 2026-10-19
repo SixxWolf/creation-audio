@@ -68,5 +68,29 @@ window.CA = window.CA || {};
     return m ? num(kind === 'refill' ? m.cost_refill : m.cost_spool) : null;
   }
 
-  window.CA.costing = { avg: avg, round2: round2, costOf: costOf, materialAvg: materialAvg };
+  /* Coût d'une bobine vide (accessoire lié par materials.empty_spool_id) — 2026-10-19.
+     La production paie la bobine au complet ; la bobine vide n'a de coût qu'à la vente =
+     ce que Théo dépensera de plus en rachetant une bobine au lieu d'une recharge. Calculé en
+     base (admin_empty_spool_costs) : écart bobine − recharge de la commande reçue la plus
+     récente qui contient les deux formats d'un même matériau (prix de la même époque).
+     loadEmptyCosts() remplit le cache ; emptySpoolCost(acc) -> coût, ou null si ce n'est pas
+     une bobine vide (ou cache pas encore chargé). */
+  var emptyCosts = null, emptyLoading = null;
+  function loadEmptyCosts(force) {
+    if (emptyLoading && !force) return emptyLoading;
+    var sb = window.CA.sb;
+    if (!sb || !sb.rpc) return Promise.resolve(emptyCosts);
+    emptyLoading = Promise.resolve(sb.rpc('admin_empty_spool_costs')).then(function (res) {
+      if (res && !res.error && res.data && typeof res.data === 'object') emptyCosts = res.data;
+      return emptyCosts;
+    }, function () { emptyLoading = null; return emptyCosts; });
+    return emptyLoading;
+  }
+  function emptySpoolCost(acc) {
+    var id = acc && (acc.id != null ? acc.id : acc);
+    if (id == null || !emptyCosts || !Object.prototype.hasOwnProperty.call(emptyCosts, String(id))) return null;
+    return num(emptyCosts[String(id)]);
+  }
+
+  window.CA.costing = { avg: avg, round2: round2, costOf: costOf, materialAvg: materialAvg, emptySpoolCost: emptySpoolCost, loadEmptyCosts: loadEmptyCosts };
 })();

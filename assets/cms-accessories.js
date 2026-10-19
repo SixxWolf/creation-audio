@@ -59,8 +59,14 @@
     });
     return out;
   }
-  // coût réel : coût moyen pondéré des réceptions (attrs.avg_cost.item), sinon coût saisi
+  // bobine vide liée à un matériau : bobine − recharge aux prix du jour (cms-costing.js), sinon null
+  function emptyCost(r) {
+    return r && window.CA.costing && window.CA.costing.emptySpoolCost ? window.CA.costing.emptySpoolCost(r) : null;
+  }
+  // coût réel : bobine vide (calculé), sinon coût moyen pondéré des réceptions (attrs.avg_cost.item), sinon coût saisi
   function costOf(r) {
+    var ev = emptyCost(r);
+    if (ev != null) return ev;
     var ac = attrsOf(r).avg_cost, v = ac && ac.item;
     return (v != null && v !== '') ? +v : (+r.cost_price || 0);
   }
@@ -70,7 +76,7 @@
   var editor = $('#ac-editor'), editorTitle = $('#ac-editor-title'),
       fileInput = $('#ac-file'), galleryEl = $('#ac-gallery'), galleryAdd = $('#ac-gallery-add'),
       nameI = $('#ac-name'), catI = $('#ac-cat'), catList = $('#ac-cat-list'), descI = $('#ac-desc'),
-      priceI = $('#ac-price'), costI = $('#ac-cost'), marginEl = $('#ac-margin'), qtyI = $('#ac-qty'),
+      priceI = $('#ac-price'), costI = $('#ac-cost'), costLbl = $('label[for="ac-cost"]'), marginEl = $('#ac-margin'), qtyI = $('#ac-qty'),
       tiersEl = $('#ac-tiers'), tierAdd = $('#ac-tier-add'),
       activeI = $('#ac-active'), onFilI = $('#ac-onfil'), stockOnlyI = $('#ac-stockonly'), brandsEl = $('#ac-brands'),
       linksEl = $('#ac-fiche-links'), longDescI = $('#ac-long-desc'), specsEl = $('#ac-specs'), specAdd = $('#ac-spec-add'),
@@ -257,7 +263,11 @@
     catI.value = row ? catOf(row) : '';
     descI.value = a.description || '';
     priceI.value = row && row.sell_price != null ? row.sell_price : '';
-    costI.value = row && row.cost_price != null ? row.cost_price : '';
+    // bobine vide : coût calculé (lecture seule) ; enregistré comme dernier coût connu
+    var ev = emptyCost(row);
+    costI.value = ev != null ? ev.toFixed(2) : (row && row.cost_price != null ? row.cost_price : '');
+    costI.readOnly = ev != null;
+    if (costLbl) costLbl.textContent = ev != null ? 'Coût actuel' : 'Coût payé';
     qtyI.value = row && row.qty != null ? row.qty : 0;
     tiersEl.innerHTML = '';
     normalizeTiers(row ? row.tiers : []).forEach(function (t) { addTierRow(t.min, t.price); });
@@ -355,9 +365,13 @@
   /* ---- liste (groupée par catégorie) ---- */
   function load() {
     listEl.innerHTML = '<p class="muted">Chargement…</p>';
-    return sb.from('products').select('*').eq('type', TYPE)
-      .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
-      .then(function (res) {
+    // coût du jour des bobines vides (cms-costing.js) — un échec n'empêche pas la liste
+    var extra = window.CA.costing && window.CA.costing.loadEmptyCosts
+      ? window.CA.costing.loadEmptyCosts(true).then(null, function () {}) : null;
+    return Promise.all([sb.from('products').select('*').eq('type', TYPE)
+      .order('sort_order', { ascending: true }).order('created_at', { ascending: true }), extra])
+      .then(function (all) {
+        var res = all[0];
         if (res.error) {
           listEl.innerHTML = '<p class="empty">Impossible de charger.<br>Si c\'est la première fois, exécute ' +
             '<strong>supabase/schema-v2.sql</strong> dans Supabase.</p>';
