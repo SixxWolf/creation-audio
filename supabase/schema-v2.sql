@@ -2803,11 +2803,10 @@ grant execute on function public.admin_delete_production(uuid) to authenticated;
 -- Les bobines vides (accessoires « Bobines vides ») ne viennent que des bobines
 -- que Théo vide lui-même. Lien dans la fiche du matériau (materials.empty_spool_id).
 -- Coût (révisé le 2026-10-19) : la production paie la bobine au complet ; la bobine
--- vide n'a de coût qu'à la vente = prix bobine − prix recharge du jour, calculé dans
--- l'admin (CA.costing.emptySpoolCost) et figé sur la ligne de facture. Les libérations
--- ne portent donc plus de valeur (unit_cost 0) et ne touchent plus attrs.avg_cost.
--- (_empty_value / _empty_recost / production_spools.empty_cost : restes de l'ancien
--- calcul, plus appelés.)
+-- vide n'a de coût qu'à la vente = prix bobine − prix recharge du jour
+-- (admin_empty_spool_costs, lu par CA.costing.emptySpoolCost) et figé sur la ligne de
+-- facture. Les libérations ne portent donc plus de valeur (unit_cost 0) et ne touchent
+-- plus attrs.avg_cost. (production_spools.empty_cost : reste de l'ancien calcul, plus écrit.)
 -- « À libérer » : bobines terminées en production (empty_state null) + bobines (pas
 -- les recharges) des factures Interne depuis le 2026-10-12. Rien n'entre au stock
 -- sans confirmation : admin_release_empty (combien libérer / garder).
@@ -2886,28 +2885,8 @@ returns jsonb language sql stable security definer set search_path = '' as $$
 $$;
 revoke all on function public._empty_internal(uuid) from public, anon, authenticated;
 
--- Coût moyen de la bobine vide : stock de départ (coût saisi) + bobines libérées.
-create or replace function public._empty_recost(p_acc uuid)
-returns void language plpgsql security definer set search_path = '' as $$
-declare v_seed jsonb; v_q numeric := 0; v_c numeric := 0; v_mq numeric; v_mc numeric;
-begin
-  select coalesce(sum(n), 0), coalesce(sum(n * unit_cost), 0) into v_mq, v_mc
-    from public.empty_spool_moves where accessory_id = p_acc and action = 'released';
-  if v_mq = 0 then
-    update public.products set attrs = attrs - 'avg_cost' - 'empty_seed', updated_at = now() where id = p_acc;
-    return;
-  end if;
-  select attrs -> 'empty_seed' into v_seed from public.products where id = p_acc;
-  if v_seed is not null then
-    v_q := greatest(0, coalesce((v_seed ->> 'qty')::numeric, 0));
-    v_c := v_q * greatest(0, coalesce((v_seed ->> 'cost')::numeric, 0));
-  end if;
-  update public.products
-     set attrs = jsonb_set(attrs, '{avg_cost}', jsonb_build_object('item', round((v_c + v_mc) / (v_q + v_mq), 2))),
-         updated_at = now()
-   where id = p_acc;
-end $$;
-revoke all on function public._empty_recost(uuid) from public, anon, authenticated;
+-- Coût moyen de la bobine vide (libérations) : retiré le 2026-10-19, le coût se calcule à la vente.
+drop function if exists public._empty_recost(uuid);
 
 -- Coût du jour de chaque bobine vide (2026-10-19) -> { "<accessory_id>": coût }.
 -- = écart bobine − recharge de la COMMANDE REÇUE la plus récente qui contient les deux
