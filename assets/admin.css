@@ -28,6 +28,7 @@
   --ic-play:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M7 4.6v14.8a1 1 0 0 0 1.5.86l12.2-7.4a1 1 0 0 0 0-1.72L8.5 3.74A1 1 0 0 0 7 4.6z'/%3E%3C/svg%3E");
   --ic-download:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V3'/%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3C/svg%3E");
   --ic-print:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6'/%3E%3Crect x='6' y='14' width='12' height='8' rx='1'/%3E%3C/svg%3E");
+  --ic-send:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 2 11 13'/%3E%3Cpath d='M22 2 15 22l-4-9-9-4z'/%3E%3C/svg%3E");
   --ic-mail:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='4' width='20' height='16' rx='2'/%3E%3Cpath d='m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7'/%3E%3C/svg%3E");
   --ic-copy:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='8' y='8' width='14' height='14' rx='2'/%3E%3Cpath d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/%3E%3C/svg%3E");
   --ic-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
@@ -296,6 +297,7 @@ body[data-tab="production"] main { max-width:none; }   /* essai grand écran (20
 .btn[data-ic="play"] { --ic:var(--ic-play); }
 .btn[data-ic="download"] { --ic:var(--ic-download); }
 .btn[data-ic="mail"] { --ic:var(--ic-mail); }
+.btn[data-ic="send"] { --ic:var(--ic-send); }
 .btn[data-ic="check"] { --ic:var(--ic-check); }
 .btn[data-ic="refresh"] { --ic:var(--ic-refresh); }
 .btn[data-ic="scan"] { --ic:var(--ic-scan); }
@@ -1596,6 +1598,26 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
    ========================================================= */
 .pr-spools, .pr-cols { margin-bottom:18px; }
 .pr-empty { margin:8px 0 2px; font-size:.88rem; }
+/* En impression : file des batchs envoyés (AutoLoop ou glissés), barre = temps écoulé */
+.pr-queue { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+.pr-q { padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--wash); }
+.pr-q.is-on { border-color:var(--ember); box-shadow:0 0 0 1px var(--ember) inset; }
+.pr-q-top { display:flex; align-items:baseline; gap:10px; min-width:0; }
+.pr-q-name { flex:1 1 auto; min-width:0; overflow-wrap:anywhere; }
+.pr-q-n { flex:none; font-weight:600; font-variant-numeric:tabular-nums; }
+.pr-q-sub { display:flex; align-items:center; gap:4px; margin-top:3px; font-size:.86rem; color:var(--muted); min-width:0; }
+.pr-q-sub span:last-child { margin-left:4px; min-width:0; }
+.pr-q-sub .pr-sw { width:12px; height:12px; }
+.pr-q-bar { height:6px; margin:9px 0 7px; border-radius:99px; background:var(--line); overflow:hidden; }
+.pr-q-bar i { display:block; height:100%; border-radius:inherit; background:var(--ember); transition:width .4s; }
+.pr-q.is-end .pr-q-bar i { background:var(--good); }
+.pr-q-foot { display:flex; align-items:center; gap:8px; font-size:.86rem; }
+.pr-q-t { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.pr-q.is-end .pr-q-t { color:var(--good); font-weight:600; }
+.pr-q-on { color:var(--ember-ink, var(--ember)); font-weight:600; white-space:nowrap; }
+.pr-q-x { flex:none; width:28px; height:28px; border:0; border-radius:6px; background:none; color:var(--muted); cursor:pointer; font-size:.9rem; }
+.pr-q-x:hover { background:var(--wash-2); color:var(--bad); }
+.pr-drop-sm { padding:16px 12px; }
 .pr-sw { display:inline-block; flex:none; width:16px; height:16px; border-radius:50%; border:1px solid color-mix(in srgb, var(--ink) 18%, transparent); vertical-align:-3px; }
 
 /* bobines en production */

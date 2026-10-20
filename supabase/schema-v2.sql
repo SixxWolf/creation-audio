@@ -3046,6 +3046,34 @@ revoke all on function public.admin_empty_undo(uuid) from public, anon;
 grant execute on function public.admin_empty_undo(uuid) to authenticated;
 
 -- ------------------------------------------------------------
+-- PRODUCTION — FILE « EN IMPRESSION » (2026-10-20)
+-- Batchs AutoLoop envoyés à la production (bouton AutoLoop ou glisser dans
+-- Stock › Production) : ce qui tourne en ce moment. Seulement les infos lues
+-- dans l'en-tête (aucun fichier stocké). « Terminé » charge la ligne dans le
+-- formulaire de production ; l'enregistrement la retire.
+-- info = { isAuto, loops, minutes, objects, fils: [{ type, hex, perLoop }] }
+-- ------------------------------------------------------------
+create table if not exists public.production_queue (
+  id          uuid primary key default gen_random_uuid(),
+  file_name   text not null default '',
+  spacer_id   uuid references public.products(id) on delete set null,
+  loops       integer not null default 1,
+  per_plate   integer not null default 1,
+  pieces      integer not null default 0,
+  minutes     integer not null default 0,
+  info        jsonb not null default '{}'::jsonb,
+  started_at  timestamptz not null default now(),
+  created_at  timestamptz not null default now()
+);
+create index if not exists production_queue_started_idx on public.production_queue (started_at);
+create index if not exists production_queue_spacer_idx  on public.production_queue (spacer_id);
+alter table public.production_queue enable row level security;
+drop policy if exists production_queue_admin_all on public.production_queue;
+create policy production_queue_admin_all on public.production_queue for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.production_queue from anon;
+
+-- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
 select count(*) as produits_v2 from public.products;

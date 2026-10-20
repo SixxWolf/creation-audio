@@ -826,6 +826,7 @@
   function resetOutput() {
     outText = ''; outBatch = null; lastRep = null;
     $('#al-download').disabled = true;
+    syncSend(false);
     renderReport(null);
     syncDownloadLabel();
   }
@@ -867,10 +868,12 @@
           outName = project ? projectOutName(opts.loops) : 'plate_1.gcode';
           outBatch = { loops: opts.loops, predictionSec: res.report.progress ? res.report.totalMin * 60 : 0 };
           $('#al-download').disabled = false;
+          syncSend(true);
         } else {
           lastRep = null;
           renderReport(res.report);
           $('#al-download').disabled = true;
+          syncSend(false);
         }
       } catch (err) {
         $('#al-report').innerHTML = '<p class="al-warn">Erreur de génération : ' + (err && err.message ? err.message : err) + '</p>';
@@ -909,6 +912,27 @@
     }, 30);
   }
 
+  // « Envoyer à la production » : le batch entre dans Stock › Production › En impression
+  // (infos de l'en-tête seulement, via CA.prodQueue de cms-production.js). Un envoi par batch généré.
+  function syncSend(on) {
+    var b = $('#al-send-prod'); if (!b) return;
+    b.disabled = !on || !(window.CA && window.CA.prodQueue);
+    b.textContent = 'Envoyer à la production';   // icône : data-ic="send"
+  }
+  function sendToProd() {
+    if (!outText || !outBatch || !(window.CA && window.CA.prodQueue)) return;
+    var btn = $('#al-send-prod');
+    var name = project ? outName : (rawName.replace(/\.gcode$/i, '') || 'plateau') + ' AutoLoop x' + outBatch.loops + '.gcode';
+    btn.disabled = true; btn.textContent = 'Envoi…';
+    window.CA.prodQueue.addText(name, outText, project, plateName).then(function () {
+      btn.textContent = 'Envoyé à la production';
+    }, function (err) {
+      syncSend(true);
+      $('#al-report').insertAdjacentHTML('afterbegin', '<p class="al-warn">Envoi impossible : ' +
+        esc(err && err.message ? err.message : err) + '</p>');
+    });
+  }
+
   function initGcode() {
     var drop = $('#al-drop'), fileInput = $('#al-file');
     if (!drop) return;
@@ -944,6 +968,7 @@
 
     $('#al-process').addEventListener('click', runGenerate);
     $('#al-download').addEventListener('click', download);
+    if ($('#al-send-prod')) $('#al-send-prod').addEventListener('click', sendToProd);
     // Rapport (re-rendu à chaque fois) : « gcode seul » et « Détail du prix → ».
     $('#al-report').addEventListener('click', function (e) {
       var t = e.target;

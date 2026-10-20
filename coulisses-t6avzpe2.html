@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=92">
+<link rel="stylesheet" href="assets/admin.css?v=93">
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
@@ -757,7 +757,7 @@
       <div class="panel-head">
         <div>
           <h1>Production</h1>
-          <p class="muted">Glisse le G-code d'AutoLoop : le stock et le coût des spacers suivent.</p>
+          <p class="muted">Envoie le batch depuis AutoLoop : le stock et le coût des spacers suivent.</p>
         </div>
       </div>
 
@@ -819,13 +819,14 @@
       <div class="al-cols pr-cols">
         <div class="al-main">
           <div class="al-card">
-            <div class="al-card-head"><span class="al-ic al-step">1</span> G-code AutoLoop</div>
-            <div class="al-drop" id="pr-drop" role="button" tabindex="0">
+            <div class="al-card-head"><span class="al-ic al-step">1</span> En impression <span class="al-note" id="pr-queue-n"></span></div>
+            <div class="pr-queue" id="pr-queue" hidden></div>
+            <div class="al-drop pr-drop-sm" id="pr-drop" role="button" tabindex="0">
               <div class="al-drop-ic">＋</div>
-              <p class="al-drop-t">Glisse le batch AutoLoop (<b>.gcode.3mf</b> ou <b>.gcode</b>) ici, ou clique pour choisir</p>
-              <p class="al-drop-s" id="pr-file-name">AutoLoop › Télécharger le gcode</p>
+              <p class="al-drop-t">Glisse les batchs AutoLoop (<b>.gcode.3mf</b> ou <b>.gcode</b>) ici, ou clique pour choisir</p>
+              <p class="al-drop-s">ou AutoLoop › Envoyer à la production</p>
             </div>
-            <input type="file" id="pr-file" accept=".3mf,.gcode,.txt,.g,text/plain" hidden>
+            <input type="file" id="pr-file" accept=".3mf,.gcode,.txt,.g,text/plain" multiple hidden>
             <p class="al-caution" id="pr-file-warn" role="status" hidden></p>
           </div>
 
@@ -1652,6 +1653,7 @@
               <div class="al-run">
                 <button class="btn btn-accent" id="al-process" type="button" disabled data-ic="play">Générer le batch</button>
                 <button class="btn btn-ghost" id="al-download" type="button" disabled data-ic="download">Télécharger le gcode</button>
+                <button class="btn btn-ghost" id="al-send-prod" type="button" disabled data-ic="send">Envoyer à la production</button>
               </div>
               <div id="al-report"><p class="muted">Aucun batch généré.</p></div>
             </div>
@@ -2023,8 +2025,8 @@
 <script src="assets/cms-statistiques.js?v=10"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
-<script src="assets/cms-autoloop.js?v=44"></script>
-<script src="assets/cms-production.js?v=9"></script>
+<script src="assets/cms-autoloop.js?v=45"></script>
+<script src="assets/cms-production.js?v=10"></script>
 <script src="assets/cms-aujourdhui.js?v=1"></script>
 <script src="assets/cms-recherche.js?v=1"></script>
 </body>

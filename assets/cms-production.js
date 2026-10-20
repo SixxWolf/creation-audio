@@ -4,7 +4,9 @@
       « sortie » pour imprimer (RPC admin_take_spool : −1 au stock, prix payé
       figé, 1000 g par défaut). Grammes restants = poids − Σ productions.
       Retirer (jamais utilisée) la remet au stock ; Terminer la range.
-   2) PRODUCTION : on glisse le batch sorti d'AutoLoop (.gcode.3mf ou .gcode).
+   2) EN IMPRESSION → PRODUCTION : le batch sorti d'AutoLoop (.gcode.3mf ou .gcode)
+      entre dans la file production_queue (AutoLoop › « Envoyer à la production »
+      ou glissé ici) ; « Terminé » le charge dans le formulaire.
       Lu dans l'en-tête : loops (« ; === LOOP 1 OF N === »), durée du batch
       (« Durée estimée du batch », cooldown compris), grammes par filament
       (déjà × loops), type + couleur de chaque filament (pré-choix des bobines).
@@ -164,7 +166,7 @@
     takeCost: $('#pr-take-cost'), takeWeight: $('#pr-take-weight'), takeSave: $('#pr-take-save'),
     takeCancel: $('#pr-take-cancel'), takeStatus: $('#pr-take-status'),
     spools: $('#pr-spools'), doneWrap: $('#pr-done-wrap'), doneN: $('#pr-done-n'), done: $('#pr-done'),
-    drop: $('#pr-drop'), file: $('#pr-file'), fileName: $('#pr-file-name'), fileWarn: $('#pr-file-warn'),
+    drop: $('#pr-drop'), file: $('#pr-file'), fileWarn: $('#pr-file-warn'), queue: $('#pr-queue'), qN: $('#pr-queue-n'),
     spacer: $('#pr-spacer'), loops: $('#pr-loops'), perPlate: $('#pr-per-plate'), good: $('#pr-good'),
     timeH: $('#pr-time-h'), timeM: $('#pr-time-m'), date: $('#pr-date'),
     uses: $('#pr-uses'), useAdd: $('#pr-use-add'),
@@ -187,10 +189,10 @@
   function loadAll() {
     return Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : null,
-      loadSpacers(), loadFilaments(), loadSpools(), loadProds(), loadRates(), loadBrandOrder(), loadEmpties()
+      loadSpacers(), loadFilaments(), loadSpools(), loadProds(), loadRates(), loadBrandOrder(), loadEmpties(), loadQueue()
     ]).then(function () {
       sortAll();
-      renderSpools(); renderEmpties(); renderTakeOptions(); renderSpacerOptions(); renderRows(); recalc(); renderHistory();
+      renderSpools(); renderEmpties(); renderTakeOptions(); renderSpacerOptions(); renderRows(); recalc(); renderHistory(); renderQueue();
     }, function (err) {
       el.spools.innerHTML = '<p class="empty">Impossible de charger : ' + esc(errText(err)) + '</p>';
     });
@@ -660,49 +662,158 @@
   });
 
   /* =========================================================
-     2) PRODUCTION — lecture du G-code
+     2) EN IMPRESSION — file des batchs lancés : AutoLoop › « Envoyer à la
+        production » (CA.prodQueue) ou glissés ici, plusieurs d'un coup.
+        Seulement les infos de l'en-tête (aucun fichier stocké) ; progression
+        = temps écoulé depuis l'envoi / durée du batch. « Terminé » charge le
+        batch dans le formulaire ; l'enregistrement le retire de la file.
      ========================================================= */
+  var queue = [];           // production_queue, plus ancien d'abord
+  var fromQueue = null;     // id de la ligne chargée dans le formulaire
+  function pickFiles(list) { Array.prototype.slice.call(list || []).forEach(readFile); }
   el.drop.addEventListener('click', function () { el.file.click(); });
   el.drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.file.click(); } });
-  el.file.addEventListener('change', function () { if (el.file.files[0]) readFile(el.file.files[0]); el.file.value = ''; });
+  el.file.addEventListener('change', function () { pickFiles(el.file.files); el.file.value = ''; });
   el.drop.addEventListener('dragover', function (e) { e.preventDefault(); el.drop.classList.add('drag'); });
   el.drop.addEventListener('dragleave', function () { el.drop.classList.remove('drag'); });
   el.drop.addEventListener('drop', function (e) {
     e.preventDefault(); el.drop.classList.remove('drag');
-    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) readFile(f);
+    pickFiles(e.dataTransfer && e.dataTransfer.files);
   });
 
   var HEAD_BYTES = 3 * 1024 * 1024;   // en-tête + bloc de config : largement dans les 3 premiers Mo
   function decodeHead(u8) { return new TextDecoder('utf-8').decode(u8.subarray(0, Math.min(u8.length, HEAD_BYTES))); }
   function readFile(f) {
-    el.fileName.textContent = 'Lecture de ' + f.name + '…';
     var reader = new FileReader();
     reader.onload = function (e) {
-      try {
-        var u8 = new Uint8Array(e.target.result), head, objects = 0;
-        if (window.ALProject && window.ALProject.isZip(u8)) {
-          var proj = window.ALProject.read(u8);
-          if (!proj.plates.length) throw new Error('Ce .3mf ne contient pas de plateau tranché.');
-          // le plateau bouclé par AutoLoop (sinon le premier)
-          var plate = proj.plates.filter(function (p) {
-            return decodeHead(proj.entries[p.name].subarray(0, 2048)).indexOf('Batch généré par AutoLoop') !== -1;
-          })[0] || proj.plates[0];
-          head = decodeHead(proj.entries[plate.name]);
-          objects = countObjects(proj.entries['Metadata/slice_info.config'], plate.n);
-        } else head = decodeHead(u8);
-        useFile(f.name, parseGcode(head), objects);
-      } catch (err) {
-        fileError(errText(err));
-      }
+      var r;
+      try { r = parseBytes(new Uint8Array(e.target.result)); }
+      catch (err) { toast(f.name + ' : ' + errText(err), 'bad'); return; }
+      enqueue(f.name, r.info, r.objects).catch(function (err) { toast('Erreur : ' + errText(err), 'bad'); });
     };
-    reader.onerror = function () { fileError('Impossible de lire ce fichier.'); };
+    reader.onerror = function () { toast(f.name + ' : impossible de lire ce fichier.', 'bad'); };
     reader.readAsArrayBuffer(f);
   }
-  function fileError(msg) {
-    el.drop.classList.remove('has-file');
-    el.fileName.textContent = 'AutoLoop › Télécharger le gcode';
-    el.fileWarn.textContent = msg; el.fileWarn.hidden = false;
+  function parseBytes(u8) {
+    var head, objects = 0;
+    if (window.ALProject && window.ALProject.isZip(u8)) {
+      var proj = window.ALProject.read(u8);
+      if (!proj.plates.length) throw new Error('ce .3mf ne contient pas de plateau tranché.');
+      // le plateau bouclé par AutoLoop (sinon le premier)
+      var plate = proj.plates.filter(function (p) {
+        return decodeHead(proj.entries[p.name].subarray(0, 2048)).indexOf('Batch généré par AutoLoop') !== -1;
+      })[0] || proj.plates[0];
+      head = decodeHead(proj.entries[plate.name]);
+      objects = countObjects(proj.entries['Metadata/slice_info.config'], plate.n);
+    } else head = decodeHead(u8);
+    return { info: parseGcode(head), objects: objects };
+  }
+
+  // Spacers + productions requis pour deviner le spacer (envoi depuis AutoLoop avant d'ouvrir l'onglet)
+  var baseP = null;
+  function ensureBase() {
+    if (spacers.length) return Promise.resolve();
+    return baseP || (baseP = Promise.all([loadSpacers(), loadProds()]).then(function () { baseP = null; }, function (e) { baseP = null; throw e; }));
+  }
+  function perPlateOf(sp, objects) {
+    var last = sp ? prods.filter(function (p) { return String(p.spacer_id) === String(sp.id); })[0] : null;
+    return Math.max(1, (last ? last.per_plate : (objects > 0 ? objects : 1)) | 0);
+  }
+  function enqueue(name, info, objects) {
+    return ensureBase().then(function () {
+      var sp = detectSpacer(name), per = perPlateOf(sp, objects);
+      return sb.from('production_queue').insert({
+        file_name: name, spacer_id: sp ? sp.id : null, loops: info.loops, per_plate: per,
+        pieces: info.loops * per, minutes: info.minutes,
+        info: { isAuto: info.isAuto, loops: info.loops, minutes: info.minutes, objects: objects || 0, fils: info.fils }
+      }).select().single();
+    }).then(function (res) {
+      if (res.error) throw res.error;
+      queue.push(res.data); renderQueue();
+      toast('En impression · ' + name);
+      return res.data;
+    });
+  }
+  // Envoi direct depuis AutoLoop : texte du batch (+ projet .3mf pour compter les objets du plateau)
+  window.CA.prodQueue = {
+    addText: function (name, text, proj, plateName) {
+      var objects = 0;
+      if (proj && proj.plates) {
+        var pl = proj.plates.filter(function (p) { return p.name === plateName; })[0];
+        if (pl) objects = countObjects(proj.entries['Metadata/slice_info.config'], pl.n);
+      }
+      return enqueue(name, parseGcode(String(text).slice(0, HEAD_BYTES)), objects);
+    }
+  };
+
+  function loadQueue() {
+    return sb.from('production_queue').select('*').order('started_at', { ascending: true })
+      .then(function (res) { queue = res.error ? [] : (res.data || []); }, function () { queue = []; });
+  }
+  function qProgress(j) {
+    var tot = (+j.minutes || 0) * 60000;
+    if (!tot) return { pct: null, txt: 'Durée inconnue' };
+    var done = Date.now() - new Date(j.started_at).getTime(), pct = Math.max(0, Math.min(1, done / tot));
+    if (pct >= 1) return { pct: 1, txt: 'Fini', end: true };
+    return { pct: pct, txt: Math.floor(pct * 100) + ' % · reste ' + fmtHm(Math.ceil((tot - done) / 60000)) };
+  }
+  function queueItem(j) {
+    var sp = spacerById(j.spacer_id), fils = (j.info && j.info.fils) || [], pr = qProgress(j);
+    var g = fils.reduce(function (s, f) { return s + (+f.perLoop || 0) * (j.loops || 1); }, 0);
+    var sub = [sp ? sp.name : 'Spacer à choisir', j.loops + ' loop' + (j.loops > 1 ? 's' : ''), grams(g)];
+    var sw = fils.map(function (f) { return swatch(f.hex); }).join('');
+    var on = String(fromQueue) === String(j.id);
+    return '<div class="pr-q' + (pr.end ? ' is-end' : '') + (on ? ' is-on' : '') + '" data-id="' + esc(j.id) + '">' +
+      '<div class="pr-q-top"><b class="pr-q-name" title="' + esc(j.file_name) + '">' + esc(j.file_name) + '</b>' +
+        '<span class="pr-q-n">' + (j.pieces | 0) + ' adaptateur' + ((j.pieces | 0) > 1 ? 's' : '') + '</span></div>' +
+      '<div class="pr-q-sub">' + sw + '<span>' + esc(sub.join(' · ')) + '</span></div>' +
+      '<div class="pr-q-bar"' + (pr.pct == null ? ' hidden' : '') + '><i style="width:' + ((pr.pct || 0) * 100).toFixed(1) + '%"></i></div>' +
+      '<div class="pr-q-foot"><span class="pr-q-t">' + esc(pr.txt) + '</span><span class="grow"></span>' +
+        (on ? '<span class="pr-q-on">Dans le formulaire</span>'
+            : '<button class="btn btn-ghost btn-sm" type="button" data-act="done" data-ic="check">Terminé</button>') +
+        '<button class="pr-q-x" type="button" data-act="del" title="Retirer de la file" aria-label="Retirer de la file">✕</button></div>' +
+    '</div>';
+  }
+  function renderQueue() {
+    el.qN.textContent = queue.length ? '(' + queue.length + ')' : '';
+    el.queue.innerHTML = queue.map(queueItem).join('');
+    el.queue.hidden = !queue.length;
+  }
+  // barres : rafraîchies chaque minute, seulement quand l'onglet est visible
+  setInterval(function () {
+    if (!queue.length || !el.queue.offsetParent) return;
+    queue.forEach(function (j) {
+      var it = el.queue.querySelector('.pr-q[data-id="' + j.id + '"]'); if (!it) return;
+      var pr = qProgress(j), bar = it.querySelector('.pr-q-bar i');
+      if (bar) bar.style.width = ((pr.pct || 0) * 100).toFixed(1) + '%';
+      it.querySelector('.pr-q-t').textContent = pr.txt;
+      it.classList.toggle('is-end', !!pr.end);
+    });
+  }, 60000);
+  el.queue.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b) return;
+    var it = b.closest('.pr-q'), id = it && it.getAttribute('data-id');
+    var j = queue.filter(function (x) { return String(x.id) === String(id); })[0]; if (!j) return;
+    if (b.getAttribute('data-act') === 'done') { loadJob(j); return; }
+    caDialog.confirm({ title: 'Retirer de la file ?', message: j.file_name + ' — rien n\'est ajouté au stock.', ok: 'Retirer' }).then(function (ok) {
+      if (!ok) return;
+      sb.from('production_queue').delete().eq('id', j.id).then(function (res) {
+        if (res.error) { caDialog.error(res.error); return; }
+        queue = queue.filter(function (x) { return x !== j; });
+        if (String(fromQueue) === String(j.id)) fromQueue = null;
+        renderQueue();
+      });
+    });
+  });
+  // « Terminé » : le batch passe dans le formulaire (pièces bonnes, bobines) avant l'enregistrement
+  function loadJob(j) {
+    var info = j.info || {};
+    fromQueue = j.id;
+    useFile(j.file_name, { isAuto: info.isAuto !== false, loops: j.loops, minutes: j.minutes, fils: info.fils || [] }, info.objects || 0);
+    if (j.spacer_id && spacerById(j.spacer_id)) spacerPk.set(j.spacer_id);
+    el.perPlate.value = Math.max(1, j.per_plate | 0);
+    syncGood(); recalc(); renderQueue();
+    var form = el.spacer.closest('.al-card'); if (form && form.scrollIntoView) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   // Nombre d'objets du plateau (slice_info.config) : pièces par plateau à défaut d'historique
   function countObjects(u8, plateN) {
@@ -758,10 +869,6 @@
     if (!info.fils.length) warn.push('Poids de filament introuvable dans l\'en-tête.');
     el.fileWarn.textContent = warn.join(' ');
     el.fileWarn.hidden = !warn.length;
-    var tot = info.fils.reduce(function (s, f) { return s + f.perLoop * info.loops; }, 0);
-    el.drop.classList.add('has-file');
-    el.fileName.textContent = name + ' · ' + info.loops + ' loop' + (info.loops > 1 ? 's' : '') + ' · ' + grams(tot) +
-      (info.minutes ? ' · ' + fmtHm(info.minutes) : '');
     el.loops.value = info.loops; lastLoops = info.loops;
     el.timeH.value = Math.floor(info.minutes / 60); el.timeM.value = info.minutes % 60;
     var guess = detectSpacer(name);
@@ -1032,7 +1139,7 @@
     else if (!r.used.length) problem = 'Indique la bobine utilisée.';
     el.save.disabled = !r.sp || !r.used.length || !!r.missing || saving;
     el.status.textContent = problem;
-    if (!file && !rows.length) { el.report.innerHTML = '<p class="muted">Glisse un G-code pour commencer.</p>'; return; }
+    if (!file && !rows.length) { el.report.innerHTML = '<p class="muted">« Terminé » sur un batch en impression pour commencer.</p>'; return; }
     var html = '';
     html += srow('Filament <em>' + grams(r.g) + '</em>', money(r.fil));
     html += srow('Électricité + usure <em>' + fmtHm(r.minutes) + ' × ' + money(r.rate) + '/h</em>', money(r.mach));
@@ -1068,9 +1175,13 @@
       var d = res.data || {};
       toast('Production enregistrée · ' + (d.pairs | 0) + ' paire' + ((d.pairs | 0) > 1 ? 's' : ''));
       file = null; rows = []; edited = { good: false, perPlate: false };
-      el.drop.classList.remove('has-file');
-      el.fileName.textContent = 'AutoLoop › Télécharger le gcode';
       el.fileWarn.hidden = true;
+      // batch confirmé : sort de la file « En impression »
+      if (fromQueue) {
+        var qid = fromQueue; fromQueue = null;
+        queue = queue.filter(function (x) { return String(x.id) !== String(qid); }); renderQueue();
+        sb.from('production_queue').delete().eq('id', qid).then(function (r2) { if (r2.error) toast('File : ' + r2.error.message, 'bad'); });
+      }
       el.timeH.value = 0; el.timeM.value = 0; el.loops.value = 1; lastLoops = 1;
       reloadAfterChange();
     }, function (err) { saving = false; el.save.disabled = false; el.status.textContent = 'Erreur : ' + errText(err); });
