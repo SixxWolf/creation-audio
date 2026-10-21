@@ -9,8 +9,10 @@
    - Connecté : envoi direct ; liste de ses conversations ; fil + réponse.
    - Photos : 4 max, réduites à 1600 px (JPEG) dans le navigateur, téléversées
      dans le bucket privé « messages » (<uid>/<uuid>.jpg), lues par URL signée.
-   - Après chaque envoi : Edge Function message-notify (avis courriel à l'admin).
-   - Fil ouvert : actualisé toutes les 10 s (page visible).
+   - Courriels différés (tick pg_cron + Edge Function message-notify) : rien
+     n'est appelé à l'envoi ; un message resté non lu 5 min déclenche l'avis.
+   - Fil ouvert : actualisé toutes les 10 s (page visible) — vaut lecture et
+     présence ; l'en-tête montre « En ligne » quand l'admin est dans le fil.
    API : CA.msg.open({ topic, ref, body, conv, list }) · CA.msg.close()
    Événement « ca:msg-change » sur document après un envoi (compte.html s'y abonne).
    Démo : CA.compte (faux client Supabase) / CA.compteFn (fausse Edge Function).
@@ -105,10 +107,6 @@
       if (res.error) { var e = new Error(res.error.message || 'Erreur'); e.code = res.error.code; throw e; }
       return res.data;
     });
-  }
-  function notify(messageId) {
-    var c = sb();
-    if (c && c.functions && messageId) c.functions.invoke('message-notify', { body: { message_id: messageId } }).then(null, function () {});
   }
   function markSignedIn(on) { $$('.home-account').forEach(function (a) { a.classList.toggle('is-in', !!on); }); }
 
@@ -242,6 +240,7 @@
   }
   function head(title, sub, back) {
     titleEl.textContent = title; subEl.textContent = sub || ''; subEl.hidden = !sub;
+    subEl.classList.remove('is-online');
     backBtn.hidden = !back;
   }
   function say(el, text, cls) { if (!el) return; el.textContent = text || ''; el.className = 'msg-status' + (cls ? ' ' + cls : ''); }
@@ -414,7 +413,6 @@
       return rpc('msg_start', { p_topic: d.topic, p_ref: d.ref || null, p_page: location.pathname, p_body: d.body, p_photos: paths });
     }).then(function (r) {
       st.busy = false; if (btn) btn.disabled = false;
-      notify(r.message_id);
       clearPhotos(); clearDraft(); st.ctx = { topic: '', ref: '', body: '' };
       changed();
       return loadConvs().then(function () { showThread(r.conversation_id, 'Envoyé. On te répond ici et par courriel.'); });
@@ -560,7 +558,7 @@
         return rpc('msg_send', { p_conv: id, p_body: body, p_photos: paths });
       }).then(function (r) {
         st.busy = false; btn.disabled = false; say(status, '');
-        notify(r.message_id); changed();
+        changed();
         ta.value = ''; grow(ta); clearPhotos();
         return refresh(true);
       }).catch(function (err) {
@@ -581,7 +579,8 @@
       var hadUnread = st.convs.some(function (c) { return c.id === id && c.unread; });
       st.convs.forEach(function (c) { if (c.id === id) c.unread = 0; });
       if (hadUnread) changed();
-      head(about(conv), 'Avec Création Audio', true);
+      head(about(conv), conv.admin_online ? 'En ligne' : 'Avec Création Audio', true);
+      subEl.classList.toggle('is-online', !!conv.admin_online);
       var same = msgs.length === st.msgs.length && (!msgs.length || msgs[msgs.length - 1].id === st.msgs[st.msgs.length - 1].id);
       if (same && !scroll) return;
       st.msgs = msgs;

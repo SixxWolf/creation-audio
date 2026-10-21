@@ -17,7 +17,7 @@
   var CA = window.CA = window.CA || {};
 
   /* ---- messagerie (panneau chargé au besoin) ---- */
-  var MSG_V = 1;
+  var MSG_V = 2;
   var me = document.currentScript && document.currentScript.src || '';
   var ASSETS = me ? me.replace(/nav\.js(\?.*)?$/, '') : 'assets/';
   CA.siteRoot = ASSETS.replace(/assets\/$/, '');

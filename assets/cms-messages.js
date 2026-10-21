@@ -4,9 +4,11 @@
    tables conversations + messages (RLS admin), photos dans le bucket privé
    « messages » (URL signées).
    - Liste (Ouvertes / Réglées / Toutes) + fil de la conversation (#messages/<id>).
-   - Ouvrir une conversation = lue (admin_unread = 0).
-   - Répondre (texte + photos, Ctrl+Entrée) -> Edge Function message-notify :
-     courriel au client (1 par série de réponses non lues).
+   - Fil ouvert (relu aux 10 s, onglet visible) : RPC admin_msg_seen = lu + présence
+     (admin_seen_at) ; renvoie client_seen_at -> « En ligne » / « Vu il y a … » dans
+     l'en-tête et point vert sur la ligne du client.
+   - Répondre (texte + photos, Ctrl+Entrée). Courriels différés : le tick pg_cron
+     (messages_tick -> message-notify) avise le client si la série reste non lue 5 min.
    - Marquer réglée / rouvrir ; Supprimer (photos effacées par l'API Storage).
    - Filtre « Comptes » : tous les comptes clients (customers) + recherche ; un clic
      ouvre sa conversation ouverte, sinon un brouillon (#messages/c-<customer_id>) :
@@ -81,10 +83,43 @@
     }, function () {});
   }
   if (CA.onAdminReady) CA.onAdminReady(refreshBadge);
+  // fil relu aux 10 s (lecture + présence), liste et pastille aux 20 s
+  var tick = 0;
   setInterval(function () {
     if (document.visibilityState !== 'visible') return;
-    if (tabOpen) { load(); if (curId && !busy) loadThread(false); } else refreshBadge();
-  }, 20000);
+    var even = ++tick % 2 === 0;
+    if (!tabOpen) { if (even) refreshBadge(); return; }
+    if (even) load();
+    if (curId && !busy) loadThread(false);
+  }, 10000);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && tabOpen && curId && !busy) loadThread(false);
+  });
+
+  /* ---- présence du client (client_seen_at, relu par me_messages aux 10 s) ---- */
+  var skew = 0;   // horloge du serveur - horloge locale
+  function online(c) {
+    var t = c && c.client_seen_at ? Date.parse(c.client_seen_at) : NaN;
+    return isFinite(t) && Date.now() + skew - t < 40000;
+  }
+  function paintSeen(c) {
+    var el = $('#ms-seen', threadEl); if (!el) return;
+    // ago() : « à l'instant » · « 12 min » · « 3 h » · « 2 jours » · « 21 oct. »
+    var on = online(c), a = !on && c.client_seen_at ? ago(c.client_seen_at) : '';
+    el.textContent = on ? 'En ligne' : !a ? '' : 'Vu ' + (/^\d/.test(a) ? 'il y a ' + a : /instant/.test(a) ? a : 'le ' + a);
+    el.hidden = !el.textContent;
+    el.classList.toggle('is-online', on);
+  }
+  function seen(c) {
+    return sb.rpc('admin_msg_seen', { p_conv: c.id }).then(function (res) {
+      var d = res && !res.error && res.data; if (!d) return;
+      if (d.now) skew = Date.parse(d.now) - Date.now();
+      var was = online(c);
+      c.client_seen_at = d.client_seen_at;
+      if (online(c) !== was) renderList();
+      if (curId === c.id) paintSeen(c);
+    }, function () {});
+  }
 
   /* ---- onglet + route #messages/<id> ---- */
   var prevOnTab = CA.onTab;
@@ -262,7 +297,8 @@
     }
     listEl.innerHTML = rows.map(function (c) {
       var un = +c.admin_unread || 0, name = who(c);
-      return '<button type="button" class="ms-row' + (un ? ' is-unread' : '') + (c.id === curId ? ' is-current' : '') + '" data-id="' + esc(c.id) + '">' +
+      return '<button type="button" class="ms-row' + (un ? ' is-unread' : '') + (c.id === curId ? ' is-current' : '') +
+        (online(c) ? ' is-online' : '') + '" data-id="' + esc(c.id) + '">' +
         CA.avatar(name) +
         '<span class="ms-row-tx">' +
           '<span class="ms-row-top"><b>' + esc(name) + '</b><time>' + esc(ago(c.updated_at)) + '</time></span>' +
@@ -300,7 +336,7 @@
       '<header class="ms-head">' +
         '<button type="button" class="btn btn-ghost btn-sm ms-back" aria-label="Retour à la liste">←</button>' +
         CA.avatar(who(c)) +
-        '<div class="ms-head-tx"><h2>' + esc(who(c)) + '</h2>' +
+        '<div class="ms-head-tx"><h2>' + esc(who(c)) + (c._draft ? '' : ' <span class="ms-seen" id="ms-seen" hidden></span>') + '</h2>' +
           '<p class="person-meta">' + (k.email ? '<a class="pm pm-mail" href="mailto:' + esc(k.email) + '">' + esc(k.email) + '</a>' : '') +
             (k.phone ? '<a class="pm pm-tel" href="tel:' + esc(String(k.phone).replace(/[^\d+]/g, '')) + '">' + esc(k.phone) + '</a>' : '') + '</p>' +
           '<p class="ms-about">' + (c._draft ? 'Nouvelle conversation' : esc(about(c)) + (c.page ? ' · <a href="' + esc(c.page) + '" target="_blank" rel="noopener">page</a>' : '')) + '</p></div>' +
@@ -342,6 +378,7 @@
     mountTpl(form, ta);
     form.addEventListener('submit', function (e) { e.preventDefault(); send(); });
     if (flash) { $('#ms-status', form).textContent = flash; flash = ''; }
+    paintSeen(c);
     loadThread(true);
     renderSide();
   }
@@ -363,17 +400,16 @@
       var list = res.data || [];
       var same = list.length === msgs.length && (!list.length || list[list.length - 1].id === msgs[msgs.length - 1].id);
       var c = conv();
-      if (c && c.admin_unread > 0) markRead(c);
+      if (c) { if (c.admin_unread > 0) markRead(c); seen(c); }
       if (same && !scroll) return;
       msgs = list;
       var paths = []; msgs.forEach(function (m) { (m.photos || []).forEach(function (p) { paths.push(p); }); });
       return signedUrls(paths).then(function () { paintThread(scroll); });
     });
   }
-  function markRead(c) {
+  function markRead(c) {   // en base : admin_msg_seen (seen) met admin_unread à 0
     c.admin_unread = 0; renderList();
     paintBadge(convs.filter(function (x) { return x.admin_unread > 0; }).length);
-    sb.from('conversations').update({ admin_unread: 0 }).eq('id', c.id).then(null, function () {});
   }
   function paintThread(scroll) {
     var box = $('#ms-msgs', threadEl); if (!box) return;
@@ -478,12 +514,8 @@
       busy = false; btn.disabled = false; ta.value = ''; clearPhotos();
       var grant = tplGrant ? grantReserve(c) : Promise.resolve('');
       tplGrant = null;
-      return Promise.all([grant, sb.functions.invoke('message-notify', { body: { message_id: res.data.id } }).then(function (r) {
-        var d = (r && r.data) || {};
-        return d.result === 'sent' ? 'Envoyé · client avisé par courriel' : 'Envoyé';
-      }, function () { return 'Envoyé · avis courriel non parti'; })]).then(function (r) {
-        st.textContent = r[1] + (r[0] ? ' · ' + r[0] : '');
-      });
+      var sent = online(c) ? 'Envoyé · client en ligne' : 'Envoyé · courriel dans 5 min si non lu';
+      return grant.then(function (g) { st.textContent = sent + (g ? ' · ' + g : ''); });
     }).then(function () {
       return load().then(function () { return loadThread(true); });
     }).catch(function (err) {

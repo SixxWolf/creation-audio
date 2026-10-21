@@ -24,6 +24,9 @@ html.msg-open { overflow:hidden; }
 .msg-head h2 { margin:0; font-family:var(--display, var(--font)); font-size:1.18rem; font-weight:700; letter-spacing:-.01em;
   overflow-wrap:anywhere; }
 .msg-sub { margin:2px 0 0; font-size:.82rem; color:var(--muted); overflow-wrap:anywhere; }
+.msg-sub.is-online { color:var(--good); font-weight:600; }
+.msg-sub.is-online::before { content:""; display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%;
+  background:var(--good); box-shadow:0 0 0 3px var(--good-wash); vertical-align:1px; }
 .msg-ic { flex:none; width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;
   background:var(--wash); border:none; border-radius:12px; color:var(--ink-2, var(--ink)); }
 .msg-ic:hover { background:var(--wash-2, #EFEDE8); color:var(--ink); }

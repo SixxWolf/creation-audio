@@ -2216,8 +2216,11 @@ grant execute on function public.admin_reservation_action(uuid, text)       to a
 -- 4 max par message, lues par URL signée ; effacées par le navigateur (API
 -- Storage) avec la conversation (admin) ou le compte (Mon compte › Supprimer).
 -- Compteurs (non lus, aperçu, réouverture) tenus par un déclencheur.
--- Courriels : Edge Function « message-notify » — admin : 1 avis par conversation
--- tant qu'il n'a pas répondu ; client : 1 avis par série de réponses non lues.
+-- Courriels DIFFÉRÉS : Edge Function « message-notify », appelée par le tick
+-- pg_cron (messages_tick, chaque minute) : un message resté non lu 5 min -> UN
+-- courriel qui regroupe toute la série non lue ; lire ou répondre réarme l'avis.
+-- Présence (« En ligne ») : client_seen_at (me_messages, aux 10 s quand le fil
+-- est ouvert) et admin_seen_at (admin_msg_seen, idem côté admin).
 -- Loi 25 : conversation effacée 12 mois après le dernier message (purge lancée
 -- par l'onglet admin Messages : les photos doivent passer par l'API Storage).
 -- ------------------------------------------------------------
@@ -2232,11 +2235,16 @@ create table if not exists public.conversations (
   last_preview       text,
   admin_unread       integer not null default 0,
   client_unread      integer not null default 0,
-  admin_notified_at  timestamptz,              -- avis envoyé à l'admin ; remis à null quand il répond
-  client_notified_at timestamptz,              -- avis envoyé au client ; remis à null quand il lit
+  admin_notified_at  timestamptz,              -- avis envoyé pour la série non lue ; remis à null quand il lit / répond
+  client_notified_at timestamptz,              -- idem pour le client
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()   -- dernier message
 );
+alter table public.conversations
+  add column if not exists admin_unread_since  timestamptz,   -- 1er message du client pas encore lu par l'admin
+  add column if not exists client_unread_since timestamptz,   -- 1re réponse de l'admin pas encore lue par le client
+  add column if not exists admin_seen_at       timestamptz,   -- admin dans ce fil (présence)
+  add column if not exists client_seen_at      timestamptz;   -- client dans ce fil (présence)
 create index if not exists conversations_customer_idx on public.conversations (customer_id, updated_at desc);
 create index if not exists conversations_updated_idx  on public.conversations (updated_at desc);
 create table if not exists public.messages (
@@ -2258,19 +2266,20 @@ create policy messages_admin_all on public.messages for all to authenticated
   using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
 
 -- Nouveau message -> conversation à jour (aperçu, non lus ; le client rouvre une conversation fermée ;
--- la réponse de l'admin vaut lecture et réarme son prochain avis courriel).
+-- la réponse de l'admin vaut lecture). *_unread_since = début de la série non lue (courriel différé).
 create or replace function public._message_after_insert()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   update public.conversations set
-    updated_at        = new.created_at,
-    last_from         = new.sender,
-    last_preview      = left(coalesce(nullif(regexp_replace(btrim(new.body), '\s+', ' ', 'g'), ''),
-                             case when jsonb_array_length(new.photos) > 1 then 'Photos' else 'Photo' end), 140),
-    admin_unread      = case when new.sender = 'client' then admin_unread + 1 else 0 end,
-    client_unread     = case when new.sender = 'admin' then client_unread + 1 else client_unread end,
-    status            = case when new.sender = 'client' then 'open' else status end,
-    admin_notified_at = case when new.sender = 'admin' then null else admin_notified_at end
+    updated_at          = new.created_at,
+    last_from           = new.sender,
+    last_preview        = left(coalesce(nullif(regexp_replace(btrim(new.body), '\s+', ' ', 'g'), ''),
+                               case when jsonb_array_length(new.photos) > 1 then 'Photos' else 'Photo' end), 140),
+    admin_unread        = case when new.sender = 'client' then admin_unread + 1 else 0 end,
+    client_unread       = case when new.sender = 'admin' then client_unread + 1 else client_unread end,
+    admin_unread_since  = case when new.sender = 'client' then coalesce(admin_unread_since, new.created_at) end,
+    client_unread_since = case when new.sender = 'admin' then coalesce(client_unread_since, new.created_at) else client_unread_since end,
+    status              = case when new.sender = 'client' then 'open' else status end
   where id = new.conversation_id;
   return null;
 end $$;
@@ -2278,6 +2287,53 @@ revoke all on function public._message_after_insert() from public, anon, authent
 drop trigger if exists messages_after_insert on public.messages;
 create trigger messages_after_insert after insert on public.messages
   for each row execute function public._message_after_insert();
+
+-- Série lue (non lus à 0, par lecture ou réponse) -> plus de courriel dû ; le prochain message réarme l'avis.
+create or replace function public._conversation_before_update()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if new.admin_unread = 0 then new.admin_unread_since := null; new.admin_notified_at := null; end if;
+  if new.client_unread = 0 then new.client_unread_since := null; new.client_notified_at := null; end if;
+  return new;
+end $$;
+revoke all on function public._conversation_before_update() from public, anon, authenticated;
+drop trigger if exists conversations_before_update on public.conversations;
+create trigger conversations_before_update before update on public.conversations
+  for each row execute function public._conversation_before_update();
+
+-- Admin dans un fil (aux 10 s, onglet visible) : présence + lu. -> { client_seen_at, now }
+create or replace function public.admin_msg_seen(p_conv uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v timestamptz;
+begin
+  if not (select public.is_admin()) then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  update public.conversations set admin_seen_at = now(), admin_unread = 0 where id = p_conv returning client_seen_at into v;
+  return jsonb_build_object('client_seen_at', v, 'now', now());
+end $$;
+revoke all on function public.admin_msg_seen(uuid) from public, anon;
+grant execute on function public.admin_msg_seen(uuid) to authenticated;
+
+-- Tick (chaque minute) : une série non lue depuis 5 min et pas encore avisée -> message-notify
+-- (clé x-cron-key du tick des réservations). Rien d'appelé quand rien n'est dû.
+create or replace function public.messages_tick()
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.conversations
+              where (admin_unread > 0 and admin_notified_at is null
+                     and admin_unread_since <= now() - interval '5 minutes' and admin_unread_since > now() - interval '2 days')
+                 or (client_unread > 0 and client_notified_at is null
+                     and client_unread_since <= now() - interval '5 minutes' and client_unread_since > now() - interval '2 days')) then
+    perform net.http_post(
+      url := 'https://cqfmvdknppscazfynoiy.supabase.co/functions/v1/message-notify',
+      body := '{"cron":true}'::jsonb,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                   'x-cron-key', (select value from private.secrets where key = 'cron_key')),
+      timeout_milliseconds := 20000);
+  end if;
+end $$;
+revoke all on function public.messages_tick() from public, anon, authenticated;
+select cron.unschedule(jobid) from cron.job where jobname = 'messages-tick';
+select cron.schedule('messages-tick', '* * * * *', 'select public.messages_tick()');
 
 -- Photos jointes : chemins du dossier du compte, déjà téléversés, 4 max.
 create or replace function public._msg_photos(p_photos jsonb, p_owner uuid)
@@ -2362,18 +2418,19 @@ returns jsonb language sql stable security definer set search_path = '' as $$
         order by updated_at desc limit 100) c;
 $$;
 
--- Fil d'une conversation ; l'ouvrir vaut lecture (réarme l'avis courriel du client).
+-- Fil d'une conversation (relu aux 10 s) ; l'ouvrir vaut lecture et présence (client_seen_at).
 create or replace function public.me_messages(p_conv uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_uid uuid := (select auth.uid()); c public.conversations;
 begin
   if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
-  update public.conversations set client_unread = 0, client_notified_at = null
+  update public.conversations set client_unread = 0, client_seen_at = now()
    where id = p_conv and customer_id = v_uid returning * into c;
   if not found then raise exception 'Conversation introuvable.'; end if;
   return jsonb_build_object(
     'conversation', jsonb_build_object('id', c.id, 'topic', c.topic, 'ref', c.ref, 'status', c.status,
-                                       'created_at', c.created_at, 'updated_at', c.updated_at),
+                                       'created_at', c.created_at, 'updated_at', c.updated_at,
+                                       'admin_online', coalesce(c.admin_seen_at > now() - interval '40 seconds', false)),
     'messages', coalesce((select jsonb_agg(jsonb_build_object('id', m.id, 'sender', m.sender, 'body', m.body,
                             'photos', m.photos, 'created_at', m.created_at) order by m.created_at, m.id)
                           from public.messages m where m.conversation_id = c.id), '[]'::jsonb));
