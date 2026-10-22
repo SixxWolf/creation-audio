@@ -17,7 +17,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
 <link rel="stylesheet" href="assets/site.css?v=6">
-<link rel="stylesheet" href="assets/compte.css?v=6">
+<link rel="stylesheet" href="assets/compte.css?v=7">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
 </head>
 <body class="home-page acct-page">
@@ -119,7 +119,10 @@
         <h1 id="acct-hello">Bonjour</h1>
         <p class="acct-sub" id="acct-sub"></p>
       </div>
-      <button class="acct-out" id="acct-logout" type="button">Se déconnecter</button>
+      <div class="acct-head-act">
+        <a class="acct-out acct-help" href="aide.html">Aide</a>
+        <button class="acct-out" id="acct-logout" type="button">Se déconnecter</button>
+      </div>
     </header>
 
     <nav class="acct-tabs" aria-label="Mon compte">
@@ -189,6 +192,7 @@
     </nav>
     <nav class="foot-col" aria-label="Aide">
       <h4>Aide</h4>
+      <a href="aide.html">Centre d'aide</a>
       <a href="./#etapes">Comment commander</a>
       <a href="./#contact">Nous joindre</a>
       <a href="compte.html">Mon compte</a>
