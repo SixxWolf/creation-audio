@@ -73,7 +73,7 @@
 
   var wrap = $('#cc-wrap'), listEl = $('#cc-list'), dealersEl = $('#co-dealers'), resvEl = $('#cr-wrap');
   if (!wrap || !listEl) return;
-  var orders = [], stock = {}, filter = 'open', loaded = false, pending = null, sub = 'dealers', tabOpen = false;
+  var orders = [], stock = {}, filter = 'open', loaded = false, pending = null, sub = 'clients', tabOpen = false;
 
   // Grand écran (≥ 1880 px, CA.wideLayout) : plus de sous-onglets, les 3 sources en colonnes (toutes affichées
   // et chargées) ; « Nouvelle commande » en bandeau au-dessus. En dessous : sous-onglets comme avant.
@@ -88,7 +88,7 @@
      …/cueillettes — cms-cueillettes.js, CA.loadPickups). Grand écran : [Commandes] (les 3 colonnes) | [Cueillettes] ---- */
   var colsEl = $('.co-cols'), topEl = $('.co-top'), cqEl = $('#cq-wrap');
   function showSub(s) {
-    sub = s === 'clients' || s === 'reservations' || s === 'cueillettes' ? s : 'dealers';
+    sub = s === 'dealers' || s === 'reservations' || s === 'cueillettes' ? s : 'clients';
     var all = isWide(), cq = sub === 'cueillettes';
     $$('[data-cosub]').forEach(function (b) {
       var k = b.getAttribute('data-cosub'), on = k === 'all' ? !cq : k === sub;
@@ -109,8 +109,8 @@
   $$('[data-cosub]').forEach(function (b) {
     b.addEventListener('click', function () {
       var s = b.getAttribute('data-cosub');
-      if (s === 'all') s = 'dealers';
-      if (CA.route && CA.route.goSub) CA.route.goSub(s === 'dealers' ? '' : s); else showSub(s);
+      if (s === 'all') s = 'clients';
+      if (CA.route && CA.route.goSub) CA.route.goSub(s === 'clients' ? '' : s); else showSub(s);
     });
   });
   if (CA.route && CA.route.onSub) CA.route.onSub(function (s, tab) { if (tab === 'commandes') showSub(s); });
@@ -119,7 +119,7 @@
     if (typeof prevOnTab === 'function') prevOnTab(name);
     tabOpen = name === 'commandes';
     if (!tabOpen) return;
-    var m = /^#commandes\/(clients|reservations|cueillettes)\b/.exec(location.hash), want = m ? m[1] : 'dealers';   // lien direct
+    var m = /^#commandes\/(dealers|reservations|cueillettes)\b/.exec(location.hash), want = m ? m[1] : 'clients';   // lien direct
     if (want !== sub) showSub(want); else if (sub === 'cueillettes') { if (CA.loadPickups) CA.loadPickups(); }
     else if (isWide()) loadAll(); else if (sub === 'clients') load();
     else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
@@ -219,11 +219,11 @@
         return '<tr>' +
           '<td class="l"><span class="co-prod">' + (hex ? '<span class="cc-sw" style="background:' + esc(hex) + '"></span>' : '<span class="co-noimg"></span>') +
             '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(l.meta) + '</small>' : '') + '</span></span></td>' +
-          '<td class="n"><b>' + (l.qty | 0) + '</b></td>' +
-          '<td class="n">' + (st == null ? '—' : st) + '</td>' +
-          '<td class="n">' + (!OPEN[o.status] ? '—' : miss ? '<span class="co-print-n">' + miss + '</span>' : '<span class="co-ok">en stock</span>') + '</td>' +
-          '<td class="n">' + money(l.unit_price) + '</td>' +
-          '<td class="n"><b>' + money(l.line_total) + '</b></td>' +
+          '<td class="n" data-l="Qté"><b>' + (l.qty | 0) + '</b></td>' +
+          '<td class="n" data-l="Stock">' + (st == null ? '—' : st) + '</td>' +
+          '<td class="n" data-l="À commander">' + (!OPEN[o.status] ? '—' : miss ? '<span class="co-print-n">' + miss + '</span>' : '<span class="co-ok">en stock</span>') + '</td>' +
+          '<td class="n co-unit" data-l="Prix">' + money(l.unit_price) + '</td>' +
+          '<td class="n" data-l="Total"><b>' + money(l.line_total) + '</b></td>' +
         '</tr>';
       }).join('');
       var who = o.name || o.email;

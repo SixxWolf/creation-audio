@@ -566,7 +566,7 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
    ONGLETS DEALERS & CLIENTS (lignes contact avec avatar)
    ========================================================= */
 .mat-row.person { gap:14px; }
-.person-av { display:grid; place-items:center; width:42px; height:42px; flex:none; border-radius:50%;
+.person-av { display:flex; align-items:center; justify-content:center; width:42px; height:42px; flex:none; border-radius:50%; line-height:1;
   font-family:var(--display); font-weight:700; font-size:.92rem; letter-spacing:.02em;
   color:hsl(var(--h, 20) 45% 30%); background:hsl(var(--h, 20) 70% 91%); }
 :root[data-theme="dark"] .person-av { color:hsl(var(--h, 20) 75% 80%); background:hsl(var(--h, 20) 30% 22%); }
@@ -1332,6 +1332,30 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .co-actions .btn { flex:1 1 auto; }
 }
 .co-src { font-size:.8rem; font-weight:600; color:var(--muted); }
+/* téléphone : chaque article devient une mini-fiche (nom sur toute la largeur, puis Qté · Stock · À commander · Total) */
+@media (max-width:640px) {
+  .co-card { padding:16px 14px; }
+  .co-head { gap:12px; }
+  .co-who { align-items:flex-start; }
+  .co-who small { display:block; margin-top:2px; overflow-wrap:anywhere; }
+  .co-table-wrap { overflow:visible; border:none; border-radius:0; }
+  .co-table, .co-table tbody { display:block; }
+  .co-table thead { display:none; }
+  .co-table tr { display:grid; grid-template-columns:.7fr .8fr 1.5fr 1fr; gap:6px 8px; margin-bottom:10px; padding:12px;
+    background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+  .co-table td { display:block; padding:0; border:none; text-align:left; }
+  .co-table td.l { grid-column:1 / -1; }
+  .co-table td.n { white-space:normal; font-size:.95rem; }
+  .co-table td.n::before { content:attr(data-l); display:block; margin-bottom:2px; font-size:.66rem; font-weight:700;
+    letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .co-table td.n:last-child { text-align:right; }
+  .co-table .co-unit { display:none; }
+  .co-prod { align-items:flex-start; }
+  .co-prod > span:last-child { min-width:0; }
+  .co-prod b { font-size:1rem; }
+  .co-prod .cc-meta { margin-top:2px; font-size:.82rem; line-height:1.35; }
+  .co-foot { flex-direction:column; align-items:stretch; }
+}
 
 /* ---- Commandes pleine largeur (ordinateur ≥ 1880 px — 2026-10-12) ----
    Sous-onglets remplacés par 3 colonnes Dealers | Clients en ligne | Réservations (.co-cols) : chacune défile
