@@ -450,7 +450,7 @@
       if (!items.length) return;
       // la vedette d'abord, puis l'ordre de l'admin
       items.sort(function (a, b) { return (b.featured ? 1 : 0) - (a.featured ? 1 : 0); });
-      var cur = 0;
+      var cur = 0, NEWS_MS = 8000, auto = items.length > 1 && !reduceMotion;
       sec.hidden = false;
 
       function tag(n) { return '<span class="news-tag k-' + esc(n.kind) + '">' + esc(KINDS[n.kind] || '') + '</span>'; }
@@ -479,24 +479,72 @@
             '<span class="news-top">' + tag(n) + (meta ? '<span class="news-meta">' + esc(meta) + '</span>' : '') + '</span>' +
             '<span class="news-mini-t">' + esc(n.title) + '</span>' +
           '</span>' +
+          (i === cur && auto ? progHtml() : '') +
         '</button>';
+      }
+      function progHtml() { return '<span class="news-prog" aria-hidden="true" style="animation-duration:' + NEWS_MS + 'ms"></span>'; }
+      function bindCopy() {
+        var copy = $('.news-copy', grid);
+        if (copy) copy.addEventListener('click', function () { copyCode(copy, copy.getAttribute('data-code')); });
       }
       function draw() {
         grid.classList.toggle('is-solo', items.length === 1);
         grid.innerHTML = feature(items[cur]) +
           (items.length > 1 ? '<div class="news-list" role="group" aria-label="Autres nouvelles">' + items.map(mini).join('') + '</div>' : '');
-        var copy = $('.news-copy', grid);
-        if (copy) copy.addEventListener('click', function () { copyCode(copy, copy.getAttribute('data-code')); });
+        bindCopy();
         $$('.news-mini', grid).forEach(function (b) {
           b.addEventListener('click', function () {
             var i = +b.getAttribute('data-i');
             if (i === cur) return;
-            cur = i; draw();
-            var f = $('.news-mini[data-i="' + i + '"]', grid); if (f) f.focus({ preventScroll: true });
+            select(i);
+            b.focus({ preventScroll: true });
           });
         });
       }
+      // changement de nouvelle sans tout redessiner : la liste garde ses cartes (transitions CSS),
+      // la vedette s'efface puis la suivante entre en douceur
+      function select(i) {
+        cur = i;
+        $$('.news-mini', grid).forEach(function (b, k) {
+          var on = k === cur, p = $('.news-prog', b);
+          b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on);
+          if (p) p.remove();
+          if (on && auto) b.insertAdjacentHTML('beforeend', progHtml());
+        });
+        function swap() {
+          var old = $('.news-feat', grid), t = document.createElement('div');
+          t.innerHTML = feature(items[cur]);
+          var nu = t.firstChild;
+          if (!reduceMotion) nu.classList.add('is-enter');
+          if (old) old.replaceWith(nu); else grid.insertBefore(nu, grid.firstChild);
+          bindCopy();
+        }
+        var old = $('.news-feat', grid);
+        if (reduceMotion || !old) swap();
+        else { old.classList.add('is-leave'); setTimeout(swap, 220); }
+      }
       draw();
+      // la barre se remplit en 8 s puis la nouvelle suivante passe en vedette, en boucle ;
+      // pause au survol / focus, onglet caché ou section hors écran
+      if (auto) {
+        var hold = { hover: false, focus: false, hidden: document.hidden, away: false };
+        function sync() {
+          grid.classList.toggle('is-paused', hold.hover || hold.focus || hold.hidden || hold.away);
+        }
+        grid.addEventListener('animationend', function (e) {
+          if (!e.target.classList || !e.target.classList.contains('news-prog')) return;
+          select((cur + 1) % items.length);
+        });
+        grid.addEventListener('mouseenter', function () { hold.hover = true; sync(); });
+        grid.addEventListener('mouseleave', function () { hold.hover = false; sync(); });
+        grid.addEventListener('focusin', function (e) { hold.focus = !!(e.target.matches && e.target.matches(':focus-visible')); sync(); });
+        grid.addEventListener('focusout', function () { hold.focus = false; sync(); });
+        document.addEventListener('visibilitychange', function () { hold.hidden = document.hidden; sync(); });
+        if ('IntersectionObserver' in window) {
+          new IntersectionObserver(function (en) { hold.away = !en[0].isIntersecting; sync(); }, { threshold: 0.2 }).observe(grid);
+        }
+        sync();
+      }
       // arrivée par la barre du haut (#nouvelles) : la section n'existait pas encore au chargement
       if (location.hash === '#nouvelles') sec.scrollIntoView();
     });
