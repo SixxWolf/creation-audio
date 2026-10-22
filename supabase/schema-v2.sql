@@ -1371,6 +1371,9 @@ begin
   if new.client_type is distinct from 'client' then return new; end if;
   if tg_op = 'UPDATE' then
     if new.client_name is not distinct from old.client_name then return new; end if;
+    -- renommage venu de la fiche (trigger clients_rename_invoices) : le lien reste
+    if new.client_id is not null and exists (select 1 from public.clients c
+         where c.id = new.client_id and lower(btrim(c.name)) = lower(btrim(new.client_name))) then return new; end if;
     if new.client_id is not distinct from old.client_id then new.client_id := null; end if;
   end if;
   if new.client_id is not null or coalesce(btrim(new.client_name), '') = '' then return new; end if;
@@ -1383,6 +1386,27 @@ revoke all on function public._invoice_link_client() from public, anon, authenti
 drop trigger if exists invoices_link_client on public.invoices;
 create trigger invoices_link_client before insert or update of client_name, client_type on public.invoices
   for each row execute function public._invoice_link_client();
+
+-- Fiche client renommée (admin ou client) : ses factures reliées prennent le nouveau nom.
+create or replace function public._client_rename_invoices()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if coalesce(btrim(new.name), '') <> '' then
+    update public.invoices set client_name = btrim(new.name)
+     where client_id = new.id and client_name is distinct from btrim(new.name);
+  end if;
+  return new;
+end $$;
+revoke all on function public._client_rename_invoices() from public, anon, authenticated;
+drop trigger if exists clients_rename_invoices on public.clients;
+create trigger clients_rename_invoices after update of name on public.clients
+  for each row when (old.name is distinct from new.name)
+  execute function public._client_rename_invoices();
+
+-- rattrapage : factures déjà reliées dont le nom a divergé de la fiche
+update public.invoices i set client_name = btrim(c.name)
+  from public.clients c
+ where i.client_id = c.id and coalesce(btrim(c.name), '') <> '' and i.client_name is distinct from btrim(c.name);
 
 -- ---- codes de connexion (schéma private : Edge Function seulement) ----
 create table if not exists private.login_codes (
