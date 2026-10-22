@@ -127,8 +127,7 @@
     if (filter === 'pending' && !pendingOf(inv)) return false;
     if (filter === 'internal' && inv.client_type !== 'internal') return false;   // ce que Théo a pris dans son stock
     if (query) {
-      var hay = ((inv.number || '') + ' ' + (inv.client_name || '') + ' ' + (inv.client_contact || '')).toLowerCase();
-      if (hay.indexOf(query) === -1) return false;
+      if (!window.CA.searchMatch([inv.number, inv.client_name, inv.client_contact].join(' '), query)) return false;
     }
     return true;
   }

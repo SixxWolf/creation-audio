@@ -258,11 +258,8 @@
     }
     var box = $('#ms-acc-rows', listEl);
     if (!accounts) { box.innerHTML = '<p class="muted">Chargement…</p>'; return; }
-    var needle = accQ.trim().toLowerCase(), digits = needle.replace(/\D/g, '');
     var rows = accounts.filter(function (k) {
-      if (!needle) return true;
-      return [k.name, k.email].join(' ').toLowerCase().indexOf(needle) !== -1 ||
-        (digits.length >= 3 && String(k.phone || '').replace(/\D/g, '').indexOf(digits) !== -1);
+      return window.CA.searchMatch([k.name, k.email, k.phone].join(' '), accQ);
     });
     if (!rows.length) {
       box.innerHTML = '<p class="ms-empty">' + (accounts.length ? 'Aucun compte trouvé.' : 'Aucun compte pour l\'instant.') + '</p>';

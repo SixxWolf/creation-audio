@@ -21,6 +21,22 @@ window.CA = window.CA || {};
       .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   };
 
+  // Recherche tolérante (clients, comptes, factures) : majuscules, accents et ponctuation ignorés,
+  // chaque mot tapé doit apparaître quelque part, dans n'importe quel ordre ; un groupe de
+  // 3 chiffres ou plus est aussi cherché dans les numéros sans tirets ni espaces.
+  window.CA.fold = function (s) {
+    return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase().replace(/[^a-z0-9@.]+/g, ' ').trim();
+  };
+  window.CA.searchMatch = function (hay, q) {
+    var words = window.CA.fold(q).split(/\s+/).filter(Boolean);
+    if (!words.length) return true;
+    var h = window.CA.fold(hay), d = String(hay == null ? '' : hay).replace(/\D/g, '');
+    return words.every(function (w) {
+      return h.indexOf(w) !== -1 || (/^\d{3,}$/.test(w) && d.indexOf(w) !== -1);
+    });
+  };
+
   // Pastille à initiales (listes Clients / Dealers) : teinte stable dérivée du nom.
   window.CA.avatar = function (name) {
     var s = String(name == null ? '' : name).trim();

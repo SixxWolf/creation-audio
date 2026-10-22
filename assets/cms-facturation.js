@@ -303,11 +303,10 @@
     return list.filter(function (c) { return String(c.id) === String(id); })[0] || null;
   }
   function clientMatches(q) {
-    q = norm(q).toLowerCase();
     var list = (window.CA.clients && window.CA.clients.list) || [];
-    if (!q) return list.slice(0, 60);
+    if (!norm(q)) return list.slice(0, 60);
     return list.filter(function (c) {
-      return (norm(c.name) + ' ' + norm(c.email) + ' ' + norm(c.phone)).toLowerCase().indexOf(q) !== -1;
+      return window.CA.searchMatch([c.name, c.email, c.phone, c.city].join(' '), q);
     }).slice(0, 60);
   }
   function hideClientResults() { if (elClientResults) elClientResults.hidden = true; }
