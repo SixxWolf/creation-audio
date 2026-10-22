@@ -114,7 +114,7 @@
   // client connecté (Mon compte, commande-client.js) : il peut commander au-delà du stock
   // (la part en trop est « à commander » chez le fournisseur : BO_DELAY, confirmé à l'envoi ;
   //  bobines vides = nos propres impressions : « à compléter · sans garantie »)
-  var BO_MAX = 99, BO_DELAY = '3 à 7 jours ouvrables', BO_EMPTY = 'sans garantie';
+  var BO_MAX = 99, BO_DELAY = '3 à 14 jours ouvrables', BO_EMPTY = 'sans garantie';
   function canBackorder() { return !!(window.CA && window.CA.custOrder && window.CA.custOrder.signedIn()); }
   function boLabel(n, empty) { return n + (empty ? ' à compléter · ' + BO_EMPTY : ' à commander · ' + BO_DELAY); }
   function boNote(stock, qty, empty) {
@@ -742,7 +742,7 @@
               '<input type="number" class="q-val" aria-label="Quantité" min="1" max="' + (canBackorder() ? BO_MAX : stock) + '" value="' + curQty + '" inputmode="numeric">' +
               '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
             '</div>') +
-            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? '<span>Commander<span class="bo-d"> · 3 à 7 jours</span></span>' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? '<span>Commander<span class="bo-d"> · 3 à 14 jours</span></span>' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + buySumText() + '</p>' +
           (out && !bo && offered(p, curType) ? notifyHtml(filNotify(p)) : '') +
@@ -1144,7 +1144,7 @@
             '</div>') +
             '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? (isEmptySpool(a)
               ? '<span>Ajouter au panier<span class="bo-d"> · ' + BO_EMPTY + '</span></span>'
-              : '<span>Commander<span class="bo-d"> · 3 à 7 jours</span></span>') : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+              : '<span>Commander<span class="bo-d"> · 3 à 14 jours</span></span>') : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + accBuySum() + '</p>' +
           (out && !bo ? notifyHtml(accNotify(a)) : '') +
@@ -1481,7 +1481,7 @@
     var st = it.type === 'accessory' ? m.qty : stockOf(m, it.type);
     var n = st == null ? 0 : it.qty - Math.max(0, st | 0);
     if (n <= 0) return '';
-    return ' · <span class="citem-bo">' + (it.type === 'accessory' && isEmptySpool(m) ? boLabel(n, true) : n + ' à commander · 3 à 7 jours') + '</span>';
+    return ' · <span class="citem-bo">' + (it.type === 'accessory' && isEmptySpool(m) ? boLabel(n, true) : n + ' à commander · 3 à 14 jours') + '</span>';
   }
   function renderCart() {
     var n = count();

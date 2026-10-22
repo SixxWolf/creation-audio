@@ -62,7 +62,7 @@ function fmtPickup(d: unknown, s: unknown, e: unknown) {
 type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number; qty_to_order: number; product_id: string | null; kind: string | null; ptype: string | null };
 
 // filaments / accessoires à commander chez le fournisseur : délai annoncé (les spacers, imprimés ici, gardent « on te confirme »)
-const BO_DELAY = "3 à 7 jours ouvrables";
+const BO_DELAY = "3 à 14 jours ouvrables";
 let emptyIds = new Set<string>();   // bobines vides (rempli par requête)
 const isEmpty = (l: Line) => !!l.product_id && emptyIds.has(l.product_id);
 const boLabel = (l: Line, n: number) => isEmpty(l) ? n + " à compléter · sans garantie"

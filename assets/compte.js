@@ -355,7 +355,7 @@
     return '<li>' + swatch(l.hex, (l.name || '') + ' ' + (l.meta || '')) +
       '<span class="ol-tx"><b>' + esc(l.name || '') + '</b>' + (l.meta ? '<small>' + esc(l.meta) + '</small>' : '') +
         (bo ? '<em class="ol-pend">' + (emptyIds[l.product_id] ? bo + ' à compléter · sans garantie'
-          : bo + ' à commander · ' + (l.ptype === 'spacer' ? 'délai à confirmer' : '3 à 7 jours ouvrables')) + '</em>' : '') + '</span>' +
+          : bo + ' à commander · ' + (l.ptype === 'spacer' ? 'délai à confirmer' : '3 à 14 jours ouvrables')) + '</em>' : '') + '</span>' +
       '<span class="ol-q">' + (+l.qty) + ' × ' + money(l.unit_price) + '</span>' +
       '<span class="ol-t">' + money(l.line_total) + '</span></li>';
   }

@@ -31,12 +31,12 @@
       go: { href: 'boutique.html', label: 'Boutique' }, keys: 'stock delai fournisseur commander',
       steps: [
         'Connecte-toi dans **Mon compte**.',
-        'Sur la fiche, choisis le format en rupture et clique [Commander · 3 à 7 jours].',
+        'Sur la fiche, choisis le format en rupture et clique [Commander · 3 à 14 jours].',
         'Envoie ta commande : une fenêtre te rappelle les articles à commander et le délai.',
         'Clique [Compris, envoyer].',
         'On commande chez notre fournisseur et on t\'écrit dès l\'arrivée.'
       ],
-      tip: 'Délai : 3 à 7 jours ouvrables pour les filaments et accessoires. Spacers : délai à confirmer.' },
+      tip: 'Délai : 3 à 14 jours ouvrables pour les filaments et accessoires. Spacers : délai à confirmer.' },
     { id: 'modifier-commande', group: 'Commander', title: 'Modifier ou annuler une commande',
       go: { href: 'compte.html#/commandes', label: 'Mes commandes' }, keys: 'changer annulation',
       steps: [
