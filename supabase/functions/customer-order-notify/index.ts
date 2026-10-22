@@ -3,7 +3,7 @@
 // Après l'envoi / la modification / l'annulation d'une commande par un client
 // connecté (boutique ou page spacers, assets/commande-client.js) :
 //  - au CLIENT (new / updated) : confirmation automatique. Tout en stock -> la plage de
-//    cueillette choisie (pickup_date/start/end ; sans plage : « on te contacte sous peu ») ;
+//    cueillette choisie (pickup_date/start/end ; sans plage : lien vers #/cueillette/c/<id>) ;
 //    sinon la liste des articles à commander et l'annonce d'un délai.
 //  - à Création Audio (toujours) : avis avec lignes, stock et lien vers l'admin.
 //  - « ready » (admin › Commandes › « Marquer prête ») : au CLIENT seulement, « ta commande est
@@ -139,6 +139,7 @@ Deno.serve(async (req) => {
   const toOrder = L.filter((l) => (Number(l.qty_to_order) || 0) > 0);
   const first = String(order.name || "").trim().split(/\s+/)[0] || "";
   const accountUrl = SITE + "/compte.html#/commandes";
+  const pickUrl = SITE + "/compte.html#/cueillette/c/" + order.id;   // écran « Choisis ta cueillette »
   const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes/clients";
   const results: Record<string, string> = {};
   const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end);
@@ -151,7 +152,7 @@ Deno.serve(async (req) => {
     const emptyBo = toOrder.some(isEmpty);
     const printBo = toOrder.some((l) => l.ptype === "spacer");
     const status = !toOrder.length
-      ? (pk ? "Tout est en stock : on t'attend " + pk + "." : "Tout est en stock : on te contacte sous peu pour convenir de la cueillette à Québec.")
+      ? (pk ? "Tout est en stock : on t'attend " + pk + "." : "Tout est en stock : choisis ta plage de cueillette dans ton compte.")
       : [supplierBo
         ? "Certains articles ne sont pas en stock : on les commande chez notre fournisseur. Prévois un délai de " + BO_DELAY +
           " avant la cueillette ; on t'écrit dès leur arrivée pour que tu choisisses ta plage de cueillette."
@@ -168,7 +169,7 @@ Deno.serve(async (req) => {
       "\n\nTotal estimé : " + money(order.total) + "\n" +
       "Cueillette à Québec · aucun paiement en ligne : tu paies à la cueillette.\n" +
       (order.note ? "\nTa note : " + order.note + "\n" : "") +
-      "\nTu peux suivre, modifier ou annuler ta commande (tant qu'on ne l'a pas commencée) dans ton compte : " + accountUrl + "\n\n" +
+      "\nTu peux suivre, modifier ou annuler ta commande (tant qu'on ne l'a pas commencée) dans ton compte : " + (toOrder.length || pk ? accountUrl : pickUrl) + "\n\n" +
       "Création Audio\n" + SITE;
     const rowsHtml = L.map((l) => {
       const bo = Number(l.qty_to_order) || 0;
@@ -194,7 +195,8 @@ Deno.serve(async (req) => {
       '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total estimé : ' + money(order.total) + '</strong></p>' +
       '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">Cueillette à Québec · aucun paiement en ligne : tu paies à la cueillette.</p>' +
       (order.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Ta note :</strong> ' + esc(order.note) + '</p>' : "") +
-      '<p style="margin:22px 0"><a href="' + accountUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">Suivre ma commande</a></p>' +
+      '<p style="margin:22px 0"><a href="' + (toOrder.length || pk ? accountUrl : pickUrl) + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
+        (toOrder.length || pk ? "Suivre ma commande" : "Choisir ma plage de cueillette") + '</a></p>' +
       '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
       '<p style="font-size:12px;color:#6C727C">Tu peux modifier ou annuler ta commande dans ton compte tant qu\'on ne l\'a pas commencée. Une question&nbsp;? Réponds simplement à ce courriel.</p>' +
       "</div>";
@@ -278,7 +280,7 @@ async function notifyReady(db: any, order: any, resendKey: string | undefined, f
     .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype").eq("order_id", order.id).order("sort_order");
   const L = (lines || []) as Line[];
   const first = String(order.name || "").trim().split(/\s+/)[0] || "";
-  const accountUrl = SITE + "/compte.html#/commandes";
+  const accountUrl = SITE + "/compte.html#/cueillette/c/" + order.id;   // écran « Choisis ta cueillette »
   const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end);
   const subject = "Commande " + order.number + " prête — Création Audio";
   const status = pk

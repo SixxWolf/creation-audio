@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
 
   const what = (kind === "reservation" ? "Réservation " : "Commande ") + x.number;
   const first = String(x.name || "").trim().split(/\s+/)[0] || "";
-  const accountUrl = SITE + "/compte.html#/commandes";
+  const accountUrl = SITE + "/compte.html#/cueillette/" + (kind === "reservation" ? "r/" : "c/") + id;
   const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes/" + (kind === "reservation" ? "reservations" : "clients");
   const results: Record<string, string> = {};
 

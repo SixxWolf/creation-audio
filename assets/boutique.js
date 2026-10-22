@@ -1618,28 +1618,8 @@
   var acctBox = $('#cart-acct'), sendBtn = $('#cart-send'), noteIn = $('#cart-note-in'),
       editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login'),
       resvBtn = $('#cart-resv'), resvWhy = $('#cart-resv-why'), resvInfo = null;
-  // Cueillette : date + plage obligatoires quand tout est en stock (plages réglées dans l'admin) ;
-  // articles à commander -> choisie plus tard dans Mon compte, une fois la commande prête.
-  var pkBox = $('#cart-pk'), pkLater = $('#cart-pk-later'), pk = null, pkOrig = null;
-  function loadPickup() {
-    var co = window.CA.custOrder;
-    if (!pkBox || !co.picker || !canBackorder()) return;
-    var ed = co.editing();
-    if (!pk) pk = co.picker(pkBox, { onChange: function () { cartMsg.textContent = ''; } });
-    pkOrig = ed && ed.pickup && ed.pickup.d ? ed.pickup : null;
-    co.slots(null, ed && ed.id).then(function (list) { pk.load(list, pkOrig); refreshAcctUi(); });
-  }
-  // plage à envoyer : undefined = manquante ; null = aucune (rien à choisir, ou inchangée en modification)
-  function pickupToSend() {
-    if (!pk || !pk.has() || overStock().length) return null;
-    var v = pk.value();
-    if (!v) return pkOrig ? null : undefined;
-    return pkOrig && v.d === pkOrig.d && v.s === pkOrig.s ? null : v;
-  }
-  function pickupTxt() {
-    var v = pk && pk.value();
-    return v ? ' Cueillette : ' + esc(window.CA.custOrder.fmtPickup(v.d, v.s, v.e)) + '.' : '';
-  }
+  // Cueillette : choisie APRÈS l'envoi, sur l'écran « Ma cueillette » de Mon compte (compte.js)
+  function goPickup(kind, id) { location.href = 'compte.html#/cueillette/' + kind + '/' + encodeURIComponent(id); }
   // Réservation 72 h (client approuvé) : articles EN STOCK seulement -> lignes au-delà du stock listées
   function overStock() {
     return entries().filter(function (it) {
@@ -1654,11 +1634,6 @@
     if (loginP) loginP.hidden = on;
     orderBtn.classList.toggle('cart-email', on);   // Messenger passe en secondaire
     if (editBar) { editBar.hidden = !ed; if (ed && editNum) editNum.textContent = ed.number; }
-    if (pkBox) {
-      var later = !!(on && pk && pk.has() && count() && overStock().length);
-      pkBox.hidden = !on || !pk || !pk.has() || !count() || later;
-      if (pkLater) pkLater.hidden = !later;
-    }
     if (sendBtn) {
       sendBtn.textContent = ed ? 'Enregistrer les modifications' : 'Envoyer ma commande';
       sendBtn.classList.toggle('is-disabled', count() === 0);
@@ -1673,16 +1648,11 @@
       if (resvWhy) { resvWhy.hidden = !showR || !why; resvWhy.textContent = why; }
     }
   }
-  if (canBackorder()) loadPickup();
   if (canBackorder() && window.CA.custOrder.reserveInfo) {
     window.CA.custOrder.reserveInfo().then(function (i) { resvInfo = i; refreshAcctUi(); });
   }
   if (resvBtn) resvBtn.addEventListener('click', function () {
     if (!count() || resvBtn.disabled || resvBtn.classList.contains('is-disabled')) return;
-    var pv = pk && pk.has() ? pk.value() : null;
-    if (pk && pk.has() && (!pv || new Date(pv.d + 'T' + pv.s) > new Date(Date.now() + 72 * 3600 * 1000))) {
-      cartMsg.textContent = pv ? 'Réservation : choisis une plage d\'ici 72 h.' : 'Choisis une date et une plage de cueillette.'; return;
-    }
     var until = new Date(Date.now() + 72 * 3600 * 1000).toLocaleString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
     caDialog.confirm({ title: 'Réserver jusqu\'au ' + until + ' ?',
       message: 'Si tu ne passes pas à temps, elle compte comme non récupérée (2 = réservations suspendues 60 jours). Tu peux l\'annuler dans ton compte.',
@@ -1690,21 +1660,14 @@
       if (!ok) return;
       var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
       resvBtn.disabled = true; cartMsg.textContent = 'Réservation…';
-      var pkTxt = pickupTxt();
-      window.CA.custOrder.reserve(lines, noteIn ? noteIn.value.trim() : '', pv).then(function (r) {
-        resvBtn.disabled = false;
+      window.CA.custOrder.reserve(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
         cart = {}; saveCart(); if (noteIn) noteIn.value = '';
-        renderCart(); loadPickup();
-        refreshStock();   // le stock gardé disparaît de la boutique
-        cartMsg.innerHTML = '✓ Réservation <b>' + esc(r.number) + '</b> : gardée jusqu\'au ' +
-          esc(new Date(r.expires_at).toLocaleString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })) +
-          '.' + pkTxt + ' Confirmation par courriel. <a href="compte.html#/commandes">Mes réservations</a>';
+        goPickup('r', r.id);
       }, function (err) { resvBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Réservation impossible. Réessaie.'; });
     });
   });
   if (sendBtn) sendBtn.addEventListener('click', function () {
     if (!count() || sendBtn.disabled) return;
-    if (pickupToSend() === undefined) { cartMsg.textContent = 'Choisis une date et une plage de cueillette.'; return; }
     var bo = overStock();
     if (!bo.length) { sendOrder(); return; }
     // articles au-delà du stock : le client confirme avoir compris le délai avant l'envoi
@@ -1734,21 +1697,15 @@
   function isEmptyLine(it) { return it.type === 'accessory' && isEmptySpool(accById[it.id]); }
   function sendOrder() {
     var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
-    var boReg = overStock().some(function (it) { return !isEmptyLine(it); });
     sendBtn.disabled = true; cartMsg.textContent = 'Envoi…';
-    var pkTxt = pickupTxt();
-    window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '', pickupToSend()).then(function (r) {
-      sendBtn.disabled = false;
+    window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
       cart = {}; saveCart(); if (noteIn) noteIn.value = '';
-      renderCart(); loadPickup();
-      cartMsg.innerHTML = '✓ Commande <b>' + esc(r.number) + '</b> ' + (r.updated ? 'modifiée' : 'envoyée') +
-        (r.has_backorder ? (boReg ? ' · articles à commander : ' + BO_DELAY + '.' : ' · bobines vides à compléter, ' + BO_EMPTY + '.') : '.' + pkTxt) +
-        ' Confirmation par courriel. <a href="compte.html#/commandes">Mes commandes</a>';
+      goPickup('c', r.id);
     }, function (err) { sendBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Envoi impossible. Réessaie.'; });
   }
   if (editCancel) editCancel.addEventListener('click', function () {
     window.CA.custOrder.cancelEdit();
-    cart = {}; saveCart(); renderCart(); loadPickup();
+    cart = {}; saveCart(); renderCart();
     cartMsg.textContent = 'Modification annulée : ta commande reste telle quelle.';
   });
 

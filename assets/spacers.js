@@ -237,42 +237,14 @@
   /* ---- commande en ligne (client connecté) : même logique que la boutique ---- */
   var acctBox = $('#cart-acct'), sendBtn = $('#cart-send'), noteIn = $('#cart-note-in'),
       editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login');
-  // Cueillette : date + plage obligatoires quand tout est en stock (plages réglées dans l'admin) ;
-  // articles à commander -> choisie plus tard dans Mon compte, une fois la commande prête.
-  var pkBox = $('#cart-pk'), pkLater = $('#cart-pk-later'), pk = null, pkOrig = null;
-  function overStock() {
-    return entries().filter(function (it) { var p = byId[it.id]; return p && it.qty > Math.max(0, p.qty | 0); });
-  }
-  function loadPickup() {
-    var co = window.CA.custOrder;
-    if (!pkBox || !co.picker || !canBackorder()) return;
-    var ed = co.editing();
-    if (!pk) pk = co.picker(pkBox, { onChange: function () { cartMsg.textContent = ''; } });
-    pkOrig = ed && ed.pickup && ed.pickup.d ? ed.pickup : null;
-    co.slots(null, ed && ed.id).then(function (list) { pk.load(list, pkOrig); refreshAcctUi(); });
-  }
-  // plage à envoyer : undefined = manquante ; null = aucune (rien à choisir, ou inchangée en modification)
-  function pickupToSend() {
-    if (!pk || !pk.has() || overStock().length) return null;
-    var v = pk.value();
-    if (!v) return pkOrig ? null : undefined;
-    return pkOrig && v.d === pkOrig.d && v.s === pkOrig.s ? null : v;
-  }
-  function pickupTxt() {
-    var v = pk && pk.value();
-    return v ? ' Cueillette : ' + esc(window.CA.custOrder.fmtPickup(v.d, v.s, v.e)) + '.' : '';
-  }
+  // Cueillette : choisie APRÈS l'envoi, sur l'écran « Ma cueillette » de Mon compte (compte.js)
+  function goPickup(kind, id) { location.href = (PAGE ? '../' : '') + 'compte.html#/cueillette/' + kind + '/' + encodeURIComponent(id); }
   function refreshAcctUi() {
     var on = canBackorder(), ed = on ? window.CA.custOrder.editing() : null;
     if (acctBox) acctBox.hidden = !on;
     if (loginP) loginP.hidden = on;
     orderBtn.classList.toggle('cart-email', on);
     if (editBar) { editBar.hidden = !ed; if (ed && editNum) editNum.textContent = ed.number; }
-    if (pkBox) {
-      var later = !!(on && pk && pk.has() && count() && overStock().length);
-      pkBox.hidden = !on || !pk || !pk.has() || !count() || later;
-      if (pkLater) pkLater.hidden = !later;
-    }
     if (sendBtn) {
       sendBtn.textContent = ed ? 'Enregistrer les modifications' : 'Envoyer ma commande';
       sendBtn.classList.toggle('is-disabled', count() === 0);
@@ -280,23 +252,16 @@
   }
   if (sendBtn) sendBtn.addEventListener('click', function () {
     if (!count() || sendBtn.disabled) return;
-    if (pickupToSend() === undefined) { cartMsg.textContent = 'Choisis une date et une plage de cueillette.'; return; }
     var lines = entries().map(function (it) { return { product_id: it.id, kind: 'unit', qty: it.qty }; });
     sendBtn.disabled = true; cartMsg.textContent = 'Envoi…';
-    var pkTxt = pickupTxt();
-    window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '', pickupToSend()).then(function (r) {
-      sendBtn.disabled = false;
+    window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
       cart = {}; saveCart(); if (noteIn) noteIn.value = '';
-      renderCart(); loadPickup();
-      cartMsg.innerHTML = '✓ Commande <b>' + esc(r.number) + '</b> ' + (r.updated ? 'modifiée' : 'envoyée') +
-        (r.has_backorder ? ' · certains spacers sont à commander (délai).' : '.' + pkTxt) +
-        ' Confirmation par courriel. <a href="' + (PAGE ? '../' : '') + 'compte.html#/commandes">Mes commandes</a>';
+      goPickup('c', r.id);
     }, function (err) { sendBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Envoi impossible. Réessaie.'; });
   });
-  if (canBackorder()) loadPickup();
   if (editCancel) editCancel.addEventListener('click', function () {
     window.CA.custOrder.cancelEdit();
-    cart = {}; saveCart(); renderCart(); loadPickup();
+    cart = {}; saveCart(); renderCart();
     cartMsg.textContent = 'Modification annulée : ta commande reste telle quelle.';
   });
 

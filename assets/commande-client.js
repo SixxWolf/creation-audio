@@ -127,14 +127,16 @@ window.CA = window.CA || {};
   }
 
   // Sélecteur : une bande de jours (pastilles défilantes ‹ ›), puis les plages du jour choisi.
+  // opts.big : grandes pastilles sur plusieurs rangées (écran « Ma cueillette » de Mon compte)
   function picker(host, opts) {
     opts = opts || {};
     var list = [], day = null, sel = null;
     var el = document.createElement('div');
-    el.className = 'pk';
+    el.className = 'pk' + (opts.big ? ' pk-lg' : '');
     el.innerHTML = '<div class="pk-days"><button type="button" class="pk-nav pk-prev" aria-label="Jours précédents">‹</button>' +
       '<div class="pk-strip" role="listbox" aria-label="Jour de cueillette"></div>' +
       '<button type="button" class="pk-nav pk-next" aria-label="Jours suivants">›</button></div>' +
+      (opts.big ? '<p class="pk-dayname"></p>' : '') +
       '<div class="pk-slots" role="listbox" aria-label="Plage horaire"></div>';
     if (host) host.appendChild(el);
     var strip = el.querySelector('.pk-strip'), slotsEl = el.querySelector('.pk-slots');
@@ -167,6 +169,8 @@ window.CA = window.CA || {};
           '" data-s="' + esc(x.s) + '" aria-selected="' + on + '"' + (x.full ? ' disabled' : '') + '>' +
           hTxt(x.s) + ' – ' + hTxt(x.e) + (x.full ? ' <small>complet</small>' : '') + '</button>';
       }).join('');
+      var dn = el.querySelector('.pk-dayname');
+      if (dn) dn.textContent = day ? fmtPickup(day) : '';
       setTimeout(navState, 0);
     }
     strip.addEventListener('click', function (e) {

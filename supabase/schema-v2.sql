@@ -1774,8 +1774,8 @@ end $$;
 revoke all on function public._customer_fill_lines(jsonb) from public, anon, authenticated;
 
 -- Envoi d'une commande par le client connecté. -> { id, number, total, has_backorder }
--- p_pickup { d: 'AAAA-MM-JJ', s: 'HH:MM' } : obligatoire si tout est en stock et qu'il y a des plages
--- (sinon ignoré : la cueillette se choisit dans Mon compte une fois la commande Prête).
+-- p_pickup { d: 'AAAA-MM-JJ', s: 'HH:MM' } : facultatif (validé s'il est fourni et que tout est en stock) ;
+-- le client choisit sa cueillette juste après l'envoi, sur l'écran « Ma cueillette » de Mon compte.
 drop function if exists public.customer_submit_order(jsonb, text);
 create or replace function public.customer_submit_order(p_lines jsonb, p_note text default null, p_pickup jsonb default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -1791,7 +1791,7 @@ begin
   v_lines := public._customer_fill_lines(p_lines);
   select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
-  if not v_bo then v_pk := public._pickup_check(p_pickup, null, null, true); end if;
+  if not v_bo then v_pk := public._pickup_check(p_pickup, null, null, false); end if;
   v_num := 'C-' || lpad(nextval('public.customer_order_seq')::text, 4, '0');
   insert into public.customer_orders (number, customer_id, email, name, phone, note, total, has_backorder,
                                       pickup_date, pickup_start, pickup_end)
@@ -1818,9 +1818,7 @@ begin
   v_lines := public._customer_fill_lines(p_lines);
   select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
-  if not v_bo and (p_pickup is not null or o.pickup_date is null) then
-    v_pk := public._pickup_check(p_pickup, null, p_id, true);
-  end if;
+  if not v_bo and p_pickup is not null then v_pk := public._pickup_check(p_pickup, null, p_id, false); end if;
   delete from public.customer_order_lines where order_id = p_id;
   insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
   select p_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
@@ -2005,7 +2003,7 @@ revoke all on function public._reservation_penalize(uuid) from public, anon, aut
 revoke all on function public._reservation_forgive(uuid)  from public, anon, authenticated;
 
 -- Réservation par le client connecté. -> { id, number, total, expires_at }
--- p_pickup { d, s } : plage de cueillette avant l'échéance (obligatoire s'il y en a une).
+-- p_pickup { d, s } : plage de cueillette avant l'échéance (facultative : choisie ensuite dans « Ma cueillette »).
 drop function if exists public.customer_reserve(jsonb, text);
 create or replace function public.customer_reserve(p_lines jsonb, p_note text default null, p_pickup jsonb default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -2035,7 +2033,7 @@ begin
     raise exception 'Plus assez de stock pour : %. Ajuste ton panier ou envoie-le en commande.', v_short;
   end if;
   select coalesce(sum((x ->> 'line_total')::numeric), 0) into v_total from jsonb_array_elements(v_lines) x;
-  v_pk := public._pickup_check(p_pickup, v_exp, null, true);
+  v_pk := public._pickup_check(p_pickup, v_exp, null, false);
   v_num := 'R-' || lpad(nextval('public.customer_reservation_seq')::text, 4, '0');
   insert into public.customer_reservations (number, customer_id, email, name, phone, note, total, expires_at,
                                             pickup_date, pickup_start, pickup_end)
@@ -3279,6 +3277,7 @@ drop policy if exists production_queue_admin_all on public.production_queue;
 create policy production_queue_admin_all on public.production_queue for all to authenticated
   using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
 revoke all on public.production_queue from anon;
+
 -- ------------------------------------------------------------
 -- NOUVELLES (2026-10-22) — promos, événements, nouveautés, mises à jour
 -- Admin : onglet Nouvelles (cms-nouvelles.js), historique gardé (rien ne s'efface
@@ -3315,7 +3314,6 @@ drop policy if exists news_admin_all on public.news;
 create policy news_admin_all on public.news for all to authenticated
   using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
 grant select on public.news to anon, authenticated;
-
 
 -- ------------------------------------------------------------
 -- Vérification
