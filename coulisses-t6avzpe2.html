@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
+<link rel="stylesheet" href="assets/silhouettes.css?v=12">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
@@ -121,6 +122,7 @@
 
       <p class="side-group" aria-hidden="true">Atelier</p>
       <button class="tab" type="button" data-tab="autoloop" data-group="Atelier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3.5l3 3-3 3"/><path d="M20 6.5H8.5a5 5 0 0 0-5 5"/><path d="M7 20.5l-3-3 3-3"/><path d="M4 17.5h11.5a5 5 0 0 0 5-5"/></svg><span>AutoLoop</span></button>
+      <button class="tab" type="button" data-tab="silhouettes" data-group="Atelier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 15.5V13l3.2-1.4 3-3.6h6.1l3.6 3.4 2.6.8v3.3"/><path d="M4.4 15.5h1.1M9.5 15.5h5M18.5 15.5h3"/><circle cx="7.5" cy="15.5" r="2"/><circle cx="16.5" cy="15.5" r="2"/></svg><span>Silhouettes</span></button>
 
       <p class="side-group" aria-hidden="true">Réglages</p>
       <button class="tab" type="button" data-tab="apparence" data-group="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9.5 9.5 0 0 0 0 19c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.7-1.7h2a5.5 5.5 0 0 0 5.5-5.5c0-4.3-4.3-7.7-9.8-7.7z"/><circle cx="7.5" cy="11.5" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/></svg><span>Apparence</span></button>
@@ -2009,6 +2011,286 @@
       </div>
     </section>
 
+    <!-- ---------------- SILHOUETTES ---------------- -->
+    <!-- Générateur de silhouettes murales (cms-silhouettes.js ; calculs : silhouette-engine.js dans
+         silhouette-worker.js). Aperçu à gauche (Plan · Mur · 3D), étapes repliables à droite,
+         contrôles + export collés en bas du panneau. -->
+    <section class="tabpanel" data-panel="silhouettes" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Silhouettes</h1>
+          <p class="muted">Une image devient une pièce murale prête à imprimer ou à découper.</p>
+        </div>
+      </div>
+
+      <div class="sil" id="sil-app">
+        <div class="sil-stage" id="sil-stage">
+          <canvas class="sil-cv" id="sil-cv" aria-label="Aperçu de la silhouette"></canvas>
+          <canvas class="sil-cv" id="sil-gl" aria-label="Aperçu 3D" hidden></canvas>
+          <button class="sil-empty" id="sil-empty" type="button">
+            <span class="al-drop-ic" aria-hidden="true">＋</span>
+            <span class="al-drop-t">Glisse une image ici, colle-la (Ctrl+V) ou clique pour choisir</span>
+            <span class="al-drop-s">Dessin, logo ou silhouette en noir sur fond clair</span>
+          </button>
+          <div class="sil-bar sil-bar-top">
+            <div class="fx-seg sil-seg" id="sil-view" role="radiogroup" aria-label="Aperçu">
+              <button class="fx-seg-btn is-active" type="button" data-v="plan" role="radio" aria-checked="true">Plan</button>
+              <button class="fx-seg-btn" type="button" data-v="mur" role="radio" aria-checked="false">Mur</button>
+              <button class="fx-seg-btn" type="button" data-v="3d" role="radio" aria-checked="false">3D</button>
+            </div>
+            <span class="sil-busy" id="sil-busy" hidden>Calcul…</span>
+            <div class="sil-tools" id="sil-zoom">
+              <button class="sil-tb" type="button" id="sil-edit" aria-pressed="false">Éditer</button>
+              <button class="sil-tb" type="button" data-zoom="out" aria-label="Dézoomer">−</button>
+              <button class="sil-tb" type="button" data-zoom="fit">Ajuster</button>
+              <button class="sil-tb" type="button" data-zoom="in" aria-label="Zoomer">+</button>
+            </div>
+          </div>
+          <div class="sil-editbar" id="sil-editbar" role="toolbar" aria-label="Retouches" hidden>
+            <div class="sil-ed-tools" id="sil-ed-tools" role="radiogroup" aria-label="Outil">
+              <button class="sil-ed" type="button" role="radio" aria-checked="true" data-tool="select"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l6 17 2.2-6.8L20 11z"/></svg>Sélection</button>
+              <button class="sil-ed" type="button" role="radio" aria-checked="false" data-tool="fill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5c3 4 6 7 6 10.5a6 6 0 0 1-12 0c0-3.5 3-6.5 6-10.5z"/><path d="M8.5 14.5a3.5 3.5 0 0 0 3.5 3.5"/></svg>Remplir</button>
+              <button class="sil-ed" type="button" role="radio" aria-checked="false" data-tool="empty"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" stroke-dasharray="2 2"/></svg>Vider</button>
+              <button class="sil-ed" type="button" role="radio" aria-checked="false" data-tool="line"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18c3-9 9-1 16-12"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="6" r="1.6"/></svg>Ligne</button>
+              <button class="sil-ed" type="button" role="radio" aria-checked="false" data-tool="paint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 4.5l-8 8"/><path d="M11.5 12.5c-2.5-.5-4.5 1-4.5 3.5 0 1.5-1 2.5-2.5 2.5 1.5 1.5 3.5 2 5.5 1.5s3.5-2.5 3-5z"/></svg>Pinceau</button>
+              <button class="sil-ed" type="button" role="radio" aria-checked="false" data-tool="erase"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 20h12"/><path d="M5.5 15.5l9-9 4.5 4.5-9 9H8z"/><path d="M10 11l4.5 4.5"/></svg>Gomme</button>
+            </div>
+            <div class="sil-ed-size" id="sil-ed-size" hidden>
+              <span>Taille</span><output id="sil-ed-sz">6 mm</output>
+              <input type="range" id="sil-ed-range" min="1" max="40" step="0.5" value="6" aria-label="Taille du pinceau">
+            </div>
+            <div class="sil-ed-sep"></div>
+            <button class="sil-ed" type="button" id="sil-ed-undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Annuler</button>
+            <button class="sil-ed" type="button" id="sil-ed-clear"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg>Tout effacer</button>
+            <p class="sil-ed-st" id="sil-ed-st" hidden></p>
+          </div>
+          <div class="sil-bar sil-bar-bot">
+            <div class="sil-tools" id="sil-layers">
+              <label class="sil-chip"><input type="checkbox" data-layer="image"> Image</label>
+              <label class="sil-chip"><input type="checkbox" data-layer="checks" checked> Contrôles</label>
+              <label class="sil-chip"><input type="checkbox" data-layer="segments" checked> Segments</label>
+            </div>
+            <div class="sil-tools" id="sil-3dbar" hidden>
+              <button class="sil-tb" type="button" data-cam="front">Face</button>
+              <button class="sil-tb" type="button" data-cam="back">Dos</button>
+              <label class="sil-chip"><input type="checkbox" id="sil-explode"> Éclaté</label>
+            </div>
+            <div class="sil-tools" id="sil-cropbar" hidden>
+              <button class="sil-tb" type="button" id="sil-crop-all">Tout</button>
+              <button class="sil-tb" type="button" id="sil-crop-cancel">Annuler</button>
+              <button class="btn btn-accent btn-sm" type="button" id="sil-crop-ok" data-ic="check">Valider</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="sil-panel" id="sil-panel">
+          <details class="al-card al-acc sil-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">1</span> Image <span class="al-note" id="sil-img-sum"></span></summary>
+            <div class="al-drop" id="sil-drop" role="button" tabindex="0">
+              <div class="al-drop-ic" aria-hidden="true">＋</div>
+              <p class="al-drop-t">Glisse une image ou clique pour choisir</p>
+              <p class="al-drop-s" id="sil-file-name">PNG, JPG, WebP, SVG</p>
+            </div>
+            <input type="file" id="sil-file" accept="image/*" hidden>
+            <div class="sil-row">
+              <button class="btn btn-ghost btn-sm" type="button" id="sil-crop" disabled>Recadrer</button>
+              <button class="btn btn-ghost btn-sm" type="button" id="sil-ai-btn" aria-expanded="false" aria-controls="sil-ai">Préparer avec l'IA</button>
+              <span class="sil-meta" id="sil-crop-sum"></span>
+            </div>
+            <!-- Prompt à copier dans Gemini (anglais) : reprend la taille, le trait et le plus petit détail réglés -->
+            <div class="sil-ai" id="sil-ai" hidden>
+              <div class="fx-seg sil-seg sil-seg-full sil-seg-sm" id="sil-ai-src" role="radiogroup" aria-label="Départ">
+                <button class="fx-seg-btn is-active" type="button" data-v="image" role="radio" aria-checked="true">Mon image</button>
+                <button class="fx-seg-btn" type="button" data-v="zero" role="radio" aria-checked="false">De zéro</button>
+              </div>
+              <div class="field">
+                <label class="lbl" for="sil-ai-subj">Sujet</label>
+                <input type="text" id="sil-ai-subj" placeholder="Porsche 911 RSR de profil" autocomplete="off">
+              </div>
+              <div class="sil-f">
+                <span class="lbl">Style</span>
+                <div class="fx-seg sil-seg sil-seg-full sil-seg-sm" id="sil-ai-style" role="radiogroup" aria-label="Style">
+                  <button class="fx-seg-btn is-active" type="button" data-v="trait" role="radio" aria-checked="true">Trait continu</button>
+                  <button class="fx-seg-btn" type="button" data-v="pochoir" role="radio" aria-checked="false">Pochoir plein</button>
+                </div>
+              </div>
+              <textarea id="sil-ai-out" rows="9" readonly aria-label="Prompt"></textarea>
+              <div class="sil-row">
+                <button class="btn btn-accent btn-sm" type="button" id="sil-ai-copy" data-ic="copy">Copier</button>
+                <span class="sil-meta" id="sil-ai-msg"></span>
+              </div>
+            </div>
+          </details>
+
+          <details class="al-card al-acc sil-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">2</span> Tracé</summary>
+            <div class="sil-f">
+              <span class="lbl">Rendu</span>
+              <div class="fx-seg sil-seg sil-seg-full" id="sil-mode" role="radiogroup" aria-label="Rendu">
+                <button class="fx-seg-btn is-active" type="button" data-v="plein" role="radio" aria-checked="true">Plein</button>
+                <button class="fx-seg-btn" type="button" data-v="contour" role="radio" aria-checked="false">Contour</button>
+                <button class="fx-seg-btn" type="button" data-v="inverse" role="radio" aria-checked="false">Inversé</button>
+              </div>
+            </div>
+            <div class="sil-f">
+              <div class="sil-lblrow"><label class="lbl" for="sil-thr">Seuil</label><output id="sil-thr-v" for="sil-thr">128</output><button class="al-link" type="button" id="sil-thr-auto">Auto</button></div>
+              <input type="range" id="sil-thr" min="1" max="254" step="1" value="128">
+            </div>
+            <label class="sil-check"><input type="checkbox" id="sil-inv"> Sujet clair sur fond foncé</label>
+            <div class="sil-f">
+              <div class="sil-lblrow"><label class="lbl" for="sil-smooth">Lissage</label><output id="sil-smooth-v" for="sil-smooth">2</output></div>
+              <input type="range" id="sil-smooth" min="0" max="10" step="1" value="2">
+            </div>
+            <div class="sil-f">
+              <div class="sil-lblrow"><label class="lbl" for="sil-simp">Simplification</label><output id="sil-simp-v" for="sil-simp">0,1 mm</output></div>
+              <input type="range" id="sil-simp" min="0" max="2" step="0.05" value="0.1">
+            </div>
+            <div class="grid sil-grid">
+              <div class="field">
+                <label class="lbl" for="sil-speck">Taches ignorées</label>
+                <span class="unit" data-unit="mm²"><input type="number" id="sil-speck" min="0" step="1" value="4" class="num"></span>
+              </div>
+              <div class="field" data-only="inverse" hidden>
+                <label class="lbl" for="sil-margin">Marge du cadre</label>
+                <span class="unit" data-unit="mm"><input type="number" id="sil-margin" min="0" step="1" value="15" class="num"></span>
+              </div>
+            </div>
+            <!-- Trait du dessin (Contour) : ses propres bornes, indépendantes des contrôles de fabrication -->
+            <div class="sil-f-top" data-only="contour" hidden>
+              <div class="sil-f">
+                <div class="sil-lblrow"><label class="lbl" for="sil-adapt">Trait adaptatif</label><output id="sil-adapt-v" for="sil-adapt">50 %</output></div>
+                <input type="range" id="sil-adapt" min="0" max="100" step="5" value="50">
+              </div>
+              <div class="grid sil-grid">
+                <div class="field">
+                  <label class="lbl" for="sil-stroke">Trait max</label>
+                  <span class="unit" data-unit="mm"><input type="number" id="sil-stroke" min="0.5" step="0.5" value="4" class="num"></span>
+                </div>
+                <div class="field">
+                  <label class="lbl" for="sil-stroke-min">Trait min</label>
+                  <span class="unit" data-unit="mm"><input type="number" id="sil-stroke-min" min="0.5" step="0.5" value="2" class="num"></span>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details class="al-card al-acc sil-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">3</span> Taille</summary>
+            <!-- Largeur et hauteur liées par la proportion de l'image : la case tapée en dernier commande l'autre -->
+            <div class="grid sil-grid">
+              <div class="field">
+                <label class="lbl" for="sil-w">Largeur</label>
+                <span class="unit" data-unit="mm"><input type="number" id="sil-w" min="20" max="5000" step="10" value="600" class="num"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="sil-h">Hauteur</label>
+                <span class="unit" data-unit="mm"><input type="number" id="sil-h" min="20" max="5000" step="10" value="" class="num"></span>
+              </div>
+            </div>
+          </details>
+
+          <details class="al-card al-acc sil-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">4</span> Pièce</summary>
+            <div class="sil-f">
+              <span class="lbl">Imprimante</span>
+              <div class="fx-seg sil-seg sil-seg-full" id="sil-printer" role="radiogroup" aria-label="Imprimante">
+                <button class="fx-seg-btn is-active" type="button" data-v="bambu" role="radio" aria-checked="true">Bambu · 256</button>
+                <button class="fx-seg-btn" type="button" data-v="sv08" role="radio" aria-checked="false">SV08 · 500</button>
+              </div>
+            </div>
+            <div class="grid sil-grid">
+              <div class="field">
+                <label class="lbl" for="sil-thick">Épaisseur</label>
+                <span class="unit" data-unit="mm"><input type="number" id="sil-thick" min="1" max="20" step="0.5" value="4" class="num"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="sil-ov">Tenon</label>
+                <span class="unit" data-unit="mm"><input type="number" id="sil-ov" min="4" max="60" step="1" value="12" class="num"></span>
+              </div>
+            </div>
+          </details>
+
+          <details class="al-card al-acc sil-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">5</span> Fond &amp; couleurs</summary>
+            <div class="sil-f">
+              <span class="lbl">Fond</span>
+              <div class="fx-seg sil-seg sil-seg-full" id="sil-back" role="radiogroup" aria-label="Fond">
+                <button class="fx-seg-btn is-active" type="button" data-v="none" role="radio" aria-checked="true">Aucun</button>
+                <button class="fx-seg-btn" type="button" data-v="contour" role="radio" aria-checked="false">Silhouette</button>
+                <button class="fx-seg-btn" type="button" data-v="rect" role="radio" aria-checked="false">Rectangle</button>
+              </div>
+            </div>
+            <div class="grid sil-grid" id="sil-back-dims" hidden>
+              <div class="field">
+                <label class="lbl" for="sil-back-t">Épaisseur fond</label>
+                <span class="unit" data-unit="mm"><input type="number" id="sil-back-t" min="0.4" max="20" step="0.2" value="2" class="num"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="sil-back-m">Marge</label>
+                <span class="unit" data-unit="mm"><input type="number" id="sil-back-m" min="0" max="200" step="1" value="5" class="num"></span>
+              </div>
+            </div>
+            <div class="grid sil-grid sil-cols">
+              <div class="field">
+                <label class="lbl" for="sil-col-piece">Silhouette</label>
+                <select id="sil-col-piece"><option value="#000000" data-sw="#000000">Noir</option></select>
+              </div>
+              <div class="field" id="sil-col-back-f" hidden>
+                <label class="lbl" for="sil-col-back">Fond</label>
+                <select id="sil-col-back"><option value="#FFFFFF" data-sw="#FFFFFF">Blanc</option></select>
+              </div>
+            </div>
+            <div class="sil-defs">
+              <p class="sil-defs-t"><b>Valeurs par défaut</b> <span class="sil-defs-msg" id="sil-defs-msg"></span></p>
+              <button class="btn btn-ghost btn-sm" type="button" id="sil-defs-save">Enregistrer comme défauts</button>
+            </div>
+          </details>
+
+          <section class="al-card sil-checks" id="sil-checks">
+            <div class="al-card-head"><span class="al-ic" aria-hidden="true">✓</span> Contrôles <span class="al-note">clic sur un morceau = son choix</span></div>
+            <div class="sil-ck">
+              <div class="sil-ck-l"><span>Morceaux détachés</span><b class="sil-ck-n" id="sil-n-isl">—</b></div>
+              <div class="fx-seg sil-seg sil-seg-full sil-seg-sm" id="sil-isl" role="radiogroup" aria-label="Morceaux détachés">
+                <button class="fx-seg-btn is-active" type="button" data-v="link" role="radio" aria-checked="true">Relier</button>
+                <button class="fx-seg-btn" type="button" data-v="drop" role="radio" aria-checked="false">Supprimer</button>
+                <button class="fx-seg-btn" type="button" data-v="apart" role="radio" aria-checked="false">À part</button>
+              </div>
+              <div class="sil-ck-f"><label class="lbl" for="sil-bridge">Largeur des ponts</label><span class="unit" data-unit="mm"><input type="number" id="sil-bridge" min="0" max="50" step="0.5" value="3" class="num"></span></div>
+            </div>
+            <div class="sil-ck">
+              <div class="sil-ck-l"><span>Passages minces</span><b class="sil-ck-n" id="sil-n-thin">—</b></div>
+              <div class="fx-seg sil-seg sil-seg-full sil-seg-sm" id="sil-thin" role="radiogroup" aria-label="Passages minces">
+                <button class="fx-seg-btn is-active" type="button" data-v="fix" role="radio" aria-checked="true">Épaissir</button>
+                <button class="fx-seg-btn" type="button" data-v="keep" role="radio" aria-checked="false">Garder</button>
+              </div>
+              <div class="sil-ck-f"><label class="lbl" for="sil-min">Trait min.</label><span class="unit" data-unit="mm"><input type="number" id="sil-min" min="0" max="50" step="0.5" value="3" class="num"></span></div>
+            </div>
+            <div class="sil-ck">
+              <div class="sil-ck-l"><span>Petits trous</span><b class="sil-ck-n" id="sil-n-holes">—</b></div>
+              <div class="fx-seg sil-seg sil-seg-full sil-seg-sm" id="sil-holes" role="radiogroup" aria-label="Petits trous">
+                <button class="fx-seg-btn is-active" type="button" data-v="fill" role="radio" aria-checked="true">Boucher</button>
+                <button class="fx-seg-btn" type="button" data-v="keep" role="radio" aria-checked="false">Garder</button>
+              </div>
+              <div class="sil-ck-f"><label class="lbl" for="sil-hole-min">Trou min.</label><span class="unit" data-unit="mm"><input type="number" id="sil-hole-min" min="0" max="50" step="0.5" value="1.5" class="num"></span></div>
+            </div>
+            <div class="sil-ck">
+              <div class="sil-ck-l"><span>Segments</span><b class="sil-ck-n" id="sil-n-seg">—</b><button class="al-link" type="button" id="sil-cuts-auto" hidden>Coupes auto</button></div>
+            </div>
+            <div class="al-warn sil-warn" id="sil-warn" role="status" hidden></div>
+          </section>
+
+          <section class="al-card sil-export" id="sil-export">
+            <div class="sil-run">
+              <button class="btn btn-accent" type="button" id="sil-3mf" data-ic="download" disabled>Exporter le 3MF</button>
+              <button class="btn btn-ghost" type="button" id="sil-svg" data-ic="download" disabled>SVG</button>
+              <button class="btn btn-ghost" type="button" id="sil-dxf" data-ic="download" disabled>DXF</button>
+            </div>
+            <div class="sil-report" id="sil-report"><p class="muted">Aucune image.</p></div>
+          </section>
+        </aside>
+      </div>
+    </section>
+
     <!-- ---------------- RÉGLAGES › APPARENCE ---------------- -->
     <!-- Couleur d'accent de l'admin (boutons, onglets actifs, liens, cases…) : admin-accent.js -->
     <section class="tabpanel" data-panel="apparence" role="tabpanel" hidden>
@@ -2161,11 +2443,14 @@
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
 <script src="assets/cms-autoloop.js?v=45"></script>
+<!-- Silhouettes : le ?v= du moteur sert aussi au worker (cms-silhouettes.js le lit ici) -->
+<script src="assets/silhouette-engine.js?v=14"></script>
+<script src="assets/cms-silhouettes.js?v=15"></script>
 <script src="assets/cms-production.js?v=11"></script>
 <script src="assets/cms-aujourdhui.js?v=1"></script>
+<script src="assets/cms-nouvelles.js?v=4"></script>
 <script src="assets/cms-recherche.js?v=1"></script>
 <script src="assets/aide.js?v=2"></script>
 <script src="assets/cms-aide.js?v=1"></script>
 </body>
 </html>
-<script src="assets/cms-nouvelles.js?v=4"></script>

@@ -1,0 +1,175 @@
+/* =========================================================
+   Création Audio — Silhouettes (admin, groupe Atelier)
+   Aperçu géant à gauche (Plan · Mur · 3D), étapes repliables à droite,
+   contrôles + export collés en bas du panneau. Les deux colonnes tiennent
+   dans la fenêtre (hauteur posée par cms-silhouettes.js : --sil-h).
+   Cartes, zone de dépôt et repliables : classes d'AutoLoop (.al-card,
+   .al-drop, .al-acc) ; boutons segmentés : .fx-seg (facture.css).
+   ========================================================= */
+body[data-tab="silhouettes"] main { max-width:none; padding-bottom:16px; }
+.sil { --sil-h:calc(100vh - 220px); display:grid; grid-template-columns:minmax(0, 1fr) 400px; gap:18px; align-items:start; }
+
+/* --- Aperçu ----------------------------------------------- */
+.sil-stage { position:relative; height:var(--sil-h); min-height:420px; overflow:hidden; background:var(--wash);
+  border:1px solid var(--line); border-radius:16px; }
+.sil-cv { position:absolute; inset:0; display:block; width:100%; height:100%; touch-action:none; cursor:grab; }
+.sil-cv.is-pan { cursor:grabbing; }
+.sil-cv.is-cut { cursor:col-resize; }
+.sil-cv.is-cut-y { cursor:row-resize; }
+.sil-cv.is-pick { cursor:pointer; }
+.sil-cv.is-crop { cursor:crosshair; }
+/* aucune image : grande zone de dépôt au centre */
+.sil-empty { position:absolute; inset:64px 24px; z-index:2; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:6px; padding:24px; font:inherit; color:var(--ink); text-align:center; cursor:pointer; background:color-mix(in srgb, var(--paper) 55%, transparent);
+  border:1.5px dashed var(--line-2); border-radius:14px; transition:background .15s, border-color .15s; }
+.sil-empty:hover, .sil-stage.drag .sil-empty { background:color-mix(in srgb, var(--ember) 7%, var(--paper)); border-color:var(--ember); }
+.sil-empty:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
+.sil-empty .al-drop-t { margin:6px 0 0; font-size:1rem; }
+.sil-stage.drag { box-shadow:inset 0 0 0 2px var(--ember); }
+/* barres d'outils posées sur l'aperçu */
+.sil-bar { position:absolute; left:0; right:0; z-index:3; display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:10px; pointer-events:none; }
+.sil-bar > * { pointer-events:auto; }
+.sil-bar-top { top:0; }
+.sil-bar-bot { bottom:0; }
+.sil-bar .fx-seg { background:var(--wash-2, var(--wash)); border-color:var(--line-2); box-shadow:var(--btn-drop); }
+.sil-tools { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.sil-tools[hidden] { display:none; }
+#sil-zoom { margin-left:auto; }
+.sil-tb, .sil-chip { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:0 12px; font:inherit; font-size:.84rem; font-weight:600;
+  color:var(--ink); white-space:nowrap; cursor:pointer; background:var(--paper); border:1px solid var(--line); border-radius:10px;
+  box-shadow:var(--btn-drop); transition:border-color .15s, color .15s; }
+.sil-tb:hover, .sil-chip:hover { border-color:color-mix(in srgb, var(--ember) 60%, var(--line-2)); }
+.sil-tb:focus-visible, .sil-chip:focus-within { outline:2px solid var(--ember); outline-offset:2px; }
+.sil-tb[data-zoom="in"], .sil-tb[data-zoom="out"] { width:34px; padding:0; justify-content:center; font-size:1.05rem; }
+.sil-chip input { margin:0; }
+/* mode Édition : bouton dans la barre du haut + outils flottants à gauche */
+#sil-edit[aria-pressed="true"] { color:var(--ember-ink, var(--ember)); border-color:var(--ember); background:color-mix(in srgb, var(--ember) 12%, var(--paper)); }
+.sil-editbar { position:absolute; left:10px; top:58px; z-index:3; display:flex; flex-direction:column; gap:3px; padding:6px;
+  background:var(--paper); border:1px solid var(--line); border-radius:12px; box-shadow:var(--btn-drop); }
+.sil-editbar[hidden] { display:none; }
+.sil-ed-tools { display:flex; flex-direction:column; gap:3px; }
+.sil-ed { display:flex; align-items:center; gap:8px; min-height:32px; padding:0 10px; font:inherit; font-size:.84rem; font-weight:600; color:var(--ink);
+  white-space:nowrap; text-align:left; cursor:pointer; background:transparent; border:1px solid transparent; border-radius:8px; }
+.sil-ed svg { width:16px; height:16px; flex:none; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.sil-ed:hover { background:var(--wash); }
+.sil-ed[aria-checked="true"] { color:var(--ember-ink, var(--ember)); background:color-mix(in srgb, var(--ember) 12%, transparent);
+  border-color:color-mix(in srgb, var(--ember) 45%, transparent); }
+.sil-ed:disabled { opacity:.45; cursor:default; background:transparent; }
+.sil-ed:focus-visible { outline:2px solid var(--ember); outline-offset:1px; }
+.sil-ed-sep { height:1px; margin:3px 4px; background:var(--line); }
+.sil-ed-st { margin:3px 4px 1px; font-size:.76rem; font-weight:600; color:var(--ink-2); white-space:nowrap; }
+.sil-ed-st[hidden] { display:none; }
+.sil-cv.is-draw { cursor:crosshair; }
+.sil-cv.is-brush { cursor:none; }
+.sil-ed-size { display:grid; grid-template-columns:1fr auto; align-items:center; gap:2px 8px; margin:3px 4px 1px; font-size:.78rem; font-weight:600; color:var(--ink-2); }
+.sil-ed-size[hidden] { display:none; }
+.sil-ed-size output { color:var(--ink); font-variant-numeric:tabular-nums; }
+.sil-ed-size input { grid-column:1 / -1; width:100%; min-width:120px; height:20px; margin:0; accent-color:var(--ember); cursor:pointer; }
+.sil-busy { display:inline-flex; align-items:center; gap:8px; min-height:30px; padding:0 12px; font-size:.82rem; font-weight:600; color:var(--ink-2);
+  background:var(--paper); border:1px solid var(--line); border-radius:999px; box-shadow:var(--btn-drop); }
+.sil-busy::before { content:''; width:12px; height:12px; border:2px solid color-mix(in srgb, var(--ember) 30%, transparent); border-top-color:var(--ember);
+  border-radius:50%; animation:sil-spin .8s linear infinite; }
+.sil-busy[hidden] { display:none; }
+@keyframes sil-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .sil-busy::before { animation:none; } }
+
+/* --- Panneau : défile seul ; contrôles + export collés en bas ----------- */
+.sil-panel { display:flex; flex-direction:column; gap:12px; height:var(--sil-h); min-height:420px; overflow-y:auto; overscroll-behavior:contain;
+  scrollbar-width:thin; padding:0 2px 0 0; }
+.sil-panel > .al-card { flex:none; }
+.sil-step { padding:14px 18px; }
+.sil-step > summary.al-card-head { margin-bottom:0; }
+.sil-step[open] > summary.al-card-head { margin-bottom:14px; }
+.sil-f { display:flex; flex-direction:column; gap:8px; margin:0 0 14px; }
+.sil-lblrow { display:flex; align-items:center; gap:10px; }
+.sil-lblrow .lbl { margin:0; }
+.sil-lblrow output { margin-left:auto; font-size:.86rem; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; }
+.sil-f input[type=range] { width:100%; height:20px; margin:0; accent-color:var(--ember); cursor:pointer; }
+.sil-seg-full { display:flex; }
+.sil-seg-full .fx-seg-btn { flex:1; min-width:0; padding:0 8px; }
+.sil-seg-sm .fx-seg-btn { min-height:30px; font-size:.84rem; }
+.sil-check { display:flex; align-items:center; gap:9px; margin:0 0 14px; font-size:.9rem; font-weight:500; color:var(--ink); cursor:pointer; }
+.sil-check input { margin:0; }
+.sil-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px 14px; }
+.sil-grid .field[hidden] { display:none; }
+.sil-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; margin-top:12px; }
+.sil-meta { font-size:.84rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+#sil-ai-btn[aria-expanded="true"] { color:var(--ember-ink, var(--ember)); border-color:var(--ember); }
+.sil-ai { display:flex; flex-direction:column; gap:12px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+.sil-ai[hidden] { display:none; }
+.sil-ai .field, .sil-ai .sil-f { margin:0; }
+.sil-ai .sil-row { margin-top:0; }
+#sil-ai-out { width:100%; min-height:180px; resize:vertical; font:inherit; font-size:.8rem; line-height:1.45; color:var(--ink);
+  background:var(--wash); border:1px solid var(--line); border-radius:8px; padding:10px; }
+.sil-step .al-drop { padding:18px 14px; }
+.sil-f-top { margin:14px 0 0; }
+.sil-f[hidden] { display:none; }
+/* valeurs par défaut (même look que celles d'AutoLoop, classe propre : AutoLoop lit toutes les .al-defs) */
+.sil-defs { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px; margin-top:16px; padding-top:14px;
+  border-top:1px solid var(--line); }
+.sil-defs-t { margin:0; font-size:.84rem; color:var(--ink-2); }
+.sil-defs-t b { margin-right:4px; font-family:var(--display); color:var(--ink); }
+.sil-defs-msg { color:var(--muted); }
+.sil-defs-msg.is-ok { color:var(--good); }
+.sil-defs-msg.is-warn { color:var(--bad); }
+
+/* --- Contrôles -------------------------------------------- */
+.sil-checks { padding:14px 18px; }
+.sil-checks > .al-card-head { margin-bottom:10px; }
+.sil-ck { padding:10px 0; border-top:1px solid var(--line); }
+.sil-ck:first-of-type { padding-top:0; border-top:0; }
+.sil-ck-l { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; font-size:.9rem; color:var(--ink); }
+.sil-ck:last-of-type .sil-ck-l { margin-bottom:0; }
+.sil-ck-n { margin-left:auto; font-size:.86rem; font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums; text-align:right; }
+.sil-ck-n.is-ok { color:var(--good); }
+.sil-ck-n.is-warn { color:var(--bad); }
+.sil-ck-n.is-note { color:var(--ember-ink); }
+.sil-ck-l .al-link { font-size:.84rem; }
+.sil-warn { margin-top:10px; }
+.sil-warn p { margin:0; }
+.sil-warn p + p { margin-top:4px; }
+
+/* --- Export (collé en bas du panneau) --------------------- */
+.sil-export { position:sticky; bottom:0; z-index:2; padding:14px 18px; box-shadow:0 -12px 24px -16px rgba(20,22,26,.35); }
+.sil-run { display:grid; grid-template-columns:minmax(0, 1fr) auto auto; gap:8px; }
+.sil-run .btn { padding:0 12px; white-space:nowrap; }
+.sil-report { margin-top:12px; }
+.sil-report .muted { margin:0; font-size:.85rem; }
+.sil-report .al-srow { padding:5px 0; font-size:.86rem; }
+.sil-report .al-srow:last-child { border-bottom:0; }
+.sil-report .al-srow > span:first-child { flex:none; color:var(--ink-2); }
+.sil-report .al-srow > span:last-child { min-width:0; font-weight:600; color:var(--ink); text-align:right; }
+.sil-report .is-bad { color:var(--bad) !important; }
+.sil-pieces > summary { cursor:pointer; list-style:none; }
+.sil-pieces > summary::-webkit-details-marker { display:none; }
+.sil-pieces > summary > span:first-child::after { content:""; display:inline-block; width:6px; height:6px; margin:0 0 2px 8px; border:solid var(--ink-2); border-width:0 2px 2px 0; transform:rotate(45deg); transition:transform .15s; }
+.sil-pieces[open] > summary > span:first-child::after { transform:rotate(-135deg); margin-bottom:-1px; }
+.sil-pieces > .al-srow { padding-left:14px; }
+
+/* --- Responsive ------------------------------------------- */
+@media (max-width:1100px) {
+  .sil { grid-template-columns:minmax(0, 1fr) 340px; }
+  .sil-run { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .sil-run #sil-3mf { grid-column:1 / -1; }
+}
+@media (max-width:900px) {
+  .sil { grid-template-columns:minmax(0, 1fr); }
+  .sil-stage { height:62vh; min-height:360px; }
+  .sil-panel { height:auto; min-height:0; overflow:visible; }
+  .sil-export { position:static; box-shadow:none; }
+}
+@media (max-width:640px) {
+  .sil-empty { inset:58px 12px; }
+  .sil-bar { padding:8px; }
+  .sil-step, .sil-checks, .sil-export { padding:14px; }
+}
+
+/* --- Réglage propre à chaque contrôle (sous ses boutons) ---- */
+.sil-ck-f { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px; }
+.sil-ck-f .lbl { margin:0; }
+.sil-ck-f .unit { flex:0 0 120px; }
+.sil-f-top > .sil-f { margin-bottom:12px; }
+
+/* Fond & couleurs : rangées masquées quand Fond = Aucun */
+.sil-grid[hidden], .sil-grid > .field[hidden] { display:none; }
+.sil-cols { grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); }
