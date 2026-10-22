@@ -30,7 +30,8 @@
 .acct-card input:disabled { color:var(--muted); background:var(--wash); }
 .acct-code-in { font-size:1.6rem !important; font-weight:700; letter-spacing:.32em; text-align:center;
   font-variant-numeric:tabular-nums; padding:10px 12px 10px calc(12px + .32em) !important; }
-.acct-hp { position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
+/* display:none : Chrome ignore le piège quand il analyse le formulaire pour l'autoremplissage */
+.acct-hp { display:none; }
 
 .acct-submit { display:inline-flex; align-items:center; justify-content:center; width:100%; padding:12px 18px;
   font:inherit; font-weight:700; color:var(--ink); cursor:pointer;
