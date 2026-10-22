@@ -38,6 +38,18 @@ function money(n: unknown) {
   return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).replace(".", ",") + " $";
 }
 function plural(n: number, one: string, many: string) { return n + " " + (n > 1 ? many : one); }
+// plage de cueillette -> « jeudi 23 octobre, 13 h – 17 h » (mêmes mots que commande-client.js)
+const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+function hTxt(t: unknown) {
+  const p = String(t || "").split(":");
+  return Number(p[0]) + " h" + (p[1] && p[1] !== "00" ? " " + p[1] : "");
+}
+function fmtPickup(d: unknown, s: unknown, e: unknown) {
+  if (!d) return "";
+  const p = String(d).split("-").map(Number), x = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+  return JOURS[x.getUTCDay()] + " " + x.getUTCDate() + " " + MOIS[x.getUTCMonth()] + (s ? ", " + hTxt(s) + (e ? " – " + hTxt(e) : "") : "");
+}
 // « jeudi 12 octobre, 14 h 30 » (heure de Québec)
 function when(iso: string) {
   try {
@@ -55,8 +67,10 @@ function day(iso: string) {
 type Res = {
   id: string; number: string; customer_id: string | null; email: string; name: string | null; phone: string | null;
   status: string; note: string | null; total: number; expires_at: string; created_at: string; cancelled_by: string | null;
-  notified_at: string | null;
+  notified_at: string | null; pickup_date: string | null; pickup_start: string | null; pickup_end: string | null;
 };
+const pkOf = (r: Res) => fmtPickup(r.pickup_date, r.pickup_start, r.pickup_end);
+const pkLine = (r: Res, label = "Cueillette") => (pkOf(r) ? label + " : " + pkOf(r) + "\n" : "");
 type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number };
 
 type Mailer = { key: string; from: string; adminTo: string };
@@ -112,14 +126,14 @@ async function linesOf(db: SupabaseClient, id: string) {
 async function mailNew(m: Mailer, r: Res, L: Line[]) {
   const until = when(r.expires_at);
   const subject = "Réservation " + r.number + " confirmée — Création Audio";
-  const text = "Bonjour " + first(r) + ",\n\nTa réservation " + r.number + " est confirmée : on garde tes articles jusqu'au " + until + ".\n\n" +
+  const text = "Bonjour " + first(r) + ",\n\nTa réservation " + r.number + " est confirmée : on garde tes articles jusqu'au " + until + ".\n" + pkLine(r) + "\n" +
     linesText(L) + "\n\nTotal estimé : " + money(r.total) + "\nCueillette à Québec · tu paies à la cueillette.\n" +
     (r.note ? "\nTa note : " + r.note + "\n" : "") +
     "\nPasse avant l'échéance : après, les articles sont remis en vente et la réservation compte comme non récupérée " +
     "(2 non récupérées = réservations suspendues 60 jours). Un empêchement ? Annule-la dans ton compte : " + ACCOUNT_URL + "\n\nCréation Audio\n" + SITE;
   const html = shell("Création Audio", "Réservation " + r.number + " confirmée",
     '<p style="margin:0 0 14px">Bonjour ' + esc(first(r)) + ', c\'est réservé&nbsp;!</p>' +
-    box("On garde tes articles jusqu'au " + until + ".", "ok") + table(L, r.total) +
+    box((pkOf(r) ? "Cueillette : " + pkOf(r) + ". " : "") + "On garde tes articles jusqu'au " + until + ".", "ok") + table(L, r.total) +
     '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">Cueillette à Québec · tu paies à la cueillette.</p>' +
     (r.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Ta note :</strong> ' + esc(r.note) + '</p>' : "") +
     button(ACCOUNT_URL, "Voir ma réservation") +
@@ -130,12 +144,12 @@ async function mailNew(m: Mailer, r: Res, L: Line[]) {
 async function mailReminder(m: Mailer, r: Res, L: Line[]) {
   const until = when(r.expires_at);
   const subject = "Rappel : ta réservation " + r.number + " se termine bientôt";
-  const text = "Bonjour " + first(r) + ",\n\nPetit rappel : on garde ta réservation " + r.number + " jusqu'au " + until + ".\n\n" +
+  const text = "Bonjour " + first(r) + ",\n\nPetit rappel : on garde ta réservation " + r.number + " jusqu'au " + until + ".\n" + pkLine(r, "Ta cueillette") + "\n" +
     linesText(L) + "\n\nTotal estimé : " + money(r.total) + "\n\nTu ne pourras pas passer ? Annule-la dans ton compte (" + ACCOUNT_URL +
     ") : elle ne comptera pas comme non récupérée.\n\nCréation Audio\n" + SITE;
   const html = shell("Création Audio", "Ta réservation " + r.number + " se termine bientôt",
     '<p style="margin:0 0 14px">Bonjour ' + esc(first(r)) + ',</p>' +
-    box("On la garde jusqu'au " + until + ".", "warn") + table(L, r.total) + button(ACCOUNT_URL, "Voir ma réservation") +
+    box((pkOf(r) ? "Ta cueillette : " + pkOf(r) + ". " : "") + "On la garde jusqu'au " + until + ".", "warn") + table(L, r.total) + button(ACCOUNT_URL, "Voir ma réservation") +
     '<p style="font-size:13px;color:#3A3D45">Tu ne pourras pas passer&nbsp;? Annule-la dans ton compte : elle ne comptera pas comme non récupérée.</p>' + FOOT);
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
 }
@@ -176,11 +190,11 @@ async function mailAdmin(m: Mailer, r: Res, L: Line[], event: "new" | "cancelled
   const who = r.name || r.email;
   const subject = label + " " + r.number + " — " + who + (event === "new" ? " (" + plural(items, "article", "articles") + ", jusqu'au " + when(r.expires_at) + ")" : "");
   const text = label + " " + r.number + "\n" + who + " · " + r.email + (r.phone ? " · " + r.phone : "") + "\n" +
-    (event === "new" ? "Gardée jusqu'au " + when(r.expires_at) + "\n" : "Stock libéré.\n") + "\n" + linesText(L) +
+    (event === "new" ? "Gardée jusqu'au " + when(r.expires_at) + "\n" + pkLine(r) : "Stock libéré.\n") + "\n" + linesText(L) +
     "\n\nTotal : " + money(r.total) + "\n" + (r.note ? "\nNote du client : " + r.note + "\n" : "") + "\nOuvrir dans l'admin : " + ADMIN_URL + "\n";
   const html = shell("Réservation", label + " " + r.number,
     '<p style="margin:0 0 16px;color:#3A3D45">' + esc(who) + ' · ' + esc(r.email) + (r.phone ? ' · ' + esc(r.phone) : '') + '</p>' +
-    box(event === "new" ? "Gardée jusqu'au " + when(r.expires_at) + "." : "Stock libéré.", event === "new" ? "ok" : "info") +
+    box(event === "new" ? (pkOf(r) ? "Cueillette : " + pkOf(r) + ". " : "") + "Gardée jusqu'au " + when(r.expires_at) + "." : "Stock libéré.", event === "new" ? "ok" : "info") +
     table(L, r.total) +
     (r.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Note :</strong> ' + esc(r.note) + '</p>' : "") +
     button(ADMIN_URL, "Ouvrir dans l'admin"));

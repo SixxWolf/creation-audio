@@ -184,6 +184,7 @@
           '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') +
             '<span><b>' + esc(who) + '</b><small>' + esc(r.email) + (r.phone ? ' · ' + esc(r.phone) : '') + '</small></span></div>' +
         '</header>' +
+        (st === 'active' && CA.pickupLine ? CA.pickupLine(r) : '') +
         (r.note ? '<p class="co-note"><b>Note :</b> ' + esc(r.note) + '</p>' : '') +
         '<div class="co-table-wrap"><table class="co-table">' +
           '<thead><tr><th class="l">Article</th><th class="n">Qté</th><th class="n">Stock</th><th class="n">Prix</th><th class="n">Total</th></tr></thead>' +

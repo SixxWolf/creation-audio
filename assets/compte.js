@@ -291,8 +291,10 @@
   function loadOrders() {
     tabEl.innerHTML = '<div id="acct-resv"></div><div id="acct-cmds"></div><div id="acct-invs"><p class="acct-empty">Chargement…</p></div>';
     cmdEl = $('#acct-cmds'); ordersEl = $('#acct-invs'); resvEl = $('#acct-resv');
-    loadResv();
-    sb.rpc('me_orders').then(function (res) {
+    var slotsP = window.CA.custOrder ? window.CA.custOrder.slots() : Promise.resolve([]);
+    slotsP.then(function (l) { hasSlots = l.length > 0; loadResv(); });
+    Promise.all([slotsP, sb.rpc('me_orders')]).then(function (all) {
+      var res = all[1];
       myOrders = (!res.error && res.data) || [];
       renderCmds();
       if (!acct.linked) { renderOrders(); return; }
@@ -329,6 +331,7 @@
         '<div class="ord-body">' +
           '<ul class="ord-lines">' + lines + '</ul>' +
           '<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>' + money(o.total) + '</span></div></div>' +
+          (open ? pkRow(o.pickup_date ? o : null, !o.has_backorder || o.status === 'ready', o.has_backorder && o.status !== 'ready') : '') +
           (o.note ? '<p class="ord-note"><span>Note</span>' + esc(o.note) + '</p>' : '') +
           (o.status === 'new' ? '<div class="ord-acts"><button class="acct-btn ord-edit" type="button">Modifier</button>' +
             '<button class="acct-btn acct-btn-danger ord-cancel" type="button">Annuler la commande</button></div>' : '') +
@@ -337,8 +340,9 @@
     }).join('') + '</div>' + (invoices.length || acct.linked ? '<h2 class="acct-h">Factures</h2>' : '');
     $$('.ord', cmdEl).forEach(function (el) {
       var o = myOrders.filter(function (x) { return String(x.id) === el.getAttribute('data-oid'); })[0];
-      var ed = $('.ord-edit', el), ca = $('.ord-cancel', el);
+      var ed = $('.ord-edit', el), ca = $('.ord-cancel', el), pk = $('.pk-change', el);
       if (ed) ed.addEventListener('click', function () { editOrder(o); });
+      if (pk) pk.addEventListener('click', function () { changePickup('order', o); });
       if (ca) ca.addEventListener('click', function () { cancelOrder(o, ca); });
     });
   }
@@ -361,10 +365,37 @@
       });
       try {
         localStorage.setItem(key, JSON.stringify(cart));
-        localStorage.setItem('ca_v2_order_edit', JSON.stringify({ id: o.id, number: o.number, at: Date.now() }));
+        localStorage.setItem('ca_v2_order_edit', JSON.stringify({ id: o.id, number: o.number, at: Date.now(),
+          pickup: o.pickup_date ? { d: o.pickup_date, s: o.pickup_start } : null }));
       } catch (e) {}
       location.href = spacersOnly ? 'spacers.html' : 'boutique.html#/';
     }
+  }
+  /* ---- cueillette : date + plage (commande ouverte, réservation gardée) — CA.custOrder (commande-client.js) ---- */
+  var hasSlots = false;
+  // x : commande/réservation avec sa plage (sinon null) ; can : modifiable ; later : articles encore à commander
+  function pkRow(x, can, later) {
+    var CO = window.CA.custOrder;
+    if (!CO || (!x && !hasSlots)) return '';
+    var txt = x ? CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end) : later ? 'à choisir quand tout sera arrivé' : 'à choisir';
+    return '<p class="ord-note ord-pk' + (x ? '' : ' is-todo') + '"><span>Cueillette</span><b>' + esc(txt) + '</b>' +
+      (can && hasSlots ? '<button class="pk-change" type="button">' + (x ? 'Changer' : 'Choisir') + '</button>' : '') + '</p>';
+  }
+  function changePickup(kind, x) {
+    var CO = window.CA.custOrder, p = CO.picker(null);
+    CO.slots(kind === 'reservation' ? x.expires_at : null, x.id).then(function (list) {
+      if (!list.length) { caDialog.alert({ title: 'Aucune plage offerte pour le moment', message: 'Écris-nous pour convenir de la cueillette.', icon: 'clock' }); return; }
+      var ask = caDialog.confirm({ title: x.pickup_date ? 'Changer ma cueillette' : 'Choisir ma cueillette', body: p.el, ok: 'Enregistrer', icon: 'clock' });
+      p.load(list, x.pickup_date ? { d: x.pickup_date, s: x.pickup_start } : null);   // fenêtre ouverte : la bande se place sur le jour choisi
+      ask.then(function (ok) {
+        var v = p.value();
+        if (!ok || !v || (v.d === x.pickup_date && v.s === x.pickup_start)) return;
+        CO.setPickup(kind, x.id, v).then(function () {
+          caDialog.toast('Cueillette : ' + CO.fmtPickup(v.d, v.s, v.e, true));
+          if (kind === 'order') loadOrders(); else loadResv();
+        }, function (err) { caDialog.error(err, 'Cueillette non enregistrée'); });
+      });
+    });
   }
   function cancelOrder(o, btn) {
     caDialog.confirm({ title: 'Annuler la commande ' + o.number + ' ?', message: 'Tu pourras en passer une nouvelle au besoin.',
@@ -421,6 +452,7 @@
           '<div class="ord-body">' +
             '<ul class="ord-lines">' + lines + '</ul>' +
             '<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>' + money(r.total) + '</span></div></div>' +
+            (active ? pkRow(r.pickup_date ? r : null, true, false) : '') +
             (r.note ? '<p class="ord-note"><span>Note</span>' + esc(r.note) + '</p>' : '') +
             (active ? '<div class="ord-acts"><button class="acct-btn acct-btn-danger resv-cancel" type="button">Annuler la réservation</button></div>' : '') +
           '</div>' +
@@ -428,8 +460,9 @@
       }).join('') + '</div>';
     $$('.ord', resvEl).forEach(function (el) {
       var r = myResv.filter(function (x) { return String(x.id) === el.getAttribute('data-rid'); })[0];
-      var ca = $('.resv-cancel', el);
+      var ca = $('.resv-cancel', el), pk = $('.pk-change', el);
       if (ca) ca.addEventListener('click', function () { cancelResv(r, ca); });
+      if (pk) pk.addEventListener('click', function () { changePickup('reservation', r); });
     });
   }
   function cancelResv(r, btn) {

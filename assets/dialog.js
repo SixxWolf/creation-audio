@@ -2,8 +2,9 @@
    Fenêtres du site — remplacent confirm / alert / prompt du navigateur.
    Style : dialog.css (carte centrée, pastille d'icône, rouge si irréversible).
 
-   caDialog.confirm({ title, message, ok, cancel, danger, icon, alt })  → Promise<boolean | 'alt'>
-   (alt : texte d'un 3e bouton, ex. « Retirer de la commande » → la promesse rend 'alt')
+   caDialog.confirm({ title, message, ok, cancel, danger, icon, alt, body })  → Promise<boolean | 'alt'>
+   (alt : texte d'un 3e bouton, ex. « Retirer de la commande » → la promesse rend 'alt' ;
+    body : élément DOM ajouté sous le message)
    caDialog.alert({ title, message, ok, icon, danger })            → Promise<void>
    caDialog.prompt({ title, message, value, placeholder, readonly, ok, cancel, icon }) → Promise<string|null>
    (cancel: false = pas de bouton « Retour »)
@@ -59,6 +60,7 @@
       var t = el('h2', 'dlg-t', o.title || ''); t.id = id + '-t';
       box.appendChild(ic); box.appendChild(t);
       if (o.message) { var m = el('p', 'dlg-m', o.message); m.id = id + '-m'; box.appendChild(m); }
+      if (o.body) box.appendChild(o.body);   // contenu libre (ex. sélecteur de cueillette)
       var field = null;
       if (kind === 'prompt') {
         field = el('input', 'dlg-field');

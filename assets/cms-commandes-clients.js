@@ -40,6 +40,21 @@
     if (s < 86400) return 'il y a ' + Math.round(s / 3600) + ' h';
     return 'il y a ' + plural(Math.round(s / 86400), 'jour', 'jours');
   }
+  // plage de cueillette -> « jeudi 23 oct., 13 h – 17 h » (aussi cms-reservations.js, cms-cueillettes.js)
+  CA.hourTxt = function (t) {
+    var p = String(t || '').split(':');
+    return Number(p[0]) + ' h' + (p[1] && p[1] !== '00' ? ' ' + p[1] : '');
+  };
+  CA.fmtPickup = function (x) {
+    if (!x || !x.pickup_date) return '';
+    var p = String(x.pickup_date).split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]);
+    return d.toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'short' }) +
+      (x.pickup_start ? ', ' + CA.hourTxt(x.pickup_start) + (x.pickup_end ? ' – ' + CA.hourTxt(x.pickup_end) : '') : '');
+  };
+  CA.pickupLine = function (x) {
+    var t = CA.fmtPickup(x);
+    return t ? '<p class="co-pk"><b>Cueillette :</b> ' + esc(t) + '</p>' : '';
+  };
   var STATUS = { 'new': 'Nouvelle', preparing: 'En préparation', ready: 'Prête', invoiced: 'Facturée', cancelled: 'Annulée' };
   var OPEN = { 'new': 1, preparing: 1, ready: 1 };
 
@@ -69,18 +84,24 @@
   if (panel) panel.addEventListener('ca:wide', function () { showSub(sub); });   // avant wideLayout : reçoit l'état initial
   if (CA.wideLayout) CA.wideLayout(panel, { min: 1880 });
 
-  /* ---- sous-onglets Dealers / Clients en ligne / Réservations (#commandes/clients, #commandes/reservations) ---- */
+  /* ---- sous-onglets Dealers / Clients en ligne / Réservations / Cueillettes (#commandes/clients, …/reservations,
+     …/cueillettes — cms-cueillettes.js, CA.loadPickups). Grand écran : [Commandes] (les 3 colonnes) | [Cueillettes] ---- */
+  var colsEl = $('.co-cols'), topEl = $('.co-top'), cqEl = $('#cq-wrap');
   function showSub(s) {
-    sub = s === 'clients' || s === 'reservations' ? s : 'dealers';
-    var all = isWide();
+    sub = s === 'clients' || s === 'reservations' || s === 'cueillettes' ? s : 'dealers';
+    var all = isWide(), cq = sub === 'cueillettes';
     $$('[data-cosub]').forEach(function (b) {
-      var on = b.getAttribute('data-cosub') === sub;
+      var k = b.getAttribute('data-cosub'), on = k === 'all' ? !cq : k === sub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on);
     });
+    if (colsEl) colsEl.hidden = cq;
+    if (topEl) topEl.hidden = cq;
+    if (cqEl) cqEl.hidden = !cq;
     if (dealersEl) dealersEl.hidden = !all && sub !== 'dealers';
     wrap.hidden = !all && sub !== 'clients';
     if (resvEl) resvEl.hidden = !all && sub !== 'reservations';
-    $$('[data-co-dealer]').forEach(function (el) { el.hidden = !all && sub !== 'dealers'; });
+    $$('[data-co-dealer]').forEach(function (el) { el.hidden = cq || (!all && sub !== 'dealers'); });
+    if (cq) { if (tabOpen && CA.loadPickups) CA.loadPickups(); return; }
     if (all) { if (tabOpen) loadAll(); return; }
     if (sub === 'clients' && tabOpen) load();
     if (sub === 'reservations' && tabOpen && CA.loadReservations) CA.loadReservations();
@@ -88,6 +109,7 @@
   $$('[data-cosub]').forEach(function (b) {
     b.addEventListener('click', function () {
       var s = b.getAttribute('data-cosub');
+      if (s === 'all') s = 'dealers';
       if (CA.route && CA.route.goSub) CA.route.goSub(s === 'dealers' ? '' : s); else showSub(s);
     });
   });
@@ -97,8 +119,9 @@
     if (typeof prevOnTab === 'function') prevOnTab(name);
     tabOpen = name === 'commandes';
     if (!tabOpen) return;
-    var m = /^#commandes\/(clients|reservations)\b/.exec(location.hash), want = m ? m[1] : 'dealers';   // lien direct
-    if (want !== sub) showSub(want); else if (isWide()) loadAll(); else if (sub === 'clients') load();
+    var m = /^#commandes\/(clients|reservations|cueillettes)\b/.exec(location.hash), want = m ? m[1] : 'dealers';   // lien direct
+    if (want !== sub) showSub(want); else if (sub === 'cueillettes') { if (CA.loadPickups) CA.loadPickups(); }
+    else if (isWide()) loadAll(); else if (sub === 'clients') load();
     else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
   };
   $$('.cc-filter').forEach(function (b) {
@@ -110,7 +133,8 @@
   });
   var refreshBtn = $('#co-refresh');
   if (refreshBtn) refreshBtn.addEventListener('click', function () {
-    if (isWide()) loadAll();
+    if (sub === 'cueillettes') { if (CA.loadPickups) CA.loadPickups(); }
+    else if (isWide()) loadAll();
     else if (sub === 'clients') load(); else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
   });
   CA.reloadCustomerOrders = function () { if (loaded) load(); else refreshBadge(); };
@@ -211,6 +235,7 @@
           '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') +
             '<span><b>' + esc(who) + '</b><small>' + esc(o.email) + (o.phone ? ' · ' + esc(o.phone) : '') + ' · ' + esc(ago(o.created_at)) + '</small></span></div>' +
         '</header>' +
+        (OPEN[o.status] ? CA.pickupLine(o) : '') +
         (o.note ? '<p class="co-note"><b>Note :</b> ' + esc(o.note) + '</p>' : '') +
         '<div class="co-table-wrap"><table class="co-table">' +
           '<thead><tr><th class="l">Article</th><th class="n">Qté</th><th class="n">Stock</th><th class="n">À commander</th><th class="n">Prix</th><th class="n">Total</th></tr></thead>' +

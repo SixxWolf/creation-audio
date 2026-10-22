@@ -15,14 +15,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=95">
+<link rel="stylesheet" href="assets/admin.css?v=96">
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
-<script src="assets/dialog.js?v=3"></script>
+<script src="assets/dialog.js?v=4"></script>
 <script src="assets/theme.js?v=1" defer></script>
 </head>
 <body>
@@ -1290,9 +1290,11 @@
       </div>
 
       <div class="inv-subtabs" role="tablist" aria-label="Commandes">
+        <button type="button" class="inv-subtab" role="tab" data-cosub="all">Commandes</button>
         <button type="button" class="inv-subtab is-active" role="tab" data-cosub="dealers">Dealers</button>
         <button type="button" class="inv-subtab" role="tab" data-cosub="clients">Clients en ligne <b class="nav-count cc-n" id="cc-new-n" hidden data-wide="cc-title">0</b></button>
         <button type="button" class="inv-subtab" role="tab" data-cosub="reservations">Réservations <b class="nav-count cc-n" id="cr-n" hidden data-wide="cr-title">0</b></button>
+        <button type="button" class="inv-subtab" role="tab" data-cosub="cueillettes">Cueillettes <b class="nav-count cc-n" id="cq-n" hidden>0</b></button>
       </div>
 
       <!-- Grand écran (≥ 1600 px, CA.wideLayout) : sous-onglets remplacés par 3 colonnes Dealers | Clients en ligne |
@@ -1353,6 +1355,35 @@
         <div class="co-list" id="cr-list"><p class="muted">Chargement…</p></div>
       </div>
       </div><!-- /.co-cols -->
+
+      <!-- Cueillettes : horaire des plages offertes aux clients (admin_settings « cueillette ») + cueillettes à venir — cms-cueillettes.js -->
+      <div id="cq-wrap" hidden>
+        <form class="editor cq-setup" id="cq-setup" novalidate>
+          <h2>Horaire de cueillette</h2>
+          <div class="cq-week" id="cq-week"></div>
+          <div class="cq-sec">
+            <div class="cq-sec-head"><h3>Fermetures</h3><button type="button" class="btn btn-ghost btn-sm" id="cq-add-closed" data-ic="plus">Ajouter</button></div>
+            <div class="cq-rows" id="cq-closed"></div>
+          </div>
+          <div class="cq-sec">
+            <div class="cq-sec-head"><h3>Plages en plus</h3><button type="button" class="btn btn-ghost btn-sm" id="cq-add-extra" data-ic="plus">Ajouter</button></div>
+            <div class="cq-rows" id="cq-extra"></div>
+          </div>
+          <div class="grid cq-nums">
+            <div class="field"><label class="lbl" for="cq-cap">Clients par plage</label><input type="number" id="cq-cap" min="0" max="99" step="1" inputmode="numeric" placeholder="Illimité"></div>
+            <div class="field"><label class="lbl" for="cq-notice">Préavis (h)</label><input type="number" id="cq-notice" min="0" max="336" step="1" inputmode="numeric"></div>
+            <div class="field"><label class="lbl" for="cq-days">Jours offerts</label><input type="number" id="cq-days" min="1" max="60" step="1" inputmode="numeric"></div>
+          </div>
+          <div class="editor-actions">
+            <button class="btn btn-accent" type="submit" id="cq-save" data-ic="save">Enregistrer</button>
+            <span class="status" id="cq-status"></span>
+          </div>
+        </form>
+        <div class="cq-up">
+          <h2>À venir</h2>
+          <div class="cq-list" id="cq-list"><p class="muted">Chargement…</p></div>
+        </div>
+      </div>
     </section>
 
     <section class="tabpanel" data-panel="facturation" role="tabpanel" hidden>
@@ -1945,6 +1976,17 @@
       </div>
     </section>
 
+<!-- ---------------- RÉGLAGES › AIDE ---------------- -->
+    <!-- Tutoriels étape par étape : cms-aide.js (moteur aide.js, styles aide.css) ; #aide/<id> -->
+    <section class="tabpanel" data-panel="aide" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Aide</h1>
+        </div>
+      </div>
+      <div class="aide-root"></div>
+    </section>
+
     <!-- ---------------- RÉGLAGES › ENTREPRISE ---------------- -->
     <!-- Coordonnées imprimées sur les factures + taux de taxes (ex. repliable de la Facturation) :
          cms-facturation.js (localStorage + admin_settings « entreprise », relu par compte.js) -->
@@ -2021,8 +2063,9 @@
 <script src="assets/cms-messages.js?v=6"></script>
 <script src="assets/cms-facturation.js?v=49"></script>
 <script src="assets/cms-historique.js?v=16"></script>
-<script src="assets/cms-commandes-clients.js?v=5"></script>
-<script src="assets/cms-reservations.js?v=3"></script>
+<script src="assets/cms-commandes-clients.js?v=6"></script>
+<script src="assets/cms-reservations.js?v=4"></script>
+<script src="assets/cms-cueillettes.js?v=1"></script>
 <script src="assets/cms-commandes.js?v=10"></script>
 <script src="assets/cms-statistiques.js?v=10"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>

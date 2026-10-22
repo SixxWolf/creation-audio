@@ -2,9 +2,9 @@
 // Création Audio — Edge Function « customer-order-notify » (commandes en ligne)
 // Après l'envoi / la modification / l'annulation d'une commande par un client
 // connecté (boutique ou page spacers, assets/commande-client.js) :
-//  - au CLIENT (new / updated) : confirmation automatique. Tout en stock -> « on te
-//    contacte sous peu pour la cueillette » ; sinon la liste des articles à commander
-//    et l'annonce d'un délai.
+//  - au CLIENT (new / updated) : confirmation automatique. Tout en stock -> la plage de
+//    cueillette choisie (pickup_date/start/end ; sans plage : « on te contacte sous peu ») ;
+//    sinon la liste des articles à commander et l'annonce d'un délai.
 //  - à Création Audio (toujours) : avis avec lignes, stock et lien vers l'admin.
 // Appel : POST { order_id, event: 'new' | 'updated' | 'cancelled' } avec le JWT du client.
 // Sécurité : JWT vérifié ; la commande doit appartenir au client (customer_id = son id).
@@ -33,6 +33,18 @@ function money(n: unknown) {
   return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).replace(".", ",") + " $";
 }
 function plural(n: number, one: string, many: string) { return n + " " + (n > 1 ? many : one); }
+// plage de cueillette -> « jeudi 23 octobre, 13 h – 17 h » (mêmes mots que commande-client.js)
+const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
+const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+function hTxt(t: unknown) {
+  const p = String(t || "").split(":");
+  return Number(p[0]) + " h" + (p[1] && p[1] !== "00" ? " " + p[1] : "");
+}
+function fmtPickup(d: unknown, s: unknown, e: unknown) {
+  if (!d) return "";
+  const p = String(d).split("-").map(Number), x = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+  return JOURS[x.getUTCDay()] + " " + x.getUTCDate() + " " + MOIS[x.getUTCMonth()] + (s ? ", " + hTxt(s) + (e ? " – " + hTxt(e) : "") : "");
+}
 
 type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number; qty_to_order: number; product_id: string | null; kind: string | null; ptype: string | null };
 
@@ -104,6 +116,7 @@ Deno.serve(async (req) => {
   const accountUrl = SITE + "/compte.html#/commandes";
   const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes/clients";
   const results: Record<string, string> = {};
+  const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end);
 
   // ---- courriel au client (envoi et modification) ----
   if (event !== "cancelled") {
@@ -111,10 +124,10 @@ Deno.serve(async (req) => {
     const subject = "Commande " + order.number + " " + verb + " — Création Audio";
     const supplierBo = toOrder.some((l) => l.ptype !== "spacer");
     const status = !toOrder.length
-      ? "Tout est en stock : on te contacte sous peu pour convenir de la cueillette à Québec."
+      ? (pk ? "Tout est en stock : on t'attend " + pk + "." : "Tout est en stock : on te contacte sous peu pour convenir de la cueillette à Québec.")
       : supplierBo
       ? "Certains articles ne sont pas en stock : on les commande chez notre fournisseur. Prévois un délai de " + BO_DELAY +
-        " avant la cueillette ; on t'écrit dès leur arrivée."
+        " avant la cueillette ; on t'écrit dès leur arrivée pour que tu choisisses ta plage de cueillette."
       : "Certains articles doivent être imprimés : il y aura donc un délai. On te contacte sous peu pour te le confirmer.";
     const toOrderTxt = toOrder.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " : " +
       boLabel(l, Number(l.qty_to_order))).join("\n");
@@ -182,7 +195,8 @@ Deno.serve(async (req) => {
     label + " " + order.number + "\n" + who + " · " + order.email + (order.phone ? " · " + order.phone : "") + "\n\n" +
     aRows.map((r) => "- " + r.l.name + (r.l.meta ? " (" + r.l.meta + ")" : "") + " × " + r.l.qty + " — " + money(r.l.line_total) +
       (r.miss ? "  (à commander : " + r.miss + ")" : "  (en stock)")).join("\n") +
-    "\n\nTotal : " + money(order.total) + "\n" + (order.note ? "\nNote du client : " + order.note + "\n" : "") +
+    "\n\nTotal : " + money(order.total) + "\n" + (pk ? "Cueillette : " + pk + "\n" : "") +
+    (order.note ? "\nNote du client : " + order.note + "\n" : "") +
     "\nOuvrir dans l'admin : " + adminUrl + "\n";
   const aHtml =
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
@@ -201,6 +215,7 @@ Deno.serve(async (req) => {
         '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(r.l.line_total) + '</td></tr>').join("") +
     '</table>' +
     '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total : ' + money(order.total) + '</strong></p>' +
+    (pk ? '<p style="margin:16px 0 0;padding:10px 12px;background:#E7F6EE;color:#16794A;border-radius:10px"><strong>Cueillette :</strong> ' + esc(pk) + '</p>' : "") +
     (order.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Note :</strong> ' + esc(order.note) + '</p>' : "") +
     '<p style="margin:22px 0"><a href="' + adminUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">Ouvrir dans l\'admin</a></p>' +
     "</div>";

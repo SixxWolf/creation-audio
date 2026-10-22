@@ -1664,6 +1664,11 @@ create table if not exists public.customer_orders (
   edited_at     timestamptz,
   notified_at   timestamptz
 );
+-- cueillette choisie par le client (section CUEILLETTE plus bas)
+alter table public.customer_orders add column if not exists pickup_date        date;
+alter table public.customer_orders add column if not exists pickup_start       time;
+alter table public.customer_orders add column if not exists pickup_end         time;
+alter table public.customer_orders add column if not exists pickup_notified_at timestamptz;
 create index if not exists customer_orders_customer_idx on public.customer_orders (customer_id, created_at desc);
 create index if not exists customer_orders_status_idx on public.customer_orders (status);
 create table if not exists public.customer_order_lines (
@@ -1770,10 +1775,13 @@ end $$;
 revoke all on function public._customer_fill_lines(jsonb) from public, anon, authenticated;
 
 -- Envoi d'une commande par le client connecté. -> { id, number, total, has_backorder }
-create or replace function public.customer_submit_order(p_lines jsonb, p_note text default null)
+-- p_pickup { d: 'AAAA-MM-JJ', s: 'HH:MM' } : obligatoire si tout est en stock et qu'il y a des plages
+-- (sinon ignoré : la cueillette se choisit dans Mon compte une fois la commande Prête).
+drop function if exists public.customer_submit_order(jsonb, text);
+create or replace function public.customer_submit_order(p_lines jsonb, p_note text default null, p_pickup jsonb default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_uid uuid := (select auth.uid()); c public.customers; v_lines jsonb; v_id uuid; v_num text;
-        v_total numeric; v_bo boolean;
+        v_total numeric; v_bo boolean; v_pk jsonb;
 begin
   if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
   select * into c from public.customers where id = v_uid;
@@ -1784,9 +1792,12 @@ begin
   v_lines := public._customer_fill_lines(p_lines);
   select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
+  if not v_bo then v_pk := public._pickup_check(p_pickup, null, null, true); end if;
   v_num := 'C-' || lpad(nextval('public.customer_order_seq')::text, 4, '0');
-  insert into public.customer_orders (number, customer_id, email, name, phone, note, total, has_backorder)
-  values (v_num, v_uid, c.email, c.name, c.phone, nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_bo)
+  insert into public.customer_orders (number, customer_id, email, name, phone, note, total, has_backorder,
+                                      pickup_date, pickup_start, pickup_end)
+  values (v_num, v_uid, c.email, c.name, c.phone, nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_bo,
+          (v_pk ->> 'd')::date, (v_pk ->> 's')::time, (v_pk ->> 'e')::time)
   returning id into v_id;
   insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
   select v_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
@@ -1795,10 +1806,11 @@ begin
   return jsonb_build_object('id', v_id, 'number', v_num, 'total', v_total, 'has_backorder', v_bo);
 end $$;
 
--- Modification par le client (seulement tant que « Nouvelle »).
-create or replace function public.customer_update_order(p_id uuid, p_lines jsonb, p_note text default null)
+-- Modification par le client (seulement tant que « Nouvelle »). p_pickup null = cueillette inchangée.
+drop function if exists public.customer_update_order(uuid, jsonb, text);
+create or replace function public.customer_update_order(p_id uuid, p_lines jsonb, p_note text default null, p_pickup jsonb default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_uid uuid := (select auth.uid()); o public.customer_orders; v_lines jsonb; v_total numeric; v_bo boolean;
+declare v_uid uuid := (select auth.uid()); o public.customer_orders; v_lines jsonb; v_total numeric; v_bo boolean; v_pk jsonb;
 begin
   if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
   select * into o from public.customer_orders where id = p_id and customer_id = v_uid for update;
@@ -1807,6 +1819,9 @@ begin
   v_lines := public._customer_fill_lines(p_lines);
   select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
+  if not v_bo and (p_pickup is not null or o.pickup_date is null) then
+    v_pk := public._pickup_check(p_pickup, null, p_id, true);
+  end if;
   delete from public.customer_order_lines where order_id = p_id;
   insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
   select p_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
@@ -1814,6 +1829,9 @@ begin
     from jsonb_array_elements(v_lines) x;
   update public.customer_orders
      set total = v_total, has_backorder = v_bo, note = nullif(left(btrim(coalesce(p_note, '')), 500), ''),
+         pickup_date  = case when v_pk is not null then (v_pk ->> 'd')::date else pickup_date end,
+         pickup_start = case when v_pk is not null then (v_pk ->> 's')::time else pickup_start end,
+         pickup_end   = case when v_pk is not null then (v_pk ->> 'e')::time else pickup_end end,
          edited_at = now(), updated_at = now()
    where id = p_id;
   return jsonb_build_object('id', p_id, 'number', o.number, 'total', v_total, 'has_backorder', v_bo);
@@ -1838,6 +1856,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
   select coalesce(jsonb_agg(jsonb_build_object(
       'id', o.id, 'number', o.number, 'status', o.status, 'created_at', o.created_at, 'edited_at', o.edited_at,
       'note', o.note, 'total', o.total, 'has_backorder', o.has_backorder, 'cancelled_by', o.cancelled_by,
+      'pickup_date', o.pickup_date, 'pickup_start', to_char(o.pickup_start, 'HH24:MI'), 'pickup_end', to_char(o.pickup_end, 'HH24:MI'),
       'invoice_number', (select i.number from public.invoices i where i.id = o.invoice_id),
       'lines', coalesce((
         select jsonb_agg(jsonb_build_object(
@@ -1881,13 +1900,13 @@ begin
   return jsonb_build_object('client_id', v_cid);
 end $$;
 
-revoke all on function public.customer_submit_order(jsonb, text)       from public, anon;
-revoke all on function public.customer_update_order(uuid, jsonb, text) from public, anon;
+revoke all on function public.customer_submit_order(jsonb, text, jsonb)       from public, anon;
+revoke all on function public.customer_update_order(uuid, jsonb, text, jsonb) from public, anon;
 revoke all on function public.customer_cancel_order(uuid)              from public, anon;
 revoke all on function public.me_orders()                               from public, anon;
 revoke all on function public.admin_invoice_customer_order(uuid, uuid)  from public, anon;
-grant execute on function public.customer_submit_order(jsonb, text)       to authenticated;
-grant execute on function public.customer_update_order(uuid, jsonb, text) to authenticated;
+grant execute on function public.customer_submit_order(jsonb, text, jsonb)       to authenticated;
+grant execute on function public.customer_update_order(uuid, jsonb, text, jsonb) to authenticated;
 grant execute on function public.customer_cancel_order(uuid)              to authenticated;
 grant execute on function public.me_orders()                               to authenticated;
 grant execute on function public.admin_invoice_customer_order(uuid, uuid)  to authenticated;
@@ -1934,6 +1953,10 @@ create table if not exists public.customer_reservations (
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
+alter table public.customer_reservations add column if not exists pickup_date        date;   -- section CUEILLETTE
+alter table public.customer_reservations add column if not exists pickup_start       time;
+alter table public.customer_reservations add column if not exists pickup_end         time;
+alter table public.customer_reservations add column if not exists pickup_notified_at timestamptz;
 create index if not exists customer_reservations_customer_idx on public.customer_reservations (customer_id, created_at desc);
 create index if not exists customer_reservations_status_idx on public.customer_reservations (status, expires_at);
 create table if not exists public.customer_reservation_lines (
@@ -1983,10 +2006,12 @@ revoke all on function public._reservation_penalize(uuid) from public, anon, aut
 revoke all on function public._reservation_forgive(uuid)  from public, anon, authenticated;
 
 -- Réservation par le client connecté. -> { id, number, total, expires_at }
-create or replace function public.customer_reserve(p_lines jsonb, p_note text default null)
+-- p_pickup { d, s } : plage de cueillette avant l'échéance (obligatoire s'il y en a une).
+drop function if exists public.customer_reserve(jsonb, text);
+create or replace function public.customer_reserve(p_lines jsonb, p_note text default null, p_pickup jsonb default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_uid uuid := (select auth.uid()); c public.customers; v_lines jsonb; v_id uuid; v_num text;
-        v_total numeric; v_short text; v_exp timestamptz := now() + interval '72 hours';
+        v_total numeric; v_short text; v_exp timestamptz := now() + interval '72 hours'; v_pk jsonb;
 begin
   if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
   select * into c from public.customers where id = v_uid;
@@ -2011,9 +2036,12 @@ begin
     raise exception 'Plus assez de stock pour : %. Ajuste ton panier ou envoie-le en commande.', v_short;
   end if;
   select coalesce(sum((x ->> 'line_total')::numeric), 0) into v_total from jsonb_array_elements(v_lines) x;
+  v_pk := public._pickup_check(p_pickup, v_exp, null, true);
   v_num := 'R-' || lpad(nextval('public.customer_reservation_seq')::text, 4, '0');
-  insert into public.customer_reservations (number, customer_id, email, name, phone, note, total, expires_at)
-  values (v_num, v_uid, c.email, c.name, c.phone, nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_exp)
+  insert into public.customer_reservations (number, customer_id, email, name, phone, note, total, expires_at,
+                                            pickup_date, pickup_start, pickup_end)
+  values (v_num, v_uid, c.email, c.name, c.phone, nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_exp,
+          (v_pk ->> 'd')::date, (v_pk ->> 's')::time, (v_pk ->> 'e')::time)
   returning id into v_id;
   insert into public.customer_reservation_lines (reservation_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, sort_order)
   select v_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
@@ -2047,6 +2075,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
           'id', r.id, 'number', r.number,
           'status', case when r.status = 'active' and r.expires_at <= now() then 'expired' else r.status end,
           'created_at', r.created_at, 'expires_at', r.expires_at, 'note', r.note, 'total', r.total,
+          'pickup_date', r.pickup_date, 'pickup_start', to_char(r.pickup_start, 'HH24:MI'), 'pickup_end', to_char(r.pickup_end, 'HH24:MI'),
           'penalized', r.penalized or (r.status = 'active' and r.expires_at <= now()), 'cancelled_by', r.cancelled_by,
           'invoice_number', (select i.number from public.invoices i where i.id = r.invoice_id),
           'lines', coalesce((
@@ -2194,16 +2223,138 @@ revoke all on function public.reservations_tick() from public, anon, authenticat
 select cron.unschedule(jobid) from cron.job where jobname = 'reservations-tick';
 select cron.schedule('reservations-tick', '*/10 * * * *', 'select public.reservations_tick()');
 
-revoke all on function public.customer_reserve(jsonb, text)              from public, anon;
+revoke all on function public.customer_reserve(jsonb, text, jsonb)       from public, anon;
 revoke all on function public.customer_cancel_reservation(uuid)          from public, anon;
 revoke all on function public.me_reservations()                          from public, anon;
 revoke all on function public.admin_invoice_reservation(uuid, uuid)      from public, anon;
 revoke all on function public.admin_reservation_action(uuid, text)       from public, anon;
-grant execute on function public.customer_reserve(jsonb, text)              to authenticated;
+grant execute on function public.customer_reserve(jsonb, text, jsonb)       to authenticated;
 grant execute on function public.customer_cancel_reservation(uuid)          to authenticated;
 grant execute on function public.me_reservations()                          to authenticated;
 grant execute on function public.admin_invoice_reservation(uuid, uuid)      to authenticated;
 grant execute on function public.admin_reservation_action(uuid, text)       to authenticated;
+
+-- ============================================================
+-- CUEILLETTE (plage de ramassage choisie par le client)
+-- Horaire réglé par l'admin (Commandes › Cueillettes) : admin_settings « cueillette »
+--   { week: { "1": [{s:"13:00", e:"17:00"}], … "7": [] }   (1 = lundi, ISO)
+--     closed: [{from:"AAAA-MM-JJ", to:"AAAA-MM-JJ"}]          (fermé, bornes incluses)
+--     extra:  [{d:"AAAA-MM-JJ", s:"10:00", e:"12:00"}]        (plage ponctuelle, même un jour fermé)
+--     cap: 3 (commandes max par plage, 0 = illimité) · notice: 24 (h de préavis) · days: 14 (jours offerts) }
+-- Une plage = une fenêtre telle quelle (pas découpée). Comptent dans une plage : commandes
+-- Nouvelle / En préparation / Prête et réservations actives non échues. Heure de Québec.
+-- Commande : obligatoire à l'envoi si tout est en stock (customer_submit_order) ; avec des
+-- articles à commander, le client la choisit dans Mon compte une fois la commande Prête.
+-- Réservation : obligatoire, avant l'échéance (customer_reserve). Sans aucune plage réglée,
+-- rien n'est exigé (le site continue de prendre des commandes).
+-- Changement par le client jusqu'à Facturée : customer_set_pickup -> EF « pickup-notify ».
+-- ------------------------------------------------------------
+create or replace function public._pickup_slots(p_until timestamptz, p_self uuid)
+returns table (d date, s time, e time, booked int, cap int)
+language sql stable security definer set search_path = '' as $$
+  with p as (
+    select v, greatest(coalesce((v ->> 'cap')::int, 0), 0) as cap,
+           greatest(coalesce((v ->> 'notice')::int, 24), 0) as notice,
+           least(greatest(coalesce((v ->> 'days')::int, 14), 1), 60) as days,
+           (now() at time zone 'America/Toronto') as lnow
+      from (select coalesce((select value from public.admin_settings where key = 'cueillette'), '{}'::jsonb) as v) c
+  ), base as (
+    select j.g as d, (x ->> 's')::time as s, (x ->> 'e')::time as e
+      from p, lateral (select p.lnow::date + i as g from generate_series(0, p.days) i) j,
+           jsonb_array_elements(coalesce(p.v -> 'week' -> (extract(isodow from j.g)::int::text), '[]'::jsonb)) x
+     where not exists (select 1 from jsonb_array_elements(coalesce(p.v -> 'closed', '[]'::jsonb)) k
+                        where j.g between (k ->> 'from')::date and coalesce((k ->> 'to')::date, (k ->> 'from')::date))
+    union
+    select (x ->> 'd')::date, (x ->> 's')::time, (x ->> 'e')::time
+      from p, jsonb_array_elements(coalesce(p.v -> 'extra', '[]'::jsonb)) x
+     where (x ->> 'd')::date between p.lnow::date and p.lnow::date + p.days
+  )
+  select b.d, b.s, b.e,
+         ((select count(*) from public.customer_orders o
+            where o.pickup_date = b.d and o.pickup_start = b.s and o.status in ('new', 'preparing', 'ready')
+              and o.id is distinct from p_self)
+        + (select count(*) from public.customer_reservations r
+            where r.pickup_date = b.d and r.pickup_start = b.s and r.status = 'active' and r.expires_at > now()
+              and r.id is distinct from p_self))::int,
+         p.cap
+    from base b, p
+   where b.e > b.s
+     and b.d + b.s >= p.lnow + make_interval(hours => p.notice)
+     and (p_until is null or (b.d + b.s) at time zone 'America/Toronto' < p_until)
+   order by b.d, b.s;
+$$;
+revoke all on function public._pickup_slots(timestamptz, uuid) from public, anon, authenticated;
+
+-- Plages offertes au client. p_until : échéance (réservation) ; p_self : sa commande / réservation
+-- (ne se compte pas elle-même). -> [{ d, s, e, full }]
+create or replace function public.pickup_slots(p_until timestamptz default null, p_self uuid default null)
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('d', d, 's', to_char(s, 'HH24:MI'), 'e', to_char(e, 'HH24:MI'),
+           'full', cap > 0 and booked >= cap) order by d, s), '[]'::jsonb)
+    from public._pickup_slots(p_until, p_self);
+$$;
+
+-- Valide une plage choisie -> { d, s, e } (null si aucune et rien d'exigé). Verrou : deux clients
+-- ne prennent pas la dernière place d'une plage en même temps.
+create or replace function public._pickup_check(p_pickup jsonb, p_until timestamptz, p_self uuid, p_required boolean)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_d date; v_s time; r record;
+begin
+  if p_pickup is null or coalesce(p_pickup ->> 'd', '') = '' then
+    if p_required and exists (select 1 from public._pickup_slots(p_until, p_self)) then
+      raise exception 'Choisis une date et une plage de cueillette.';
+    end if;
+    return null;
+  end if;
+  if coalesce(p_pickup ->> 'd', '') !~ '^\d{4}-\d{2}-\d{2}$' or coalesce(p_pickup ->> 's', '') !~ '^\d{2}:\d{2}$' then
+    raise exception 'Plage de cueillette invalide.';
+  end if;
+  v_d := (p_pickup ->> 'd')::date; v_s := (p_pickup ->> 's')::time;
+  perform pg_advisory_xact_lock(hashtext('ca_pickup'));
+  select * into r from public._pickup_slots(p_until, p_self) x where x.d = v_d and x.s = v_s;
+  if not found then raise exception 'Cette plage de cueillette n''est plus offerte. Choisis-en une autre.'; end if;
+  if r.cap > 0 and r.booked >= r.cap then raise exception 'Cette plage vient de se remplir. Choisis-en une autre.'; end if;
+  return jsonb_build_object('d', r.d, 's', to_char(r.s, 'HH24:MI'), 'e', to_char(r.e, 'HH24:MI'));
+end $$;
+revoke all on function public._pickup_check(jsonb, timestamptz, uuid, boolean) from public, anon, authenticated;
+
+-- Changement par le client (Mon compte) : commande jusqu'à Facturée (avec articles à commander :
+-- seulement une fois Prête) ; réservation active, avant son échéance. -> { d, s, e }
+create or replace function public.customer_set_pickup(p_kind text, p_id uuid, p_pickup jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); o public.customer_orders; r public.customer_reservations; v_pk jsonb;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  if p_pickup is null then raise exception 'Choisis une date et une plage de cueillette.'; end if;
+  if p_kind = 'reservation' then
+    select * into r from public.customer_reservations where id = p_id and customer_id = v_uid for update;
+    if not found then raise exception 'Réservation introuvable.'; end if;
+    if r.status <> 'active' or r.expires_at <= now() then raise exception 'Cette réservation n''est plus active.'; end if;
+    v_pk := public._pickup_check(p_pickup, r.expires_at, p_id, true);
+    update public.customer_reservations
+       set pickup_date = (v_pk ->> 'd')::date, pickup_start = (v_pk ->> 's')::time, pickup_end = (v_pk ->> 'e')::time,
+           updated_at = now()
+     where id = p_id;
+  else
+    select * into o from public.customer_orders where id = p_id and customer_id = v_uid for update;
+    if not found then raise exception 'Commande introuvable.'; end if;
+    if o.status not in ('new', 'preparing', 'ready') then raise exception 'Cette commande est fermée.'; end if;
+    if o.has_backorder and o.status <> 'ready' then
+      raise exception 'On t''écrit dès que tes articles sont arrivés : tu choisiras ta cueillette à ce moment-là.';
+    end if;
+    v_pk := public._pickup_check(p_pickup, null, p_id, true);
+    update public.customer_orders
+       set pickup_date = (v_pk ->> 'd')::date, pickup_start = (v_pk ->> 's')::time, pickup_end = (v_pk ->> 'e')::time,
+           updated_at = now()
+     where id = p_id;
+  end if;
+  return v_pk;
+end $$;
+
+revoke all on function public.pickup_slots(timestamptz, uuid)              from public, anon;
+revoke all on function public.customer_set_pickup(text, uuid, jsonb)       from public, anon;
+grant execute on function public.pickup_slots(timestamptz, uuid)           to authenticated;
+grant execute on function public.customer_set_pickup(text, uuid, jsonb)    to authenticated;
 
 -- ============================================================
 -- MESSAGERIE (questions filaments / spacers / compte)

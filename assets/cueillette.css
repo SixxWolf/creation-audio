@@ -1,0 +1,50 @@
+/* =========================================================
+   Sélecteur de cueillette — CA.custOrder.picker (commande-client.js)
+   Panier (boutique, spacers) et fenêtre « Ma cueillette » de Mon compte.
+   Bande de jours défilante (‹ ›) puis plages du jour choisi.
+   ========================================================= */
+.cart-pk { display:flex; flex-direction:column; gap:8px; }
+.cart-pk-t { margin:0; font-size:.86rem; font-weight:700; color:var(--ink); }
+.cart-pk-later { margin:0; padding:9px 12px; font-size:.85rem; line-height:1.4; color:var(--muted);
+  background:var(--wash); border-radius:10px; }
+
+.pk { display:flex; flex-direction:column; gap:10px; min-width:0; }
+.pk-days { display:flex; align-items:center; gap:6px; min-width:0; }
+.pk-strip { flex:1; min-width:0; display:flex; gap:6px; overflow-x:auto; scroll-snap-type:x mandatory;
+  scrollbar-width:none; padding:2px; }
+.pk-strip::-webkit-scrollbar { display:none; }
+.pk-nav { flex:none; width:30px; height:30px; display:grid; place-items:center; padding:0; font:inherit; font-size:1.1rem;
+  line-height:1; color:var(--ink); cursor:pointer; background:var(--paper); border:1px solid var(--line); border-radius:50%; }
+.pk-nav:disabled { opacity:.35; cursor:default; }
+.pk-day { flex:none; width:54px; scroll-snap-align:start; display:flex; flex-direction:column; align-items:center; gap:1px;
+  padding:6px 0 7px; font:inherit; color:var(--ink); cursor:pointer; background:var(--paper);
+  border:1.5px solid var(--line); border-radius:12px; transition:border-color .15s, background .15s; }
+.pk-day small { font-size:.7rem; line-height:1.2; color:var(--muted); text-transform:lowercase; }
+.pk-day b { font-size:1.05rem; line-height:1.2; font-weight:700; font-variant-numeric:tabular-nums; }
+.pk-day:hover { border-color:var(--ember); }
+.pk-day.is-on { background:var(--fill-strong); border-color:var(--fill-strong); color:#fff; }
+.pk-day.is-on small { color:rgba(255,255,255,.75); }
+.pk-day.is-full { opacity:.45; cursor:default; }
+.pk-day.is-full:hover { border-color:var(--line); }
+
+.pk-slots { display:grid; grid-template-columns:repeat(auto-fill, minmax(128px, 1fr)); gap:6px; }
+.pk-slot { display:flex; align-items:center; justify-content:center; gap:6px; min-height:38px; padding:6px 10px;
+  font:inherit; font-size:.88rem; font-weight:600; color:var(--ink); white-space:nowrap; cursor:pointer;
+  background:var(--paper); border:1.5px solid var(--line); border-radius:10px; transition:border-color .15s, background .15s; }
+.pk-slot:hover { border-color:var(--ember); }
+.pk-slot.is-on { color:var(--ember-ink, #9A3A0E); background:color-mix(in srgb, var(--ember) 12%, var(--paper)); border-color:var(--ember); }
+.pk-slot.is-full, .pk-slot:disabled { color:var(--muted); cursor:default; background:var(--wash); text-decoration:line-through; }
+.pk-slot.is-full:hover { border-color:var(--line); }
+.pk-slot small { font-size:.72rem; font-weight:600; text-decoration:none; }
+
+/* dans la fenêtre caDialog */
+.ca-dlg .pk { margin-top:4px; text-align:left; }
+
+/* Mon compte : ligne « Cueillette » d'une commande / réservation */
+.ord-pk { display:flex; align-items:center; flex-wrap:wrap; gap:4px 0; }
+.ord-pk b { font-weight:600; }
+.ord-pk.is-todo b { color:var(--muted); font-weight:500; }
+.pk-change { margin-left:auto; padding:5px 12px; font:inherit; font-size:.82rem; font-weight:700; color:var(--ink); cursor:pointer;
+  background:var(--paper); border:1px solid var(--line); border-radius:8px; }
+.pk-change:hover { border-color:var(--ember); }
+.ord-pk.is-todo .pk-change { color:#fff; background:var(--ember); border-color:var(--ember); }
