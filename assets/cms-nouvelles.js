@@ -245,6 +245,7 @@
         '<div class="nw-top"><span class="nw-kind k-' + esc(r.kind) + '">' + esc(KINDS[r.kind] || r.kind) + '</span>' +
           '<span class="nw-when">' + esc(whenText(r)) + '</span></div>' +
         '<div class="nw-title">' + esc(r.title || 'Sans titre') + '</div>' +
+        (prop && r.body ? '<div class="nw-body">' + esc(r.body) + '</div>' : '') +
         (tags ? '<div class="sp-minis">' + tags + '</div>' : '') +
       '</div>' +
       '<div class="nw-actions">' + (prop ?
