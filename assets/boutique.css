@@ -626,8 +626,10 @@ body.has-buybar .toast { bottom:92px; }
   color:#9A4A0E; background:#FFF3EC; border-radius:10px; }
 .cart-editbar button { margin-left:auto; padding:4px 10px; font:inherit; font-weight:700; font-size:.82rem; color:var(--ink); cursor:pointer;
   background:#fff; border:1px solid var(--line-2); border-radius:8px; }
-.cart-login { margin:0; text-align:center; font-size:.84rem; color:var(--ink-2); }
-.cart-login a { font-weight:700; color:var(--ember-ink); }
+.cart-login { margin:0; padding:14px; font-size:.86rem; color:var(--ink-2); background:#FFF3EC; border:2px solid var(--ember); border-radius:14px; }
+.cart-login b { display:block; margin-bottom:6px; font-size:.98rem; color:var(--ink); }
+.cart-login ul { margin:0 0 10px; padding-left:18px; line-height:1.5; }
+.cart-login-btn { display:block; padding:10px; text-align:center; font-weight:700; color:var(--ink); background:var(--ember); border-radius:10px; text-decoration:none; }
 .cart-msg a { font-weight:700; color:var(--ember-ink); }
 .citem-bo, .buy-bo { font-weight:700; color:#9A4A0E; }
 .buy-bo { display:block; margin-top:4px; }

@@ -260,3 +260,7 @@
 @media (prefers-reduced-motion:reduce) {
   .ord-chev, .acct-tabs a, .acct-submit { transition:none; }
 }
+
+.acct-perks { list-style:none; margin:0 0 20px; padding:12px 14px; display:grid; gap:6px; font-size:.9rem; font-weight:600; background:#FFF3EC; border-radius:12px; }
+.acct-perks li { position:relative; padding-left:22px; }
+.acct-perks li::before { content:"✓"; position:absolute; left:0; font-weight:800; color:var(--ember-ink); }
