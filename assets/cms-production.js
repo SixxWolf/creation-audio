@@ -778,10 +778,23 @@
     el.qN.textContent = queue.length ? '(' + queue.length + ')' : '';
     el.queue.innerHTML = queue.map(queueItem).join('');
     el.queue.hidden = !queue.length;
+    paintBadge();
   }
-  // barres : rafraîchies chaque minute, seulement quand l'onglet est visible
+  // pastille de la barre latérale : impressions finies, pas encore enregistrées
+  function paintBadge() {
+    var navN = $('#nav-prod-n'); if (!navN) return;
+    var n = queue.filter(function (j) { return qProgress(j).end; }).length;
+    navN.textContent = n; navN.hidden = !n;
+    var tab = navN.closest('.tab');
+    if (tab) tab.setAttribute('aria-label', 'Production' + (n ? ' (' + n + (n > 1 ? ' finies' : ' finie') + ')' : ''));
+  }
+  if (window.CA.onAdminReady) window.CA.onAdminReady(function () { loadQueue().then(paintBadge); });
+  // barres : rafraîchies chaque minute ; pastille aussi quand l'onglet est caché
   setInterval(function () {
-    if (!queue.length || !el.queue.offsetParent) return;
+    if (document.visibilityState !== 'visible') return;
+    if (!el.queue.offsetParent) { loadQueue().then(paintBadge); return; }
+    if (!queue.length) return;
+    paintBadge();
     queue.forEach(function (j) {
       var it = el.queue.querySelector('.pr-q[data-id="' + j.id + '"]'); if (!it) return;
       var pr = qProgress(j), bar = it.querySelector('.pr-q-bar i');
