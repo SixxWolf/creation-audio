@@ -96,8 +96,8 @@
       <div class="side-today">
         <button class="tab" type="button" data-tab="aujourdhui" data-group="Accueil"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="4.5" rx="1.5"/><rect x="13.5" y="11" width="7" height="9.5" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/></svg><span>Aujourd'hui</span></button>
       </div>
-      <p class="side-group" aria-hidden="true">Catalogue</p>
       <button class="tab" type="button" data-tab="nouvelles" data-group="Accueil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3l6 4V5.5l-6 4z"/><path d="M16.5 9a4 4 0 0 1 0 6M18.8 6.5a7.5 7.5 0 0 1 0 11"/></svg><span>Nouvelles</span></button>
+      <p class="side-group" aria-hidden="true">Catalogue</p>
       <button class="tab" type="button" data-tab="filaments" data-group="Catalogue" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 3.5v5.5M12 15v5.5"/></svg><span>Filaments</span></button>
       <!-- Sous-liste « Aller au matériau » (remplie par cms-materials.js, visible sur l'onglet Filaments) -->
       <nav class="mat-nav" id="mat-nav" aria-label="Aller au matériau"></nav>
@@ -175,8 +175,6 @@
       </div>
     </section>
 
-    <section class="tabpanel" data-panel="filaments" role="tabpanel">
-     <!-- Grand écran (≥ 1600 px) : contenu à gauche (.dock-main), éditeur ouvert collé à droite (.dock, CA.dockEditor) -->
     <!-- ---------------- NOUVELLES (cms-nouvelles.js, table news) ----------------
          Barre du haut de tout le site public (nav.js, « in_bar ») + section #nouvelles de l'accueil (accueil.js).
          Rien n'est effacé tout seul : les nouvelles terminées ou hors ligne restent dans l'Historique. -->
@@ -267,6 +265,8 @@
      <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
 
+    <section class="tabpanel" data-panel="filaments" role="tabpanel">
+     <!-- Grand écran (≥ 1600 px) : contenu à gauche (.dock-main), éditeur ouvert collé à droite (.dock, CA.dockEditor) -->
      <div class="dock-main">
 
       <!-- ===== MARQUES (Bambu Lab, Elegoo, Anycubic…) ===== -->
