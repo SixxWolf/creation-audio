@@ -1307,7 +1307,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .co-edited { font-size:.8rem; font-weight:600; color:var(--ember-ink); }
 .co-who { display:flex; align-items:center; gap:10px; }
 .co-who .person-av { width:36px; height:36px; font-size:.8rem; }
-.co-who > span { display:flex; flex-direction:column; line-height:1.25; }
+.co-who > span:not(.person-av) { display:flex; flex-direction:column; line-height:1.25; }
 .co-who small { font-size:.78rem; color:var(--muted); }
 .co-note { margin:12px 0 0; padding:9px 12px; font-size:.9rem; background:var(--wash); border-left:3px solid var(--ember); border-radius:0 10px 10px 0; }
 .co-table-wrap { margin-top:12px; overflow-x:auto; border:1px solid var(--line); border-radius:12px; }
