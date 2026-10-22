@@ -3280,6 +3280,43 @@ drop policy if exists production_queue_admin_all on public.production_queue;
 create policy production_queue_admin_all on public.production_queue for all to authenticated
   using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
 revoke all on public.production_queue from anon;
+-- ------------------------------------------------------------
+-- NOUVELLES (2026-10-22) — promos, événements, nouveautés, mises à jour
+-- Admin : onglet Nouvelles (cms-nouvelles.js), historique gardé (rien ne s'efface
+-- à l'expiration). Public : barre du haut sur toutes les pages (nav.js, in_bar)
+-- + section « Nouvelles » de l'accueil (accueil.js). Lecture anonyme limitée aux
+-- nouvelles actives dans leur fenêtre starts_at / ends_at.
+-- kind : promo | event | new | update ; image_path dans le bucket « products » (news/…)
+-- ------------------------------------------------------------
+create table if not exists public.news (
+  id          uuid primary key default gen_random_uuid(),
+  kind        text not null default 'new' check (kind in ('promo', 'event', 'new', 'update')),
+  title       text not null default '',
+  body        text not null default '',
+  image_path  text,
+  cta_label   text,
+  cta_url     text,
+  promo_code  text,
+  event_at    date,
+  starts_at   timestamptz,
+  ends_at     timestamptz,
+  featured    boolean not null default false,
+  in_bar      boolean not null default true,
+  active      boolean not null default true,
+  sort_order  integer not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists news_sort_idx on public.news (sort_order, created_at desc);
+alter table public.news enable row level security;
+drop policy if exists news_public_read on public.news;
+create policy news_public_read on public.news for select to anon, authenticated
+  using ( active and (starts_at is null or starts_at <= now()) and (ends_at is null or ends_at > now()) );
+drop policy if exists news_admin_all on public.news;
+create policy news_admin_all on public.news for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+grant select on public.news to anon, authenticated;
+
 
 -- ------------------------------------------------------------
 -- Vérification

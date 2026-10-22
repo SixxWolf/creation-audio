@@ -27,8 +27,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/site.css?v=6">
-<link rel="stylesheet" href="assets/accueil.css?v=14">
+<link rel="stylesheet" href="assets/site.css?v=7">
+<link rel="stylesheet" href="assets/accueil.css?v=15">
 </head>
 <body class="home-page">
 <a class="skip" href="#main">Aller au contenu</a>
@@ -211,6 +211,20 @@
       </div>
       <p class="sr-only" id="sw-live" aria-live="polite"></p>
     </div>
+  </div>
+</section>
+
+<!-- ======================= NOUVELLES ======================= -->
+<!-- Promos, événements, nouveautés (table news, admin › Nouvelles) : rendu par accueil.js, caché s'il n'y a rien -->
+<section class="sec news-sec" id="nouvelles" hidden>
+  <div class="wrap">
+    <header class="sec-head">
+      <div>
+        <p class="eyebrow">Nouvelles</p>
+        <h2>Quoi de neuf</h2>
+      </div>
+    </header>
+    <div class="news-grid" id="news-grid"></div>
   </div>
 </section>
 
@@ -442,7 +456,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
-<script src="assets/nav.js?v=6"></script>
-<script src="assets/accueil.js?v=13"></script>
+<script src="assets/nav.js?v=7"></script>
+<script src="assets/accueil.js?v=14"></script>
 </body>
 </html>

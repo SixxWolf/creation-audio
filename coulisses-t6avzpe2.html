@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=96">
+<link rel="stylesheet" href="assets/admin.css?v=97">
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
@@ -91,12 +91,13 @@
       <button class="side-close" id="nav-close" type="button" aria-label="Fermer le menu">&times;</button>
     </div>
     <nav class="side-nav" aria-label="Sections admin">
-      <!-- Accueil (grand écran ≥ 1600 px seulement) : page Aujourd'hui (cms-aujourdhui.js) -->
+      <!-- Accueil : Aujourd'hui (grand écran ≥ 1600 px seulement, cms-aujourdhui.js) + Nouvelles (partout, cms-nouvelles.js) -->
+      <p class="side-group" aria-hidden="true">Accueil</p>
       <div class="side-today">
-        <p class="side-group" aria-hidden="true">Accueil</p>
         <button class="tab" type="button" data-tab="aujourdhui" data-group="Accueil"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="4.5" rx="1.5"/><rect x="13.5" y="11" width="7" height="9.5" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/></svg><span>Aujourd'hui</span></button>
       </div>
       <p class="side-group" aria-hidden="true">Catalogue</p>
+      <button class="tab" type="button" data-tab="nouvelles" data-group="Accueil"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3l6 4V5.5l-6 4z"/><path d="M16.5 9a4 4 0 0 1 0 6M18.8 6.5a7.5 7.5 0 0 1 0 11"/></svg><span>Nouvelles</span></button>
       <button class="tab" type="button" data-tab="filaments" data-group="Catalogue" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 3.5v5.5M12 15v5.5"/></svg><span>Filaments</span></button>
       <!-- Sous-liste « Aller au matériau » (remplie par cms-materials.js, visible sur l'onglet Filaments) -->
       <nav class="mat-nav" id="mat-nav" aria-label="Aller au matériau"></nav>
@@ -176,6 +177,96 @@
 
     <section class="tabpanel" data-panel="filaments" role="tabpanel">
      <!-- Grand écran (≥ 1600 px) : contenu à gauche (.dock-main), éditeur ouvert collé à droite (.dock, CA.dockEditor) -->
+    <!-- ---------------- NOUVELLES (cms-nouvelles.js, table news) ----------------
+         Barre du haut de tout le site public (nav.js, « in_bar ») + section #nouvelles de l'accueil (accueil.js).
+         Rien n'est effacé tout seul : les nouvelles terminées ou hors ligne restent dans l'Historique. -->
+    <section class="tabpanel" data-panel="nouvelles" role="tabpanel" hidden>
+     <div class="dock-main">
+      <div class="panel-head">
+        <div>
+          <h1>Nouvelles</h1>
+          <p class="muted">Barre du haut sur tout le site et section de l'accueil.</p>
+        </div>
+        <span class="grow"></span>
+        <a class="btn btn-ghost btn-sm" href="./#nouvelles" target="_blank" rel="noopener" data-ic="link">Voir l'accueil</a>
+        <button class="btn btn-ghost btn-sm" id="nw-refresh" type="button" data-ic="refresh">Rafraîchir</button>
+        <button class="btn btn-accent" id="nw-new" type="button" data-ic="plus">Nouvelle</button>
+      </div>
+
+      <form class="editor" id="nw-editor" hidden>
+        <h2 id="nw-editor-title">Nouvelle</h2>
+        <div class="grid">
+          <div class="field col-2">
+            <span class="lbl" id="nw-kind-l">Type</span>
+            <div class="fx-seg pr-seg nw-seg" id="nw-kind" role="radiogroup" aria-labelledby="nw-kind-l">
+              <button type="button" class="fx-seg-btn" data-kind="promo" role="radio" aria-checked="false"><i class="nw-dot k-promo"></i>Promotion</button>
+              <button type="button" class="fx-seg-btn" data-kind="event" role="radio" aria-checked="false"><i class="nw-dot k-event"></i>Événement</button>
+              <button type="button" class="fx-seg-btn" data-kind="new" role="radio" aria-checked="false"><i class="nw-dot k-new"></i>Nouveauté</button>
+              <button type="button" class="fx-seg-btn" data-kind="update" role="radio" aria-checked="false"><i class="nw-dot k-update"></i>Mise à jour</button>
+            </div>
+          </div>
+          <div class="field col-2">
+            <label class="lbl" for="nw-title">Titre</label>
+            <input type="text" id="nw-title" maxlength="90" placeholder="Ex. -15 % sur tout le Silk" autocomplete="off">
+          </div>
+          <div class="field col-2">
+            <label class="lbl" for="nw-body">Texte</label>
+            <textarea id="nw-body" rows="3" placeholder="Ex. Jusqu'à l'Halloween, toutes les couleurs Silk, en bobine ou en recharge."></textarea>
+          </div>
+          <div class="field col-2">
+            <span class="lbl">Image</span>
+            <div class="nw-img">
+              <span class="nw-img-prev" id="nw-img-prev" hidden><img id="nw-img" alt=""></span>
+              <button type="button" class="btn btn-ghost btn-sm" id="nw-img-add" data-ic="plus">Ajouter une image</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="nw-img-rm" data-ic="trash" hidden>Retirer</button>
+            </div>
+            <input type="file" id="nw-file" accept="image/*" hidden>
+          </div>
+          <div class="field">
+            <label class="lbl" for="nw-cta-label">Bouton</label>
+            <input type="text" id="nw-cta-label" maxlength="40" placeholder="Ex. En profiter" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="nw-cta-url">Lien du bouton</label>
+            <input type="text" id="nw-cta-url" placeholder="Ex. boutique.html" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="nw-code">Code promo</label>
+            <input type="text" id="nw-code" maxlength="30" placeholder="Ex. SILK15" autocomplete="off">
+          </div>
+          <div class="field" id="nw-event-f">
+            <label class="lbl" for="nw-event">Date de l'événement</label>
+            <input type="date" id="nw-event">
+          </div>
+          <div class="field">
+            <label class="lbl" for="nw-start">Début</label>
+            <input type="date" id="nw-start">
+          </div>
+          <div class="field">
+            <label class="lbl" for="nw-end">Fin</label>
+            <input type="date" id="nw-end">
+          </div>
+          <div class="field col-2">
+            <span class="lbl">Affichage</span>
+            <div class="ac-show">
+              <label class="inline"><input type="checkbox" id="nw-active" checked> En ligne</label>
+              <label class="inline"><input type="checkbox" id="nw-featured"> Vedette</label>
+              <label class="inline"><input type="checkbox" id="nw-bar" checked> Barre du haut</label>
+            </div>
+          </div>
+        </div>
+        <div class="editor-actions">
+          <button class="btn btn-accent" type="submit" id="nw-save" data-ic="save">Enregistrer</button>
+          <button class="btn btn-ghost" type="button" id="nw-cancel">Annuler</button>
+          <span class="status" id="nw-status"></span>
+        </div>
+      </form>
+
+      <div class="nw-list" id="nw-list"><p class="muted">Chargement…</p></div>
+     </div><!-- /.dock-main -->
+     <aside class="dock" data-dock aria-label="Éditeur"></aside>
+    </section>
+
      <div class="dock-main">
 
       <!-- ===== MARQUES (Bambu Lab, Elegoo, Anycubic…) ===== -->
@@ -2078,3 +2169,4 @@
 <script src="assets/cms-aide.js?v=1"></script>
 </body>
 </html>
+<script src="assets/cms-nouvelles.js?v=1"></script>

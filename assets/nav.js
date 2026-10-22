@@ -100,3 +100,117 @@
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(true); });
   Array.prototype.forEach.call(drawer.querySelectorAll('a'), function (a) { a.addEventListener('click', function () { close(false); }); });
 })();
+
+/* =========================================================
+   Nouvelles (table « news », admin cms-nouvelles.js)
+   - CA.loadNews() : nouvelles en ligne (la RLS filtre déjà actif + dates),
+     lues une seule fois en REST anon ; accueil.js s'en sert pour #nouvelles.
+   - Barre du haut (.promo-bar) : les nouvelles « in_bar » défilent à la place du
+     texte habituel ; ✕ les cache jusqu'à la prochaine nouvelle (empreinte
+     ids + dates de maj en localStorage), le texte habituel revient.
+   ========================================================= */
+(function () {
+  'use strict';
+  var CA = window.CA = window.CA || {};
+  var KINDS = { promo: 'Promo', event: 'Événement', 'new': 'Nouveauté', update: 'Mise à jour' };
+  var COLS = 'id,kind,title,body,image_path,cta_label,cta_url,promo_code,event_at,starts_at,ends_at,featured,in_bar,sort_order,updated_at';
+  var KEY = 'ca-news-closed';
+
+  function cfg() { return window.CA_SUPABASE || null; }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  CA.newsKinds = KINDS;
+  CA.newsImg = function (path) {
+    var c = cfg();
+    return c && path ? c.url + '/storage/v1/object/public/products/' + String(path).split('/').map(encodeURIComponent).join('/') : '';
+  };
+  // lien saisi dans l'admin : http(s), mailto, ancre ou chemin du site (relatif à la racine, même depuis spacer/)
+  CA.newsHref = function (u) {
+    u = String(u || '').trim();
+    if (!u) return '';
+    if (/^(https?:|mailto:|tel:)/i.test(u) || u.charAt(0) === '#') return u;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return '';          // javascript:, data:… refusés
+    if (u.charAt(0) === '/') return u;
+    return (CA.siteRoot || '') + u.replace(/^\.\//, '');
+  };
+
+  // pages sans supabase-config.js (aide, conditions…) : on le charge au besoin
+  function cfgP() {
+    if (cfg()) return Promise.resolve(cfg());
+    return new Promise(function (res) {
+      var s = document.createElement('script');
+      s.src = (CA.siteRoot || '') + 'assets/supabase-config.js?v=1';
+      s.onload = s.onerror = function () { res(cfg()); };
+      document.head.appendChild(s);
+    });
+  }
+  var newsP = null;
+  CA.loadNews = function () {
+    if (newsP) return newsP;
+    if (!window.fetch) return (newsP = Promise.resolve([]));
+    newsP = cfgP().then(function (c) {
+      if (!c) return [];
+      return fetch(c.url + '/rest/v1/news?select=' + COLS + '&order=sort_order.asc,created_at.desc', {
+      headers: { apikey: c.anonKey, Authorization: 'Bearer ' + c.anonKey }
+    }).then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) { return Array.isArray(rows) ? rows : []; }, function () { return []; });
+    });
+    return newsP;
+  };
+
+  var bar = document.querySelector('.promo-bar');
+  if (!bar) return;
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  CA.loadNews().then(function (rows) {
+    var items = rows.filter(function (n) { return n.in_bar && n.title; });
+    if (!items.length) return;
+    var sig = items.map(function (n) { return n.id + '@' + (n.updated_at || ''); }).join('|');
+    var closed = '';
+    try { closed = localStorage.getItem(KEY) || ''; } catch (e) {}
+    if (closed === sig) return;
+
+    var original = bar.innerHTML, i = 0, timer = null, paused = false;
+    bar.classList.add('is-news');
+    bar.setAttribute('role', 'region');
+    bar.setAttribute('aria-label', 'Nouvelles');
+    bar.innerHTML =
+      (items.length > 1 ? '<button class="pb-nav pb-prev" type="button" aria-label="Nouvelle précédente">‹</button>' : '') +
+      '<div class="pb-item" aria-live="polite"></div>' +
+      (items.length > 1 ? '<button class="pb-nav pb-next" type="button" aria-label="Nouvelle suivante">›</button>' : '') +
+      '<button class="pb-close" type="button" aria-label="Fermer les nouvelles">×</button>';
+    var slot = bar.querySelector('.pb-item');
+
+    function show(k) {
+      i = (k + items.length) % items.length;
+      var n = items[i], href = CA.newsHref(n.cta_url) || (CA.siteRoot || '') + '#nouvelles';
+      slot.innerHTML = '<span class="pb-tag k-' + esc(n.kind) + '">' + esc(KINDS[n.kind] || '') + '</span>' +
+        '<a class="pb-link" href="' + esc(href) + '">' + esc(n.title) +
+          (n.promo_code ? ' <span class="pb-code">Code ' + esc(n.promo_code) + '</span>' : '') +
+          (n.cta_label ? ' <span class="pb-cta">' + esc(n.cta_label) + ' →</span>' : '') +
+        '</a>';
+    }
+    function tick() {
+      clearInterval(timer);
+      if (items.length > 1 && !reduceMotion) timer = setInterval(function () { if (!paused) show(i + 1); }, 6000);
+    }
+    show(0); tick();
+    bar.addEventListener('mouseenter', function () { paused = true; });
+    bar.addEventListener('mouseleave', function () { paused = false; });
+    bar.addEventListener('focusin', function () { paused = true; });
+    bar.addEventListener('focusout', function () { paused = false; });
+    var prev = bar.querySelector('.pb-prev'), next = bar.querySelector('.pb-next');
+    if (prev) prev.addEventListener('click', function () { show(i - 1); tick(); });
+    if (next) next.addEventListener('click', function () { show(i + 1); tick(); });
+    bar.querySelector('.pb-close').addEventListener('click', function () {
+      clearInterval(timer);
+      try { localStorage.setItem(KEY, sig); } catch (e) {}
+      bar.classList.remove('is-news');
+      bar.removeAttribute('role'); bar.removeAttribute('aria-label');
+      bar.innerHTML = original;
+    });
+  });
+})();

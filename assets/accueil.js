@@ -415,6 +415,95 @@
   load();
 
   /* =========================================================
+     Nouvelles (#nouvelles) : une vedette + les autres en liste ;
+     cliquer une petite carte la passe en vedette. Données :
+     CA.loadNews() (nav.js), déjà filtrées par la RLS (en ligne + dates).
+     ========================================================= */
+  var MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  function dayText(v, dateOnly) {
+    if (!v) return '';
+    var d = dateOnly ? new Date(+v.slice(0, 4), +v.slice(5, 7) - 1, +v.slice(8, 10)) : new Date(v);
+    return isNaN(d) ? '' : d.getDate() + (d.getDate() === 1 ? 'er' : '') + ' ' + MONTHS[d.getMonth()];
+  }
+  function newsMeta(n) {
+    if (n.kind === 'event' && n.event_at) return 'Le ' + dayText(n.event_at, true);
+    if (n.ends_at) return 'Jusqu\'au ' + dayText(n.ends_at);
+    return '';
+  }
+  function copyCode(btn, code) {
+    function ok() { btn.textContent = 'Copié !'; btn.classList.add('is-done'); setTimeout(function () { btn.textContent = 'Copier'; btn.classList.remove('is-done'); }, 1800); }
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(code).then(ok, legacy); return; }
+    legacy();
+    function legacy() {
+      var t = document.createElement('textarea'); t.value = code; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      try { if (document.execCommand('copy')) ok(); } catch (e) {}
+      t.remove();
+    }
+  }
+  function renderNews() {
+    var sec = $('#nouvelles'), grid = $('#news-grid'), CA = window.CA || {};
+    if (!sec || !grid || !CA.loadNews) return;
+    var KINDS = CA.newsKinds || {};
+    CA.loadNews().then(function (rows) {
+      var items = rows.filter(function (n) { return n.title; });
+      if (!items.length) return;
+      // la vedette d'abord, puis l'ordre de l'admin
+      items.sort(function (a, b) { return (b.featured ? 1 : 0) - (a.featured ? 1 : 0); });
+      var cur = 0;
+      sec.hidden = false;
+
+      function tag(n) { return '<span class="news-tag k-' + esc(n.kind) + '">' + esc(KINDS[n.kind] || '') + '</span>'; }
+      function feature(n) {
+        var img = CA.newsImg(n.image_path), meta = newsMeta(n), href = CA.newsHref(n.cta_url);
+        return '<article class="news-feat k-' + esc(n.kind) + (img ? '' : ' no-img') + '">' +
+          (img ? '<div class="news-media"><img src="' + esc(img) + '" alt="" loading="lazy"></div>' : '') +
+          '<div class="news-body">' +
+            '<div class="news-top">' + tag(n) + (meta ? '<span class="news-meta">' + esc(meta) + '</span>' : '') + '</div>' +
+            '<h3>' + esc(n.title) + '</h3>' +
+            (n.body ? '<p>' + esc(n.body).replace(/\n/g, '<br>') + '</p>' : '') +
+            ((href && n.cta_label) || n.promo_code ? '<div class="news-acts">' +
+              (href && n.cta_label ? '<a class="btn btn-ember" href="' + esc(href) + '">' + esc(n.cta_label) +
+                ' <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>' : '') +
+              (n.promo_code ? '<span class="news-code"><span>Code</span><b>' + esc(n.promo_code) + '</b>' +
+                '<button type="button" class="news-copy" data-code="' + esc(n.promo_code) + '">Copier</button></span>' : '') +
+            '</div>' : '') +
+          '</div>' +
+        '</article>';
+      }
+      function mini(n, i) {
+        var img = CA.newsImg(n.image_path), meta = newsMeta(n);
+        return '<button type="button" class="news-mini' + (i === cur ? ' is-on' : '') + '" data-i="' + i + '" aria-pressed="' + (i === cur) + '">' +
+          (img ? '<span class="news-thumb"><img src="' + esc(img) + '" alt="" loading="lazy"></span>' : '') +
+          '<span class="news-mini-txt">' +
+            '<span class="news-top">' + tag(n) + (meta ? '<span class="news-meta">' + esc(meta) + '</span>' : '') + '</span>' +
+            '<span class="news-mini-t">' + esc(n.title) + '</span>' +
+          '</span>' +
+        '</button>';
+      }
+      function draw() {
+        grid.classList.toggle('is-solo', items.length === 1);
+        grid.innerHTML = feature(items[cur]) +
+          (items.length > 1 ? '<div class="news-list" role="group" aria-label="Autres nouvelles">' + items.map(mini).join('') + '</div>' : '');
+        var copy = $('.news-copy', grid);
+        if (copy) copy.addEventListener('click', function () { copyCode(copy, copy.getAttribute('data-code')); });
+        $$('.news-mini', grid).forEach(function (b) {
+          b.addEventListener('click', function () {
+            var i = +b.getAttribute('data-i');
+            if (i === cur) return;
+            cur = i; draw();
+            var f = $('.news-mini[data-i="' + i + '"]', grid); if (f) f.focus({ preventScroll: true });
+          });
+        });
+      }
+      draw();
+      // arrivée par la barre du haut (#nouvelles) : la section n'existait pas encore au chargement
+      if (location.hash === '#nouvelles') sec.scrollIntoView();
+    });
+  }
+  renderNews();
+
+  /* =========================================================
      Apparition douce des sections au défilement
      ========================================================= */
   if ('IntersectionObserver' in window && !reduceMotion) {
