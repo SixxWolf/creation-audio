@@ -125,6 +125,7 @@
   CA.newsKinds = KINDS;
   CA.newsImg = function (path) {
     var c = cfg();
+    if (/^assets\//.test(path || '')) return (CA.siteRoot || '') + path;   // visuel hébergé dans le dépôt
     return c && path ? c.url + '/storage/v1/object/public/products/' + String(path).split('/').map(encodeURIComponent).join('/') : '';
   };
   // lien saisi dans l'admin : http(s), mailto, ancre ou chemin du site (relatif à la racine, même depuis spacer/)

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Gabarit visuels Nouvelles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Paramètres (query string) : t = new | update | stock | promo, h = titre, s = sous-titre,
+     l = liste (séparée par |), c = couleurs hex (séparées par |), b = badge, f = format (wide | square) */
+  :root { --ink:#181A1F; --muted:#6C727C; --ember:#FF6A2B; --ember-ink:#B23F12; --wash:#F6F6F4; --line:#E6E3DC;
+          --nw-promo:#FF6A2B; --nw-event:#7C5CE0; --nw-new:#1F9D63; --nw-update:#2F7BE5; --k:var(--nw-new); }
+  * { box-sizing:border-box; margin:0; }
+  html, body { width:1200px; height:630px; overflow:hidden; background:#fff; }
+  body.square, body.square html { width:1080px; height:1080px; }
+  body { font-family:'Inter', system-ui, sans-serif; color:var(--ink); position:relative; }
+  body.square { width:1080px; height:1080px; }
+  body.t-new { --k:var(--nw-new); } body.t-update { --k:var(--nw-update); }
+  body.t-stock { --k:var(--nw-new); } body.t-promo { --k:var(--nw-promo); }
+
+  .card { position:absolute; inset:0; display:flex; padding:64px 72px; overflow:hidden;
+          background:radial-gradient(900px 600px at 100% 0%, color-mix(in srgb, var(--k) 14%, #fff) 0%, #fff 62%); }
+  .card::before { content:""; position:absolute; left:0; top:0; bottom:0; width:14px; background:var(--k); }
+  .tx { position:relative; z-index:2; display:flex; flex-direction:column; justify-content:center; gap:22px; flex:1; min-width:0; }
+  body.square .card { flex-direction:column; padding:72px; }
+  body.square .tx { justify-content:flex-start; }
+
+  .badge { align-self:flex-start; display:inline-flex; align-items:center; gap:10px; padding:10px 20px;
+           border-radius:999px; background:var(--k); color:#fff; font-weight:800; font-size:22px;
+           letter-spacing:.1em; text-transform:uppercase; }
+  .badge i { width:10px; height:10px; border-radius:50%; background:#fff; }
+  h1 { font-family:'Space Grotesk', 'Inter', sans-serif; font-weight:700; font-size:76px; line-height:1.04; letter-spacing:-.025em; max-width:760px; text-wrap:balance; }
+  body.square h1 { font-size:88px; max-width:none; }
+  .sub { font-size:30px; line-height:1.35; color:var(--ink); opacity:.72; max-width:720px; font-weight:500; text-wrap:pretty; }
+  body.square .sub { max-width:none; font-size:34px; }
+
+  ul.pts { list-style:none; padding:0; display:flex; flex-direction:column; gap:14px; }
+  ul.pts li { display:flex; align-items:center; gap:16px; font-size:30px; font-weight:600; }
+  ul.pts li::before { content:""; width:14px; height:14px; border-radius:4px; background:var(--k); flex:none; }
+
+  .sw { display:flex; flex-wrap:wrap; gap:16px; max-width:640px; }
+  .sw span { width:76px; height:76px; border-radius:50%; border:4px solid #fff; box-shadow:0 0 0 2px var(--line), 0 6px 14px rgba(0,0,0,.12); }
+
+  .art { position:relative; z-index:1; width:400px; flex:none; display:flex; align-items:center; justify-content:center; }
+  body.square .art { width:100%; height:300px; margin-top:auto; }
+  .art img.wolf { width:430px; height:430px; object-fit:contain; opacity:.95; }
+  body.square .art img.wolf { height:300px; width:300px; }
+  .art img.prod { max-width:100%; max-height:430px; object-fit:contain; filter:drop-shadow(0 18px 24px rgba(0,0,0,.2)); }
+  body.has-prod .art img.wolf { position:absolute; right:-120px; bottom:-120px; width:360px; height:360px; opacity:.1; }
+
+  .foot { position:absolute; z-index:3; left:86px; bottom:34px; right:72px; display:flex; align-items:center; justify-content:space-between;
+          font-size:22px; font-weight:700; letter-spacing:.04em; color:var(--muted); }
+  .foot b { font-family:'Space Grotesk', sans-serif; color:var(--ink); text-transform:uppercase; letter-spacing:.08em; }
+  body.square .foot { left:72px; bottom:40px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="tx">
+    <span class="badge"><i></i><span id="badge"></span></span>
+    <h1 id="h"></h1>
+    <p class="sub" id="s" hidden></p>
+    <ul class="pts" id="l" hidden></ul>
+    <div class="sw" id="c" hidden></div>
+  </div>
+  <div class="art"><img class="wolf" id="wolf" alt=""><img class="prod" id="prod" alt="" hidden></div>
+  <div class="foot"><b>Création Audio</b><span>creationaudio.ca</span></div>
+</div>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var t = q.get('t') || 'new';
+  var badges = { new:'Nouveauté', update:'Mise à jour', stock:'De retour en stock', promo:'Promo' };
+  document.body.classList.add('t-' + t);
+  if (q.get('f') === 'square') document.body.classList.add('square');
+  document.getElementById('badge').textContent = q.get('b') || badges[t] || '';
+  document.getElementById('h').textContent = q.get('h') || '';
+  var s = q.get('s'); if (s) { var e = document.getElementById('s'); e.textContent = s; e.hidden = false; }
+  var l = q.get('l');
+  if (l) { var ul = document.getElementById('l'); l.split('|').forEach(function (x) { var li = document.createElement('li'); li.textContent = x; ul.appendChild(li); }); ul.hidden = false; }
+  var c = q.get('c');
+  if (c) { var w = document.getElementById('c'); c.split('|').forEach(function (x) { var sp = document.createElement('span'); sp.style.background = '#' + x.replace('#', ''); w.appendChild(sp); }); w.hidden = false; }
+  var p = q.get('p');
+  if (p) { var im = document.getElementById('prod'); im.src = p; im.hidden = false; document.body.classList.add('has-prod'); }
+  document.getElementById('wolf').src = '../../assets/img/loup_ondes_rouges_1024_transparent.png';
+})();
+</script>
+</body>
+</html>

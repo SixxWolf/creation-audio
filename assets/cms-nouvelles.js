@@ -26,8 +26,14 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  // visuels générés par Claude : fichiers du dépôt (assets/news/…), pas du stockage
+  function isRepoImg(path) { return /^assets\//.test(path || ''); }
+  function removeImg(path) {
+    if (path && !isRepoImg(path)) sb.storage.from(BUCKET).remove([path]).then(null, function () {});
+  }
   function publicUrl(path) {
     if (!path) return '';
+    if (isRepoImg(path)) return path;
     try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; } catch (e) { return ''; }
   }
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -201,7 +207,7 @@
         var saved = res.data[0];
         // une seule vedette : les autres perdent l'étoile
         var unfeat = saved.featured ? sb.from('news').update({ featured: false }).neq('id', saved.id).eq('featured', true) : null;
-        if (oldPath && oldPath !== saved.image_path) sb.storage.from(BUCKET).remove([oldPath]).then(null, function () {});
+        if (oldPath !== saved.image_path) removeImg(oldPath);
         return Promise.resolve(unfeat).then(function () { closeEditor(); load(); });
       }, function (err) {
         if (newPath) sb.storage.from(BUCKET).remove([newPath]).then(null, function () {});
@@ -305,7 +311,7 @@
       sb.from('news').delete().eq('id', row.id).select().then(function (res) {
         if (res.error) { caDialog.error(res.error); return; }
         if (!res.data || !res.data.length) { caDialog.error('Suppression refusée (permissions).'); return; }
-        if (row.image_path) sb.storage.from(BUCKET).remove([row.image_path]).then(null, function () {});
+        removeImg(row.image_path);
         if (editingId === row.id) closeEditor();
         load();
       });
