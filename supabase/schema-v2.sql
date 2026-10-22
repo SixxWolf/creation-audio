@@ -185,18 +185,28 @@ create policy materials_admin_all
 -- plus bas, section RÉSERVATIONS) : retiré du stock affiché par products_public
 -- tant que la réservation est active et pas expirée (libéré à la seconde près).
 -- plpgsql : le corps n'est validé qu'à l'appel (les tables sont créées plus bas).
+-- + commandes en ligne dont le stock est « en attente de paiement » (customer_orders.stock_hold,
+-- bouton admin Commandes › Clients en ligne) tant qu'elles sont ouvertes (Nouvelle / En préparation / Prête).
 create or replace function public._held_stock()
 returns table (product_id uuid, held_main integer, held_refill integer)
 language plpgsql stable security definer set search_path = '' as $$
 begin
   return query
-    select l.product_id,
-           coalesce(sum(l.qty) filter (where l.kind is distinct from 'refill'), 0)::int,
-           coalesce(sum(l.qty) filter (where l.kind = 'refill'), 0)::int
-      from public.customer_reservation_lines l
-      join public.customer_reservations r on r.id = l.reservation_id
-     where r.status = 'active' and r.expires_at > now() and l.product_id is not null
-     group by l.product_id;
+    select u.product_id,
+           coalesce(sum(u.qty) filter (where u.kind is distinct from 'refill'), 0)::int,
+           coalesce(sum(u.qty) filter (where u.kind = 'refill'), 0)::int
+      from (
+        select l.product_id, l.kind, l.qty
+          from public.customer_reservation_lines l
+          join public.customer_reservations r on r.id = l.reservation_id
+         where r.status = 'active' and r.expires_at > now() and l.product_id is not null
+        union all
+        select l.product_id, l.kind, l.qty
+          from public.customer_order_lines l
+          join public.customer_orders o on o.id = l.order_id
+         where o.stock_hold and o.status in ('new', 'preparing', 'ready') and l.product_id is not null
+      ) u
+     group by u.product_id;
 end $$;
 grant execute on function public._held_stock() to anon, authenticated;   -- appelée par la vue (quantités seulement)
 
@@ -1674,6 +1684,7 @@ alter table public.customer_orders add column if not exists pickup_start       t
 alter table public.customer_orders add column if not exists pickup_end         time;
 alter table public.customer_orders add column if not exists pickup_notified_at timestamptz;
 alter table public.customer_orders add column if not exists ready_notified_at  timestamptz;   -- courriel « commande prête » (EF customer-order-notify, event ready)
+alter table public.customer_orders add column if not exists stock_hold boolean not null default false;   -- stock retiré du site en attendant le paiement (voir _held_stock)
 create index if not exists customer_orders_customer_idx on public.customer_orders (customer_id, created_at desc);
 create index if not exists customer_orders_status_idx on public.customer_orders (status);
 create table if not exists public.customer_order_lines (

@@ -191,10 +191,11 @@
       return '<button type="button" class="btn ' + (cls || 'btn-ghost') + ' btn-sm" data-act="' + act + '"' +
         (act === 'invoice' ? ' data-ic="receipt"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
     };
+    var hold = OPEN[o.status] ? b(o.stock_hold ? 'unhold' : 'hold', o.stock_hold ? 'Libérer le stock' : 'Mettre en attente') : '';
     switch (o.status) {
-      case 'new': return b('preparing', 'Commencer la préparation', 'btn-accent') + b('invoice', 'Facturer') + b('cancel', 'Annuler', 'btn-ghost co-danger');
-      case 'preparing': return b('ready', 'Marquer prête', 'btn-accent') + b('invoice', 'Facturer') + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
-      case 'ready': return b('invoice', 'Facturer', 'btn-accent') + b('preparing', '↩ En préparation') + b('cancel', 'Annuler', 'btn-ghost co-danger');
+      case 'new': return b('preparing', 'Commencer la préparation', 'btn-accent') + hold + b('invoice', 'Facturer') + b('cancel', 'Annuler', 'btn-ghost co-danger');
+      case 'preparing': return b('ready', 'Marquer prête', 'btn-accent') + hold + b('invoice', 'Facturer') + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
+      case 'ready': return b('invoice', 'Facturer', 'btn-accent') + hold + b('preparing', '↩ En préparation') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'invoiced': return o.invoice_id ? b('see-invoice', 'Voir la facture') : '';
       case 'cancelled': return b('new', 'Rouvrir') + b('delete', 'Supprimer', 'btn-ghost co-danger');
     }
@@ -230,6 +231,7 @@
         '<header class="co-head">' +
           '<div class="co-id"><b>' + esc(o.number) + '</b><span class="co-status is-' + esc(o.status) + '">' + esc(STATUS[o.status] || o.status) + '</span>' +
             (o.edited_at && OPEN[o.status] ? '<span class="co-edited">modifiée par le client ' + esc(ago(o.edited_at)) + '</span>' : '') +
+            (o.stock_hold && OPEN[o.status] ? '<span class="co-status is-preparing">Stock en attente</span>' : '') +
             (o.status === 'cancelled' ? '<span class="co-edited">' + (o.cancelled_by === 'client' ? 'par le client' : 'par toi') + '</span>' : '') +
           '</div>' +
           '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') +
@@ -286,7 +288,18 @@
         ok: 'Annuler la commande', danger: true }).then(function (ok) { if (ok) setStatus(o, what, btn); });
       return;
     }
+    if (what === 'hold' || what === 'unhold') { setHold(o, what === 'hold', btn); return; }
     setStatus(o, what, btn);
+  }
+  // stock retiré du site (ou remis) en attendant le paiement : customer_orders.stock_hold -> _held_stock
+  function setHold(o, on, btn) {
+    btn.disabled = true;
+    sb.from('customer_orders').update({ stock_hold: on, updated_at: new Date().toISOString() }).eq('id', o.id).select('id').then(function (res) {
+      if (res.error) throw res.error;
+      if (!res.data || !res.data.length) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
+      caDialog.toast(on ? 'Stock en attente — retiré du site.' : 'Stock remis en vente.');
+      load();
+    }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
   }
   function setStatus(o, what, btn) {
     var patch = { status: what === 'cancel' ? 'cancelled' : what, updated_at: new Date().toISOString(),
