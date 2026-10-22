@@ -6,7 +6,12 @@
 //    cueillette choisie (pickup_date/start/end ; sans plage : « on te contacte sous peu ») ;
 //    sinon la liste des articles à commander et l'annonce d'un délai.
 //  - à Création Audio (toujours) : avis avec lignes, stock et lien vers l'admin.
-// Appel : POST { order_id, event: 'new' | 'updated' | 'cancelled' } avec le JWT du client.
+//  - « ready » (admin › Commandes › « Marquer prête ») : au CLIENT seulement, « ta commande est
+//    prête » + sa plage de cueillette (ou le lien pour la choisir). Une seule fois (ready_notified_at).
+// Bobines vides (accessoire visé par materials.empty_spool_id) : nos propres impressions, pas de
+// fournisseur -> « N à compléter · sans garantie » au lieu du délai fournisseur.
+// Appel : POST { order_id, event: 'new' | 'updated' | 'cancelled' | 'ready' } avec le JWT du client
+// (ready : JWT de l'admin, double authentification aal2).
 // Sécurité : JWT vérifié ; la commande doit appartenir au client (customer_id = son id).
 // Anti-rafale : « new » une seule fois ; modification / annulation au plus 1 fois / 2 min.
 // Adresses de test Resend (…@resend.dev) : l'avis admin part aussi vers le puits de test.
@@ -16,6 +21,14 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
+const ADMIN_EMAIL = "creationaudio.ca@gmail.com";
+
+function jwtClaim(authHeader: string, key: string): unknown {
+  try {
+    const p = authHeader.replace(/^Bearer\s+/i, "").split(".")[1];
+    return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((p.length + 3) % 4)))[key];
+  } catch { return undefined; }
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -50,7 +63,12 @@ type Line = { name: string; meta: string | null; qty: number; unit_price: number
 
 // filaments / accessoires à commander chez le fournisseur : délai annoncé (les spacers, imprimés ici, gardent « on te confirme »)
 const BO_DELAY = "3 à 7 jours ouvrables";
-const boLabel = (l: Line, n: number) => n + " à commander" + (l.ptype === "spacer" ? "" : " · " + BO_DELAY);
+let emptyIds = new Set<string>();   // bobines vides (rempli par requête)
+const isEmpty = (l: Line) => !!l.product_id && emptyIds.has(l.product_id);
+const boLabel = (l: Line, n: number) => isEmpty(l) ? n + " à compléter · sans garantie"
+  : n + " à commander" + (l.ptype === "spacer" ? "" : " · " + BO_DELAY);
+const EMPTY_TXT = "Bobines vides : elles viennent de nos propres impressions, on ne peut pas en commander chez un fournisseur. " +
+  "On fera tout notre possible pour compléter ta commande, sans garantie de quantité ni de délai.";
 
 const ADMIN_LABEL: Record<string, string> = {
   new: "Nouvelle commande en ligne",
@@ -89,15 +107,21 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     orderId = typeof body?.order_id === "string" ? body.order_id : "";
-    event = ["new", "updated", "cancelled"].includes(body?.event) ? body.event : "new";
+    event = ["new", "updated", "cancelled", "ready"].includes(body?.event) ? body.event : "new";
   } catch { /* corps invalide */ }
   if (!/^[0-9a-f-]{36}$/i.test(orderId)) return json({ error: "Commande invalide." }, 400);
+  // « prête » : seul l'admin (double authentification, comme is_admin() en base)
+  if (event === "ready") {
+    if ((u?.user?.email || "").toLowerCase() !== ADMIN_EMAIL) return json({ error: "Réservé à l'administrateur." }, 403);
+    if (jwtClaim(authHeader, "aal") !== "aal2") return json({ error: "Double authentification requise." }, 403);
+  }
 
-  // 2) la commande doit appartenir au client connecté
+  // 2) la commande doit appartenir au client connecté (ready : n'importe quelle commande, admin)
   const db = createClient(url, service);
   const { data: order, error } = await db.from("customer_orders").select("*").eq("id", orderId).maybeSingle();
   if (error) return json({ error: error.message }, 500);
-  if (!order || order.customer_id !== uid) return json({ error: "Commande introuvable." }, 404);
+  if (!order || (event !== "ready" && order.customer_id !== uid)) return json({ error: "Commande introuvable." }, 404);
+  if (event === "ready") return await notifyReady(db, order, resendKey, from);
 
   // 3) anti-rafale
   const last = order.notified_at ? Date.parse(order.notified_at) : 0;
@@ -110,6 +134,7 @@ Deno.serve(async (req) => {
   const { data: lines } = await db.from("customer_order_lines")
     .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype").eq("order_id", orderId).order("sort_order");
   const L = (lines || []) as Line[];
+  await loadEmptyIds(db, L);
   const items = L.reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const toOrder = L.filter((l) => (Number(l.qty_to_order) || 0) > 0);
   const first = String(order.name || "").trim().split(/\s+/)[0] || "";
@@ -122,13 +147,16 @@ Deno.serve(async (req) => {
   if (event !== "cancelled") {
     const verb = event === "updated" ? "modifiée" : "reçue";
     const subject = "Commande " + order.number + " " + verb + " — Création Audio";
-    const supplierBo = toOrder.some((l) => l.ptype !== "spacer");
+    const supplierBo = toOrder.some((l) => l.ptype !== "spacer" && !isEmpty(l));
+    const emptyBo = toOrder.some(isEmpty);
+    const printBo = toOrder.some((l) => l.ptype === "spacer");
     const status = !toOrder.length
       ? (pk ? "Tout est en stock : on t'attend " + pk + "." : "Tout est en stock : on te contacte sous peu pour convenir de la cueillette à Québec.")
-      : supplierBo
-      ? "Certains articles ne sont pas en stock : on les commande chez notre fournisseur. Prévois un délai de " + BO_DELAY +
-        " avant la cueillette ; on t'écrit dès leur arrivée pour que tu choisisses ta plage de cueillette."
-      : "Certains articles doivent être imprimés : il y aura donc un délai. On te contacte sous peu pour te le confirmer.";
+      : [supplierBo
+        ? "Certains articles ne sont pas en stock : on les commande chez notre fournisseur. Prévois un délai de " + BO_DELAY +
+          " avant la cueillette ; on t'écrit dès leur arrivée pour que tu choisisses ta plage de cueillette."
+        : printBo ? "Certains articles doivent être imprimés : il y aura donc un délai. On te contacte sous peu pour te le confirmer." : "",
+        emptyBo ? EMPTY_TXT : ""].filter(Boolean).join(" ");
     const toOrderTxt = toOrder.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " : " +
       boLabel(l, Number(l.qty_to_order))).join("\n");
     const text =
@@ -194,7 +222,7 @@ Deno.serve(async (req) => {
   const aText =
     label + " " + order.number + "\n" + who + " · " + order.email + (order.phone ? " · " + order.phone : "") + "\n\n" +
     aRows.map((r) => "- " + r.l.name + (r.l.meta ? " (" + r.l.meta + ")" : "") + " × " + r.l.qty + " — " + money(r.l.line_total) +
-      (r.miss ? "  (à commander : " + r.miss + ")" : "  (en stock)")).join("\n") +
+      (r.miss ? "  (" + (isEmpty(r.l) ? "à compléter" : "à commander") + " : " + r.miss + ")" : "  (en stock)")).join("\n") +
     "\n\nTotal : " + money(order.total) + "\n" + (pk ? "Cueillette : " + pk + "\n" : "") +
     (order.note ? "\nNote du client : " + order.note + "\n" : "") +
     "\nOuvrir dans l'admin : " + adminUrl + "\n";
@@ -211,7 +239,7 @@ Deno.serve(async (req) => {
           (r.l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(r.l.meta) + '</span>' : '') + '</td>' +
         '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(r.l.qty) + '</td>' +
         '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right;color:' + (r.miss ? '#B23F12' : '#16794A') + '">' +
-          (r.miss ? r.miss + ' à commander' : 'en stock') + '</td>' +
+          (r.miss ? r.miss + (isEmpty(r.l) ? ' à compléter' : ' à commander') : 'en stock') + '</td>' +
         '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(r.l.line_total) + '</td></tr>').join("") +
     '</table>' +
     '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total : ' + money(order.total) + '</strong></p>' +
@@ -227,3 +255,68 @@ Deno.serve(async (req) => {
   await db.from("customer_orders").update({ notified_at: new Date().toISOString() }).eq("id", orderId);
   return json({ result: "done", ...results });
 });
+
+// bobines vides présentes dans ces lignes (accessoires visés par materials.empty_spool_id)
+// deno-lint-ignore no-explicit-any
+async function loadEmptyIds(db: any, L: Line[]) {
+  const pids = L.map((l) => l.product_id).filter(Boolean) as string[];
+  const { data } = pids.length
+    ? await db.from("materials").select("empty_spool_id").in("empty_spool_id", pids)
+    : { data: [] };
+  emptyIds = new Set(((data || []) as { empty_spool_id: string }[]).map((m) => m.empty_spool_id));
+}
+
+// ---- « Ta commande est prête » (admin › Commandes › Marquer prête) : au client, une seule fois ----
+// deno-lint-ignore no-explicit-any
+async function notifyReady(db: any, order: any, resendKey: string | undefined, from: string) {
+  if (order.status !== "ready") return json({ result: "skipped", reason: "pas prête" });
+  if (order.ready_notified_at) return json({ result: "skipped", reason: "déjà avisé" });
+  if (!order.email) return json({ result: "skipped", reason: "sans courriel" });
+  if (!resendKey) return json({ error: "Envoi non configuré : secret RESEND_API_KEY manquant." }, 503);
+
+  const { data: lines } = await db.from("customer_order_lines")
+    .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype").eq("order_id", order.id).order("sort_order");
+  const L = (lines || []) as Line[];
+  const first = String(order.name || "").trim().split(/\s+/)[0] || "";
+  const accountUrl = SITE + "/compte.html#/commandes";
+  const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end);
+  const subject = "Commande " + order.number + " prête — Création Audio";
+  const status = pk
+    ? "On t'attend " + pk + ". Tu peux changer de plage dans ton compte."
+    : "Choisis ta plage de cueillette dans ton compte.";
+  const text =
+    "Bonjour " + first + ",\n\n" +
+    "Ta commande " + order.number + " est prête !\n\n" + status + "\n\n" +
+    L.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + money(l.line_total)).join("\n") +
+    "\n\nTotal : " + money(order.total) + "\n" +
+    "Cueillette à Québec · tu paies à la cueillette.\n\n" +
+    (pk ? "Mon compte : " : "Choisir ma plage de cueillette : ") + accountUrl + "\n\n" +
+    "Création Audio\n" + SITE;
+  const rowsHtml = L.map((l) => '<tr>' +
+    '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(l.name) + '</strong>' +
+      (l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(l.meta) + '</span>' : '') + '</td>' +
+    '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
+    '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(l.line_total) + '</td></tr>').join("");
+  const html =
+    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
+    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
+    '<h1 style="font-size:22px;margin:0 0 10px">Ta commande ' + esc(order.number) + ' est prête</h1>' +
+    '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ',</p>' +
+    '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#E7F6EE;color:#16794A;font-weight:700">' + esc(status) + '</p>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
+      '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">Article</th><th style="padding:8px 10px;text-align:right">Qté</th>' +
+      '<th style="padding:8px 10px;text-align:right">Total</th></tr>' + rowsHtml +
+    '</table>' +
+    '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total : ' + money(order.total) + '</strong></p>' +
+    '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">Cueillette à Québec · tu paies à la cueillette.</p>' +
+    '<p style="margin:22px 0"><a href="' + accountUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
+      (pk ? 'Voir ma commande' : 'Choisir ma plage de cueillette') + '</a></p>' +
+    '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
+    '<p style="font-size:12px;color:#6C727C">Une question&nbsp;? Réponds simplement à ce courriel.</p>' +
+    "</div>";
+  try {
+    await send(resendKey, from, { to: [order.email], reply_to: REPLY_TO, subject, html, text });
+  } catch (e) { return json({ error: String((e as Error).message || e) }, 502); }
+  await db.from("customer_orders").update({ ready_notified_at: new Date().toISOString() }).eq("id", order.id);
+  return json({ result: "done", sent: true });
+}

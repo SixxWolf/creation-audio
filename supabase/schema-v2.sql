@@ -162,6 +162,8 @@ alter table public.materials add column if not exists long_desc text;           
 alter table public.materials add column if not exists specs   jsonb not null default '[]'::jsonb; -- specs : [{k,v}] libres (ajout/suppr. à volonté)
 alter table public.materials add column if not exists gallery jsonb not null default '[]'::jsonb; -- galerie « prints » : liste de chemins d'images (bucket products)
 alter table public.materials add column if not exists slug    text;                            -- segment d'URL du matériau (ex. « pla-basic ») ; null => auto-généré depuis le nom
+-- bobine vide (accessoire) liée au matériau ; posée ici car la vue products_public l'expose (détail : section BOBINES VIDES)
+alter table public.materials add column if not exists empty_spool_id uuid references public.products(id) on delete set null;
 -- clé primaire = (brand, name) : on retire l'ancienne (sur name) et on pose la composite
 alter table public.materials drop constraint if exists materials_pkey;
 alter table public.materials add  constraint materials_pkey primary key (brand, name);
@@ -234,9 +236,7 @@ with (security_invoker = off) as
       -- accessoires : catégorie (puces + rabais cumulé), affichage sur la fiche filament (+ marques visées)
       'category',     p.attrs -> 'category',
       'on_filament',  p.attrs -> 'on_filament',
-      'fil_brands',   p.attrs -> 'fil_brands',
-      -- accessoires « stock seulement » (bobines vides récupérées) : jamais commandés au-delà du stock
-      'stock_only',   p.attrs -> 'stock_only'
+      'fil_brands',   p.attrs -> 'fil_brands'
     )) as attrs,
     p.image_path,
     p.slug,                            -- slug perso de la couleur (null = auto côté boutique)
@@ -255,6 +255,7 @@ with (security_invoker = off) as
     m.specs       as material_specs,     -- fiche : specs libres [{k,v}]
     m.gallery     as material_gallery,   -- fiche : galerie « prints » (chemins d'images)
     m.sort_order  as material_sort,    -- ordre des matériaux (drag-and-drop admin) -> pilote l'ordre boutique
+    m.empty_spool_id,                  -- bobine vide (accessoire) du matériau : avertissement + échange recharge -> bobine (boutique)
     -- stock offert = stock réel − réservations en cours (null = non suivi, reste null)
     case when p.qty   is null then null else greatest(0, p.qty   - coalesce(h.held_main, 0))   end as qty,
     case when p.qty_2 is null then null else greatest(0, p.qty_2 - coalesce(h.held_refill, 0)) end as qty_2,
@@ -277,6 +278,9 @@ update public.products
              || case when coalesce(attrs, '{}'::jsonb) ? 'category' then '{}'::jsonb
                      else jsonb_build_object('category', 'Bobines vides') end
  where type = 'accessory' and not (coalesce(attrs, '{}'::jsonb) ? 'on_filament');
+-- « Stock seulement » retiré (2026-10-22) : les bobines vides se commandent au-delà du stock
+-- (client connecté), avec un avertissement en boutique (délai sans garantie).
+update public.products set attrs = attrs - 'stock_only' where attrs ? 'stock_only';
 
 -- ------------------------------------------------------------
 -- RÉCEPTIONS DE COMMANDE (entrées de stock) + historique
@@ -1669,6 +1673,7 @@ alter table public.customer_orders add column if not exists pickup_date        d
 alter table public.customer_orders add column if not exists pickup_start       time;
 alter table public.customer_orders add column if not exists pickup_end         time;
 alter table public.customer_orders add column if not exists pickup_notified_at timestamptz;
+alter table public.customer_orders add column if not exists ready_notified_at  timestamptz;   -- courriel « commande prête » (EF customer-order-notify, event ready)
 create index if not exists customer_orders_customer_idx on public.customer_orders (customer_id, created_at desc);
 create index if not exists customer_orders_status_idx on public.customer_orders (status);
 create table if not exists public.customer_order_lines (
@@ -1712,7 +1717,7 @@ $$;
 -- meta, qty, unit_price, line_total, qty_to_order, sort_order}]
 create or replace function public._customer_fill_lines(p_lines jsonb)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
-declare v_in int; v_ok int; v_out jsonb; v_short text;
+declare v_in int; v_ok int; v_out jsonb;
 begin
   if jsonb_typeof(p_lines) is distinct from 'array' or jsonb_array_length(p_lines) = 0 then
     raise exception 'Ton panier est vide.';
@@ -1735,8 +1740,7 @@ begin
                 when pp.type = 'accessory' and coalesce(btrim(pp.attrs ->> 'category'), '') <> ''
                   then 'acc|' || lower(btrim(pp.attrs ->> 'category'))
                 else 'one|' || l.pid::text || '|' || l.kind end as gkey,
-           case when l.kind = 'refill' then coalesce(pp.qty_2, 0) else pp.qty end as stock,
-           coalesce(pp.attrs ->> 'stock_only', '') = 'true' as stock_only
+           case when l.kind = 'refill' then coalesce(pp.qty_2, 0) else pp.qty end as stock
       from l
       join public.products_public pp on pp.id = l.pid
      where (pp.type = 'filament' and l.kind in ('spool', 'refill'))
@@ -1758,17 +1762,12 @@ begin
                         when type = 'accessory' then 'Accessoire' else 'Spacer · paire' end,
            'qty', qty, 'unit_price', unit, 'line_total', round(unit * qty, 2),
            'qty_to_order', case when stock is null then 0 else greatest(0, qty - greatest(stock, 0)) end,
-           'sort_order', rn) order by rn), '[]'::jsonb),
-         string_agg(name, ', ' order by rn) filter (where stock_only and stock is not null and qty > greatest(stock, 0))
-    into v_in, v_ok, v_out, v_short
+           'sort_order', rn) order by rn), '[]'::jsonb)
+    into v_in, v_ok, v_out
     from s;
   if v_in = 0 then raise exception 'Ton panier est vide.'; end if;
   if v_ok <> v_in then
     raise exception 'Un article de ton panier n''est plus offert. Recharge la page puis réessaie.';
-  end if;
-  -- « stock seulement » : ni commande au-delà du stock, ni réservation
-  if v_short is not null then
-    raise exception 'Plus assez de stock pour : %. Ajuste la quantité dans ton panier.', v_short;
   end if;
   return v_out;
 end $$;

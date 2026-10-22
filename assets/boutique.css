@@ -631,6 +631,18 @@ body.has-buybar .toast { bottom:92px; }
 .cart-msg a { font-weight:700; color:var(--ember-ink); }
 .citem-bo, .buy-bo { font-weight:700; color:#9A4A0E; }
 .buy-bo { display:block; margin-top:4px; }
+/* bobines vides en manque : échange recharge -> version avec bobine (fenêtre + panier) */
+.es-swaps { display:grid; gap:8px; margin-top:14px; }
+.es-swap { display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; padding:9px 11px; font-size:.86rem; line-height:1.35;
+  color:var(--ink); background:#FFF3EC; border-radius:10px; }
+.es-swap .citem-sw { flex:none; width:22px; height:22px; }
+.es-tx { flex:1 1 180px; min-width:0; }
+.es-btn { flex:none; margin-left:auto; padding:5px 11px; font:inherit; font-weight:700; font-size:.82rem; color:var(--ink); cursor:pointer;
+  background:#fff; border:1px solid var(--line-2); border-radius:8px; }
+.es-btn:hover:not(:disabled) { border-color:var(--ember-ink); color:var(--ember-ink); }
+.es-btn:disabled { cursor:default; color:#2E7D4F; border-color:transparent; }
+.citem-swap { display:grid; gap:6px; margin-top:8px; }
+.citem-swap .es-swap { padding:7px 9px; font-size:.8rem; }
 body.cart-lock { overflow:hidden; }
 
 /* ---- Toast ---- */

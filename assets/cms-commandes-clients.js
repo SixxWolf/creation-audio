@@ -296,6 +296,11 @@
       if (res.error) throw res.error;
       if (!res.data || !res.data.length) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
       load();
+      // « Prête » : courriel au client (une seule fois par commande, garde côté fonction : ready_notified_at)
+      if (what === 'ready') sb.functions.invoke('customer-order-notify', { body: { order_id: o.id, event: 'ready' } }).then(function (r) {
+        if (r && r.error) caDialog.toast('Courriel « prête » non envoyé.', 'bad');
+        else if (r && r.data && r.data.sent) caDialog.toast('Client prévenu par courriel.');
+      }, function () { caDialog.toast('Courriel « prête » non envoyé.', 'bad'); });
     }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
   }
 })();

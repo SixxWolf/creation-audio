@@ -287,13 +287,17 @@
 
   /* ---- Mes commandes ---- */
   // onglet Commandes = réservations (#acct-resv), commandes en ligne (#acct-cmds) puis factures (#acct-invs)
-  var tabEl = $('#acct-orders'), cmdEl = null, ordersEl = null, resvEl = null, myOrders = [];
+  var tabEl = $('#acct-orders'), cmdEl = null, ordersEl = null, resvEl = null, myOrders = [], emptyIds = {};
   function loadOrders() {
     tabEl.innerHTML = '<div id="acct-resv"></div><div id="acct-cmds"></div><div id="acct-invs"><p class="acct-empty">Chargement…</p></div>';
     cmdEl = $('#acct-cmds'); ordersEl = $('#acct-invs'); resvEl = $('#acct-resv');
     var slotsP = window.CA.custOrder ? window.CA.custOrder.slots() : Promise.resolve([]);
     slotsP.then(function (l) { hasSlots = l.length > 0; loadResv(); });
-    Promise.all([slotsP, sb.rpc('me_orders')]).then(function (all) {
+    // bobines vides (materials.empty_spool_id) : « à compléter · sans garantie » au lieu du délai fournisseur
+    var emptyP = sb.from('products_public').select('empty_spool_id').not('empty_spool_id', 'is', null).then(function (r) {
+      emptyIds = {}; ((r && r.data) || []).forEach(function (p) { emptyIds[p.empty_spool_id] = true; });
+    }, function () {});
+    Promise.all([slotsP, sb.rpc('me_orders'), emptyP]).then(function (all) {
       var res = all[1];
       myOrders = (!res.error && res.data) || [];
       renderCmds();
@@ -318,7 +322,8 @@
         var bo = open ? (+l.qty_to_order || 0) : 0;
         return '<li>' + swatch(l.hex, (l.name || '') + ' ' + (l.meta || '')) +
           '<span class="ol-tx"><b>' + esc(l.name || '') + '</b>' + (l.meta ? '<small>' + esc(l.meta) + '</small>' : '') +
-            (bo ? '<em class="ol-pend">' + bo + ' à commander · ' + (l.ptype === 'spacer' ? 'délai à confirmer' : '3 à 7 jours ouvrables') + '</em>' : '') + '</span>' +
+            (bo ? '<em class="ol-pend">' + (emptyIds[l.product_id] ? bo + ' à compléter · sans garantie'
+              : bo + ' à commander · ' + (l.ptype === 'spacer' ? 'délai à confirmer' : '3 à 7 jours ouvrables')) + '</em>' : '') + '</span>' +
           '<span class="ol-q">' + (+l.qty) + ' × ' + money(l.unit_price) + '</span>' +
           '<span class="ol-t">' + money(l.line_total) + '</span></li>';
       }).join('');

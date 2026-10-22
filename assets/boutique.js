@@ -112,12 +112,14 @@
   function hasRefill(p) { return p.sell_price_2 != null; }
   function offered(p, type) { return type === 'refill' ? hasRefill(p) : hasSpool(p); }
   // client connecté (Mon compte, commande-client.js) : il peut commander au-delà du stock
-  // (la part en trop est « à commander » chez le fournisseur : BO_DELAY, confirmé à l'envoi)
-  var BO_MAX = 99, BO_DELAY = '3 à 7 jours ouvrables';
+  // (la part en trop est « à commander » chez le fournisseur : BO_DELAY, confirmé à l'envoi ;
+  //  bobines vides = nos propres impressions : « à compléter · sans garantie »)
+  var BO_MAX = 99, BO_DELAY = '3 à 7 jours ouvrables', BO_EMPTY = 'sans garantie';
   function canBackorder() { return !!(window.CA && window.CA.custOrder && window.CA.custOrder.signedIn()); }
-  function boNote(stock, qty) {
+  function boLabel(n, empty) { return n + (empty ? ' à compléter · ' + BO_EMPTY : ' à commander · ' + BO_DELAY); }
+  function boNote(stock, qty, empty) {
     var n = canBackorder() && stock != null ? qty - Math.max(0, stock | 0) : 0;
-    return n > 0 ? '<span class="buy-bo">' + n + ' à commander · ' + BO_DELAY + '</span>' : '';
+    return n > 0 ? '<span class="buy-bo">' + boLabel(n, empty) + '</span>' : '';
   }
   function stockOf(p, type) { return type === 'refill' ? (p.qty_2 | 0) : (p.qty | 0); }
   function baseOf(p, type) { return type === 'refill' ? p.sell_price_2 : p.sell_price; }
@@ -144,7 +146,6 @@
              qty: (p.qty == null ? null : (p.qty | 0)),
              tiers: normalizeTiers(p.tiers).filter(function (t) { return t.min > 1; }),
              cat: String(a.category || '').trim(),
-             stockOnly: a.stock_only === true,
              onFil: a.on_filament === true,
              filBrands: Array.isArray(a.fil_brands) ? a.fil_brands : [],
              slug: p.slug || slugify(p.name),
@@ -152,8 +153,10 @@
              specs: Array.isArray(a.specs) ? a.specs.filter(function (s) { return s && (s.k || s.v); }) : [] };
   }
   function accOut(a) { return a.qty != null && a.qty <= 0; }
-  // « Stock seulement » (admin, ex. bobines vides récupérées) : jamais commandable au-delà du stock
-  function accCanBO(a) { return canBackorder() && !(a && a.stockOnly); }
+  function accCanBO() { return canBackorder(); }
+  // bobine vide = accessoire visé par materials.empty_spool_id (products_public.empty_spool_id)
+  var emptyIds = {};
+  function isEmptySpool(a) { return !!(a && emptyIds[a.id]); }
   function accCatKey(a) { return a.cat ? a.cat.toLowerCase() : ''; }
   function accCatName(a) { return a.cat || 'Autres'; }
   // meilleur palier (le plus bas prix atteignable en quantité), null si aucun
@@ -315,6 +318,8 @@
       products = pr.data || [];
       byId = {};
       products.forEach(function (p) { byId[p.id] = p; });
+      emptyIds = {};
+      products.forEach(function (p) { if (p.empty_spool_id) emptyIds[p.empty_spool_id] = true; });
       brandInfo = {};
       ((br && br.data) || []).forEach(function (b) { brandInfo[b.name] = b; });
       // accessoires (admin) + repli sur les 2 bobines vides codées en dur
@@ -693,8 +698,8 @@
         '<div class="acc-main"><a class="acc-name" href="' + esc(accHref(a)) + '">' + esc(a.name) + '</a>' + (a.desc ? '<div class="acc-desc">' + esc(a.desc) + '</div>' : '') + '</div>' +
         '<div class="acc-right"><span class="acc-prices"><span class="acc-price">' + money(a.price) + '</span>' +
             (best ? '<span class="acc-tier">' + best.min + '+ : ' + money(best.price) + '</span>' : '') + '</span>' +
-          '<button type="button" class="acc-add" data-acc="' + esc(a.id) + '"' + (o ? ' disabled' : '') +
-            ' aria-label="' + esc((o ? 'Rupture : ' : 'Ajouter au panier : ') + a.name) + '">' + (o ? 'Rupture' : '+ Ajouter') + '</button></div>' +
+          '<button type="button" class="acc-add" data-acc="' + esc(a.id) + '"' + (o && !accCanBO(a) ? ' disabled' : '') +
+            ' aria-label="' + esc((o && !accCanBO(a) ? 'Rupture : ' : 'Ajouter au panier : ') + a.name) + '">' + (o && !accCanBO(a) ? 'Rupture' : '+ Ajouter') + '</button></div>' +
       '</div>';
     }).join('') + '</div>' : '';
     var spoolHint = accDisp.some(function (a) { return /bobine/i.test(a.cat + ' ' + a.name); });
@@ -1085,7 +1090,7 @@
       }).join('') + '</div></div>';
   }
   function accBuySum() {
-    var u = accUnitNow(), bo = boNote(curAcc.qty, accQty);
+    var u = accUnitNow(), bo = boNote(curAcc.qty, accQty, isEmptySpool(curAcc));
     if (accQty < 2 && u >= curAcc.price) return bo;
     return accQty + ' × ' + money(u) + ' = <b>' + money(u * accQty) + '</b>' + (u < curAcc.price ? ' <em>· rabais quantité</em>' : '') + bo;
   }
@@ -1137,7 +1142,9 @@
               '<input type="number" class="q-val" aria-label="Quantité" min="1"' + (a.qty != null && !accCanBO(a) ? ' max="' + a.qty + '"' : '') + ' value="' + accQty + '" inputmode="numeric">' +
               '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
             '</div>') +
-            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? '<span>Commander<span class="bo-d"> · 3 à 7 jours</span></span>' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? (isEmptySpool(a)
+              ? '<span>Ajouter au panier<span class="bo-d"> · ' + BO_EMPTY + '</span></span>'
+              : '<span>Commander<span class="bo-d"> · 3 à 7 jours</span></span>') : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + accBuySum() + '</p>' +
           (out && !bo ? notifyHtml(accNotify(a)) : '') +
@@ -1340,25 +1347,112 @@
     var cur = cart[k] ? cart[k].qty : 0;
     var max = accCanBO(a) ? BO_MAX : (a.qty == null ? Infinity : a.qty);
     if (cur >= max) { toast('Maximum ' + max + ' en stock.'); return; }
-    var next = Math.min(cur + (qty || 1), max);
-    cart[k] = { id: id, type: 'accessory', qty: next };
-    saveCart(); renderCart();
-    if (!qty) pulseCart();
-    toast(a.name + (next - cur > 1 ? ' ×' + (next - cur) : '') + ' ajouté au panier.');
+    emptyCheck(a, cur, Math.min(cur + (qty || 1), max), function (next) {
+      cur = cart[k] ? cart[k].qty : 0;   // un échange a pu toucher la ligne
+      if (next <= cur) return;
+      cart[k] = { id: id, type: 'accessory', qty: next };
+      saveCart(); renderCart();
+      if (!qty) pulseCart();
+      toast(a.name + (next - cur > 1 ? ' ×' + (next - cur) : '') + ' ajouté au panier.');
+    });
   }
   function changeQty(k, delta) {
     if (!cart[k]) return;
     var max = maxOf(cart[k]); var next = cart[k].qty + delta;
     if (next > max) { toast('Maximum ' + max + ' en stock.'); next = max; }
-    if (next <= 0) delete cart[k]; else cart[k].qty = next;
-    saveCart(); renderCart();
+    commitQty(k, next);
   }
   function setQty(k, val) {
     if (!cart[k]) return;
     var n = parseInt(val, 10); if (isNaN(n)) { renderCart(); return; }
     var max = maxOf(cart[k]); if (n > max) { toast('Maximum ' + max + ' en stock.'); n = max; }
-    if (n <= 0) delete cart[k]; else cart[k].qty = n;
-    saveCart(); renderCart();
+    commitQty(k, n);
+  }
+  function commitQty(k, n) {
+    var it = cart[k], a = it.type === 'accessory' ? accById[it.id] : null;
+    emptyCheck(a, it.qty, n, function (q) {
+      if (!cart[k]) { renderCart(); return; }
+      if (q <= 0) delete cart[k]; else cart[k].qty = q;
+      saveCart(); renderCart();
+    }, function () { renderCart(); });
+  }
+
+  /* ---- bobines vides au-delà du stock : avertissement + échange recharge → version avec bobine ----
+     Elles viennent de nos impressions (pas de fournisseur) : le client est prévenu dès qu'il dépasse
+     le stock (ajout, + du panier, modification d'une commande), une fois par article et par page. */
+  var emptyWarned = {};
+  // recharges du panier dont la bobine vide est `a` et dont la version avec bobine est en stock
+  function swapCands(a) {
+    return entries().filter(function (it) {
+      var p = it.type === 'refill' && byId[it.id];
+      return p && p.empty_spool_id === a.id && hasSpool(p) && spoolFree(p) > 0;
+    }).map(function (it) { return { it: it, p: byId[it.id] }; });
+  }
+  function spoolFree(p) { var s = cart[keyOf(p.id, 'spool')]; return stockOf(p, 'spool') - (s ? s.qty : 0); }
+  function filLabel(p) { return ((p.material ? p.material + ' ' : '') + p.name).trim(); }
+  // n recharges → n bobines ; la bobine vide `a` (si donnée) baisse d'autant
+  function doSwap(p, n, a) {
+    var rk = keyOf(p.id, 'refill'), sk = keyOf(p.id, 'spool');
+    n = Math.min(n, cart[rk] ? cart[rk].qty : 0, spoolFree(p));
+    if (n <= 0) return 0;
+    if ((cart[rk].qty -= n) <= 0) delete cart[rk];
+    cart[sk] = { id: p.id, type: 'spool', qty: (cart[sk] ? cart[sk].qty : 0) + n };
+    var ek = a && keyOf(a.id, 'accessory');
+    if (ek && cart[ek]) { if ((cart[ek].qty -= n) <= 0) delete cart[ek]; }
+    saveCart();
+    return n;
+  }
+  function emptyCheck(a, cur, next, done, cancel) {
+    var st = a && a.qty != null ? Math.max(0, a.qty | 0) : null;
+    if (!isEmptySpool(a) || st == null || !canBackorder() || next <= cur || next <= st || emptyWarned[a.id]) { done(next); return; }
+    var swapped = 0, body = null, cands = swapCands(a);
+    if (cands.length) {
+      body = document.createElement('div'); body.className = 'es-swaps';
+      cands.forEach(function (c) {
+        var row = document.createElement('div'); row.className = 'es-swap';
+        row.innerHTML = '<span class="citem-sw" style="background:' + esc(swatchBg(c.p)) + '"></span>' +
+          '<span class="es-tx"><b>' + esc(filLabel(c.p)) + '</b> — recharge ×' + c.it.qty + ' · La version avec bobine est en stock.</span>' +
+          '<button type="button" class="es-btn">Ajouter la version avec bobine</button>';
+        $('.es-btn', row).addEventListener('click', function () {
+          var n = doSwap(c.p, Math.max(1, next - st - swapped), null);
+          swapped += n; renderCart();
+          this.disabled = true; this.textContent = n ? '✓ ' + plural(n, 'bobine', 'bobines') : 'Plus en stock';
+        });
+        body.appendChild(row);
+      });
+    }
+    var miss = next - st;
+    caDialog.confirm({
+      title: 'Bobines vides : stock limité',
+      message: (st ? 'Il nous en reste ' + st + '. ' : 'Il ne nous en reste aucune. ') +
+        'Nos bobines vides viennent de nos propres impressions : on ne peut pas en commander chez un fournisseur. ' +
+        'On fera tout notre possible pour compléter ta commande, mais on ne peut pas garantir ' +
+        (miss > 1 ? 'les ' + miss + ' qui manquent' : 'celle qui manque') + ' ni le délai.',
+      ok: 'Compris, ajouter', cancel: 'Retour', icon: 'warn', body: body
+    }).then(function (ok) {
+      if (ok === true) { emptyWarned[a.id] = true; done(Math.max(cur, next - swapped)); }
+      else if (cancel) cancel(); else if (swapped) renderCart();
+    });
+  }
+  // panier : sous une bobine vide en manque, propose d'échanger les recharges de la même couleur
+  function swapHint(it) {
+    var a = it.type === 'accessory' && accById[it.id];
+    if (!isEmptySpool(a) || !canBackorder() || a.qty == null || it.qty <= Math.max(0, a.qty | 0)) return null;
+    var cands = swapCands(a); if (!cands.length) return null;
+    var box = document.createElement('div'); box.className = 'citem-swap';
+    cands.forEach(function (c) {
+      var n = Math.min(c.it.qty, spoolFree(c.p), it.qty - Math.max(0, a.qty | 0));
+      var row = document.createElement('div'); row.className = 'es-swap';
+      row.innerHTML = '<span class="citem-sw" style="background:' + esc(swatchBg(c.p)) + '"></span>' +
+        '<span class="es-tx">ⓘ <b>' + esc(filLabel(c.p)) + '</b> existe avec bobine.</span>' +
+        '<button type="button" class="es-btn">Échanger ' + plural(n, 'recharge', 'recharges') + '</button>';
+      $('.es-btn', row).addEventListener('click', function () {
+        var done = doSwap(c.p, n, a); renderCart();
+        if (done) toast(plural(done, 'recharge échangée', 'recharges échangées') + ' contre la version avec bobine.');
+      });
+      box.appendChild(row);
+    });
+    return box;
   }
   function removeItem(k) { delete cart[k]; saveCart(); renderCart(); }
   function clearCart() { cart = {}; saveCart(); renderCart(); }
@@ -1380,13 +1474,14 @@
     return url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:' + esc(swatchBg(m)) + '"></span>';
   }
 
-  // ligne au-delà du stock (client connecté) : « N à commander »
+  // ligne au-delà du stock (client connecté) : « N à commander » (bobine vide : « N à compléter · sans garantie »)
   function boTag(it) {
     if (!canBackorder()) return '';
     var m = metaOf(it); if (!m) return '';
     var st = it.type === 'accessory' ? m.qty : stockOf(m, it.type);
     var n = st == null ? 0 : it.qty - Math.max(0, st | 0);
-    return n > 0 ? ' · <span class="citem-bo">' + n + ' à commander · 3 à 7 jours</span>' : '';
+    if (n <= 0) return '';
+    return ' · <span class="citem-bo">' + (it.type === 'accessory' && isEmptySpool(m) ? boLabel(n, true) : n + ' à commander · 3 à 7 jours') + '</span>';
   }
   function renderCart() {
     var n = count();
@@ -1427,6 +1522,7 @@
           inp.addEventListener('change', function () { setQty(k, this.value); });
           inp.addEventListener('focus', function () { this.select(); });
           $('.citem-del', row).addEventListener('click', function () { removeItem(k); });
+          var hint = swapHint(it); if (hint) $('.citem-main', row).appendChild(hint);
           cartItems.appendChild(row);
         });
     }
@@ -1618,19 +1714,27 @@
       return m.name + ' — ' + (it.type === 'accessory' ? (m.cat || 'accessoire')
         : ((m.brand ? m.brand + ' ' : '') + (m.material || '')).trim() + ', ' + typeLabel(it));
     };
+    var emp = bo.filter(isEmptyLine);
+    bo = bo.filter(function (it) { return !isEmptyLine(it); });
     var one = bo.length === 1, n1 = one ? boN(bo[0]) : 0, many = !one || n1 > 1;
-    caDialog.confirm({
-      title: many ? 'Articles à commander' : 'Article à commander',
-      message: one
+    var msg = !bo.length ? '' : one
         ? (n1 > 1 ? n1 + ' × ' : '') + label(bo[0]) + (n1 > 1 ? ' ne sont pas en stock. On les commande' : ' n\'est pas en stock. On le commande') +
           ' chez notre fournisseur : compte ' + BO_DELAY + ' avant la cueillette. On t\'écrit dès ' + (n1 > 1 ? 'leur arrivée.' : 'qu\'il est arrivé.')
         : 'Ces articles ne sont pas en stock :\n' + bo.map(function (it) { return '• ' + boN(it) + ' × ' + label(it); }).join('\n') +
-          '\nOn les commande chez notre fournisseur : compte ' + BO_DELAY + ' avant la cueillette. On t\'écrit dès leur arrivée.',
+          '\nOn les commande chez notre fournisseur : compte ' + BO_DELAY + ' avant la cueillette. On t\'écrit dès leur arrivée.';
+    if (emp.length) msg += (msg ? '\n\n' : '') + 'Bobines vides à compléter, ' + BO_EMPTY + ' :\n' +
+      emp.map(function (it) { return '• ' + boN(it) + ' × ' + metaOf(it).name; }).join('\n') +
+      '\nOn fera tout notre possible pour les compléter.';
+    caDialog.confirm({
+      title: !bo.length ? 'Bobines vides : stock limité' : many ? 'Articles à commander' : 'Article à commander',
+      message: msg,
       ok: 'Compris, envoyer', icon: 'clock'
     }).then(function (ok) { if (ok) sendOrder(); });
   });
+  function isEmptyLine(it) { return it.type === 'accessory' && isEmptySpool(accById[it.id]); }
   function sendOrder() {
     var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
+    var boReg = overStock().some(function (it) { return !isEmptyLine(it); });
     sendBtn.disabled = true; cartMsg.textContent = 'Envoi…';
     var pkTxt = pickupTxt();
     window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '', pickupToSend()).then(function (r) {
@@ -1638,7 +1742,7 @@
       cart = {}; saveCart(); if (noteIn) noteIn.value = '';
       renderCart(); loadPickup();
       cartMsg.innerHTML = '✓ Commande <b>' + esc(r.number) + '</b> ' + (r.updated ? 'modifiée' : 'envoyée') +
-        (r.has_backorder ? ' · articles à commander : ' + BO_DELAY + '.' : '.' + pkTxt) +
+        (r.has_backorder ? (boReg ? ' · articles à commander : ' + BO_DELAY + '.' : ' · bobines vides à compléter, ' + BO_EMPTY + '.') : '.' + pkTxt) +
         ' Confirmation par courriel. <a href="compte.html#/commandes">Mes commandes</a>';
     }, function (err) { sendBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Envoi impossible. Réessaie.'; });
   }
