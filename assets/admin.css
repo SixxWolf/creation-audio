@@ -1894,6 +1894,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .nw-rows { display:flex; flex-direction:column; gap:8px; }
 .nw-row { display:flex; align-items:center; gap:14px; padding:10px 14px; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
 .nw-row.is-past { opacity:.72; }
+.nw-row.is-prop { border-style:dashed; border-color:color-mix(in srgb, var(--ember) 55%, var(--line)); }
 .nw-row.dragging { opacity:.5; }
 .nw-row.drop-target { border-color:var(--ember); box-shadow:var(--ring); }
 .nw-row .drag-handle { position:static; }

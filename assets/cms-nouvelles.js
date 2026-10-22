@@ -5,7 +5,7 @@
    title, body, image_path (bucket products, dossier news/), cta_label/cta_url,
    promo_code, event_at, starts_at/ends_at (apparaît / disparaît tout seul),
    featured (carte vedette de l'accueil), in_bar (barre du haut de tout le site),
-   active, sort_order.
+   active, sort_order, proposed (rédigée par Claude, en attente : groupe Propositions).
    Public : nav.js (barre, in_bar) + accueil.js (section #nouvelles) lisent la
    même table en anon — la RLS ne rend que les nouvelles en ligne et dans leurs dates.
    Rien n'est effacé tout seul : terminées / hors ligne = Historique.
@@ -54,6 +54,7 @@
 
   function stateOf(r, now) {
     now = now || Date.now();
+    if (r.proposed) return 'prop';
     if (!r.active) return 'off';
     if (r.ends_at && new Date(r.ends_at).getTime() <= now) return 'done';
     if (r.starts_at && new Date(r.starts_at).getTime() > now) return 'soon';
@@ -144,7 +145,8 @@
     eventI.value = row && row.event_at ? String(row.event_at).slice(0, 10) : '';
     startI.value = row && !copy ? toDay(row.starts_at) : '';
     endI.value = row && !copy ? toDay(row.ends_at) : '';
-    activeI.checked = row ? (copy ? false : !!row.active) : true;
+    // une proposition ouverte : « En ligne » coché, enregistrer = publier
+    activeI.checked = row ? (copy ? false : !!row.active || !!row.proposed) : true;
     featI.checked = row ? !!row.featured : false;
     barI.checked = row ? row.in_bar !== false : true;
     // une copie ne partage pas le fichier : elle repart sans image (sinon supprimer l'une effacerait l'autre)
@@ -186,7 +188,7 @@
         promo_code: codeI.value.trim().toUpperCase() || null,
         event_at: kind === 'event' && eventI.value ? eventI.value : null,
         starts_at: starts, ends_at: ends,
-        active: activeI.checked, featured: featI.checked, in_bar: barI.checked,
+        active: activeI.checked, featured: featI.checked, in_bar: barI.checked, proposed: false,
         image_path: newPath || (imgDrop ? null : oldPath),
         updated_at: new Date().toISOString()
       };
@@ -211,16 +213,19 @@
     }).then(function () { saveBtn.disabled = false; });
   }
 
-  /* ---- liste : En ligne · Programmées · Historique ---- */
+  /* ---- liste : Propositions · En ligne · Programmées · Historique ----
+     Propositions = rédigées par Claude (proposed, hors ligne) : Publier / Modifier / Rejeter. */
   var GROUPS = [
+    { key: 'prop', name: 'Propositions' },
     { key: 'live', name: 'En ligne' },
     { key: 'soon', name: 'Programmées' },
     { key: 'past', name: 'Historique' }
   ];
-  function groupOf(r) { var s = stateOf(r); return s === 'live' || s === 'soon' ? s : 'past'; }
+  function groupOf(r) { var s = stateOf(r); return s === 'live' || s === 'soon' || s === 'prop' ? s : 'past'; }
 
   function whenText(r) {
     var s = stateOf(r), a = fmtDay(r.starts_at), b = fmtDay(r.ends_at);
+    if (s === 'prop') return 'Proposée par Claude · ' + fmtDay(r.created_at);
     if (s === 'soon') return 'Dès le ' + a + (b ? ' · jusqu\'au ' + b : '');
     if (s === 'done') return 'Terminée le ' + b;
     if (s === 'off') return 'Hors ligne' + (b ? ' · fin ' + b : '');
@@ -228,13 +233,13 @@
   }
 
   function rowHtml(r) {
-    var url = publicUrl(r.image_path), past = groupOf(r) === 'past';
+    var url = publicUrl(r.image_path), g = groupOf(r), past = g === 'past', prop = g === 'prop', fixed = past || prop;
     var tags = (r.featured ? '<span class="sp-mini is-feat">★ Vedette</span>' : '') +
       (r.in_bar ? '<span class="sp-mini">Barre du haut</span>' : '') +
       (r.promo_code ? '<span class="sp-mini nw-code">' + esc(r.promo_code) + '</span>' : '') +
       (r.kind === 'event' && r.event_at ? '<span class="sp-mini">Le ' + esc(fmtDate(r.event_at)) + '</span>' : '');
-    return '<article class="nw-row' + (past ? ' is-past' : '') + '" data-id="' + esc(r.id) + '"' + (past ? '' : ' draggable="true"') + '>' +
-      (past ? '' : '<span class="drag-handle" title="Glisser pour réordonner">⠿</span>') +
+    return '<article class="nw-row' + (past ? ' is-past' : '') + (prop ? ' is-prop' : '') + '" data-id="' + esc(r.id) + '"' + (fixed ? '' : ' draggable="true"') + '>' +
+      (fixed ? '' : '<span class="drag-handle" title="Glisser pour réordonner">⠿</span>') +
       '<span class="nw-thumb">' + (url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '') + '</span>' +
       '<div class="nw-main">' +
         '<div class="nw-top"><span class="nw-kind k-' + esc(r.kind) + '">' + esc(KINDS[r.kind] || r.kind) + '</span>' +
@@ -242,10 +247,13 @@
         '<div class="nw-title">' + esc(r.title || 'Sans titre') + '</div>' +
         (tags ? '<div class="sp-minis">' + tags + '</div>' : '') +
       '</div>' +
-      '<div class="nw-actions">' +
+      '<div class="nw-actions">' + (prop ?
+        '<button class="btn btn-accent btn-sm nw-pub" type="button" data-ic="check">Publier</button>' +
+        '<button class="btn btn-ghost btn-sm nw-edit" type="button" data-ic="edit">Modifier</button>' +
+        '<button class="btn btn-ghost btn-sm nw-del" type="button" data-ic="trash">Rejeter</button>' :
         '<button class="btn btn-ghost btn-sm nw-edit" type="button" data-ic="edit">Modifier</button>' +
         '<button class="btn btn-ghost btn-sm nw-dup" type="button" data-ic="copy">Dupliquer</button>' +
-        '<button class="btn btn-ghost btn-sm nw-del" type="button" data-ic="trash">Suppr.</button>' +
+        '<button class="btn btn-ghost btn-sm nw-del" type="button" data-ic="trash">Suppr.</button>') +
       '</div>' +
     '</article>';
   }
@@ -268,14 +276,30 @@
       var id = el.getAttribute('data-id');
       var row = cache.filter(function (x) { return String(x.id) === id; })[0];
       $('.nw-edit', el).addEventListener('click', function () { openEditor(row); });
-      $('.nw-dup', el).addEventListener('click', function () { openEditor(row, true); });
+      var dup = $('.nw-dup', el), pub = $('.nw-pub', el);
+      if (dup) dup.addEventListener('click', function () { openEditor(row, true); });
+      if (pub) pub.addEventListener('click', function () { publish(row, pub); });
       $('.nw-del', el).addEventListener('click', function () { del(row); });
       if (el.hasAttribute('draggable')) wireDrag(el, row);
     });
   }
 
+  // proposition acceptée telle quelle : en ligne (ou Programmées si sa date de début est à venir)
+  function publish(row, btn) {
+    btn.disabled = true;
+    sb.from('news').update({ proposed: false, active: true, updated_at: new Date().toISOString() }).eq('id', row.id).select().then(function (res) {
+      if (res.error) { caDialog.error(res.error); btn.disabled = false; return; }
+      if (!res.data || !res.data.length) { caDialog.error('Publication refusée (permissions).'); btn.disabled = false; return; }
+      if (editingId === row.id) closeEditor();
+      load();
+    });
+  }
+
   function del(row) {
-    caDialog.confirm({ title: 'Supprimer « ' + (row.title || 'cette nouvelle') + ' » ?', message: 'Elle disparaît aussi de l\'historique.', ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+    var opts = row.proposed
+      ? { title: 'Rejeter « ' + (row.title || 'cette proposition') + ' » ?', message: 'La proposition est supprimée.', ok: 'Rejeter', danger: true, icon: 'trash' }
+      : { title: 'Supprimer « ' + (row.title || 'cette nouvelle') + ' » ?', message: 'Elle disparaît aussi de l\'historique.', ok: 'Supprimer', danger: true, icon: 'trash' };
+    caDialog.confirm(opts).then(function (ok) {
       if (!ok) return;
       sb.from('news').delete().eq('id', row.id).select().then(function (res) {
         if (res.error) { caDialog.error(res.error); return; }

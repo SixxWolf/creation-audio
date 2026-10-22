@@ -3306,6 +3306,8 @@ create table if not exists public.news (
   updated_at  timestamptz not null default now()
 );
 create index if not exists news_sort_idx on public.news (sort_order, created_at desc);
+-- proposed : nouvelle rédigée par Claude, en attente (active = false → invisible du public)
+alter table public.news add column if not exists proposed boolean not null default false;
 alter table public.news enable row level security;
 drop policy if exists news_public_read on public.news;
 create policy news_public_read on public.news for select to anon, authenticated
