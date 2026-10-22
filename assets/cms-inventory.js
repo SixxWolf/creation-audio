@@ -273,7 +273,7 @@
       var state = got >= q && q ? '<span class="ro-q ro-done">✓ ' + q + ' reçu' + (q > 1 ? 's' : '') + '</span>'
         : '<span class="ro-q">' + (got ? got + ' / ' + q : '×' + q) + '</span>';
       return '<li' + (got >= q && q ? ' class="is-done"' : '') + '>' + sw + '<span>' + esc(name) +
-        (acc ? '' : ' <span class="ro-code">' + kindLabel(l.kind) + '</span>') + '</span>' + state + '</li>';
+        (acc ? '' : ' ' + CA.kindPill(l.kind === 'refill' ? 'refill' : 'spool')) + '</span>' + state + '</li>';
     }).join('');
   }
   // format d'une ligne selon le produit : accessoire -> 'item', filament -> bobine/recharge offert
@@ -416,11 +416,11 @@
         : '<div class="rv-art">' + (f && !acc ? '<span class="ro-sw" style="background:' + esc(swOf(f)) + '"></span>' : '') +
             '<span>' + esc(f ? artName(f) : (r.label || '(article retiré)')) + '</span></div>';
       var fmt = r.free && !acc
-        ? '<select class="rcp-kind" aria-label="Format">' +
+        ? CA.kindPill(r.kind === 'refill' ? 'refill' : 'spool') + '<select class="rcp-kind" aria-label="Format">' +
             '<option value="spool"' + (r.kind !== 'refill' ? ' selected' : '') + (!f || offersSpool(f) ? '' : ' disabled') + '>Bobine</option>' +
             '<option value="refill"' + (r.kind === 'refill' ? ' selected' : '') + (!f || offersRefill(f) ? '' : ' disabled') + '>Recharge</option>' +
           '</select>'
-        : '<span class="rv-kind">' + kindTxt(acc ? 'item' : r.kind) + '</span>';
+        : (acc ? '<span class="rv-kind">Article</span>' : CA.kindPill(r.kind === 'refill' ? 'refill' : 'spool'));
       var removable = r.free || !r.expected;
       return '<tr class="rcp-row' + (r.productId ? '' : ' unmatched') + (st ? ' is-' + st[0] : '') + (flashIdx === i ? ' rv-flash' : '') + '" data-i="' + i + '">' +
         '<td class="rcp-fil">' + art + '</td>' +
@@ -816,7 +816,7 @@
         var p = l.product_id ? bcProd(l.product_id) : null, acc = isAcc(p);
         var sw = p && !acc ? '<span class="ro-sw" style="background:' + esc(swOf(p)) + '"></span>' : '<span class="ro-sw ro-sw-none"></span>';
         return '<li>' + sw + '<span class="rcp-hist-nm">' + esc(p ? artName(p) : (l.label || '(produit supprimé)')) +
-          (acc ? '' : ' <span class="ro-code">' + kindLabel(l.kind) + '</span>') + '</span>' +
+          (acc ? '' : ' ' + CA.kindPill(l.kind === 'refill' ? 'refill' : 'spool')) + '</span>' +
           '<span class="rcp-hist-q">×' + q + '</span>' +
           '<span class="rcp-hist-price' + (priced ? '' : ' muted') + '">' + (priced ? money(l.unit_cost) + '/u' : '—') + '</span></li>';
       }).join('');
@@ -1149,7 +1149,8 @@
       var lis = byBrand[brand].map(function (it) {
         var sw = swOf(it.f);
         var name = '<span>' + esc((it.f.material ? it.f.material + ' · ' : '') + (it.f.name || '')) +
-          ' <span class="ro-code">' + kindLabel(it.kind) + (it.f.code ? ' · ' + esc(it.f.code) : '') + '</span></span>';
+          ' ' + (it.kind === 'item' ? '<span class="ro-code">article</span>' : CA.kindPill(it.kind === 'refill' ? 'refill' : 'spool')) +
+          (it.f.code ? ' <span class="ro-code">' + esc(it.f.code) + '</span>' : '') + '</span>';
         // promis (en tout ou en partie) à un client — facture « À venir », réservation ou commande en
         // ligne : étiquette cliquable -> ouvre la facture / la réservation / la commande
         var res = window.CA.reserved ? window.CA.reserved.detail(it.f.id, it.kind) : [];

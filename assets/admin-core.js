@@ -21,6 +21,21 @@ window.CA = window.CA || {};
       .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   };
 
+  // Pastille « Recharge » / « Avec bobine » : même rendu partout dans l'admin (CSS .kind-pill).
+  // CA.kindMeta retire ce libellé d'un texte « Marque · Matériau · Recharge » (la pastille le remplace).
+  window.CA.kindPill = function (kind) {
+    if (kind !== 'refill' && kind !== 'spool') return '';
+    return '<span class="kind-pill is-' + kind + '" data-ic="' + (kind === 'refill' ? 'refresh' : 'spool') + '">' +
+      (kind === 'refill' ? 'Recharge' : 'Avec bobine') + '</span>';
+  };
+  window.CA.kindOf = function (meta, kind) {
+    if (kind === 'refill' || kind === 'spool') return kind;
+    return /recharge/i.test(meta || '') ? 'refill' : /avec bobine/i.test(meta || '') ? 'spool' : '';
+  };
+  window.CA.kindMeta = function (meta) {
+    return String(meta || '').split(/\s*·\s*/).filter(function (p) { return p && !/^(recharge|avec bobine)$/i.test(p); }).join(' · ');
+  };
+
   // Recherche tolérante (clients, comptes, factures) : majuscules, accents et ponctuation ignorés,
   // chaque mot tapé doit apparaître quelque part, dans n'importe quel ordre ; un groupe de
   // 3 chiffres ou plus est aussi cherché dans les numéros sans tirets ni espaces.

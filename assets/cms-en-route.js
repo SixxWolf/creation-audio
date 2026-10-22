@@ -475,7 +475,7 @@
           (how ? '<span class="po-how">' + how[1] + '</span>' : '') + '</div></td>' +
         '<td class="rcp-fil"><select class="po-fil" aria-label="Article">' + options(r.productId) + '</select></td>' +
         '<td>' + (acc ? '<span class="rcp-kind-item">Article</span>'
-          : '<select class="rcp-kind po-kind" aria-label="Format">' +
+          : CA.kindPill(r.kind === 'refill' ? 'refill' : 'spool') + '<select class="rcp-kind po-kind" aria-label="Format">' +
             '<option value="spool"' + (r.kind !== 'refill' ? ' selected' : '') + (hasS ? '' : ' disabled') + '>Avec bobine</option>' +
             '<option value="refill"' + (r.kind === 'refill' ? ' selected' : '') + (hasR ? '' : ' disabled') + '>Recharge</option>' +
           '</select>') + '</td>' +

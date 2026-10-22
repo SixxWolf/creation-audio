@@ -212,13 +212,17 @@
     }
     listEl.innerHTML = list.map(function (o) {
       var lines = linesOf(o), items = 0, missing = 0;
+      var nRef = 0, nSpl = 0;
       var rows = lines.map(function (l) {
+        var kd = CA.kindOf(l.meta, l.kind), st0 = stockFor(l);
+        if (OPEN[o.status] && st0 != null && (l.qty | 0) > st0) { var mq = (l.qty | 0) - st0; if (kd === 'refill') nRef += mq; else if (kd === 'spool') nSpl += mq; }
         var st = stockFor(l), miss = st == null ? 0 : Math.max(0, (l.qty | 0) - st);
         items += l.qty | 0; missing += OPEN[o.status] ? miss : 0;
         var hex = l.product_id && stock[l.product_id] && stock[l.product_id].hex;
         return '<tr>' +
           '<td class="l"><span class="co-prod">' + (hex ? '<span class="cc-sw" style="background:' + esc(hex) + '"></span>' : '<span class="co-noimg"></span>') +
-            '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(l.meta) + '</small>' : '') + '</span></span></td>' +
+            '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(CA.kindMeta(l.meta)) + '</small>' : '') + '</span>' +
+            CA.kindPill(CA.kindOf(l.meta, l.kind)) + '</span></td>' +
           '<td class="n" data-l="Qté"><b>' + (l.qty | 0) + '</b></td>' +
           '<td class="n" data-l="Stock">' + (st == null ? '—' : st) + '</td>' +
           '<td class="n" data-l="À commander">' + (!OPEN[o.status] ? '—' : miss ? '<span class="co-print-n">' + miss + '</span>' : '<span class="co-ok">en stock</span>') + '</td>' +
@@ -243,7 +247,9 @@
           '<thead><tr><th class="l">Article</th><th class="n">Qté</th><th class="n">Stock</th><th class="n">À commander</th><th class="n">Prix</th><th class="n">Total</th></tr></thead>' +
           '<tbody>' + rows + '</tbody></table></div>' +
         '<footer class="co-foot">' +
-          '<span class="co-total">' + plural(items, 'article', 'articles') + (missing ? ' · <span class="co-print-n">' + missing + ' à commander</span>' : '') +
+          '<span class="co-total">' + plural(items, 'article', 'articles') + (missing ? ' · <span class="co-print-n">' + missing + ' à commander</span>' +
+            (nRef ? ' <span class="kind-pill is-refill">' + nRef + ' recharge' + (nRef > 1 ? 's' : '') + '</span>' : '') +
+            (nSpl ? ' <span class="kind-pill is-spool">' + nSpl + ' avec bobine</span>' : '') : '') +
             ' · <b>' + money(o.total) + '</b> <small>' + esc(fmtDate(o.created_at)) + '</small></span>' +
           '<div class="co-actions">' + actionsFor(o) + '</div>' +
         '</footer>' +

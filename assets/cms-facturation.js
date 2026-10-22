@@ -271,14 +271,16 @@
   }
 
   /* ---------- gabarit (segmented) ---------- */
+  // [data-cat] : seulement le gabarit de Facturation — .fx-seg-btn sert aussi ailleurs (filtres de
+  // Messages / Commandes, Production, Silhouettes) ; sans ce filtre, un clic là-bas vidait le gabarit.
   function setCat(c) {
     cat = c;
-    $$('.fx-seg-btn').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-cat') === c); });
+    $$('.fx-seg-btn[data-cat]').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-cat') === c); });
     elType.hidden = (c !== 'filament');
     if (elFilters) elFilters.hidden = (c !== 'filament');
     loadCatalog(c);
   }
-  $$('.fx-seg-btn').forEach(function (b) {
+  $$('.fx-seg-btn[data-cat]').forEach(function (b) {
     b.addEventListener('click', function () { setCat(b.getAttribute('data-cat')); });
   });
   $$('.fx-cli-btn').forEach(function (b) {
@@ -706,7 +708,7 @@
             (marginShown ? '<span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
               (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span>' : '') +
           '</div>'
-        : swatchSVG(l.hex) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(l.meta) + '</span>' : '') + pendPill;
+        : swatchSVG(l.hex) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(CA.kindMeta(l.meta)) + '</span> ' + CA.kindPill(CA.kindOf(l.meta, l.kind)) : '') + pendPill;
       return '<tr data-i="' + i + '"' + (pend > 0 ? ' class="is-pending"' : '') + '>' +
         '<td>' + descCell + '</td>' +
         '<td class="num"><input class="inv-qty" type="number" min="0" step="1" value="' + l.qty + '" data-i="' + i + '"></td>' +
