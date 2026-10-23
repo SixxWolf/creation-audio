@@ -1932,6 +1932,30 @@ begin
   return jsonb_build_object('client_id', v_cid);
 end $$;
 
+-- Modification par l'admin d'une commande client en cours (Nouvelle / En préparation / Prête) :
+-- remplace les lignes (prix recalculés comme à l'envoi). N'écrit pas edited_at (= « modifiée par le client »).
+create or replace function public.admin_update_customer_order(p_id uuid, p_lines jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare o public.customer_orders; v_lines jsonb; v_total numeric; v_bo boolean;
+begin
+  if not (select public.is_admin()) then raise exception 'Réservé à l''admin.' using errcode = '42501'; end if;
+  select * into o from public.customer_orders where id = p_id for update;
+  if not found then raise exception 'Commande introuvable.'; end if;
+  if o.status not in ('new', 'preparing', 'ready') then raise exception 'Commande facturée ou annulée : plus modifiable.'; end if;
+  v_lines := public._customer_fill_lines(p_lines);
+  select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
+    into v_total, v_bo from jsonb_array_elements(v_lines) x;
+  delete from public.customer_order_lines where order_id = p_id;
+  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
+  select p_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int
+    from jsonb_array_elements(v_lines) x;
+  update public.customer_orders set total = v_total, has_backorder = v_bo, updated_at = now() where id = p_id;
+  return jsonb_build_object('id', p_id, 'number', o.number, 'total', v_total, 'has_backorder', v_bo);
+end $$;
+revoke all on function public.admin_update_customer_order(uuid, jsonb) from public, anon;
+grant execute on function public.admin_update_customer_order(uuid, jsonb) to authenticated;
+
 revoke all on function public.customer_submit_order(jsonb, text, jsonb)       from public, anon;
 revoke all on function public.customer_update_order(uuid, jsonb, text, jsonb) from public, anon;
 revoke all on function public.customer_cancel_order(uuid)              from public, anon;

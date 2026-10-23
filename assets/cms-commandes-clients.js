@@ -189,9 +189,9 @@
   function actionsFor(o) {
     var b = function (act, label, cls) {
       return '<button type="button" class="btn ' + (cls || 'btn-ghost') + ' btn-sm" data-act="' + act + '"' +
-        (act === 'invoice' ? ' data-ic="receipt"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
+        (act === 'invoice' ? ' data-ic="receipt"' : act === 'edit' ? ' data-ic="edit"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
     };
-    var hold = OPEN[o.status] ? b(o.stock_hold ? 'unhold' : 'hold', o.stock_hold ? 'Libérer le stock' : 'Mettre en attente') : '';
+    var hold = OPEN[o.status] ? b(o.stock_hold ? 'unhold' : 'hold', o.stock_hold ? 'Libérer le stock' : 'Mettre en attente') + b('edit', 'Modifier') : '';
     switch (o.status) {
       case 'new': return b('preparing', 'Commencer la préparation', 'btn-accent') + hold + b('invoice', 'Facturer') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'preparing': return b('ready', 'Marquer prête', 'btn-accent') + hold + b('invoice', 'Facturer') + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
@@ -230,6 +230,7 @@
         '</tr>';
       }).join('');
       var who = o.name || o.email;
+      if (editing && editing.id === o.id && OPEN[o.status]) return editCard(o, who);
       return '<article class="co-card is-' + esc(o.status) + '" data-id="' + esc(o.id) + '">' +
         '<header class="co-head">' +
           '<div class="co-id"><b>' + esc(o.number) + '</b><span class="co-status is-' + esc(o.status) + '">' + esc(STATUS[o.status] || o.status) + '</span>' +
@@ -256,9 +257,128 @@
     }).join('');
     $$('.co-card', listEl).forEach(function (card) {
       var o = orders.filter(function (x) { return x.id === card.getAttribute('data-id'); })[0];
+      if (card.classList.contains('is-editing')) { bindEditor(card, o); return; }
       $$('[data-act]', card).forEach(function (btn) {
         btn.addEventListener('click', function () { act(o, btn.getAttribute('data-act'), btn); });
       });
+    });
+  }
+
+  /* ---- modifier les articles d'une commande en cours (bobine 70 °C introuvable -> 90 °C, etc.) ----
+     Catalogue = products_public (même vue que le serveur) ; RPC admin_update_customer_order recalcule les prix. */
+  var editing = null, catalog = null, catPending = null, ecMatches = [], ecActive = -1;
+  function loadCatalog() {
+    if (catalog) return Promise.resolve();
+    if (catPending) return catPending;
+    catPending = sb.from('products_public').select('id,type,name,brand,material,hex,qty,qty_2,sell_price,sell_price_2').then(function (r) {
+      if (r.error) throw r.error;
+      var out = [];
+      (r.data || []).forEach(function (p) {
+        var base = [p.brand, p.material].filter(Boolean).join(' · ');
+        if (p.type === 'filament') {
+          if (p.sell_price != null) out.push({ pid: p.id, kind: 'spool', name: p.name, meta: base + (base ? ' · ' : '') + 'Avec bobine', stock: p.qty | 0, price: +p.sell_price });
+          if (p.sell_price_2 != null) out.push({ pid: p.id, kind: 'refill', name: p.name, meta: base + (base ? ' · ' : '') + 'Recharge', stock: p.qty_2 | 0, price: +p.sell_price_2 });
+        } else if (p.sell_price != null) {
+          out.push({ pid: p.id, kind: 'unit', name: p.name, meta: p.type === 'accessory' ? 'Accessoire' : 'Spacer · paire', stock: p.qty | 0, price: +p.sell_price });
+        }
+      });
+      catalog = out;
+    }).then(function () { catPending = null; }, function (e) { catPending = null; throw e; });
+    return catPending;
+  }
+  function startEdit(o) {
+    var dropped = 0, items = [];
+    linesOf(o).forEach(function (l) {
+      if (!l.product_id) { dropped++; return; }
+      var k = CA.kindOf(l.meta, l.kind);
+      items.push({ pid: l.product_id, kind: k === 'refill' || k === 'spool' ? k : 'unit', name: l.name, meta: l.meta || '', qty: l.qty | 0 });
+    });
+    editing = { id: o.id, items: items, status: dropped ? plural(dropped, 'article retiré', 'articles retirés') + ' : produit supprimé.' : '' };
+    render();
+    loadCatalog().then(function () { render(); var s = $('.ce-search', listEl); if (s) s.focus({ preventScroll: true }); },
+      function (e) { if (editing) { editing.status = 'Catalogue indisponible : ' + (e && e.message || e); render(); } });
+  }
+  function stopEdit() { editing = null; render(); }
+  function editCard(o, who) {
+    var rows = editing.items.map(function (it, i) {
+      var c = catalog && catalog.filter(function (x) { return x.pid === it.pid && x.kind === it.kind; })[0];
+      var st = c ? (c.stock > 0 ? c.stock + ' en stock' : 'sur commande') : '';
+      return '<tr data-i="' + i + '"><td class="l"><span class="co-prod"><span><b>' + esc(it.name) + '</b>' +
+          (it.meta ? '<small class="cc-meta">' + esc(CA.kindMeta(it.meta)) + '</small>' : '') + '</span>' + CA.kindPill(it.kind) + '</span></td>' +
+        '<td class="n"><input type="number" class="cof-qty" min="1" max="999" step="1" inputmode="numeric" value="' + it.qty + '" aria-label="Quantité ' + esc(it.name) + '"></td>' +
+        '<td class="n cof-opt">' + esc(st) + '</td>' +
+        '<td class="n"><button type="button" class="btn btn-ghost btn-sm btn-icon ce-del" data-ic="trash" aria-label="Retirer ' + esc(it.name) + '"></button></td></tr>';
+    }).join('');
+    return '<article class="co-card is-editing is-' + esc(o.status) + '" data-id="' + esc(o.id) + '">' +
+      '<header class="co-head"><div class="co-id"><b>' + esc(o.number) + '</b><span class="co-status is-' + esc(o.status) + '">Modification</span></div>' +
+        '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') + '<span><b>' + esc(who) + '</b><small>' + esc(o.email) + '</small></span></div></header>' +
+      '<div class="field"><div class="fx-combo"><input type="search" class="ce-search" placeholder="Ajouter ou remplacer un article…" autocomplete="off">' +
+        '<div class="fx-combo-list ce-results" hidden></div></div></div>' +
+      '<div class="co-table-wrap">' + (rows ? '<table class="co-table cof-table"><thead><tr><th class="l">Article</th><th class="n">Qté</th><th class="n cof-opt">Stock</th><th class="n" aria-label="Retirer"></th></tr></thead><tbody>' + rows + '</tbody></table>'
+        : '<p class="cof-empty">Aucun article.</p>') + '</div>' +
+      '<footer class="co-foot"><div class="co-actions">' +
+        '<button type="button" class="btn btn-accent btn-sm ce-save" data-ic="save">Enregistrer</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm ce-cancel">Annuler</button>' +
+        '<span class="status ce-status">' + esc(editing.status || '') + '</span></div></footer></article>';
+  }
+  function bindEditor(card, o) {
+    var search = $('.ce-search', card), results = $('.ce-results', card), status = $('.ce-status', card), save = $('.ce-save', card);
+    function hide() { results.hidden = true; ecActive = -1; }
+    function show() {
+      if (!catalog) { results.innerHTML = '<div class="fx-combo-empty">Chargement…</div>'; results.hidden = false; return; }
+      var q = search.value;
+      ecMatches = catalog.filter(function (c) { return !q.trim() || CA.searchMatch([c.name, c.meta].join(' '), q); }).slice(0, 40);
+      ecActive = ecMatches.length ? 0 : -1;
+      results.innerHTML = !ecMatches.length ? '<div class="fx-combo-empty">Aucun article trouvé.</div>' : ecMatches.map(function (c, i) {
+        return '<button type="button" class="fx-combo-item' + (i === ecActive ? ' is-active' : '') + '" data-i="' + i + '"><span class="nm">' + esc(c.name) + '</span><span class="ct">' +
+          esc([c.meta, c.stock > 0 ? c.stock + ' en stock' : 'sur commande', money(c.price)].filter(Boolean).join(' · ')) + '</span></button>';
+      }).join('');
+      $$('.fx-combo-item', results).forEach(function (b) {
+        b.addEventListener('mousedown', function (e) { e.preventDefault(); add(ecMatches[+b.getAttribute('data-i')]); });
+      });
+      results.hidden = false;
+    }
+    function add(c) {
+      if (!c) return;
+      var it = editing.items.filter(function (x) { return x.pid === c.pid && x.kind === c.kind; })[0];
+      if (it) it.qty = Math.min(999, it.qty + 1); else editing.items.push({ pid: c.pid, kind: c.kind, name: c.name, meta: c.meta, qty: 1 });
+      editing.status = '';
+      render();
+    }
+    search.addEventListener('input', show);
+    search.addEventListener('click', function () { if (results.hidden) show(); });
+    search.addEventListener('blur', hide);
+    search.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); if (!results.hidden && ecMatches[ecActive]) add(ecMatches[ecActive]); }
+      else if (e.key === 'Escape') hide();
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); if (results.hidden) { show(); return; }
+        if (!ecMatches.length) return;
+        ecActive = (ecActive + (e.key === 'ArrowDown' ? 1 : -1) + ecMatches.length) % ecMatches.length;
+        $$('.fx-combo-item', results).forEach(function (b, i) { b.classList.toggle('is-active', i === ecActive); if (i === ecActive) b.scrollIntoView({ block: 'nearest' }); });
+      }
+    });
+    $$('tbody tr', card).forEach(function (tr) {
+      var it = editing.items[+tr.getAttribute('data-i')], q = $('.cof-qty', tr);
+      q.addEventListener('input', function () { var n = parseInt(q.value, 10); if (n >= 1) it.qty = Math.min(999, n); });
+      q.addEventListener('change', function () { q.value = it.qty; });
+      $('.ce-del', tr).addEventListener('click', function () { editing.items = editing.items.filter(function (x) { return x !== it; }); render(); });
+    });
+    $('.ce-cancel', card).addEventListener('click', stopEdit);
+    save.addEventListener('click', function () {
+      if (!editing.items.length) { status.textContent = 'Ajoute au moins un article.'; return; }
+      save.disabled = true; status.textContent = 'Enregistrement…';
+      sb.rpc('admin_update_customer_order', { p_id: o.id, p_lines: editing.items.map(function (it) { return { product_id: it.pid, kind: it.kind, qty: it.qty }; }) })
+        .then(function (res) {
+          if (res.error) throw res.error;
+          if (!res.data || !res.data.id) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
+          editing = null; caDialog.toast('Commande ' + o.number + ' modifiée.'); load();
+        }).then(null, function (err) {
+          save.disabled = false;
+          var m = err && err.message ? err.message : String(err);
+          if (/admin_update_customer_order|schema cache/i.test(m)) m = 'relance schema-v2.sql (modification des commandes clients).';
+          status.textContent = 'Erreur : ' + m;
+        });
     });
   }
 
@@ -275,6 +395,7 @@
       location.hash = '#historique';
       return;
     }
+    if (what === 'edit') { startEdit(o); return; }
     if (what === 'delete') {
       caDialog.confirm({ title: 'Supprimer la commande ' + o.number + ' ?', message: 'Elle disparaîtra aussi de Mon compte du client.',
         ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
