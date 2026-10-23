@@ -1148,26 +1148,28 @@
     var listHtml = Object.keys(byBrand).map(function (brand) {
       var lis = byBrand[brand].map(function (it) {
         var sw = swOf(it.f);
-        var name = '<span>' + esc((it.f.material ? it.f.material + ' · ' : '') + (it.f.name || '')) +
-          ' ' + (it.kind === 'item' ? '<span class="ro-code">article</span>' : CA.kindPill(it.kind === 'refill' ? 'refill' : 'spool')) +
-          (it.f.code ? ' <span class="ro-code">' + esc(it.f.code) + '</span>' : '') + '</span>';
+        // colonnes fixes (grille) : pastille | nom · format · quantité, puis code · commande liée
+        var nm = esc((it.f.material ? it.f.material + ' · ' : '') + (it.f.name || ''));
+        var kindHtml = it.kind === 'item' ? '<span class="ro-code">article</span>' : CA.kindPill(it.kind === 'refill' ? 'refill' : 'spool');
+        var fors = '';
         // promis (en tout ou en partie) à un client — facture « À venir », réservation ou commande en
         // ligne : étiquette cliquable -> ouvre la facture / la réservation / la commande
         var res = window.CA.reserved ? window.CA.reserved.detail(it.f.id, it.kind) : [];
         if (res.length) {
           var resQty = res.reduce(function (s, d) { return s + d.qty; }, 0);
           var TIP = { invoice: 'Ouvrir la facture', resv: 'Ouvrir la réservation', order: 'Ouvrir la commande' };
-          name = '<span class="ro-main">' + name + '<span class="ro-fors">' + res.map(function (d) {
-            return '<button type="button" class="ro-for" data-type="' + esc(d.type) + '" data-id="' + esc(d.id) + '" title="' + (TIP[d.type] || TIP.invoice) + '">📦 ' +
-              (resQty >= it.qty && res.length === 1 ? 'Pour ' : d.qty + ' pour ') + esc(d.client) + ' · ' + esc(d.number) + '</button>';
-          }).join('') + '</span></span>';
+          fors = '<span class="ro-fors">' + res.map(function (d) {
+            return '<button type="button" class="ro-for" data-type="' + esc(d.type) + '" data-id="' + esc(d.id) + '" title="' +
+              esc((TIP[d.type] || TIP.invoice) + ' — ' + (resQty >= it.qty && res.length === 1 ? 'pour ' : d.qty + ' pour ') + d.client) + '">📦 ' + esc(d.number) + '</button>';
+          }).join('') + '</span>';
         }
-        return '<li' + (res.length ? ' class="is-res"' : '') + '><span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
-          name + '<span class="ro-q">×' + it.qty + '</span></li>';
+        return '<li class="ro-row' + (res.length ? ' is-res' : '') + '"><span class="ro-sw" style="background:' + esc(sw) + '"></span>' +
+          '<span class="ro-nm" title="' + nm + '">' + nm + '</span><span class="ro-kd">' + kindHtml + '</span><span class="ro-q">×' + it.qty + '</span>' +
+          '<span class="ro-cd">' + (it.f.code ? '<span class="ro-code">' + esc(it.f.code) + '</span>' : '') + '</span>' + fors + '</li>';
       }).join('');
       return '<div class="reorder-brandgroup"><h3 style="font-size:.9rem;margin:12px 0 4px">' + esc(brand) +
           (multiBrand && estByBrand[brand] ? '<span class="ro-brand-est">≈ ' + money(estByBrand[brand]) + '</span>' : '') + '</h3>' +
-        '<ul class="reorder-list">' + lis + '</ul></div>';
+        '<ul class="reorder-list ro-grid">' + lis + '</ul></div>';
     }).join('');
 
     reorderSummary.innerHTML = '<div class="reorder-card has-miss">' +

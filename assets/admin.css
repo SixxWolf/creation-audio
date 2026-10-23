@@ -1971,3 +1971,14 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .co-table:not(.cof-table) td.n:nth-of-type(5) { grid-column:4; }
   .co-table:not(.cof-table) td.n::before { white-space:nowrap; }
 }
+
+/* ---- Liste à commander (Inventaire) : toutes les lignes sur la même grille, même hauteur (2026-10-23) ----
+   ligne 1 : pastille | nom (toute la largeur) | quantité ; ligne 2 : format | code | commande liée */
+.reorder-list.ro-grid li.ro-row { display:grid; grid-template-columns:16px 126px minmax(0,1fr) 34px; grid-template-rows:26px 28px; align-items:center; gap:0 9px; padding:7px 0; }
+.ro-grid .ro-sw { grid-column:1; grid-row:1; }
+.ro-grid .ro-nm { grid-column:2 / 4; grid-row:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ro-grid .ro-q { grid-column:4; grid-row:1; margin-left:0; text-align:right; }
+.ro-grid .ro-kd { grid-column:2; grid-row:2; justify-self:start; }
+.ro-grid .ro-cd { grid-column:3; grid-row:2; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ro-grid .ro-fors { grid-column:3 / -1; grid-row:2; justify-self:end; display:flex; gap:4px; min-width:0; }
+.ro-grid .ro-for { padding:1px 9px; white-space:nowrap; }
