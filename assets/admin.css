@@ -79,13 +79,9 @@ html, body { overflow-x:hidden; overscroll-behavior-x:none; }
 .side-nav { flex:1; display:flex; flex-direction:column; gap:2px; padding:6px 10px 14px; overflow-y:auto; scrollbar-width:thin; }
 .side-group { margin:16px 12px 6px; font-size:.64rem; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
 .side-group:first-child { margin-top:10px; }
-/* « Aujourd'hui » (Accueil) : grand écran seulement ; en dessous, le menu reste exactement comme avant */
-.side-today { display:none; }
-.side-today + .side-group { margin-top:10px; }
-@media screen and (min-width:1600px) {
-  .side-today { display:flex; flex-direction:column; gap:2px; }
-  .side-today + .side-group { margin-top:16px; }
-}
+/* « Aujourd'hui » (Accueil) : dans le menu partout (téléphone compris) ; page d'accueil seulement dès 1600 px */
+.side-today { display:flex; flex-direction:column; gap:2px; }
+.side-today + .side-group { margin-top:16px; }
 .tab { position:relative; display:flex; align-items:center; gap:11px; width:100%; min-height:40px; padding:0 12px;
   font:inherit; font-weight:600; font-size:.92rem; text-align:left; color:var(--ink-2); cursor:pointer;
   background:none; border:none; border-radius:10px; transition:background .15s, color .15s; }
@@ -186,7 +182,7 @@ body[data-tab="production"] main { max-width:none; }   /* essai grand écran (20
 /* ---- Aujourd'hui (tableau de bord, cms-aujourdhui.js — entrée du menu en grand écran seulement) ---- */
 @media screen {
   .td-date::first-letter { text-transform:uppercase; }
-  .td-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-bottom:20px; }
+  .td-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(190px, 100%), 1fr)); gap:12px; margin-bottom:20px; }
   .td-tile { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; padding:16px 18px;
     font:inherit; color:var(--ink); text-align:left; cursor:pointer; background:var(--paper); border:1px solid var(--line); border-radius:16px;
     transition:border-color .15s, box-shadow .15s, transform .1s; }
@@ -199,7 +195,7 @@ body[data-tab="production"] main { max-width:none; }   /* essai grand écran (20
   .td-tile.is-hot .td-n { color:var(--ember-ink); }
   .td-l { font-size:.86rem; font-weight:600; color:var(--ink-2); }
   .td-s { font-size:.78rem; color:var(--muted); }
-  .td-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(440px, 1fr)); gap:16px; align-items:start; }
+  .td-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(440px, 100%), 1fr)); gap:16px; align-items:start; }
   .td-card { min-width:0; padding:16px 18px; background:var(--paper); border:1px solid var(--line); border-radius:16px; }
   .td-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
   .td-card-head h2 { margin:0; font-family:var(--display); font-size:1.1rem; letter-spacing:-.01em; }
