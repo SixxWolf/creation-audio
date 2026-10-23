@@ -224,7 +224,6 @@
             '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(CA.kindMeta(l.meta)) + '</small>' : '') + '</span>' +
             CA.kindPill(CA.kindOf(l.meta, l.kind)) + '</span></td>' +
           '<td class="n" data-l="Qté"><b>' + (l.qty | 0) + '</b></td>' +
-          '<td class="n" data-l="Stock">' + (st == null ? '—' : st) + '</td>' +
           '<td class="n" data-l="À commander">' + (!OPEN[o.status] ? '—' : miss ? '<span class="co-print-n">' + miss + '</span>' : '<span class="co-ok">en stock</span>') + '</td>' +
           '<td class="n co-unit" data-l="Prix">' + money(l.unit_price) + '</td>' +
           '<td class="n" data-l="Total"><b>' + money(l.line_total) + '</b></td>' +
@@ -244,7 +243,7 @@
         (OPEN[o.status] ? CA.pickupLine(o) : '') +
         (o.note ? '<p class="co-note"><b>Note :</b> ' + esc(o.note) + '</p>' : '') +
         '<div class="co-table-wrap"><table class="co-table">' +
-          '<thead><tr><th class="l">Article</th><th class="n">Qté</th><th class="n">Stock</th><th class="n">À commander</th><th class="n">Prix</th><th class="n">Total</th></tr></thead>' +
+          '<thead><tr><th class="l">Article</th><th class="n">Qté</th><th class="n">À commander</th><th class="n">Prix</th><th class="n">Total</th></tr></thead>' +
           '<tbody>' + rows + '</tbody></table></div>' +
         '<footer class="co-foot">' +
           '<span class="co-total">' + plural(items, 'article', 'articles') + (missing ? ' · <span class="co-print-n">' + missing + ' à commander</span>' +
