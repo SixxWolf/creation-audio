@@ -164,7 +164,7 @@
         var ids = {};
         orders.forEach(function (o) { linesOf(o).forEach(function (l) { if (l.product_id) ids[l.product_id] = 1; }); });
         var list = Object.keys(ids);
-        return (list.length ? sb.from('products').select('id,qty,qty_2,hex').in('id', list) : Promise.resolve({ data: [] }))
+        return (list.length ? sb.from('products').select('id,qty,qty_2,hex,image_path,attrs').in('id', list) : Promise.resolve({ data: [] }))
           .then(function (rp) {
             stock = {};
             ((rp && rp.data) || []).forEach(function (p) { stock[p.id] = p; });
@@ -178,6 +178,17 @@
   }
   function linesOf(o) {
     return (o.customer_order_lines || []).slice().sort(function (a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
+  }
+  function publicUrl(path) { if (!path) return ''; try { return sb.storage.from('products').getPublicUrl(path).data.publicUrl; } catch (e) { return ''; } }
+  // image du produit : filament = photo du format (bobine / recharge) sinon photo de la couleur ; accessoire, spacer = image_path
+  function imgPath(p, kind) {
+    if (!p) return '';
+    var a = p.attrs || {};
+    return (kind === 'refill' ? a.img_refill : kind === 'spool' ? a.img_spool : '') || p.image_path || '';
+  }
+  function thumb(p, kind) {
+    var u = publicUrl(imgPath(p, kind));
+    return u ? '<img src="' + esc(u) + '" alt="" loading="lazy">' : '<span class="co-noimg"></span>';
   }
   function stockFor(l) {
     var p = l.product_id ? stock[l.product_id] : null;
@@ -218,9 +229,8 @@
         if (OPEN[o.status] && st0 != null && (l.qty | 0) > st0) { var mq = (l.qty | 0) - st0; if (kd === 'refill') nRef += mq; else if (kd === 'spool') nSpl += mq; }
         var st = stockFor(l), miss = st == null ? 0 : Math.max(0, (l.qty | 0) - st);
         items += l.qty | 0; missing += OPEN[o.status] ? miss : 0;
-        var hex = l.product_id && stock[l.product_id] && stock[l.product_id].hex;
         return '<tr>' +
-          '<td class="l"><span class="co-prod">' + (hex ? '<span class="cc-sw" style="background:' + esc(hex) + '"></span>' : '<span class="co-noimg"></span>') +
+          '<td class="l"><span class="co-prod">' + thumb(l.product_id && stock[l.product_id], kd) +
             '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(CA.kindMeta(l.meta)) + '</small>' : '') + '</span>' +
             CA.kindPill(CA.kindOf(l.meta, l.kind)) + '</span></td>' +
           '<td class="n" data-l="Qté"><b>' + (l.qty | 0) + '</b></td>' +
@@ -270,16 +280,16 @@
   function loadCatalog() {
     if (catalog) return Promise.resolve();
     if (catPending) return catPending;
-    catPending = sb.from('products_public').select('id,type,name,brand,material,hex,qty,qty_2,sell_price,sell_price_2').then(function (r) {
+    catPending = sb.from('products_public').select('id,type,name,brand,material,hex,qty,qty_2,sell_price,sell_price_2,image_path,attrs').then(function (r) {
       if (r.error) throw r.error;
       var out = [];
       (r.data || []).forEach(function (p) {
         var base = [p.brand, p.material].filter(Boolean).join(' · ');
         if (p.type === 'filament') {
-          if (p.sell_price != null) out.push({ pid: p.id, kind: 'spool', name: p.name, meta: base + (base ? ' · ' : '') + 'Avec bobine', stock: p.qty | 0, price: +p.sell_price });
-          if (p.sell_price_2 != null) out.push({ pid: p.id, kind: 'refill', name: p.name, meta: base + (base ? ' · ' : '') + 'Recharge', stock: p.qty_2 | 0, price: +p.sell_price_2 });
+          if (p.sell_price != null) out.push({ pid: p.id, kind: 'spool', name: p.name, meta: base + (base ? ' · ' : '') + 'Avec bobine', stock: p.qty | 0, price: +p.sell_price, p: p });
+          if (p.sell_price_2 != null) out.push({ pid: p.id, kind: 'refill', name: p.name, meta: base + (base ? ' · ' : '') + 'Recharge', stock: p.qty_2 | 0, price: +p.sell_price_2, p: p });
         } else if (p.sell_price != null) {
-          out.push({ pid: p.id, kind: 'unit', name: p.name, meta: p.type === 'accessory' ? 'Accessoire' : 'Spacer · paire', stock: p.qty | 0, price: +p.sell_price });
+          out.push({ pid: p.id, kind: 'unit', name: p.name, meta: p.type === 'accessory' ? 'Accessoire' : 'Spacer · paire', stock: p.qty | 0, price: +p.sell_price, p: p });
         }
       });
       catalog = out;
@@ -303,7 +313,7 @@
     var rows = editing.items.map(function (it, i) {
       var c = catalog && catalog.filter(function (x) { return x.pid === it.pid && x.kind === it.kind; })[0];
       var st = c ? (c.stock > 0 ? c.stock + ' en stock' : 'sur commande') : '';
-      return '<tr data-i="' + i + '"><td class="l"><span class="co-prod"><span><b>' + esc(it.name) + '</b>' +
+      return '<tr data-i="' + i + '"><td class="l"><span class="co-prod">' + thumb(c ? c.p : stock[it.pid], it.kind) + '<span><b>' + esc(it.name) + '</b>' +
           (it.meta ? '<small class="cc-meta">' + esc(CA.kindMeta(it.meta)) + '</small>' : '') + '</span>' + CA.kindPill(it.kind) + '</span></td>' +
         '<td class="n"><input type="number" class="cof-qty" min="1" max="999" step="1" inputmode="numeric" value="' + it.qty + '" aria-label="Quantité ' + esc(it.name) + '"></td>' +
         '<td class="n cof-opt">' + esc(st) + '</td>' +
@@ -330,8 +340,8 @@
       ecMatches = catalog.filter(function (c) { return !q.trim() || CA.searchMatch([c.name, c.meta].join(' '), q); }).slice(0, 40);
       ecActive = ecMatches.length ? 0 : -1;
       results.innerHTML = !ecMatches.length ? '<div class="fx-combo-empty">Aucun article trouvé.</div>' : ecMatches.map(function (c, i) {
-        return '<button type="button" class="fx-combo-item' + (i === ecActive ? ' is-active' : '') + '" data-i="' + i + '"><span class="nm">' + esc(c.name) + '</span><span class="ct">' +
-          esc([c.meta, c.stock > 0 ? c.stock + ' en stock' : 'sur commande', money(c.price)].filter(Boolean).join(' · ')) + '</span></button>';
+        return '<button type="button" class="fx-combo-item' + (i === ecActive ? ' is-active' : '') + '" data-i="' + i + '">' + thumb(c.p, c.kind) + '<span class="ce-tx"><span class="nm">' + esc(c.name) + '</span><span class="ct">' +
+          esc([c.meta, c.stock > 0 ? c.stock + ' en stock' : 'sur commande', money(c.price)].filter(Boolean).join(' · ')) + '</span></span></button>';
       }).join('');
       $$('.fx-combo-item', results).forEach(function (b) {
         b.addEventListener('mousedown', function (e) { e.preventDefault(); add(ecMatches[+b.getAttribute('data-i')]); });

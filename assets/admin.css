@@ -1948,3 +1948,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .nw-main { flex-basis:100%; }
   .nw-actions { flex-basis:100%; justify-content:flex-start; }
 }
+
+.ce-results .fx-combo-item { flex-direction:row; align-items:center; gap:10px; }
+.ce-results .fx-combo-item img, .ce-results .co-noimg { width:36px; height:36px; flex:none; object-fit:contain; background:var(--thumb-bg); border:1px solid var(--line); border-radius:8px; }
+.ce-tx { display:flex; flex-direction:column; gap:2px; min-width:0; }
