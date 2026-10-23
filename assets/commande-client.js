@@ -51,6 +51,14 @@ window.CA = window.CA || {};
     return m || 'Envoi impossible pour le moment. Réessaie.';
   }
 
+  // appelle une Edge Function de courriel ; résout toujours (échec ou lenteur : la commande est déjà enregistrée)
+  function notifyThen(fn, body) {
+    var c = cli();
+    if (!c || !c.functions) return Promise.resolve();
+    var call = c.functions.invoke(fn, { body: body }).then(null, function () {});
+    return Promise.race([call, new Promise(function (ok) { setTimeout(ok, 5000); })]);
+  }
+
   function send(lines, note, pickup) {
     var c = cli();
     if (!c) return Promise.reject(new Error('Service indisponible pour le moment.'));
@@ -62,10 +70,10 @@ window.CA = window.CA || {};
       if (res.error) throw new Error(errMsg(res.error));
       var r = res.data || {};
       if (ed) cancelEdit();
-      // courriels (confirmation au client + avis à Création Audio) : sans bloquer l'écran
-      c.functions.invoke('customer-order-notify', { body: { order_id: r.id, event: ed ? 'updated' : 'new' } })
-        .then(null, function () {});
-      return { id: r.id, number: r.number, has_backorder: !!r.has_backorder, total: r.total, updated: !!ed };
+      // courriels (confirmation au client + avis à Création Audio) : on attend la réponse (5 s max) avant de rendre
+      // la main — la page enchaîne sur « Ma cueillette » (changement de page) et couperait l'envoi en cours
+      var out = { id: r.id, number: r.number, has_backorder: !!r.has_backorder, total: r.total, updated: !!ed };
+      return notifyThen('customer-order-notify', { order_id: r.id, event: ed ? 'updated' : 'new' }).then(function () { return out; });
     });
   }
 
@@ -87,9 +95,8 @@ window.CA = window.CA || {};
     return c.rpc('customer_reserve', { p_lines: lines, p_note: note || null, p_pickup: pickup || null }).then(function (res) {
       if (res.error) throw new Error(errMsg(res.error));
       var r = res.data || {};
-      // confirmation au client + avis à Création Audio : sans bloquer l'écran
-      c.functions.invoke('reservation-notify', { body: { reservation_id: r.id, event: 'new' } }).then(null, function () {});
-      return r;
+      // confirmation au client + avis à Création Audio : on attend la réponse (5 s max), voir send()
+      return notifyThen('reservation-notify', { reservation_id: r.id, event: 'new' }).then(function () { return r; });
     });
   }
 
