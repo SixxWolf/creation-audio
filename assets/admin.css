@@ -510,6 +510,7 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .stk { padding:2px 9px; font-size:.74rem; font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums;
   background:var(--wash); border:1px solid var(--line); border-radius:100px; }
 .stk.out { color:var(--bad); background:var(--bad-wash); border-color:transparent; }
+.stk.hold { color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 12%, transparent); border-color:transparent; }
 .card-tierline { font-size:.74rem; color:var(--muted); }
 .card-actions { display:flex; gap:6px; margin-top:auto; padding-top:4px; container-type:inline-size; }
 .card-actions .btn-ghost { flex:1; min-width:0; min-height:32px; padding:0 7px; gap:5px; font-size:.8rem; --ic-size:14px; }

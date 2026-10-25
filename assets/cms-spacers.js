@@ -479,8 +479,10 @@
         }
         cache = res.data || [];
         render();
+        if (window.CA.loadHeldStock) window.CA.loadHeldStock();
       }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
+  document.addEventListener('ca:held', function () { if (cache.length) render(); });
 
   function render() {
     if (!cache.length) {
@@ -489,7 +491,8 @@
       return;
     }
     listEl.innerHTML = cache.map(function (r) {
-      var url = publicUrl(r.image_path), out = (r.qty | 0) <= 0, a = attrsOf(r);
+      var held = window.CA.heldStock ? Math.min(r.qty | 0, window.CA.heldStock(r.id)) : 0, avail = Math.max(0, (r.qty | 0) - held);   // disponible, comme la boutique
+      var url = publicUrl(r.image_path), out = avail <= 0, a = attrsOf(r);
       var nPhotos = photosOf(r).length, nFit = Array.isArray(a.fitment) ? a.fitment.length : 0, repl = replacesLabel(r), nSpk = speakersCount(r);
       var tags = '<span class="sp-mini">' + (repl ? 'Remplace ' + esc(repl) : 'Création Audio') + '</span>' +
         (a.speaker_size ? '<span class="sp-mini">' + esc(a.speaker_size) + '</span>' : '') +
@@ -507,7 +510,7 @@
         '<div class="card-body">' +
           '<div class="card-name">' + esc(r.name) + '</div>' +
           '<div class="sp-minis">' + tags + '</div>' +
-          '<div class="card-stock"><span class="stk' + (out ? ' out' : '') + '">' + (r.qty | 0) + ' paire' + ((r.qty | 0) > 1 ? 's' : '') + ' en stock</span>' +
+          '<div class="card-stock"><span class="stk' + (out ? ' out' : '') + '">' + avail + ' paire' + (avail > 1 ? 's' : '') + ' en stock</span>' + window.CA.heldTag(held, r.qty | 0) +
             (a.loose && a.loose.n > 0 ? '<span class="stk" title="Pièce seule en réserve (Stock › Production)">+ 1 pièce</span>' : '') + '</div>' +
           '<div class="sp-tiers-break">' + priceBlock(r) + '</div>' +
           '<div class="card-actions">' +

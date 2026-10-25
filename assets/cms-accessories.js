@@ -376,8 +376,10 @@
         }
         cache = res.data || [];
         render();
+        if (window.CA.loadHeldStock) window.CA.loadHeldStock();
       }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
+  document.addEventListener('ca:held', function () { if (cache.length) render(); });
 
   // catégories dans l'ordre de leur 1er accessoire ; « Sans catégorie » en dernier
   function groups() {
@@ -401,7 +403,8 @@
   }
 
   function cardHtml(r) {
-    var url = publicUrl(r.image_path), out = (r.qty | 0) <= 0, a = attrsOf(r), nPhotos = photosOf(r).length;
+    var held = window.CA.heldStock ? Math.min(r.qty | 0, window.CA.heldStock(r.id)) : 0, avail = Math.max(0, (r.qty | 0) - held);   // disponible, comme la boutique
+    var url = publicUrl(r.image_path), out = avail <= 0, a = attrsOf(r), nPhotos = photosOf(r).length;
     var fb = Array.isArray(a.fil_brands) ? a.fil_brands : [];
     var tags = (a.on_filament ? '<span class="sp-mini is-feat">★ Fiche filament · ' + esc(fb.length ? fb.join(', ') : 'toutes marques') + '</span>' : '') +
       (nPhotos > 1 ? '<span class="sp-mini">' + nPhotos + ' photos</span>' : '');
@@ -416,7 +419,7 @@
         '<div class="card-name">' + esc(r.name) + '</div>' +
         (tags ? '<div class="sp-minis">' + tags + '</div>' : '') +
         (a.description ? '<p class="card-desc">' + esc(a.description) + '</p>' : '') +
-        '<div class="card-stock"><span class="stk' + (out ? ' out' : '') + '">' + (r.qty | 0) + ' en stock</span></div>' +
+        '<div class="card-stock"><span class="stk' + (out ? ' out' : '') + '">' + avail + ' en stock</span>' + window.CA.heldTag(held, r.qty | 0) + '</div>' +
         '<div class="sp-tiers-break">' + priceBlock(r) + '</div>' +
         '<div class="card-actions">' +
           '<button class="btn btn-ghost card-edit" type="button">Modifier</button>' +

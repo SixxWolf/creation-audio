@@ -412,8 +412,10 @@
         }
         cache = res.data || [];
         render();
+        if (window.CA.loadHeldStock) window.CA.loadHeldStock();
       }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
+  document.addEventListener('ca:held', function () { if (cache.length) render(); });
 
   function cardHtml(r) {
     var url = publicUrl(r.image_path);
@@ -421,7 +423,10 @@
     // format effectif = matériau l'offre ET la couleur ne l'a pas désactivé
     var hasS = mat ? (matHasSpool(mat) && r.offer_spool !== false) : true;
     var hasR = mat ? (matHasRefillM(mat) && r.offer_refill !== false) : (r.qty_2 != null);
-    var qb = r.qty | 0, qr = r.qty_2 | 0;
+    // disponible = stock − gardé (commandes en attente, réservations), comme la boutique
+    var hb = window.CA.heldStock ? Math.min(r.qty | 0, window.CA.heldStock(r.id, 'spool')) : 0;
+    var hr = window.CA.heldStock ? Math.min(r.qty_2 | 0, window.CA.heldStock(r.id, 'refill')) : 0;
+    var qb = Math.max(0, (r.qty | 0) - hb), qr = Math.max(0, (r.qty_2 | 0) - hr);
     var outB = hasS && qb <= 0, outR = hasR && qr <= 0;
     var outAll = (hasS || hasR) && !((hasS && qb > 0) || (hasR && qr > 0));
 
@@ -446,7 +451,9 @@
         (priceHtml ? '<div class="card-meta">' + priceHtml + '</div>' : '') +
         '<div class="card-stock">' +
           (hasS ? '<span class="stk' + (outB ? ' out' : '') + '">Bobine&nbsp;: ' + qb + '</span>' : '') +
+          (hasS && hb ? window.CA.heldTag(hb, r.qty | 0) : '') +
           (hasR ? '<span class="stk' + (outR ? ' out' : '') + '">Recharge&nbsp;: ' + qr + '</span>' : '') +
+          (hasR && hr ? window.CA.heldTag(hr, r.qty_2 | 0) : '') +
         '</div>' +
         '<div class="card-actions">' +
           '<button class="btn btn-ghost card-edit" type="button">Modifier</button>' +

@@ -92,6 +92,25 @@ window.CA = window.CA || {};
     });
   };
 
+  // Stock gardé (réservations actives + commandes « Mettre en attente ») : même calcul que la
+  // boutique (_held_stock) -> les cartes de l'admin montrent le disponible. Événement ca:held.
+  var heldMap = {};
+  window.CA.heldStock = function (pid, kind) {
+    var h = heldMap[pid];
+    return h ? (kind === 'refill' ? h.r : h.m) : 0;
+  };
+  window.CA.heldTag = function (n, total) {
+    return n > 0 ? '<span class="stk hold" title="Stock total : ' + total + '">' + n + ' en attente</span>' : '';
+  };
+  window.CA.loadHeldStock = function () {
+    return sb.rpc('_held_stock').then(function (res) {
+      if (res.error) return;
+      heldMap = {};
+      (res.data || []).forEach(function (h) { heldMap[h.product_id] = { m: h.held_main | 0, r: h.held_refill | 0 }; });
+      document.dispatchEvent(new CustomEvent('ca:held'));
+    }, function () {});
+  };
+
   var loginWrap = $('#login'), app = $('#app'),
       loginForm = $('#login-form'), emailI = $('#login-email'), passI = $('#login-pass'),
       loginBtn = $('#login-btn'), loginStatus = $('#login-status'),

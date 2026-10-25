@@ -169,6 +169,7 @@
             stock = {};
             ((rp && rp.data) || []).forEach(function (p) { stock[p.id] = p; });
             loaded = true;
+            if (CA.loadHeldStock) CA.loadHeldStock();   // attente / statut changé -> cartes de stock à jour
             setClientBadge(orders.filter(function (o) { return o.status === 'new'; }).length);
             render();
           });

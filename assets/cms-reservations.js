@@ -61,6 +61,7 @@
         var act = (res.data || []).filter(function (r) { return Date.parse(r.expires_at) > Date.now(); });
         setBadge(act.length);
         setHeld(act);
+        if (CA.loadHeldStock) CA.loadHeldStock();   // réservation échue / annulée -> cartes de stock à jour
       }, function () {});
   }
   if (CA.onAdminReady) CA.onAdminReady(refreshBadge);
@@ -119,6 +120,7 @@
             var act = resv.filter(function (r) { return stOf(r) === 'active'; });
             setHeld(act);
             setBadge(act.length);
+            if (CA.loadHeldStock) CA.loadHeldStock();
             render();
           });
       }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; })
