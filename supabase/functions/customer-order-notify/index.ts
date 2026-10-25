@@ -51,7 +51,7 @@ const JOURS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "s
 const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 function hTxt(t: unknown) {
   const p = String(t || "").split(":");
-  return Number(p[0]) + " h" + (p[1] && p[1] !== "00" ? " " + p[1] : "");
+  return Number(p[0]) + " h " + (p[1] || "00");
 }
 function fmtPickup(d: unknown, s: unknown, e: unknown) {
   if (!d) return "";

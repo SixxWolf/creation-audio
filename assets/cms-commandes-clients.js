@@ -43,7 +43,7 @@
   // plage de cueillette -> « jeudi 23 oct., 13 h – 17 h » (aussi cms-reservations.js, cms-cueillettes.js)
   CA.hourTxt = function (t) {
     var p = String(t || '').split(':');
-    return Number(p[0]) + ' h' + (p[1] && p[1] !== '00' ? ' ' + p[1] : '');
+    return Number(p[0]) + ' h ' + (p[1] || '00');
   };
   CA.fmtPickup = function (x) {
     if (!x || !x.pickup_date) return '';

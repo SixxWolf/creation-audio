@@ -121,7 +121,7 @@ window.CA = window.CA || {};
   var MOIS_L = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   var JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   function dOf(d) { var p = String(d || '').split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
-  function hTxt(t) { var p = String(t || '').split(':'); return (+p[0]) + ' h' + (p[1] && p[1] !== '00' ? ' ' + p[1] : ''); }
+  function hTxt(t) { var p = String(t || '').split(':'); return (+p[0]) + ' h ' + (p[1] || '00'); }
   function mins(t) { var p = String(t || '').split(':'); return (+p[0]) * 60 + (+p[1] || 0); }
   function fmtPickup(d, s, e, short) {
     if (!d) return '';
