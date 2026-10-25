@@ -1,7 +1,7 @@
 /* =========================================================
    Sélecteur de cueillette — CA.custOrder.picker (commande-client.js)
    Écran « Ma cueillette » de Mon compte (compte.js) : grandes pastilles (.pk-lg).
-   Bande de jours défilante (‹ ›) puis plages du jour choisi.
+   Bande de jours défilante (‹ ›) puis heures du jour choisi (aux 15 min).
    ========================================================= */
 
 .pk { display:flex; flex-direction:column; gap:10px; min-width:0; }
@@ -23,7 +23,8 @@
 .pk-day.is-full { opacity:.45; cursor:default; }
 .pk-day.is-full:hover { border-color:var(--line); }
 
-.pk-slots { display:grid; grid-template-columns:repeat(auto-fill, minmax(128px, 1fr)); gap:6px; }
+.pk-slots { display:grid; grid-template-columns:repeat(auto-fill, minmax(78px, 1fr)); gap:6px; }
+.pk-gap { grid-column:1 / -1; height:4px; }
 .pk-slot { display:flex; align-items:center; justify-content:center; gap:6px; min-height:38px; padding:6px 10px;
   font:inherit; font-size:.88rem; font-weight:600; color:var(--ink); white-space:nowrap; cursor:pointer;
   background:var(--paper); border:1.5px solid var(--line); border-radius:10px; transition:border-color .15s, background .15s; }
@@ -42,8 +43,8 @@
 .pk-lg .pk-day b { font-size:1.4rem; }
 .pk-dayname { margin:4px 0 0; font-size:.95rem; font-weight:700; color:var(--ink); }
 .pk-dayname::first-letter { text-transform:uppercase; }
-.pk-lg .pk-slots { grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; }
-.pk-lg .pk-slot { min-height:50px; font-size:1rem; border-radius:12px; }
+.pk-lg .pk-slots { grid-template-columns:repeat(auto-fill, minmax(92px, 1fr)); gap:8px; }
+.pk-lg .pk-slot { min-height:46px; font-size:1rem; border-radius:12px; }
 @media (max-width:560px) {
   .pk-lg .pk-strip { grid-template-columns:repeat(5, minmax(0, 1fr)); gap:6px; }
   .pk-lg .pk-day b { font-size:1.2rem; }

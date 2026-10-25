@@ -122,6 +122,7 @@ window.CA = window.CA || {};
   var JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   function dOf(d) { var p = String(d || '').split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
   function hTxt(t) { var p = String(t || '').split(':'); return (+p[0]) + ' h' + (p[1] && p[1] !== '00' ? ' ' + p[1] : ''); }
+  function mins(t) { var p = String(t || '').split(':'); return (+p[0]) * 60 + (+p[1] || 0); }
   function fmtPickup(d, s, e, short) {
     if (!d) return '';
     var x = dOf(d);
@@ -144,7 +145,7 @@ window.CA = window.CA || {};
       '<div class="pk-strip" role="listbox" aria-label="Jour de cueillette"></div>' +
       '<button type="button" class="pk-nav pk-next" aria-label="Jours suivants">›</button></div>' +
       (opts.big ? '<p class="pk-dayname"></p>' : '') +
-      '<div class="pk-slots" role="listbox" aria-label="Plage horaire"></div>';
+      '<div class="pk-slots" role="listbox" aria-label="Heure de cueillette"></div>';
     if (host) host.appendChild(el);
     var strip = el.querySelector('.pk-strip'), slotsEl = el.querySelector('.pk-slots');
     var prev = el.querySelector('.pk-prev'), next = el.querySelector('.pk-next');
@@ -170,11 +171,15 @@ window.CA = window.CA || {};
           '" data-d="' + esc(g.d) + '" aria-selected="' + (g.d === day) + '"' + (g.open ? '' : ' aria-disabled="true"') + '>' +
           '<small>' + JOURS[x.getDay()].slice(0, 3) + '</small><b>' + x.getDate() + '</b><small>' + MOIS[x.getMonth()] + '</small></button>';
       }).join('');
+      // heures aux 15 min ; un saut (ex. 14 h 45 → 16 h) = nouvelle rangée
+      var last = null;
       slotsEl.innerHTML = list.filter(function (x) { return x.d === day; }).map(function (x) {
-        var on = !!(sel && sel.d === x.d && sel.s === x.s);
-        return '<button type="button" role="option" class="pk-slot' + (on ? ' is-on' : '') + (x.full ? ' is-full' : '') +
-          '" data-s="' + esc(x.s) + '" aria-selected="' + on + '"' + (x.full ? ' disabled' : '') + '>' +
-          hTxt(x.s) + ' – ' + hTxt(x.e) + (x.full ? ' <small>complet</small>' : '') + '</button>';
+        var on = !!(sel && sel.d === x.d && sel.s === x.s), m = mins(x.s);
+        var gap = last != null && m - last > 15 ? '<span class="pk-gap" aria-hidden="true"></span>' : '';
+        last = m;
+        return gap + '<button type="button" role="option" class="pk-slot' + (on ? ' is-on' : '') + (x.full ? ' is-full' : '') +
+          '" data-s="' + esc(x.s) + '" aria-selected="' + on + '"' + (x.full ? ' disabled title="Complet"' : '') + '>' +
+          hTxt(x.s) + (x.e ? ' – ' + hTxt(x.e) : '') + '</button>';
       }).join('');
       var dn = el.querySelector('.pk-dayname');
       if (dn) dn.textContent = day ? fmtPickup(day) : '';

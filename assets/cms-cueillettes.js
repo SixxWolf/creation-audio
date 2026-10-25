@@ -2,7 +2,7 @@
    Création Audio — CMS Commandes › Cueillettes (#commandes/cueillettes)
    - Horaire des plages offertes aux clients : admin_settings clé « cueillette »
      { week: { "1": [{ s, e }] … "7" } (jour ISO, lundi = 1), closed: [{ from, to }],
-       extra: [{ d, s, e }], cap (clients par plage, 0 = illimité), notice (h), days }.
+       extra: [{ d, s, e }], cap (clients par heure de 15 min, 0 = illimité), notice (h), days }.
      Lu par les RPC pickup_slots / customer_* (schema-v2.sql) -> sélecteur du panier
      et de Mon compte (CA.custOrder.picker, commande-client.js).
    - À venir : commandes en cours (Nouvelle → Prête) et réservations actives avec

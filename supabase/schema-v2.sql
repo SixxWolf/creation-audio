@@ -2297,7 +2297,8 @@ grant execute on function public.admin_reservation_action(uuid, text)       to a
 --     closed: [{from:"AAAA-MM-JJ", to:"AAAA-MM-JJ"}]          (fermé, bornes incluses)
 --     extra:  [{d:"AAAA-MM-JJ", s:"10:00", e:"12:00"}]        (plage ponctuelle, même un jour fermé)
 --     cap: 3 (commandes max par plage, 0 = illimité) · notice: 24 (h de préavis) · days: 14 (jours offerts) }
--- Une plage = une fenêtre telle quelle (pas découpée). Comptent dans une plage : commandes
+-- Chaque plage est découpée en heures d'arrivée aux 15 min (12:00, 12:15… jusqu'à la fin − 15 min) ;
+-- le client choisit une heure (pickup_end reste vide). Comptent dans une heure : commandes
 -- Nouvelle / En préparation / Prête et réservations actives non échues. Heure de Québec.
 -- Commande : obligatoire à l'envoi si tout est en stock (customer_submit_order) ; avec des
 -- articles à commander, le client la choisit dans Mon compte une fois la commande Prête.
@@ -2324,8 +2325,12 @@ language sql stable security definer set search_path = '' as $$
     select (x ->> 'd')::date, (x ->> 's')::time, (x ->> 'e')::time
       from p, jsonb_array_elements(coalesce(p.v -> 'extra', '[]'::jsonb)) x
      where (x ->> 'd')::date between p.lnow::date and p.lnow::date + p.days
+  ), q as (
+    select distinct b.d, t::time as s
+      from base b, generate_series(b.d + b.s, b.d + b.e - interval '15 minutes', interval '15 minutes') t
+     where b.e > b.s
   )
-  select b.d, b.s, b.e,
+  select b.d, b.s, null::time as e,
          ((select count(*) from public.customer_orders o
             where o.pickup_date = b.d and o.pickup_start = b.s and o.status in ('new', 'preparing', 'ready')
               and o.id is distinct from p_self)
@@ -2333,9 +2338,8 @@ language sql stable security definer set search_path = '' as $$
             where r.pickup_date = b.d and r.pickup_start = b.s and r.status = 'active' and r.expires_at > now()
               and r.id is distinct from p_self))::int,
          p.cap
-    from base b, p
-   where b.e > b.s
-     and b.d + b.s >= p.lnow + make_interval(hours => p.notice)
+    from q b, p
+   where b.d + b.s >= p.lnow + make_interval(hours => p.notice)
      and (p_until is null or (b.d + b.s) at time zone 'America/Toronto' < p_until)
    order by b.d, b.s;
 $$;
