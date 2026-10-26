@@ -2426,7 +2426,7 @@ revoke all on function public.customer_set_pickup(text, uuid, jsonb)       from 
 grant execute on function public.pickup_slots(timestamptz, uuid)           to authenticated;
 grant execute on function public.customer_set_pickup(text, uuid, jsonb)    to authenticated;
 
--- Demande d'exception : le client propose un jour ouvrable (lundi-vendredi, aujourd'hui ou plus tard) et
+-- Demande d'exception : le client propose un jour (tous les jours, aujourd'hui ou plus tard) et
 -- une heure libre, hors plages, préavis et capacité. pickup_req = { d, s, note, at, state: 'pending' | 'refused', reply }.
 -- La plage déjà choisie reste valide tant que l'admin n'a pas répondu (admin_decide_pickup).
 create or replace function public.customer_request_pickup(p_kind text, p_id uuid, p_req jsonb)
@@ -2439,8 +2439,8 @@ begin
   end if;
   v_d := (p_req ->> 'd')::date; v_s := (p_req ->> 's')::time;
   v_note := left(trim(coalesce(p_req ->> 'note', '')), 300);
-  if v_d < (now() at time zone 'America/Toronto')::date or extract(isodow from v_d) > 5 then
-    raise exception 'Choisis un jour ouvrable, à partir d''aujourd''hui.';
+  if v_d < (now() at time zone 'America/Toronto')::date then
+    raise exception 'Choisis un jour à partir d''aujourd''hui.';
   end if;
   if v_d + v_s <= (now() at time zone 'America/Toronto') then raise exception 'Cette heure est déjà passée.'; end if;
   v_req := jsonb_build_object('d', v_d, 's', to_char(v_s, 'HH24:MI'), 'note', v_note, 'at', now(), 'state', 'pending');
