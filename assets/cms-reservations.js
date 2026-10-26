@@ -67,6 +67,7 @@
   if (CA.onAdminReady) CA.onAdminReady(refreshBadge);
   setInterval(function () {
     if (document.visibilityState !== 'visible') return;
+    if (document.querySelector('.co-pkedit')) return;
     if (wrap.offsetParent !== null) load(); else refreshBadge();   // affichée (grand écran : colonne toujours là, mais pas hors de l'onglet)
   }, 60000);
 
@@ -211,7 +212,7 @@
     return function (err) { btn.disabled = false; caDialog.error(err); };
   }
   function act(r, what, btn) {
-    if (what === 'pickup') { CA.editPickup(r, 'reservation', load); return; }
+    if (what === 'pickup') { CA.editPickup(r, 'reservation', load, btn.closest('.co-card')); return; }
     if (what === 'invoice') {
       if (!CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
       var ord = Object.assign({}, r, { kind: 'reservation' });

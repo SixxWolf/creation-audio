@@ -24,7 +24,7 @@ window.CA = window.CA || {};
 (function () {
   'use strict';
   var KEY = 'ca-compte-auth', EDIT = 'ca_v2_order_edit', EDIT_TTL = 6 * 3600 * 1000;
-  var _t = window.CA.t, EN = window.CA.lang === 'en';
+  var _t = window.CA.t || function (s) { return s; }, EN = window.CA.lang === 'en';
   var cfg = window.CA_SUPABASE || {}, client = null;
 
   function session() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }

@@ -83,21 +83,44 @@
       });
     });
   };
-  // bouton « Cueillette » des cartes : l'admin fixe lui-même le jour et l'heure (admin_set_pickup, sans plages ni capacité)
-  CA.editPickup = function (x, kind, reload) {
-    var body = document.createElement('div'), cur = x.pickup_date ? String(x.pickup_date) : '', st = x.pickup_start ? String(x.pickup_start).slice(0, 5) : '';
-    body.className = 'dlg-pk';
-    body.innerHTML = '<input type="date" class="dlg-field" id="pke-d" value="' + esc(cur) + '"> <input type="time" class="dlg-field" id="pke-s" step="900" value="' + esc(st) + '">';
-    return caDialog.confirm({ title: 'Cueillette de ' + (x.number || ''), message: (x.name || x.email) + (cur ? ' — actuellement ' + CA.fmtPickup(x) : ''),
-      ok: 'Enregistrer', icon: 'clock', body: body }).then(function (ok) {
-      if (!ok) return;
-      var d = body.querySelector('#pke-d').value, s = body.querySelector('#pke-s').value;
+  // bouton « Cueillette » des cartes : même sélecteur que Mon compte (CA.custOrder.picker), affiché dans la carte.
+  // « Autre jour ou heure » = jour et heure libres (admin_set_pickup ne regarde ni plages, ni préavis, ni capacité).
+  CA.editPickup = function (x, kind, reload, card) {
+    var old = card.querySelector('.co-pkedit');
+    if (old) { old.remove(); return; }
+    var CO = CA.custOrder, cur = x.pickup_date ? { d: String(x.pickup_date), s: String(x.pickup_start || '').slice(0, 5) } : null;
+    var panel = document.createElement('div');
+    panel.className = 'co-pkedit';
+    panel.innerHTML = '<h3 class="co-pkedit-h">Changer la cueillette</h3><div class="co-pkedit-cal"><p class="muted">Chargement des plages…</p></div>' +
+      '<div class="co-pkedit-free" hidden><input type="date" id="pke-d" value="' + esc(cur ? cur.d : '') + '"><input type="time" id="pke-s" step="900" value="' + esc(cur ? cur.s : '') + '"></div>' +
+      '<div class="co-pkedit-foot"><button type="button" class="btn btn-accent btn-sm" data-ic="check" data-k="ok">Enregistrer</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-k="free">Autre jour ou heure</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" data-k="no">Annuler</button></div>';
+    var anchor = card.querySelector('.co-table-wrap');
+    anchor.parentNode.insertBefore(panel, anchor);
+    var calEl = panel.querySelector('.co-pkedit-cal'), freeEl = panel.querySelector('.co-pkedit-free'), p = null;
+    sb.rpc('pickup_slots', { p_until: kind === 'reservation' ? x.expires_at : null, p_self: x.id }).then(function (res) {
+      calEl.innerHTML = '';
+      if (res.error || !(res.data || []).length) { calEl.innerHTML = '<p class="muted">Aucune plage offerte : utilise « Autre jour ou heure ».</p>'; return; }
+      p = CO.picker(calEl, { big: true });
+      p.load(res.data, cur);
+    });
+    panel.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-k]');
+      if (!btn) return;
+      var k = btn.getAttribute('data-k');
+      if (k === 'no') { panel.remove(); return; }
+      if (k === 'free') { freeEl.hidden = !freeEl.hidden; calEl.hidden = !freeEl.hidden; return; }
+      var d, s;
+      if (!freeEl.hidden) { d = panel.querySelector('#pke-d').value; s = panel.querySelector('#pke-s').value; }
+      else { var v = p && p.value(); d = v && v.d; s = v && v.s; }
       if (!d || !s) { caDialog.toast('Choisis un jour et une heure.', 'bad'); return; }
-      return sb.rpc('admin_set_pickup', { p_kind: kind, p_id: x.id, p_d: d, p_s: s }).then(function (res) {
+      btn.disabled = true;
+      sb.rpc('admin_set_pickup', { p_kind: kind, p_id: x.id, p_d: d, p_s: s }).then(function (res) {
         if (res.error) throw res.error;
         caDialog.toast('Cueillette modifiée.');
         reload();
-      }).then(null, function (err) { caDialog.error(err); });
+      }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
     });
   };
   var STATUS = { 'new': 'Nouvelle', preparing: 'En préparation', ready: 'Prête', invoiced: 'Facturée', cancelled: 'Annulée' };
@@ -192,6 +215,7 @@
   if (CA.onAdminReady) CA.onAdminReady(refreshBadge);
   setInterval(function () {
     if (document.visibilityState !== 'visible') return;
+    if (document.querySelector('.co-pkedit')) return;
     if (tabOpen && (sub === 'clients' || isWide())) load(); else refreshBadge();
   }, 60000);
 
@@ -441,7 +465,7 @@
 
   /* ---- actions ---- */
   function act(o, what, btn) {
-    if (what === 'pickup') { CA.editPickup(o, 'order', load); return; }
+    if (what === 'pickup') { CA.editPickup(o, 'order', load, btn.closest('.co-card')); return; }
     if (what === 'invoice') {
       if (!CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
       var ord = Object.assign({ kind: 'client' }, o);
