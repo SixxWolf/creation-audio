@@ -522,10 +522,10 @@
     if (type === 'sealed') {
       var vPhys = ts.Qts < G.qtc ? ts.Vas / (Math.pow(G.qtc / ts.Qts, 2) - 1) : null;
       vRef = sealedRec ? sealedRec * FT3 * G.sealed : (vPhys || 1 * FT3);
-      if (sealedRec) why.push('Sundown : ' + fr(sealedRec) + ' pi³ scellée');
+      if (sealedRec) why.push('Sundown : ' + fr(sealedRec) + ' ft³ scellée');
     } else {
       vRef = portedRec ? portedRec * FT3 : 15 * ts.Vas * Math.pow(ts.Qts, 2.87);
-      if (portedRec) why.push('Sundown : ' + fr(portedRec) + ' pi³ à ' + (rec.recTune || 35) + ' Hz');
+      if (portedRec) why.push('Sundown : ' + fr(portedRec) + ' ft³ à ' + (rec.recTune || 35) + ' Hz');
     }
     vRef *= n;
 
@@ -557,7 +557,7 @@
 
     var best;
     var vLo = vRef * G.vol[0], vHi = vRef * G.vol[1];
-    if (vMaxSpace && vHi > vMaxSpace) { vHi = vMaxSpace; vLo = Math.min(vLo, vHi * 0.85); why.push('Espace limité : ' + fr(vMaxSpace / FT3) + ' pi³ net au plus'); }
+    if (vMaxSpace && vHi > vMaxSpace) { vHi = vMaxSpace; vLo = Math.min(vLo, vHi * 0.85); why.push('Espace limité : ' + fr(vMaxSpace / FT3) + ' ft³ net au plus'); }
     if (type === 'sealed') best = { vb: Math.min(vRef, vHi), fb: 0, area: 0 };
     else {
       for (var vi = 0; vi <= 8; vi++) {
@@ -631,7 +631,7 @@
       }
       break;
     }
-    if (shrunk) why.push('Volume réduit à ' + fr(g.net / FT3) + ' pi³ pour tenir dans l\'espace');
+    if (shrunk) why.push('Volume réduit à ' + fr(g.net / FT3) + ' ft³ pour tenir dans l\'espace');
     if (type === 'round' && !g.ok) why.push('Évent rond impossible dans cet espace : prends une fente');
     if (type !== 'sealed') why.push('Accord ' + best.fb + ' Hz · ' + G.name);
     var simFinal = run(Object.assign({}, P, { coil: inp.coil, link: inp.link, watts: watts, vehicle: inp.vehicle, fc: inp.fc }), ts).sim;

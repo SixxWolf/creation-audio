@@ -105,7 +105,7 @@
   function lenBare(m) { return mm() ? fmt(m * 1000, Math.abs(m) < 0.1 ? 1 : 0) : inch(m / IN); }
   function lenTxt(m) { return m == null || !isFinite(m) ? '—' : lenBare(m) + (mm() ? ' mm' : ' po'); }
   function dims3(a, b, c) { return [a, b, c].map(lenBare).join(' × ') + (mm() ? ' mm' : ' po'); }
-  function volTxt(m3) { return m3 == null || !isFinite(m3) ? '—' : mm() ? fmt(m3 / LITRE, 1) + ' L' : fmt(m3 / FT3, 2) + ' pi³'; }
+  function volTxt(m3) { return m3 == null || !isFinite(m3) ? '—' : mm() ? fmt(m3 / LITRE, 1) + ' L' : fmt(m3 / FT3, 2) + ' ft³'; }
   function areaTxt(m2) { return mm() ? fmt(m2 / 1e-4, 0) + ' cm²' : fmt(m2 / (IN * IN), 1) + ' po²'; }
   function hz(f, d) { return fmt(f, d == null ? (f < 100 ? 1 : 0) : d) + ' Hz'; }
   function ohm(z) {
@@ -334,7 +334,7 @@
           '<button class="fx-seg-btn" type="button" data-v="2" role="radio" aria-checked="false">Double</button></div></div>';
       }
       var input = '<input type="text" ' + (f.t === 'text' ? '' : 'inputmode="decimal" class="num" ') + 'id="' + id + '" data-k="' + f.k + '" autocomplete="off">';
-      var unit = f.t === 'len' ? (mm() ? 'mm' : 'po') : f.t === 'vol' ? (mm() ? 'L' : 'pi³') : f.u;
+      var unit = f.t === 'len' ? (mm() ? 'mm' : 'po') : f.t === 'vol' ? (mm() ? 'L' : 'ft³') : f.u;
       return '<div class="field"><label class="lbl" for="' + id + '">' + esc(f.l) + '</label>' +
         (unit ? '<span class="unit" data-unit="' + esc(unit) + '"' + (f.t === 'len' ? ' data-len' : f.t === 'vol' ? ' data-vol' : '') + '>' + input + '</span>' : input) + '</div>';
     }).join('');
@@ -583,7 +583,7 @@
   function sheetUI() { el.sheetDims.hidden = D.sheet.id !== 'custom'; }
   function unitsUI() {
     $$('[data-len]', panel).forEach(function (s) { s.setAttribute('data-unit', mm() ? 'mm' : 'po'); });
-    $$('[data-vol]', panel).forEach(function (s) { s.setAttribute('data-unit', mm() ? 'L' : 'pi³'); });
+    $$('[data-vol]', panel).forEach(function (s) { s.setAttribute('data-unit', mm() ? 'L' : 'ft³'); });
     el.denF.hidden = mm();
   }
   function nearT() {
@@ -683,7 +683,7 @@
     if (!p) { el.portRep.innerHTML = ''; el.portSum.textContent = ''; return; }
     var vmax = sim ? maxOf(sim.vp) : null, ratio = g.net > 0 ? (p.Sp / (IN * IN)) / (g.net / FT3) : 0;
     el.portRep.innerHTML = rep([
-      ['Surface', areaTxt(p.Sp) + (mm() ? '' : ' · ' + fmt(ratio, 1) + ' po²/pi³')],
+      ['Surface', areaTxt(p.Sp) + (mm() ? '' : ' · ' + fmt(ratio, 1) + ' po²/ft³')],
       ['Longueur', lenTxt(p.L)],
       p.shape === 'L' ? ['Forme', 'en L · retour ' + lenTxt(p.wall2)] : p.shape === 'straight' ? ['Forme', 'droit'] :
         ['Forme', p.np + ' × Ø ' + lenTxt(p.dp)],
