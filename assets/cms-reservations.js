@@ -143,7 +143,7 @@
         (act === 'invoice' ? ' data-ic="receipt"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
     };
     switch (stOf(r)) {
-      case 'active': return b('invoice', 'Facturer', 'btn-accent') + b('cancel', 'Annuler', 'btn-ghost co-danger');
+      case 'active': return b('invoice', 'Facturer', 'btn-accent') + b('pickup', 'Cueillette') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'expired': return b('invoice', 'Facturer') + (penalized(r) ? b('forgive', 'Retirer la pénalité') : '');
       case 'invoiced': return r.invoice_id ? b('see-invoice', 'Voir la facture') : '';
       case 'cancelled': return b('delete', 'Supprimer', 'btn-ghost co-danger');
@@ -211,6 +211,7 @@
     return function (err) { btn.disabled = false; caDialog.error(err); };
   }
   function act(r, what, btn) {
+    if (what === 'pickup') { CA.editPickup(r, 'reservation', load); return; }
     if (what === 'invoice') {
       if (!CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
       var ord = Object.assign({}, r, { kind: 'reservation' });

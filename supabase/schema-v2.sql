@@ -2491,6 +2491,27 @@ begin
   end if;
   return v_req;
 end $$;
+-- Changement direct par l'admin (carte de la commande / réservation) : jour et heure libres, sans regarder
+-- plages, préavis ni capacité. Une demande d'exception en attente est classée (la nouvelle plage la remplace).
+create or replace function public.admin_set_pickup(p_kind text, p_id uuid, p_d date, p_s time)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare n int;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  if p_d is null or p_s is null then raise exception 'Choisis un jour et une heure.'; end if;
+  if p_kind = 'reservation' then
+    update public.customer_reservations set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_req = null, updated_at = now()
+     where id = p_id and status = 'active';
+  else
+    update public.customer_orders set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_req = null, updated_at = now()
+     where id = p_id and status in ('new', 'preparing', 'ready');
+  end if;
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'Commande introuvable ou fermée.'; end if;
+  return jsonb_build_object('d', p_d, 's', to_char(p_s, 'HH24:MI'));
+end $$;
+revoke all on function public.admin_set_pickup(text, uuid, date, time) from public, anon;
+grant execute on function public.admin_set_pickup(text, uuid, date, time) to authenticated;
 revoke all on function public.customer_request_pickup(text, uuid, jsonb) from public, anon;
 revoke all on function public.admin_decide_pickup(text, uuid, boolean, text) from public, anon;
 grant execute on function public.customer_request_pickup(text, uuid, jsonb) to authenticated;

@@ -83,6 +83,23 @@
       });
     });
   };
+  // bouton « Cueillette » des cartes : l'admin fixe lui-même le jour et l'heure (admin_set_pickup, sans plages ni capacité)
+  CA.editPickup = function (x, kind, reload) {
+    var body = document.createElement('div'), cur = x.pickup_date ? String(x.pickup_date) : '', st = x.pickup_start ? String(x.pickup_start).slice(0, 5) : '';
+    body.className = 'dlg-pk';
+    body.innerHTML = '<input type="date" class="dlg-field" id="pke-d" value="' + esc(cur) + '"> <input type="time" class="dlg-field" id="pke-s" step="900" value="' + esc(st) + '">';
+    return caDialog.confirm({ title: 'Cueillette de ' + (x.number || ''), message: (x.name || x.email) + (cur ? ' — actuellement ' + CA.fmtPickup(x) : ''),
+      ok: 'Enregistrer', icon: 'clock', body: body }).then(function (ok) {
+      if (!ok) return;
+      var d = body.querySelector('#pke-d').value, s = body.querySelector('#pke-s').value;
+      if (!d || !s) { caDialog.toast('Choisis un jour et une heure.', 'bad'); return; }
+      return sb.rpc('admin_set_pickup', { p_kind: kind, p_id: x.id, p_d: d, p_s: s }).then(function (res) {
+        if (res.error) throw res.error;
+        caDialog.toast('Cueillette modifiée.');
+        reload();
+      }).then(null, function (err) { caDialog.error(err); });
+    });
+  };
   var STATUS = { 'new': 'Nouvelle', preparing: 'En préparation', ready: 'Prête', invoiced: 'Facturée', cancelled: 'Annulée' };
   var OPEN = { 'new': 1, preparing: 1, ready: 1 };
 
@@ -231,7 +248,7 @@
       return '<button type="button" class="btn ' + (cls || 'btn-ghost') + ' btn-sm" data-act="' + act + '"' +
         (act === 'invoice' ? ' data-ic="receipt"' : act === 'edit' ? ' data-ic="edit"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
     };
-    var hold = OPEN[o.status] ? b(o.stock_hold ? 'unhold' : 'hold', o.stock_hold ? 'Libérer le stock' : 'Mettre en attente') + b('edit', 'Modifier') : '';
+    var hold = OPEN[o.status] ? b(o.stock_hold ? 'unhold' : 'hold', o.stock_hold ? 'Libérer le stock' : 'Mettre en attente') + b('edit', 'Modifier') + b('pickup', 'Cueillette') : '';
     switch (o.status) {
       case 'new': return b('preparing', 'Commencer la préparation', 'btn-accent') + hold + b('invoice', 'Facturer') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'preparing': return b('ready', 'Marquer prête', 'btn-accent') + hold + b('invoice', 'Facturer') + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
@@ -424,6 +441,7 @@
 
   /* ---- actions ---- */
   function act(o, what, btn) {
+    if (what === 'pickup') { CA.editPickup(o, 'order', load); return; }
     if (what === 'invoice') {
       if (!CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
       var ord = Object.assign({ kind: 'client' }, o);
