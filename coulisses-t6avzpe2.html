@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
+<link rel="stylesheet" href="assets/boites.css?v=4">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
@@ -123,6 +124,7 @@
       <p class="side-group" aria-hidden="true">Atelier</p>
       <button class="tab" type="button" data-tab="autoloop" data-group="Atelier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3.5l3 3-3 3"/><path d="M20 6.5H8.5a5 5 0 0 0-5 5"/><path d="M7 20.5l-3-3 3-3"/><path d="M4 17.5h11.5a5 5 0 0 0 5-5"/></svg><span>AutoLoop</span></button>
       <button class="tab" type="button" data-tab="silhouettes" data-group="Atelier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 15.5V13l3.2-1.4 3-3.6h6.1l3.6 3.4 2.6.8v3.3"/><path d="M4.4 15.5h1.1M9.5 15.5h5M18.5 15.5h3"/><circle cx="7.5" cy="15.5" r="2"/><circle cx="16.5" cy="15.5" r="2"/></svg><span>Silhouettes</span></button>
+      <button class="tab" type="button" data-tab="boites" data-group="Atelier"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="10" cy="12" r="4.6"/><circle cx="10" cy="12" r="1.4"/><path d="M17.5 7.5v9"/></svg><span>Boîtes</span></button>
 
       <p class="side-group" aria-hidden="true">Réglages</p>
       <button class="tab" type="button" data-tab="apparence" data-group="Réglages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9.5 9.5 0 0 0 0 19c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.7-1.7h2a5.5 5.5 0 0 0 5.5-5.5c0-4.3-4.3-7.7-9.8-7.7z"/><circle cx="7.5" cy="11.5" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15.5" cy="7.5" r="1.2"/></svg><span>Apparence</span></button>
@@ -2291,6 +2293,391 @@
       </div>
     </section>
 
+    <!-- ---------------- BOÎTES ---------------- -->
+    <!-- Calculateur de boîtes de sub (cms-boites.js ; calculs : box-engine.js ; bibliothèque Sundown : box-subs.js ;
+         Mes subs / projets : tables box_subs, box_projects). 3 colonnes : étapes | 3D + plan | courbes + coupes. -->
+    <section class="tabpanel" data-panel="boites" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Boîtes</h1>
+          <p class="muted">Volume, évent, courbes et coupes d'une boîte de sub.</p>
+        </div>
+        <div class="fx-seg bx-units" id="bx-units" role="radiogroup" aria-label="Unités">
+          <button class="fx-seg-btn is-active" type="button" data-v="in" role="radio" aria-checked="true">po · pi³</button>
+          <button class="fx-seg-btn" type="button" data-v="mm" role="radio" aria-checked="false">mm · L</button>
+        </div>
+      </div>
+
+      <div class="bx-wrap">
+      <div class="bx" id="bx-app">
+        <aside class="bx-steps" id="bx-steps">
+          <details class="al-card al-acc bx-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">1</span> Sub &amp; ampli <span class="al-note" id="bx-sub-sum"></span></summary>
+            <div class="field">
+              <label class="lbl" for="bx-sub">Sub</label>
+              <select id="bx-sub"></select>
+            </div>
+            <div class="bx-kv" id="bx-sub-rep"></div>
+            <div class="bx-f">
+              <span class="lbl">Nombre</span>
+              <div class="fx-seg bx-seg" id="bx-n" role="radiogroup" aria-label="Nombre de subs">
+                <button class="fx-seg-btn is-active" type="button" data-v="1" role="radio" aria-checked="true">1</button>
+                <button class="fx-seg-btn" type="button" data-v="2" role="radio" aria-checked="false">2</button>
+                <button class="fx-seg-btn" type="button" data-v="3" role="radio" aria-checked="false">3</button>
+                <button class="fx-seg-btn" type="button" data-v="4" role="radio" aria-checked="false">4</button>
+              </div>
+            </div>
+            <div class="field bx-f">
+              <label class="lbl" for="bx-wiring">Câblage</label>
+              <select id="bx-wiring"></select>
+            </div>
+            <div class="grid bx-grid">
+              <div class="field">
+                <label class="lbl" for="bx-watts">Puissance</label>
+                <span class="unit" data-unit="W"><input type="text" inputmode="decimal" id="bx-watts" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-volts">Tension</label>
+                <span class="unit" data-unit="V"><input type="text" id="bx-volts" class="num" readonly tabindex="-1"></span>
+              </div>
+            </div>
+            <details class="bx-more" id="bx-ts-box">
+              <summary>Paramètres T/S <span class="bx-more-n" id="bx-ts-n"></span></summary>
+              <div class="grid bx-grid bx-ts" id="bx-ts"></div>
+              <ul class="bx-list" id="bx-ts-notes"></ul>
+              <div class="bx-row">
+                <button class="btn btn-accent btn-sm" type="button" id="bx-sub-save" data-ic="save">Enregistrer dans Mes subs</button>
+                <button class="btn btn-ghost btn-sm" type="button" id="bx-sub-new" data-ic="plus">Nouveau sub</button>
+                <button class="btn btn-ghost btn-sm" type="button" id="bx-sub-del" data-ic="trash" hidden>Supprimer</button>
+              </div>
+            </details>
+          </details>
+
+          <details class="al-card al-acc bx-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">2</span> Objectif <span class="al-note">assistant</span></summary>
+            <p class="bx-ref" id="bx-ref"></p>
+            <div class="bx-f">
+              <span class="lbl">Écoute</span>
+              <div class="fx-seg bx-seg" id="bx-goal" role="radiogroup" aria-label="Objectif d'écoute">
+                <button class="fx-seg-btn" type="button" data-v="sq" role="radio" aria-checked="false">SQ</button>
+                <button class="fx-seg-btn is-active" type="button" data-v="daily" role="radio" aria-checked="true">Polyvalent</button>
+                <button class="fx-seg-btn" type="button" data-v="sql" role="radio" aria-checked="false">SQL</button>
+                <button class="fx-seg-btn" type="button" data-v="spl" role="radio" aria-checked="false">SPL</button>
+              </div>
+            </div>
+            <div class="bx-f">
+              <span class="lbl">Type</span>
+              <div class="fx-seg bx-seg" id="bx-atype" role="radiogroup" aria-label="Type proposé">
+                <button class="fx-seg-btn is-active" type="button" data-v="auto" role="radio" aria-checked="true">Auto</button>
+                <button class="fx-seg-btn" type="button" data-v="sealed" role="radio" aria-checked="false">Scellée</button>
+                <button class="fx-seg-btn" type="button" data-v="slot" role="radio" aria-checked="false">Fente</button>
+                <button class="fx-seg-btn" type="button" data-v="round" role="radio" aria-checked="false">Rond</button>
+              </div>
+            </div>
+            <div class="bx-f">
+              <span class="lbl">Espace max</span>
+              <div class="grid bx-grid3">
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-max-w" class="num" placeholder="L" aria-label="Largeur max" autocomplete="off"></span>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-max-h" class="num" placeholder="H" aria-label="Hauteur max" autocomplete="off"></span>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-max-d" class="num" placeholder="P" aria-label="Profondeur max" autocomplete="off"></span>
+              </div>
+            </div>
+            <div class="grid bx-grid">
+              <div class="field">
+                <label class="lbl" for="bx-veh">Véhicule</label>
+                <select id="bx-veh"></select>
+              </div>
+              <div class="field" id="bx-fc-f" hidden>
+                <label class="lbl" for="bx-fc">Gain de cabine</label>
+                <span class="unit" data-unit="Hz"><input type="text" inputmode="decimal" id="bx-fc" class="num" autocomplete="off"></span>
+              </div>
+            </div>
+            <div class="bx-row">
+              <button class="btn btn-accent btn-sm" type="button" id="bx-propose" data-ic="play">Proposer</button>
+            </div>
+            <div class="bx-prop" id="bx-prop" hidden>
+              <div class="bx-rep" id="bx-prop-rep"></div>
+              <ul class="bx-list" id="bx-prop-why"></ul>
+              <div class="bx-row">
+                <button class="btn btn-accent btn-sm" type="button" id="bx-apply" data-ic="check">Appliquer</button>
+                <button class="btn btn-ghost btn-sm" type="button" id="bx-prop-x">Ignorer</button>
+              </div>
+            </div>
+          </details>
+
+          <details class="al-card al-acc bx-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">3</span> Boîte <span class="al-note" id="bx-box-sum"></span></summary>
+            <div class="field">
+              <label class="lbl" for="bx-type">Type</label>
+              <select id="bx-type">
+                <optgroup label="Types">
+                  <option value="sealed">Scellée</option>
+                  <option value="slot">Évent fente</option>
+                  <option value="round">Évent rond</option>
+                </optgroup>
+                <optgroup label="À venir">
+                  <option value="bp4" disabled>Bandpass 4e ordre</option>
+                  <option value="passive" disabled>Radiateur passif</option>
+                  <option value="bp6" disabled>Bandpass 6e ordre</option>
+                  <option value="wedge" disabled>Boîte en biseau</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="bx-f">
+              <span class="lbl">Cotes</span>
+              <div class="fx-seg bx-seg" id="bx-mode" role="radiogroup" aria-label="Mode des cotes">
+                <button class="fx-seg-btn is-active" type="button" data-v="dims" role="radio" aria-checked="true">Extérieures</button>
+                <button class="fx-seg-btn" type="button" data-v="vol" role="radio" aria-checked="false">Volume visé</button>
+              </div>
+            </div>
+            <div class="field bx-f" id="bx-vt-f" hidden>
+              <label class="lbl" for="bx-vt">Volume net visé</label>
+              <span class="unit" data-unit="pi³" data-vol><input type="text" inputmode="decimal" id="bx-vt" class="num" autocomplete="off"></span>
+            </div>
+            <div class="grid bx-grid3">
+              <div class="field">
+                <label class="lbl" for="bx-w">Largeur</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-w" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-h">Hauteur</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-h" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-d">Profondeur</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-d" class="num" autocomplete="off"></span>
+              </div>
+            </div>
+            <div class="bx-rep" id="bx-box-rep"></div>
+            <ul class="bx-list" id="bx-box-warn"></ul>
+          </details>
+
+          <details class="al-card al-acc bx-step" open id="bx-port-step">
+            <summary class="al-card-head"><span class="al-ic al-step">4</span> Évent <span class="al-note" id="bx-port-sum"></span></summary>
+            <div class="grid bx-grid">
+              <div class="field">
+                <label class="lbl" for="bx-fb">Accord</label>
+                <span class="unit" data-unit="Hz"><input type="text" inputmode="decimal" id="bx-fb" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field" data-port="slot">
+                <label class="lbl" for="bx-pw">Largeur fente</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-pw" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field" data-port="round">
+                <label class="lbl" for="bx-dp">Ø intérieur</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-dp" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field" data-port="round">
+                <label class="lbl" for="bx-wall">Paroi</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-wall" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-k">Correction k</label>
+                <input type="text" inputmode="decimal" id="bx-k" class="num" autocomplete="off">
+              </div>
+            </div>
+            <div class="bx-f" data-port="slot">
+              <span class="lbl">Côté</span>
+              <div class="fx-seg bx-seg" id="bx-side" role="radiogroup" aria-label="Côté de la fente">
+                <button class="fx-seg-btn is-active" type="button" data-v="left" role="radio" aria-checked="true">Gauche</button>
+                <button class="fx-seg-btn" type="button" data-v="right" role="radio" aria-checked="false">Droite</button>
+              </div>
+            </div>
+            <div class="bx-f" data-port="round">
+              <span class="lbl">Nombre</span>
+              <div class="fx-seg bx-seg" id="bx-np" role="radiogroup" aria-label="Nombre d'évents">
+                <button class="fx-seg-btn is-active" type="button" data-v="1" role="radio" aria-checked="true">1</button>
+                <button class="fx-seg-btn" type="button" data-v="2" role="radio" aria-checked="false">2</button>
+                <button class="fx-seg-btn" type="button" data-v="3" role="radio" aria-checked="false">3</button>
+                <button class="fx-seg-btn" type="button" data-v="4" role="radio" aria-checked="false">4</button>
+              </div>
+            </div>
+            <label class="bx-check" data-port="round"><input type="checkbox" id="bx-flare"> Bouts évasés</label>
+            <div class="bx-rep" id="bx-port-rep"></div>
+          </details>
+
+          <details class="al-card al-acc bx-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">5</span> Construction <span class="al-note" id="bx-build-sum"></span></summary>
+            <div class="bx-f">
+              <span class="lbl">Épaisseur</span>
+              <div class="fx-seg bx-seg" id="bx-t" role="radiogroup" aria-label="Épaisseur du bois">
+                <button class="fx-seg-btn" type="button" data-v="0.5" role="radio" aria-checked="false">1/2</button>
+                <button class="fx-seg-btn" type="button" data-v="0.625" role="radio" aria-checked="false">5/8</button>
+                <button class="fx-seg-btn is-active" type="button" data-v="0.75" role="radio" aria-checked="true">3/4</button>
+                <button class="fx-seg-btn" type="button" data-v="1" role="radio" aria-checked="false">1</button>
+              </div>
+            </div>
+            <div class="bx-f">
+              <span class="lbl">Façade</span>
+              <div class="fx-seg bx-seg" id="bx-layers" role="radiogroup" aria-label="Façade">
+                <button class="fx-seg-btn is-active" type="button" data-v="1" role="radio" aria-checked="true">Simple</button>
+                <button class="fx-seg-btn" type="button" data-v="2" role="radio" aria-checked="false">Double</button>
+              </div>
+            </div>
+            <div class="grid bx-grid">
+              <div class="field">
+                <label class="lbl" for="bx-mat">Matériau</label>
+                <select id="bx-mat">
+                  <option value="mdf">MDF</option>
+                  <option value="birch">Bouleau russe</option>
+                  <option value="ply">Contreplaqué</option>
+                </select>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-finish">Fini</label>
+                <select id="bx-finish">
+                  <option value="raw">Brut</option>
+                  <option value="carpet">Tapis</option>
+                  <option value="paint">Peint noir</option>
+                </select>
+              </div>
+            </div>
+            <label class="bx-check"><input type="checkbox" id="bx-brace"> Renfort ajouré derrière les subs</label>
+            <div class="bx-f" id="bx-stuff-f">
+              <div class="bx-lblrow"><label class="lbl" for="bx-stuff">Rembourrage</label><output id="bx-stuff-v" for="bx-stuff">0 %</output></div>
+              <input type="range" id="bx-stuff" min="0" max="100" step="10" value="0">
+            </div>
+            <div class="grid bx-grid">
+              <div class="field">
+                <label class="lbl" for="bx-ql">Fuites Ql</label>
+                <input type="text" inputmode="decimal" id="bx-ql" class="num" autocomplete="off">
+              </div>
+            </div>
+          </details>
+
+          <details class="al-card al-acc bx-step" open>
+            <summary class="al-card-head"><span class="al-ic al-step">6</span> Coupes <span class="al-note" id="bx-cut-note"></span></summary>
+            <div class="bx-f">
+              <span class="lbl">Feuille</span>
+              <div class="fx-seg bx-seg" id="bx-sheet" role="radiogroup" aria-label="Feuille">
+                <button class="fx-seg-btn is-active" type="button" data-v="4x8" role="radio" aria-checked="true">4 × 8</button>
+                <button class="fx-seg-btn" type="button" data-v="5x5" role="radio" aria-checked="false">5 × 5</button>
+                <button class="fx-seg-btn" type="button" data-v="4x4" role="radio" aria-checked="false">4 × 4</button>
+                <button class="fx-seg-btn" type="button" data-v="custom" role="radio" aria-checked="false">Autre</button>
+              </div>
+            </div>
+            <div class="grid bx-grid" id="bx-sheet-dims" hidden>
+              <div class="field">
+                <label class="lbl" for="bx-sheet-l">Longueur</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-sheet-l" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-sheet-w">Largeur</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-sheet-w" class="num" autocomplete="off"></span>
+              </div>
+            </div>
+            <div class="grid bx-grid">
+              <div class="field">
+                <label class="lbl" for="bx-kerf">Trait de scie</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-kerf" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-trim">Marge de bord</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-trim" class="num" autocomplete="off"></span>
+              </div>
+            </div>
+            <div class="bx-f">
+              <span class="lbl">Fractions</span>
+              <div class="fx-seg bx-seg" id="bx-den" role="radiogroup" aria-label="Précision des cotes en pouces">
+                <button class="fx-seg-btn is-active" type="button" data-v="16" role="radio" aria-checked="true">1/16</button>
+                <button class="fx-seg-btn" type="button" data-v="32" role="radio" aria-checked="false">1/32</button>
+                <button class="fx-seg-btn" type="button" data-v="0" role="radio" aria-checked="false">Décimales</button>
+              </div>
+            </div>
+            <label class="bx-check"><input type="checkbox" id="bx-grain"> Respecter le fil</label>
+          </details>
+        </aside>
+
+        <div class="bx-mid">
+          <div class="al-card bx-proj">
+            <input type="text" id="bx-name" placeholder="Projet sans nom" aria-label="Nom du projet" autocomplete="off">
+            <span class="bx-proj-st" id="bx-proj-st"></span>
+            <button class="btn btn-accent btn-sm" type="button" id="bx-save" data-ic="save">Enregistrer</button>
+            <div class="bx-menu-wrap">
+              <button class="btn btn-ghost btn-sm" type="button" id="bx-projects" aria-expanded="false" aria-controls="bx-menu">Projets</button>
+              <div class="bx-menu" id="bx-menu" hidden>
+                <div class="bx-menu-acts">
+                  <button class="btn btn-ghost btn-sm" type="button" id="bx-new" data-ic="plus">Nouveau</button>
+                  <button class="btn btn-ghost btn-sm" type="button" id="bx-dup" data-ic="copy">Dupliquer</button>
+                  <button class="btn btn-ghost btn-sm" type="button" id="bx-del" data-ic="trash">Supprimer</button>
+                </div>
+                <ul class="bx-menu-list" id="bx-plist"></ul>
+              </div>
+            </div>
+          </div>
+          <div class="bx-stage" id="bx-stage">
+            <canvas class="bx-cv" id="bx-gl" aria-label="Aperçu 3D de la boîte"></canvas>
+            <canvas class="bx-cv bx-ov" id="bx-ov" aria-hidden="true"></canvas>
+            <svg class="bx-plan" id="bx-plan" role="img" aria-label="Plan coté de la boîte" hidden></svg>
+            <div class="bx-bar bx-bar-top">
+              <div class="fx-seg" id="bx-view" role="radiogroup" aria-label="Aperçu">
+                <button class="fx-seg-btn is-active" type="button" data-v="3d" role="radio" aria-checked="true">3D</button>
+                <button class="fx-seg-btn" type="button" data-v="plan" role="radio" aria-checked="false">Plan</button>
+              </div>
+              <div class="bx-tools" id="bx-cams">
+                <button class="bx-tb" type="button" data-cam="iso">3/4</button>
+                <button class="bx-tb" type="button" data-cam="front">Face</button>
+                <button class="bx-tb" type="button" data-cam="side">Côté</button>
+                <button class="bx-tb" type="button" data-cam="top">Dessus</button>
+              </div>
+            </div>
+            <div class="bx-bar bx-bar-bot" id="bx-3dbar">
+              <label class="bx-range"><span>Éclater</span><input type="range" id="bx-explode" min="0" max="100" step="1" value="0" aria-label="Éclater la boîte"></label>
+              <label class="bx-chip"><input type="checkbox" id="bx-xray"> Transparent</label>
+              <label class="bx-chip"><input type="checkbox" id="bx-dims" checked> Cotes</label>
+            </div>
+            <p class="bx-stage-msg" id="bx-stage-msg" hidden></p>
+          </div>
+          <div class="bx-sum" id="bx-sum"></div>
+        </div>
+
+        <div class="bx-right">
+          <section class="al-card bx-chart-card">
+            <div class="al-card-head bx-chart-head">
+              <span class="al-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 15c2.5 0 3-8 5.5-8S11 17 13.5 17 16 9 18.5 9 20 12 21 12"/></svg></span> Courbes
+              <select id="bx-metric" aria-label="Courbe affichée">
+                <option value="spl">SPL</option>
+                <option value="splmax">SPL max</option>
+                <option value="x">Excursion</option>
+                <option value="vp">Vitesse d'évent</option>
+                <option value="z">Impédance</option>
+                <option value="phase">Phase</option>
+                <option value="gd">Retard de groupe</option>
+                <option value="pmax">Puissance max</option>
+              </select>
+            </div>
+            <div class="bx-chart-tools">
+              <label class="bx-chip" id="bx-cabin-c"><input type="checkbox" id="bx-cabin"> Dans le véhicule</label>
+              <button class="bx-tb" type="button" id="bx-freeze">Figer</button>
+              <select id="bx-overlay" aria-label="Superposer un projet"><option value="">Superposer un projet</option></select>
+            </div>
+            <div class="bx-chart" id="bx-chart"></div>
+            <div class="bx-legend" id="bx-legend"></div>
+          </section>
+
+          <section class="al-card bx-cut-card">
+            <div class="al-card-head bx-cut-head">
+              <span class="al-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M11 5v14M11 12h10M16 12v7"/></svg></span> Coupes <span class="al-note" id="bx-cut-sum"></span>
+              <button class="btn btn-ghost btn-sm" type="button" id="bx-print" data-ic="print">Imprimer</button>
+            </div>
+            <p class="bx-cut-msg" id="bx-cut-msg" hidden></p>
+            <div class="bx-sheets" id="bx-sheets"></div>
+            <div class="bx-table-wrap">
+              <table class="bx-table" id="bx-pieces">
+                <thead><tr><th>Pièce</th><th class="num">Qté</th><th class="num">Longueur</th><th class="num">Largeur</th><th>Détail</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <details class="bx-more" id="bx-order-box">
+              <summary>Ordre des coupes</summary>
+              <ol class="bx-order" id="bx-order"></ol>
+            </details>
+          </section>
+        </div>
+      </div>
+      </div>
+    </section>
+
     <!-- ---------------- RÉGLAGES › APPARENCE ---------------- -->
     <!-- Couleur d'accent de l'admin (boutons, onglets actifs, liens, cases…) : admin-accent.js -->
     <section class="tabpanel" data-panel="apparence" role="tabpanel" hidden>
@@ -2464,6 +2851,10 @@
 <!-- Silhouettes : le ?v= du moteur sert aussi au worker (cms-silhouettes.js le lit ici) -->
 <script src="assets/silhouette-engine.js?v=14"></script>
 <script src="assets/cms-silhouettes.js?v=15"></script>
+<!-- Boîtes : moteur sans DOM + bibliothèque Sundown, puis l'onglet -->
+<script src="assets/box-engine.js?v=3"></script>
+<script src="assets/box-subs.js?v=1"></script>
+<script src="assets/cms-boites.js?v=7"></script>
 <script src="assets/cms-production.js?v=11"></script>
 <script src="assets/cms-aujourdhui.js?v=1"></script>
 <script src="assets/cms-nouvelles.js?v=4"></script>
