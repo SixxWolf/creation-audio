@@ -2454,6 +2454,10 @@
                 <label class="lbl" for="bx-k">Correction k</label>
                 <input type="text" inputmode="decimal" id="bx-k" class="num" autocomplete="off">
               </div>
+              <div class="field" data-port="slot" id="bx-rad-f">
+                <label class="lbl" for="bx-rad">Rayon du coin</label>
+                <span class="unit" data-unit="in" data-len><input type="text" inputmode="decimal" id="bx-rad" class="num" autocomplete="off"></span>
+              </div>
             </div>
             <div class="bx-f" data-port="slot">
               <span class="lbl">Côté</span>
@@ -2472,6 +2476,7 @@
               </div>
             </div>
             <label class="bx-check" data-port="round"><input type="checkbox" id="bx-flare"> Bouts évasés</label>
+            <label class="bx-check" data-port="slot"><input type="checkbox" id="bx-soft"> Coude adouci</label>
             <div class="bx-rep" id="bx-port-rep"></div>
           </details>
 
@@ -2830,9 +2835,9 @@
 <script src="assets/silhouette-engine.js?v=14"></script>
 <script src="assets/cms-silhouettes.js?v=15"></script>
 <!-- Boîtes : moteur sans DOM + bibliothèque Sundown, puis l'onglet -->
-<script src="assets/box-engine.js?v=6"></script>
+<script src="assets/box-engine.js?v=10"></script>
 <script src="assets/box-subs.js?v=1"></script>
-<script src="assets/cms-boites.js?v=16"></script>
+<script src="assets/cms-boites.js?v=18"></script>
 <script src="assets/cms-production.js?v=11"></script>
 <script src="assets/cms-aujourdhui.js?v=1"></script>
 <script src="assets/cms-nouvelles.js?v=4"></script>

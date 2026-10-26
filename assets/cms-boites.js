@@ -28,7 +28,7 @@
     mw: $('#bx-mw'), mh: $('#bx-mh'), md: $('#bx-md'), maxRep: $('#bx-max-rep'), ratio: $('#bx-ratio'),
     boxRep: $('#bx-box-rep'), boxWarn: $('#bx-box-warn'), boxSum: $('#bx-box-sum'),
     portStep: $('#bx-port-step'), portSum: $('#bx-port-sum'), fb: $('#bx-fb'), pw: $('#bx-pw'), dp: $('#bx-dp'), wall: $('#bx-wall'), k: $('#bx-k'),
-    flare: $('#bx-flare'), portRep: $('#bx-port-rep'),
+    flare: $('#bx-flare'), soft: $('#bx-soft'), rad: $('#bx-rad'), radF: $('#bx-rad-f'), portRep: $('#bx-port-rep'),
     buildSum: $('#bx-build-sum'), mat: $('#bx-mat'), finish: $('#bx-finish'), brace: $('#bx-brace'), stuffF: $('#bx-stuff-f'), stuff: $('#bx-stuff'),
     stuffV: $('#bx-stuff-v'), ql: $('#bx-ql'),
     cutNote: $('#bx-cut-note'), sheetDims: $('#bx-sheet-dims'), sheetL: $('#bx-sheet-l'), sheetW: $('#bx-sheet-w'), kerf: $('#bx-kerf'), trim: $('#bx-trim'),
@@ -157,7 +157,7 @@
       n: 1, coil: null, link: 'parallel', watts: null,
       goal: 'daily', atype: 'auto', max: { w: null, h: null, d: null }, vehicle: 'sedan', fc: 50,
       P: { type: 'slot', w: 30 * IN, h: 15 * IN, d: 18 * IN, t: 0.75 * IN, layers: 1, n: 1, fb: 34, brace: false, stuff: 0, ql: null,
-        port: { side: 'left', pw: 2.5 * IN, dp: 4 * IN, np: 1, wall: 0.25 * IN, flare: true, k: 0.732 } },
+        port: { side: 'left', pw: 2.5 * IN, dp: 4 * IN, np: 1, wall: 0.25 * IN, flare: true, k: 0.732, soft: true, rad: 0.375 * IN } },
       mode: 'dims', vt: null, ratio: null, mat: 'mdf', finish: 'raw',
       sheet: { id: '4x8', L: 96 * IN, W: 48 * IN, kerf: 0.125 * IN, trim: 0, grain: false }
     };
@@ -559,6 +559,7 @@
     { el: el.dp, k: 'len', get: function () { return D.P.port.dp; }, set: function (v) { D.P.port.dp = v; }, min: 1 * IN },
     { el: el.wall, k: 'len', get: function () { return D.P.port.wall; }, set: function (v) { D.P.port.wall = v; }, min: 0 },
     { el: el.k, k: 'num', get: function () { return D.P.port.k; }, set: function (v) { D.P.port.k = v; }, min: 0, max: 2, d: 3 },
+    { el: el.rad, k: 'len', get: function () { return D.P.port.rad == null ? 0.375 * IN : D.P.port.rad; }, set: function (v) { D.P.port.rad = v; }, min: 0 },
     { el: el.ql, k: 'num', get: function () { return D.P.ql; }, set: function (v) { D.P.ql = v; }, empty: true, min: 1, d: 1 },
     { el: el.sheetL, k: 'len', get: function () { return D.sheet.L; }, set: function (v) { D.sheet.L = v; }, min: 12 * IN },
     { el: el.sheetW, k: 'len', get: function () { return D.sheet.W; }, set: function (v) { D.sheet.W = v; }, min: 12 * IN },
@@ -667,6 +668,7 @@
   el.finish.addEventListener('change', function () { D.finish = el.finish.value; markDirty(); build3d(); draw3d(); });
   el.brace.addEventListener('change', function () { D.P.brace = el.brace.checked; markDirty(); schedule(); });
   el.flare.addEventListener('change', function () { D.P.port.flare = el.flare.checked; markDirty(); schedule(); });
+  el.soft.addEventListener('change', function () { D.P.port.soft = el.soft.checked; softUI(); markDirty(); schedule(); });
   el.grain.addEventListener('change', function () { D.sheet.grain = el.grain.checked; markDirty(); schedule(); });
   el.stuff.addEventListener('input', function () { D.P.stuff = +el.stuff.value / 100; el.stuffV.textContent = el.stuff.value + ' %'; markDirty(); schedule(); });
 
@@ -676,8 +678,9 @@
     $$('[data-port]', el.portStep).forEach(function (x) { x.hidden = x.getAttribute('data-port') !== t; });
     el.stuffF.hidden = vented;
     el.type.value = t; pick(el.type);
-    portUI();
+    portUI(); softUI();
   }
+  function softUI() { el.radF.hidden = D.P.type !== 'slot' || D.P.port.soft === false; }
   // surface visée → largeur de fente / diamètre calculés
   function portUI() {
     var on = ratioOn();
@@ -714,7 +717,7 @@
     setSeg('bx-units', UI.units); setSeg('bx-n', String(D.n));
     setSeg('bx-mode', D.mode); setSeg('bx-side', D.P.port.side); setSeg('bx-np', String(D.P.port.np)); setSeg('bx-t', nearT());
     setSeg('bx-layers', String(D.P.layers)); setSeg('bx-sheet', D.sheet.id); setSeg('bx-den', String(UI.den)); setSeg('bx-view', UI.view);
-    el.brace.checked = !!D.P.brace; el.flare.checked = !!D.P.port.flare; el.grain.checked = !!D.sheet.grain;
+    el.brace.checked = !!D.P.brace; el.flare.checked = !!D.P.port.flare; el.soft.checked = D.P.port.soft !== false; el.grain.checked = !!D.sheet.grain;
     el.xray.checked = !!UI.xray; el.dims.checked = !!UI.dims;
     el.stuff.value = Math.round((D.P.stuff || 0) * 100); el.stuffV.textContent = el.stuff.value + ' %';
     el.mat.value = D.mat; pick(el.mat); el.finish.value = D.finish; pick(el.finish);
@@ -778,6 +781,7 @@
       ['Longueur', lenTxt(p.L)],
       p.shape === 'L' ? ['Forme', 'en L · retour ' + lenTxt(p.wall2)] : p.shape === 'straight' ? ['Forme', 'droit'] :
         ['Forme', p.np + ' × Ø ' + lenTxt(p.dp)],
+      p.kx > 0 ? ['k effectif', fmt(p.k + p.kx, 3)] : null,
       ['Accord réel', g.net > 0 ? hz(p.fb) : '—'],
       vmax != null ? ['Air max', fmt(vmax, 1) + ' m/s', vmax > 26 ? 'bad' : ''] : null
     ]);
@@ -869,6 +873,22 @@
     quad(B, [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], thin === 2 ? 0 : 1);
     quad(B, [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [x1, y0, z0], [0, 0, -1], thin === 2 ? 0 : 1);
   }
+  // prisme convexe : contour [x, z] extrudé entre y0 et y1 (normales vers l'extérieur)
+  function prismXZ(B, pts, y0, y1) {
+    var cx = 0, cz = 0, i;
+    pts.forEach(function (p) { cx += p[0] / pts.length; cz += p[1] / pts.length; });
+    for (i = 0; i < pts.length; i++) {
+      var p = pts[i], q = pts[(i + 1) % pts.length], dx = q[0] - p[0], dz = q[1] - p[1], L = Math.hypot(dx, dz);
+      if (L < 1e-9) continue;
+      var n = [dz / L, 0, -dx / L];
+      if (n[0] * ((p[0] + q[0]) / 2 - cx) + n[2] * ((p[1] + q[1]) / 2 - cz) < 0) n = [-n[0], 0, -n[2]];
+      quad(B, [p[0], y0, p[1]], [q[0], y0, q[1]], [q[0], y1, q[1]], [p[0], y1, p[1]], n, L > 0.02 ? 0 : 1);
+    }
+    for (i = 1; i < pts.length - 1; i++) {
+      quad(B, [pts[0][0], y1, pts[0][1]], [pts[i][0], y1, pts[i][1]], [pts[i + 1][0], y1, pts[i + 1][1]], [pts[0][0], y1, pts[0][1]], [0, 1, 0], 1);
+      quad(B, [pts[0][0], y0, pts[0][1]], [pts[i][0], y0, pts[i][1]], [pts[i + 1][0], y0, pts[i + 1][1]], [pts[0][0], y0, pts[0][1]], [0, -1, 0], 1);
+    }
+  }
   // révolution autour de l'axe z (profil [r, z] relatif à z0) ; pref = sens voulu des normales [r, z]
   function revolve(B, cx, cy, z0, pts, pref, seg) {
     seg = seg || 48;
@@ -912,7 +932,8 @@
     var end = function (p, f) { p.first = f; p.count = B.length / 7 - f; parts.push(p); };
     g.panels.forEach(function (p) {
       var f = begin(), a = sc(p.x0, p.y0, p.z1), b = sc(p.x1, p.y1, p.z0);
-      box(B, a, b);
+      if (p.poly) prismXZ(B, p.poly.map(function (v) { return [v[0] - W / 2, Dp / 2 - v[1]]; }), a[1], b[1]);
+      else box(B, a, b);
       var part = { kind: 'panel', outer: p.role !== 'port' && p.role !== 'brace', glass: p.role === 'top', col: col, tex: tex,
         ex: [p.ex[0], p.ex[1], -p.ex[2]], c: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2] };
       if (p.holes && p.holes.length) {
@@ -1209,6 +1230,7 @@
         out.push(R(q.x1 - m, oy + q.z0, m, q.z1 - q.z0, 'pl-wall'));
         return;
       }
+      if (q.poly) { out.push('<path class="pl-wall" d="M' + q.poly.map(function (v) { return v[0] + ' ' + (oy + v[1]); }).join('L') + 'Z"/>'); return; }
       out.push(R(q.x0, oy + q.z0, q.x1 - q.x0, q.z1 - q.z0, 'pl-wall'));
     });
     if (dep && g.cut) (g.subs || []).forEach(function (sb) { out.push(subPath(0, sb.x, false, function (z, v) { return v + ' ' + (oy + z); })); });
@@ -1422,6 +1444,8 @@
     return p.notes.map(function (n) {
       if (n.k === 'hole') return n.n + ' trou' + (n.n > 1 ? 's' : '') + ' Ø ' + lenTxt(n.d);
       if (n.k === 'win') return 'fenêtre ' + lenBare(n.w) + ' × ' + lenTxt(n.h);
+      if (n.k === 'bevel') return 'chanfrein 45° · jambe ' + lenTxt(n.c);
+      if (n.k === 'round') return 'coin arrondi ' + lenTxt(n.r);
       return '';
     }).filter(Boolean).join(' · ');
   }

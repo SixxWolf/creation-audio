@@ -211,15 +211,17 @@
       var Sp, Deq;
       if (P.type === 'slot') { Sp = pw * g.ih; Deq = 2 * Math.sqrt(Sp / Math.PI); }
       else { Sp = rp.np * Math.PI * rp.dp * rp.dp / 4; Deq = rp.dp; }
-      var lenFor = function (V) { return C * C * Sp / (Math.pow(TAU * P.fb, 2) * V) - k * Deq; };
+      // sortie arrondie (fente) : un bout évasé allonge l'évent ; 0,12 = écart bride / bout libre, ×½ car seules les 2 arêtes verticales sont arrondies
+      var kx = P.type === 'slot' && pp.soft !== false ? 0.06 * Math.min(1, Math.min(num(pp.rad) != null ? pp.rad : 0.375 * IN, t) / (pw / 2)) : 0;
+      var lenFor = function (V) { return C * C * Sp / (Math.pow(TAU * P.fb, 2) * V) - (k + kx) * Deq; };
       for (it = 0; it < 40; it++) {
         var Lnew = Math.min(Math.max(lenFor(Math.max(Vn, 1e-5)), tf), g.zb + W + H);   // bornée : sans volume, la longueur théorique explose
-        port = P.type === 'slot' ? slotLayout(g, pw, Lnew) : roundLayout(g, rp, Lnew);
+        port = P.type === 'slot' ? slotLayout(g, pw, Lnew, pp) : roundLayout(g, rp, Lnew);
         var Vnew = g.gross - g.dispSubs - brace0 - port.disp;
         if (Math.abs(Lnew - Lp) < 1e-5 && Math.abs(Vnew - Vn) < 1e-7) { Vn = Vnew; Lp = Lnew; break; }
         Lp = Lnew; Vn = Vnew;
       }
-      port.Sp = Sp; port.Deq = Deq; port.k = k; port.Leff = Lp + k * Deq; port.L = Lp;
+      port.Sp = Sp; port.Deq = Deq; port.k = k; port.kx = kx; port.Leff = Lp + (k + kx) * Deq; port.L = Lp;
       port.fb = C / TAU * Math.sqrt(Sp / (Math.max(Vn, 1e-6) * port.Leff));
       if (lenFor(Math.max(Vn, 1e-5)) < tf) g.warn.push('Évent plus court que la façade : accord réel ' + fr(port.fb, 1) + ' Hz');
       if (!port.ok) fail(g, 'port', port.msg);
@@ -243,12 +245,13 @@
   function fail(g, k, msg) { g.err.push(msg); g.errK[k] = true; }
 
   // Fente le long du côté gauche, pleine hauteur intérieure. Longueur = axe central.
-  function slotLayout(g, pw, Lc) {
+  function slotLayout(g, pw, Lc, pp) {
     var t = g.t, ih = g.ih, zb = g.zb, tf = g.tf, o = { shape: 'straight', pw: pw, ok: true };
     var straightMax = zb - pw;                         // garde un jeu = largeur de fente au fond
     if (Lc <= straightMax) {
       o.wall1 = Lc; o.wall2 = 0; o.legs = [Lc];
       o.disp = (pw + t) * ih * Math.max(Lc - tf, 0);
+      if (pp && pp.soft !== false) { o.soft = true; o.rad = Math.max(0, Math.min(num(pp.rad) != null ? pp.rad : 0.375 * IN, t)); }
       return o;
     }
     o.shape = 'L';
@@ -262,6 +265,12 @@
     var air = pw * ih * Math.max((zb - pw) - tf, 0) + pw * ih * Math.max(t + pw + o.wall2 - t, 0);
     var wall = t * ih * Math.max(o.wall1 - tf, 0) + t * ih * o.wall2;
     o.disp = air + wall;
+    // coude adouci (sans effet sur le volume ni sur k) : chanfrein 45° dans le coin extérieur, arrondi sur le coin du retour
+    if (pp && pp.soft !== false) {
+      o.soft = true;
+      o.chamf = (2 - Math.SQRT2) * pw;                  // la gorge du coude garde la largeur de la fente
+      o.rad = Math.max(0, Math.min(num(pp.rad) != null ? pp.rad : 0.375 * IN, t, o.wall2));
+    }
     return o;
   }
 
@@ -291,9 +300,37 @@
     }
     var p = g.port;
     if (p && p.shape !== 'round') {
-      add({ role: 'port', name: 'Mur d\'évent', x0: t + p.pw, x1: 2 * t + p.pw, y0: t, y1: H - t, z0: 0, z1: p.wall1, cut: [p.wall1, H - 2 * t], ex: [0.25, 0, -0.2] });
-      if (p.shape === 'L') add({ role: 'port', name: 'Retour d\'évent', x0: t + p.pw, x1: t + p.pw + p.wall2, y0: t, y1: H - t,
-        z0: g.zb - p.pw - t, z1: g.zb - p.pw, cut: [p.wall2, H - 2 * t], ex: [0.2, 0, 0.35] });
+      var mur = { role: 'port', name: 'Mur d\'évent', x0: t + p.pw, x1: 2 * t + p.pw, y0: t, y1: H - t, z0: 0, z1: p.wall1, cut: [p.wall1, H - 2 * t], ex: [0.25, 0, -0.2] };
+      if (p.soft && p.rad > 0.0005) {                      // sortie : arête du mur côté fente et arête intérieure du côté gauche arrondies
+        var rr = p.rad, k0, side = out.filter(function (q) { return q.name === 'Côté gauche'; })[0];
+        mur.poly = [[mur.x1, 0], [mur.x1, mur.z1], [mur.x0, mur.z1], [mur.x0, rr]];
+        for (k0 = 1; k0 <= 8; k0++) { var a0 = Math.PI * (1 + k0 / 16); mur.poly.push([mur.x0 + rr + rr * Math.cos(a0), rr + rr * Math.sin(a0)]); }
+        mur.notes = [{ k: 'round', r: rr }];
+        side.poly = [[0, 0], [0, D], [t, D], [t, rr]];
+        for (k0 = 1; k0 <= 8; k0++) { var a1 = 2 * Math.PI - Math.PI / 2 * k0 / 8; side.poly.push([t - rr + rr * Math.cos(a1), rr + rr * Math.sin(a1)]); }
+        side.notes = [{ k: 'round', r: rr }];
+      }
+      add(mur);
+      if (p.shape === 'L') {
+        var ret = { role: 'port', name: 'Retour d\'évent', x0: t + p.pw, x1: t + p.pw + p.wall2, y0: t, y1: H - t,
+          z0: g.zb - p.pw - t, z1: g.zb - p.pw, cut: [p.wall2, H - 2 * t], ex: [0.2, 0, 0.35] };
+        if (p.soft && p.rad > 0.0005) {                    // coin du retour arrondi
+          var r = p.rad, rt = Math.max(0, Math.min(p.rad, t / 2, p.wall2 - r)), i, arc = function (cx, cz, rr, a0) {
+            for (i = 0; i <= 8; i++) { var a = a0 + Math.PI / 2 * i / 8; ret.poly.push([cx + rr * Math.cos(a), cz + rr * Math.sin(a)]); }
+          };
+          ret.poly = [[ret.x0, ret.z0]];                   // bout libre arrondi des deux côtés, coin vers la fente arrondi
+          arc(ret.x1 - rt, ret.z0 + rt, rt, 1.5 * Math.PI);
+          arc(ret.x1 - rt, ret.z1 - rt, rt, 0);
+          arc(ret.x0 + r, ret.z1 - r, r, Math.PI / 2);
+          ret.notes = [{ k: 'round', r: r }];
+        }
+        add(ret);
+        if (p.soft && p.chamf > 0.0005) {                  // chanfrein 45° dans le coin arrière, côté caisson
+          var c = p.chamf;
+          add({ role: 'port', name: 'Chanfrein d\'évent', x0: t, x1: t + c, y0: t, y1: H - t, z0: g.zb - c, z1: g.zb, cut: [H - 2 * t, c],
+            poly: [[t, g.zb - c], [t, g.zb], [t + c, g.zb]], notes: [{ k: 'bevel', c: c }], ex: [-0.1, 0, 0.5] });
+        }
+      }
     }
     if (g.brace) {
       var b = g.brace;
@@ -303,6 +340,7 @@
       var a = W - q.x1, b2 = W - q.x0; q.x0 = a; q.x1 = b2; q.ex = [-q.ex[0], q.ex[1], q.ex[2]];
       if (q.name === 'Côté gauche') q.name = 'Côté droit'; else if (q.name === 'Côté droit') q.name = 'Côté gauche';
       if (q.holes) q.holes = q.holes.map(function (h) { return { x: W - h.x, y: h.y, r: h.r }; });
+      if (q.poly) q.poly = q.poly.map(function (v) { return [W - v[0], v[1]]; });
     });
     if (g.side === 'right') {
       (g.subs || []).forEach(function (s) { s.x = W - s.x; });
@@ -317,16 +355,17 @@
     var groups = [], key = function (p) { return p.role + ':' + round(Math.max(p.cut[0], p.cut[1]) * 1e4) + 'x' + round(Math.min(p.cut[0], p.cut[1]) * 1e4); };
     var names = { bottom: 'Dessus / dessous', top: 'Dessus / dessous', side: 'Côtés', back: 'Arrière', baffle: 'Façade', port: null, brace: 'Renfort' };
     (g.panels || []).forEach(function (p) {
-      var role = p.role === 'top' ? 'bottom' : p.role, k = key({ role: role, cut: p.cut });
+      var role = p.role === 'top' ? 'bottom' : p.role, k = key({ role: role, cut: p.cut }) + (p.notes ? '|' + p.name : '');
       var grp = groups.filter(function (x) { return x.k === k; })[0];
       if (!grp) {
-        grp = { k: k, role: role, name: names[p.role] || p.name, a: Math.max(p.cut[0], p.cut[1]), b: Math.min(p.cut[0], p.cut[1]), qty: 0, notes: [] };
+        grp = { k: k, role: role, name: (p.notes ? p.name : names[p.role]) || p.name, a: Math.max(p.cut[0], p.cut[1]), b: Math.min(p.cut[0], p.cut[1]), qty: 0, notes: [] };
         if (p.role === 'baffle' && p.holes && p.holes.length) {
           var subH = (g.subs || []).length, ports = p.holes.length - subH;
           if (subH) grp.notes.push({ k: 'hole', n: subH, d: g.cut });
           if (ports > 0) grp.notes.push({ k: 'hole', n: ports, d: p.holes[p.holes.length - 1].r * 2 });
         }
         if (p.role === 'brace') grp.notes.push({ k: 'win', w: p.win.w, h: p.win.h });
+        (p.notes || []).forEach(function (n) { grp.notes.push(n); });
         groups.push(grp);
       }
       grp.qty++;
