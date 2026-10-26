@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
-<link rel="stylesheet" href="assets/boites.css?v=5">
+<link rel="stylesheet" href="assets/boites.css?v=6">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
@@ -2382,6 +2382,22 @@
                 </optgroup>
               </select>
             </div>
+            <span class="lbl bx-f">Espace max</span>
+            <div class="grid bx-grid3">
+              <div class="field">
+                <label class="lbl" for="bx-mw">Largeur</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-mw" class="num" autocomplete="off" placeholder="—"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-mh">Hauteur</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-mh" class="num" autocomplete="off" placeholder="—"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-md">Profondeur</label>
+                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-md" class="num" autocomplete="off" placeholder="—"></span>
+              </div>
+            </div>
+            <div class="bx-rep" id="bx-max-rep"></div>
             <div class="bx-f">
               <span class="lbl">Cotes</span>
               <div class="fx-seg bx-seg" id="bx-mode" role="radiogroup" aria-label="Mode des cotes">
@@ -2417,6 +2433,10 @@
               <div class="field">
                 <label class="lbl" for="bx-fb">Accord</label>
                 <span class="unit" data-unit="Hz"><input type="text" inputmode="decimal" id="bx-fb" class="num" autocomplete="off"></span>
+              </div>
+              <div class="field">
+                <label class="lbl" for="bx-ratio">Surface visée</label>
+                <span class="unit" data-unit="po²/ft³" data-ratio><input type="text" inputmode="decimal" id="bx-ratio" class="num" autocomplete="off" placeholder="—"></span>
               </div>
               <div class="field" data-port="slot">
                 <label class="lbl" for="bx-pw">Largeur fente</label>
@@ -2811,9 +2831,9 @@
 <script src="assets/silhouette-engine.js?v=14"></script>
 <script src="assets/cms-silhouettes.js?v=15"></script>
 <!-- Boîtes : moteur sans DOM + bibliothèque Sundown, puis l'onglet -->
-<script src="assets/box-engine.js?v=4"></script>
+<script src="assets/box-engine.js?v=5"></script>
 <script src="assets/box-subs.js?v=1"></script>
-<script src="assets/cms-boites.js?v=9"></script>
+<script src="assets/cms-boites.js?v=10"></script>
 <script src="assets/cms-production.js?v=11"></script>
 <script src="assets/cms-aujourdhui.js?v=1"></script>
 <script src="assets/cms-nouvelles.js?v=4"></script>

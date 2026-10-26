@@ -538,6 +538,8 @@
 
     var fq = freqs(15, 120, 70);
     var areaFor = function (vb, ratio) { return ratio * vb / FT3 * IN * IN; };
+    // surface visée imposée (po²/ft³) : remplace celle de l'objectif
+    var aR = inp.area > 0 ? inp.area : G.area, aRMax = inp.area > 0 ? inp.area : G.areaMax;
     function score(vb, fb, area) {
       var s = simulate({ ts: ts, n: n, coil: inp.coil, link: inp.link, watts: watts, type: type, vb: vb,
         Sp: area, Leff: type === 'sealed' ? 0 : C * C * area / (Math.pow(TAU * fb, 2) * vb), fc: fc, f: fq });
@@ -563,12 +565,12 @@
       for (var vi = 0; vi <= 8; vi++) {
         var vb = vLo + (vHi - vLo) * vi / 8;
         for (var fb = G.fb[0]; fb <= G.fb[1]; fb += 1) {
-          var ar = areaFor(vb, G.area), sc = score(vb, fb, ar);
+          var ar = areaFor(vb, aR), sc = score(vb, fb, ar);
           if (!best || sc.v > best.s.v) best = { vb: vb, fb: fb, area: ar, s: sc };
         }
       }
       // surface : monte jusqu'au plafond de l'objectif si l'air va trop vite à pleine puissance
-      var aMax = areaFor(best.vb, G.areaMax);
+      var aMax = areaFor(best.vb, aRMax);
       for (var k = 0; k < 10 && best.area < aMax; k++) {
         if (Math.max.apply(null, score(best.vb, best.fb, best.area).sim.vp) <= G.vmax) break;
         best.area = Math.min(best.area * 1.1, aMax);
@@ -585,6 +587,7 @@
     P.h = cap(Math.max(hMin, od + 2 * t + 1 * IN, max.h ? 0 : Math.min(edge * 0.75, od * 1.6)), max.h);
     P.d = cap(Math.max(dMin, od * 1.2, max.d ? 0 : Math.min(edge * 0.87, P.h * 1.2)), max.d);
     var setPort = function () {
+      if (inp.area > 0) best.area = areaFor(target, inp.area);
       if (type === 'slot') P.port.pw = Math.max(best.area / (P.h - 2 * t), 1 * IN);
       if (type === 'round') {
         var dp = 3 * IN, np = 1;
@@ -625,12 +628,14 @@
         // plus d'espace d'abord, puis évent plus petit / accord plus haut, puis moins de volume
         if (roomD() && !K.width) { P.d = cap(P.d + 1 * IN, max.d); continue; }
         if (roomH()) { P.h = cap(P.h + 1 * IN, max.h); continue; }
-        if (K.port && best.area > areaFor(target, 9)) { best.area *= 0.92; continue; }
+        if (K.port && !(inp.area > 0) && best.area > areaFor(target, 9)) { best.area *= 0.92; continue; }
         if ((K.port || K.depth) && best.fb < G.fb[1] + 6) { best.fb += 1; P.fb = best.fb; continue; }
         target *= 0.94; shrunk = true; continue;
       }
       break;
     }
+    // l'espace max n'est jamais dépassé
+    if (max.w && P.w > max.w) { P.w = max.w; g = geometry(P, ts); }
     if (shrunk) why.push('Volume réduit à ' + fr(g.net / FT3) + ' ft³ pour tenir dans l\'espace');
     if (type === 'round' && !g.ok) why.push('Évent rond impossible dans cet espace : prends une fente');
     if (type !== 'sealed') why.push('Accord ' + best.fb + ' Hz · ' + G.name);
