@@ -708,7 +708,10 @@
             (marginShown ? '<span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
               (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span>' : '') +
           '</div>'
-        : swatchSVG(l.hex) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(CA.kindMeta(l.meta)) + '</span> ' + CA.kindPill(CA.kindOf(l.meta, l.kind)) : '') + pendPill;
+        : swatchSVG(l.hex) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(CA.kindMeta(l.meta)) + '</span> ' + CA.kindPill(CA.kindOf(l.meta, l.kind)) : '') + pendPill +
+          // coût unitaire modifiable (privé) : seulement quand la marge est affichée
+          (marginShown ? '<div class="inv-sub no-print"><span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
+            (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span></div>' : '');
       return '<tr data-i="' + i + '"' + (pend > 0 ? ' class="is-pending"' : '') + '>' +
         '<td>' + descCell + '</td>' +
         '<td class="num"><input class="inv-qty" type="number" min="0" step="1" value="' + l.qty + '" data-i="' + i + '"></td>' +
