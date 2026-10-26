@@ -3381,6 +3381,25 @@ create policy news_admin_all on public.news for all to authenticated
 grant select on public.news to anon, authenticated;
 
 -- ------------------------------------------------------------
+-- THÈME DES FÊTES (2026-10-25) — skin de Noël du site public
+-- admin_settings « fetes » : { on: bool, from: "AAAA-MM-JJ", to: "AAAA-MM-JJ", at }
+-- (bornes incluses, heure du visiteur). Réglé dans Réglages › Apparence (cms-fetes.js).
+-- Lu en anon par nav.js (public_fetes) qui pose html.fetes et charge fetes.js ;
+-- ne renvoie que l'interrupteur et les dates. Réglage de départ : 1er déc. → 6 janv.
+-- ------------------------------------------------------------
+create or replace function public.public_fetes()
+returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('on', coalesce((v ->> 'on')::boolean, false), 'from', v ->> 'from', 'to', v ->> 'to')
+    from (select coalesce((select value from public.admin_settings where key = 'fetes'), '{}'::jsonb) as v) s;
+$$;
+revoke all on function public.public_fetes() from public;
+grant execute on function public.public_fetes() to anon, authenticated;
+insert into public.admin_settings (key, value)
+  values ('fetes', '{"on": true, "from": "2026-12-01", "to": "2027-01-06"}'::jsonb)
+  on conflict (key) do nothing;
+
+-- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
 select count(*) as produits_v2 from public.products;

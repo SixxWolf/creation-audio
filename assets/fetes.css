@@ -1,0 +1,173 @@
+/* =========================================================
+   Création Audio — THÈME DES FÊTES (skin de Noël, éphémère)
+   Tout est sous html.fetes : la classe est posée dans le <head> de chaque
+   page publique (petit script, cache local « ca-fetes ») puis confirmée par
+   nav.js (RPC public_fetes ← Réglages › Apparence de l'admin). Sans la
+   classe, cette feuille ne change rien (ses images ne sont même pas chargées).
+   Décors ajoutés par fetes.js : neige (.xm-snow), guirlande (.xm-garland),
+   tuque sur le loup (.xm-hat), sapin du héros (.xm-tree), collines du héros
+   (.xm-hills), village du pied de page (.xm-village), bouton neige (.xm-snow-btn).
+   Palette « chalet clair » : rouge canneberge, vert sapin, or, fond crème neige.
+   ========================================================= */
+
+html.fetes {
+  --xm-red:#C8102E; --xm-red-d:#A00D25; --xm-green:#1E5B3A; --xm-green-d:#164730; --xm-gold:#D4A24C;
+  --xm-cream:#FBF7EF; --xm-tint:#FBECEE;
+  /* l'accent de la marque devient rouge canneberge : texte BLANC sur les remplissages (AA) */
+  --ember:var(--xm-red); --ember-dim:var(--xm-red-d); --ember-ink:#A10E28;
+  --wash:#F6F1E7; --wash-2:#EFE8DA; --line:#ECE4D5; --line-2:#DCD1BD;
+  --nw-promo:var(--xm-red);
+}
+
+/* ---- fond : crème + flocons en filigrane ---- */
+html.fetes body, html.fetes .home-page {
+  background-color:var(--xm-cream);
+  background-image:url(img/fetes/flocons.svg); background-size:320px 320px;
+}
+html.fetes .sec-wash { background:rgba(236,226,208,.32); }
+html.fetes .home-page ::selection { background:rgba(200,16,46,.18); }
+
+/* ---- bandeau du haut : vert sapin ---- */
+html.fetes .promo-bar { background:var(--xm-green); color:#F4F1E8; border-bottom-color:var(--xm-green-d); }
+html.fetes .pb-code { color:var(--ink); border-color:var(--xm-gold); }
+html.fetes .pb-nav:hover, html.fetes .pb-close:hover { background:rgba(255,255,255,.14); }
+html.fetes .promo-bar a:focus-visible, html.fetes .promo-bar button:focus-visible { outline-color:#fff; }
+
+/* ---- couleurs : rouge et vert en alternance ---- */
+html.fetes .home-page .eyebrow { color:var(--xm-green); }
+html.fetes .foot-made .dot { box-shadow:0 0 0 3px rgba(200,16,46,.18); }
+html.fetes .bn-ic, html.fetes .ch-ic { color:var(--xm-green); background:#E8F1EA; }
+html.fetes .contact-card { border-color:#E9D3D6;
+  background:radial-gradient(120% 140% at 100% 0%, #F7DCE0 0%, var(--xm-tint) 40%, #FFFAF9 72%); }
+html.fetes .cp-box { background:linear-gradient(135deg, var(--xm-tint), #fff 70%); }
+
+/* remplissages rouges : texte blanc. ⚠ Seulement les boutons PLEINS et actifs : .cart-order sert aussi aux
+   boutons secondaires blancs du panier (.cart-email) et aux états désactivés gris (.is-disabled, :disabled). */
+html.fetes .home-page .btn-ember, html.fetes .btn-add:not(:disabled), html.fetes .add-btn:not(:disabled),
+html.fetes .cart-order:not(.cart-email, .is-disabled),
+html.fetes .drawer-cta .primary, html.fetes .buybar-btn:not(.is-notify), html.fetes .acct-submit, html.fetes .msg-send,
+html.fetes .msg-send-ic, html.fetes .cart-login-btn, html.fetes .cart-btn.has-items .cart-count,
+html.fetes .step-n, html.fetes .cp-ic, html.fetes .acct-n, html.fetes .msg-row-n { color:#fff; }
+html.fetes .home-page .btn-ember, html.fetes .btn-add:not(:disabled), html.fetes .add-btn:not(:disabled),
+html.fetes .cart-order:not(.cart-email, .is-disabled) { box-shadow:0 14px 28px -16px rgba(160,13,37,.85); }
+html.fetes .acct-submit:hover, html.fetes .msg-send:hover, html.fetes .msg-send-ic:hover {
+  background:var(--xm-red-d); border-color:var(--xm-red-d); }
+/* boutons « encre » : vert sapin */
+html.fetes .home-cta, html.fetes .home-page .btn-primary { background:var(--xm-green); border-color:var(--xm-green); }
+html.fetes .home-cta:hover, html.fetes .home-page .btn-primary:hover { background:var(--xm-green-d); border-color:var(--xm-green-d); }
+
+/* ---- boutons enneigés : couche de neige qui déborde sur le dessus (boutons pleins et actifs seulement) ---- */
+html.fetes :is(.home-page .btn-ember, .home-page .btn-primary, .home-cta, .btn-add, .add-btn, .cart-order,
+  .drawer-cta .primary, .buybar-btn, .acct-submit, .msg-send) { position:relative; }
+html.fetes :is(.home-page .btn-ember, .home-page .btn-primary, .home-cta, .btn-add:not(:disabled), .add-btn:not(:disabled),
+  .cart-order:not(.cart-email, .is-disabled), .drawer-cta .primary, .buybar-btn, .acct-submit, .msg-send)::before {
+  content:''; position:absolute; z-index:1; top:-8px; left:-4px; right:-4px; height:24px; pointer-events:none;
+  background:url(img/fetes/neige-bouton.svg) 50% 0 / 300px 24px repeat-x;
+  border-radius:12px / 50%;
+  /* contour bleu glacé : la neige reste visible sur fond blanc (en-tête, cartes, panier) */
+  filter:drop-shadow(0 0 .7px rgba(84,112,146,.8)) drop-shadow(0 1.5px 0 rgba(120,145,175,.4)) drop-shadow(0 2px 3px rgba(20,22,26,.12));
+}
+/* boutons pilule (bouts tout ronds) : couche plus courte, posée sur le haut plat, qui suit la courbe */
+html.fetes .acct-submit.acct-submit::before { left:12px; right:12px; top:-7px; }   /* classe doublée : passe devant le :is() ci-dessus */
+
+/* =========================================================
+   DÉCORS (fetes.js)
+   ========================================================= */
+.xm-snow, .xm-garland, .xm-hat, .xm-tree, .xm-hills, .xm-village, .xm-snow-btn, .xm-drawer-snow { display:none; }
+
+/* ---- neige qui tombe : sous l'en-tête, au-dessus du contenu, jamais cliquable ---- */
+html.fetes .xm-snow { display:block; position:fixed; inset:0; z-index:29; width:100%; height:100%; pointer-events:none; }
+
+/* ---- bouton ❄ (en-tête) : même gabarit que Mon compte ---- */
+html.fetes .xm-snow-btn {
+  display:inline-flex; position:relative; flex:none; width:40px; height:40px; align-items:center; justify-content:center; padding:0;
+  color:var(--ink-2); cursor:pointer; background:#fff; border:1px solid var(--line); border-radius:12px;
+  transition:color .15s, border-color .15s, background .15s;
+}
+html.fetes .xm-snow-btn:hover { color:var(--ink); border-color:var(--line-2); background:var(--wash); }
+html.fetes .xm-snow-btn svg { width:19px; height:19px; }
+html.fetes .xm-snow-btn[aria-pressed="true"] { color:#2F6FB0; border-color:#C9DAEA; background:#F1F6FB; }
+html.fetes .xm-snow-btn[aria-pressed="false"]::after {        /* barré quand la neige est coupée */
+  content:''; position:absolute; left:9px; right:9px; top:50%; height:2px; border-radius:2px;
+  background:currentColor; transform:rotate(-45deg); box-shadow:0 0 0 1.5px #fff; }
+html.fetes .xm-snow-btn:focus-visible { outline:3px solid var(--ember-dim); outline-offset:2px; }
+/* menu mobile : même interrupteur, en texte */
+html.fetes .xm-drawer-snow {
+  display:flex; align-items:center; justify-content:center; gap:8px; height:48px; margin-top:10px; width:100%;
+  font:inherit; font-weight:700; font-size:.95rem; color:var(--ink); cursor:pointer;
+  background:#fff; border:1px solid var(--line-2); border-radius:12px; }
+html.fetes .xm-drawer-snow svg { width:17px; height:17px; color:#2F6FB0; }
+@media (max-width:560px) { html.fetes .xm-snow-btn { display:none; } }
+
+/* ---- guirlande lumineuse accrochée sous l'en-tête ---- */
+html.fetes .home-top { overflow:visible; }
+html.fetes .xm-garland {
+  display:block; position:absolute; left:0; right:0; top:100%; height:22px; margin-top:-1px; pointer-events:none; overflow:hidden;
+}
+.xm-garland svg { position:absolute; inset:0 auto auto 0; height:22px; }
+.xm-garland .wire { fill:none; stroke:#3B4238; stroke-width:1.3; }
+.xm-garland .bulb { transform-box:fill-box; transform-origin:50% 0; }
+.xm-garland .glass { animation:xm-twinkle 2.6s ease-in-out infinite; }
+.xm-garland .glow { opacity:.45; animation:xm-glow 2.6s ease-in-out infinite; }
+@keyframes xm-twinkle { 0%, 100% { opacity:1; } 50% { opacity:.55; } }
+@keyframes xm-glow { 0%, 100% { opacity:.5; } 50% { opacity:.08; } }
+
+/* ---- tuque sur le loup du logo ---- */
+html.fetes .brand, html.fetes .drawer-head { position:relative; }
+html.fetes .xm-hat { display:block; position:absolute; z-index:1; pointer-events:none; width:27px; height:auto;
+  left:4px; top:-10px; transform:rotate(-18deg); filter:drop-shadow(0 1px 1px rgba(0,0,0,.18)); }
+html.fetes .drawer-head .xm-hat { width:23px; left:2px; top:-8px; }
+@media (max-width:400px) { html.fetes .brand .xm-hat { width:25px; left:3px; top:-9px; } }
+
+/* ---- accueil : collines enneigées au bas du héros ---- */
+html.fetes .xm-hills {
+  display:block; position:absolute; z-index:-1; left:0; right:0; bottom:0; height:clamp(90px, 10vw, 150px); pointer-events:none;
+}
+.xm-hills svg { position:absolute; left:0; bottom:0; width:100%; height:100%; }
+.xm-hills .h-back { fill:#EDF2F6; }
+.xm-hills .h-front { fill:var(--xm-cream); }
+.xm-hills .h-sheen { fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+.xm-hills .h-trees { position:absolute; left:0; right:0; bottom:28%; height:52%;
+  background:url(img/fetes/sapins-loin.svg) 0 100% / auto 100% repeat-x; opacity:.85; }
+
+/* ---- accueil : sapin à côté de la bobine ; ses boules = couleurs en stock ---- */
+html.fetes .xm-tree {
+  display:block; position:absolute; z-index:2; right:-6%; bottom:7%; width:38%; aspect-ratio:200 / 290; pointer-events:none;
+}
+.xm-tree svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.xm-tree .star { transform-box:fill-box; transform-origin:center; animation:xm-star 3.2s ease-in-out infinite; }
+@keyframes xm-star { 0%, 100% { transform:scale(1) rotate(0); } 50% { transform:scale(1.12) rotate(8deg); } }
+.xm-tree .light { animation:xm-twinkle 1.9s ease-in-out infinite; }
+.xm-orn {
+  position:absolute; width:8.5%; aspect-ratio:1; margin:-4.25% 0 0 -4.25%; border-radius:50%; pointer-events:auto; cursor:pointer;
+  background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.85) 0 9%, rgba(255,255,255,.25) 22%, transparent 46%),
+             radial-gradient(circle at 60% 70%, rgba(0,0,0,.28), transparent 62%), var(--sw, #C8102E);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,.18), 0 2px 3px rgba(0,0,0,.22);
+  transition:transform .2s;
+}
+.xm-orn::before { content:''; position:absolute; left:34%; right:34%; top:-14%; height:18%; border-radius:2px 2px 1px 1px;
+  background:linear-gradient(90deg, #B08A3A, #E9CD86 50%, #B08A3A); }
+.xm-orn:hover { transform:scale(1.18); }
+.xm-orn.is-big { width:11%; margin:-5.5% 0 0 -5.5%; }
+.xm-orn.is-pop { animation:xm-pop .55s cubic-bezier(.3,1.6,.5,1); }
+@keyframes xm-pop { 0% { transform:scale(.3); } 100% { transform:scale(1); } }
+
+/* ---- village : sapins et cadeaux au-dessus du pied de page ---- */
+html.fetes .xm-village {
+  display:block; height:96px; margin-top:-40px; position:relative; z-index:1; pointer-events:none;
+  background:url(img/fetes/village.svg) 50% 100% / 560px 96px repeat-x;
+}
+html.fetes .site-foot { border-top:0; background:#fff; }
+html.fetes .foot-bottom { background:var(--xm-cream); }
+
+@media (max-width:980px) {
+  html.fetes .xm-tree { right:-2%; width:34%; }
+}
+@media (max-width:640px) {
+  html.fetes .xm-tree { right:0; bottom:2%; width:33%; }
+  html.fetes .xm-village { height:72px; background-size:420px 72px; margin-top:-24px; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .xm-garland .glass, .xm-garland .glow, .xm-tree .star, .xm-tree .light, .xm-orn.is-pop { animation:none; }
+}

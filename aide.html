@@ -18,6 +18,9 @@
 <link rel="stylesheet" href="assets/site.css?v=7">
 <link rel="stylesheet" href="assets/legal.css?v=1">
 <link rel="stylesheet" href="assets/aide.css?v=1">
+<!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
+<link rel="stylesheet" href="assets/fetes.css?v=3">
+<script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b)document.documentElement.classList.add('fetes')}catch(e){}})();</script>
 </head>
 <body class="home-page">
 
@@ -136,6 +139,6 @@
 
 <script src="assets/aide.js?v=2"></script>
 <script src="assets/aide-public.js?v=2"></script>
-<script src="assets/nav.js?v=8"></script>
+<script src="assets/nav.js?v=9"></script>
 </body>
 </html>

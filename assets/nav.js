@@ -148,6 +148,7 @@
       document.head.appendChild(s);
     });
   }
+  CA.supaCfg = cfgP;
   var newsP = null;
   CA.loadNews = function () {
     if (newsP) return newsP;
@@ -214,4 +215,65 @@
       bar.innerHTML = original;
     });
   });
+})();
+
+/* =========================================================
+   Thème des fêtes (fetes.css + fetes.js, skin de Noël éphémère)
+   Réglé dans l'admin : Réglages › Apparence → admin_settings « fetes »
+   { on, from, to }, lu ici par la RPC public_fetes.
+   - Le <head> de chaque page publique pose html.fetes AVANT le rendu d'après
+     le cache local « ca-fetes » ({a, b} : fenêtre en ms, heure du visiteur)
+     ou l'aperçu « ?fetes=1 » (cet onglet seulement : sessionStorage
+     « ca-fetes-voir » ; ?fetes=0 force le site normal).
+   - Ici : on relit le réglage en ligne, on met le cache à jour, on corrige
+     la classe et on charge les décors (fetes.js) quand le thème est actif.
+   ========================================================= */
+(function () {
+  'use strict';
+  var CA = window.CA = window.CA || {};
+  var FETES_V = 1, KEY = 'ca-fetes', PREV = 'ca-fetes-voir', root = document.documentElement;
+  var q = /[?&]fetes=([01])/.exec(location.search), preview = q ? q[1] : null;
+  try {
+    if (q) sessionStorage.setItem(PREV, q[1]);
+    else preview = sessionStorage.getItem(PREV);
+  } catch (e) {}
+
+  var loading = false;
+  function decor() {
+    if (CA.fetes) { CA.fetes.start(); return; }
+    if (loading) return;
+    loading = true;
+    var s = document.createElement('script');
+    s.src = (CA.siteRoot || '') + 'assets/fetes.js?v=' + FETES_V;
+    document.body.appendChild(s);
+  }
+  function set(on) {
+    root.classList.toggle('fetes', on);
+    if (on) decor();
+  }
+  // { on, from: "AAAA-MM-JJ", to } → fenêtre { a, b } en ms (minuit local, fin incluse), ou null
+  function windowOf(f) {
+    if (!f || !f.on || !f.from || !f.to) return null;
+    var a = new Date(f.from + 'T00:00:00').getTime(), b = new Date(f.to + 'T00:00:00').getTime();
+    if (!isFinite(a) || !isFinite(b) || b < a) return null;
+    b = new Date(b); b.setDate(b.getDate() + 1);
+    return { a: a, b: b.getTime() };
+  }
+
+  if (preview) set(preview === '1');
+  else if (root.classList.contains('fetes')) decor();
+
+  if (!window.fetch || !CA.supaCfg) return;
+  CA.supaCfg().then(function (c) {
+    if (!c) return;
+    return fetch(c.url + '/rest/v1/rpc/public_fetes', {
+      method: 'POST', body: '{}',
+      headers: { apikey: c.anonKey, Authorization: 'Bearer ' + c.anonKey, 'Content-Type': 'application/json' }
+    }).then(function (r) { return r.ok ? r.json() : null; }).then(function (f) {
+      if (!f || typeof f !== 'object') return;
+      var w = windowOf(f), t = Date.now();
+      try { if (w) localStorage.setItem(KEY, JSON.stringify(w)); else localStorage.removeItem(KEY); } catch (e) {}
+      if (!preview) set(!!w && t >= w.a && t < w.b);
+    });
+  }).then(null, function () {});
 })();

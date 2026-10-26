@@ -1511,6 +1511,18 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .acc-chk { display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--ink); }
 .acc-tab { position:relative; padding:4px 2px 9px; font-weight:600; font-size:.9rem; color:var(--ink); }
 .acc-tab::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--ember); }
+/* thème des fêtes du site public (cms-fetes.js) */
+.fe-card { margin-top:16px; }
+.fe-row { display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px 18px; }
+.fe-row .field { margin:0; }
+.fe-row input[type="date"] { width:160px; min-width:160px; }
+.fe-on { height:40px; font-weight:600; }
+.fe-state { display:inline-flex; align-items:center; gap:7px; height:40px; font-size:.88rem; font-weight:600; color:var(--muted); white-space:nowrap; }
+.fe-state::before { content:''; width:8px; height:8px; border-radius:50%; background:currentColor; }
+.fe-state.is-live { color:var(--good); }
+.fe-state.is-soon { color:var(--ember-ink); }
+.fe-state.is-warn { color:var(--bad); }
+.fe-row #fe-preview { margin:0 0 3px auto; }
 
 /* =========================================================
    RÉGLAGES › SÉCURITÉ — appareils de double authentification (cms-securite.js)

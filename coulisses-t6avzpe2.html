@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=111">
+<link rel="stylesheet" href="assets/admin.css?v=113">
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
@@ -2320,6 +2320,23 @@
           <span class="acc-tab">Onglet actif</span>
         </div>
       </div>
+      <!-- Thème des fêtes du site public (cms-fetes.js → admin_settings « fetes », lu par nav.js) -->
+      <div class="set-card fe-card">
+        <div class="set-head"><b>Thème des fêtes</b> <span class="set-msg" id="fe-msg" aria-live="polite"></span></div>
+        <div class="fe-row">
+          <label class="inline fe-on"><input type="checkbox" id="fe-on"> Activé</label>
+          <div class="field">
+            <label class="lbl" for="fe-from">Du</label>
+            <input type="date" id="fe-from">
+          </div>
+          <div class="field">
+            <label class="lbl" for="fe-to">Au</label>
+            <input type="date" id="fe-to">
+          </div>
+          <span class="fe-state" id="fe-state"></span>
+          <a class="btn btn-ghost btn-sm" id="fe-preview" href="./?fetes=1" target="_blank" rel="noopener">Aperçu</a>
+        </div>
+      </div>
     </section>
 
     <section class="tabpanel" data-panel="securite" role="tabpanel" hidden>
@@ -2417,6 +2434,7 @@
 <script src="assets/auth-gate.js?v=2"></script>
 <script src="assets/admin-core.js?v=16"></script>
 <script src="assets/admin-accent.js?v=1"></script>
+<script src="assets/cms-fetes.js?v=1"></script>
 <script src="assets/cms-securite.js?v=2"></script>
 <script src="assets/cms-costing.js?v=4"></script>
 <script src="assets/cms-brands.js?v=7"></script>

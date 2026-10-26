@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* Paramètres (query string) : t = new | update | stock | promo, h = titre, s = sous-titre,
+  /* Paramètres (query string) : t = new | update | stock | promo | fetes, h = titre, s = sous-titre,
      l = liste (séparée par |), c = couleurs hex (séparées par |), b = badge, f = format (wide | square) */
   :root { --ink:#181A1F; --muted:#6C727C; --ember:#FF6A2B; --ember-ink:#B23F12; --wash:#F6F6F4; --line:#E6E3DC;
           --nw-promo:#FF6A2B; --nw-event:#7C5CE0; --nw-new:#1F9D63; --nw-update:#2F7BE5; --k:var(--nw-new); }
@@ -48,6 +48,31 @@
   .art img.prod { max-width:100%; max-height:430px; object-fit:contain; filter:drop-shadow(0 18px 24px rgba(0,0,0,.2)); }
   body.has-prod .art img.wolf { position:absolute; right:-120px; bottom:-120px; width:360px; height:360px; opacity:.1; }
 
+  /* t = fetes : reprend le thème des fêtes du site (fetes.css / fetes.js) — fond crème enneigé, sapin dont les boules
+     prennent les couleurs de c, collines enneigées sous le pied */
+  body.t-fetes { --k:#C8102E; --muted:#5E6470; }
+  body.t-fetes .card { background:radial-gradient(760px 520px at 100% 0%, rgba(200,16,46,.09), transparent 62%),
+                                  url(../../assets/img/fetes/flocons.svg) 0 0 / 320px, #FBF7EF; }
+  body.t-fetes .card::before { background:repeating-linear-gradient(-45deg, #C8102E 0 12px, #fff 12px 22px); }
+  body.t-fetes .badge { background:#1E5B3A; }
+  body.t-fetes .sw, body.t-fetes .art img.wolf { display:none; }
+  body.t-fetes .foot { justify-content:flex-start; gap:12px; }
+  body.t-fetes .foot span::before { content:'· '; }
+  .xm-hills { display:none; }
+  body.t-fetes .xm-hills { display:block; position:absolute; z-index:0; left:0; right:0; bottom:0; height:150px; }
+  .xm-hills svg { position:absolute; inset:0; width:100%; height:100%; }
+  .xm-hills .h-trees { position:absolute; left:0; right:0; bottom:58px; height:62px; background:url(../../assets/img/fetes/sapins-loin.svg) 0 100% / 380px 62px repeat-x; }
+  .xm-tree { display:none; }
+  body.t-fetes .xm-tree { display:block; position:absolute; right:30px; bottom:34px; width:330px; aspect-ratio:200 / 290; }
+  .xm-tree svg { position:absolute; inset:0; width:100%; height:100%; }
+  .xm-orn { position:absolute; width:8.5%; aspect-ratio:1; margin:-4.25% 0 0 -4.25%; border-radius:50%;
+            background:radial-gradient(circle at 34% 30%, rgba(255,255,255,.85) 0 9%, rgba(255,255,255,.25) 22%, transparent 46%),
+                       radial-gradient(circle at 60% 70%, rgba(0,0,0,.28), transparent 62%), var(--sw, #C8102E);
+            box-shadow:inset 0 0 0 1px rgba(0,0,0,.18), 0 2px 3px rgba(0,0,0,.22); }
+  .xm-orn::before { content:''; position:absolute; left:34%; right:34%; top:-14%; height:18%; border-radius:2px 2px 1px 1px;
+                    background:linear-gradient(90deg, #B08A3A, #E9CD86 50%, #B08A3A); }
+  .xm-orn.is-big { width:11%; margin:-5.5% 0 0 -5.5%; }
+
   .foot { position:absolute; z-index:3; left:86px; bottom:34px; right:72px; display:flex; align-items:center; justify-content:space-between;
           font-size:22px; font-weight:700; letter-spacing:.04em; color:var(--muted); }
   .foot b { font-family:'Space Grotesk', sans-serif; color:var(--ink); text-transform:uppercase; letter-spacing:.08em; }
@@ -63,14 +88,21 @@
     <ul class="pts" id="l" hidden></ul>
     <div class="sw" id="c" hidden></div>
   </div>
+  <div class="xm-hills">
+    <svg viewBox="0 0 1200 150" preserveAspectRatio="none"><path fill="#E6EDF3" d="M0 66C150 30 300 38 450 62S750 30 900 48 1100 66 1200 42V150H0Z"/></svg>
+    <div class="h-trees"></div>
+    <svg viewBox="0 0 1200 150" preserveAspectRatio="none"><path fill="#fff" d="M0 100C200 76 350 86 530 98S870 66 1030 88 1170 96 1200 86V150H0Z"/>
+      <path fill="none" stroke="#D5E0EA" stroke-width="2" d="M0 100C200 76 350 86 530 98S870 66 1030 88 1170 96 1200 86"/></svg>
+  </div>
   <div class="art"><img class="wolf" id="wolf" alt=""><img class="prod" id="prod" alt="" hidden></div>
+  <div class="xm-tree" id="tree"></div>
   <div class="foot"><b>Création Audio</b><span>creationaudio.ca</span></div>
 </div>
 <script>
 (function () {
   var q = new URLSearchParams(location.search);
   var t = q.get('t') || 'new';
-  var badges = { new:'Nouveauté', update:'Mise à jour', stock:'De retour en stock', promo:'Promo' };
+  var badges = { new:'Nouveauté', update:'Mise à jour', stock:'De retour en stock', promo:'Promo', fetes:'Temps des fêtes' };
   document.body.classList.add('t-' + t);
   if (q.get('f') === 'square') document.body.classList.add('square');
   document.getElementById('badge').textContent = q.get('b') || badges[t] || '';
@@ -79,10 +111,48 @@
   var l = q.get('l');
   if (l) { var ul = document.getElementById('l'); l.split('|').forEach(function (x) { var li = document.createElement('li'); li.textContent = x; ul.appendChild(li); }); ul.hidden = false; }
   var c = q.get('c');
-  if (c) { var w = document.getElementById('c'); c.split('|').forEach(function (x) { var sp = document.createElement('span'); sp.style.background = '#' + x.replace('#', ''); w.appendChild(sp); }); w.hidden = false; }
+  if (t === 'fetes') fetes(c ? c.split('|') : []);
+  else if (c) { var w = document.getElementById('c'); c.split('|').forEach(function (x) { var sp = document.createElement('span'); sp.style.background = '#' + x.replace('#', ''); w.appendChild(sp); }); w.hidden = false; }
   var p = q.get('p');
   if (p) { var im = document.getElementById('prod'); im.src = p; im.hidden = false; document.body.classList.add('has-prod'); }
   document.getElementById('wolf').src = '../../assets/img/loup_ondes_rouges_1024_transparent.png';
+
+  // sapin du thème des fêtes (copie du dessin de fetes.js) ; les boules prennent les couleurs passées dans c
+  function fetes(cols) {
+    var ORN = [[88, 70], [114, 82, 1], [76, 118], [103, 128], [128, 112], [64, 166], [93, 174, 1], [122, 160], [146, 176],
+               [54, 216], [84, 224], [114, 214], [141, 228, 1], [164, 210]];
+    var FALLBACK = ['#C8102E', '#D4A24C', '#2F6FB0', '#E8E8EA', '#7C2A8A', '#C8102E', '#D4A24C', '#1F9D57'];
+    var lights = [[80, 77], [100, 84], [120, 76], [66, 130], [86, 139], [110, 138], [132, 127], [50, 183], [74, 191], [100, 194], [126, 189], [150, 177]]
+      .map(function (p, i) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="2.2" fill="' + (i % 2 ? '#FFF1C9' : '#FFD36B') + '"/>'; }).join('');
+    var box = document.getElementById('tree');
+    box.innerHTML = '<svg viewBox="0 0 200 290"><defs>' +
+        '<linearGradient id="xm-star" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE59A"/><stop offset="1" stop-color="#D4A24C"/></linearGradient>' +
+        '<radialGradient id="xm-ground"><stop offset="0" stop-color="#000" stop-opacity=".22"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient></defs>' +
+      '<ellipse cx="100" cy="280" rx="96" ry="9" fill="url(#xm-ground)"/>' +
+      '<rect x="91" y="232" width="18" height="30" rx="2" fill="#6B4A2E"/>' +
+      '<path fill="#174A2F" d="M100 140 6 244Q100 262 194 244Z"/><path fill="#fff" d="M6 244Q100 262 194 244" stroke="#fff" stroke-width="5" stroke-linecap="round"/>' +
+      '<path fill="#1B5536" d="M100 100 24 190Q100 206 176 190Z"/><path fill="none" d="M24 190Q100 206 176 190" stroke="#fff" stroke-width="4.5" stroke-linecap="round"/>' +
+      '<path fill="#1F5E3B" d="M100 60 42 140Q100 154 158 140Z"/><path fill="none" d="M42 140Q100 154 158 140" stroke="#fff" stroke-width="4" stroke-linecap="round"/>' +
+      '<path fill="#246A43" d="M100 22 60 92Q100 104 140 92Z"/><path fill="none" d="M60 92Q100 104 140 92" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>' +
+      '<path fill="#fff" d="M100 22 108 36Q104 33.5 100 36.5 96 33.5 92 36Z"/>' +
+      '<g fill="none" stroke="#E8C05C" stroke-width="1.4" opacity=".9"><path d="M74 72Q102 92 128 70"/><path d="M58 124Q98 150 142 118"/><path d="M40 176Q100 204 160 168"/></g>' +
+      lights +
+      '<rect x="26" y="240" width="48" height="38" rx="3" fill="#C8102E"/><rect x="45" y="240" width="9" height="38" fill="#E8C05C"/><rect x="24" y="234" width="52" height="10" rx="3" fill="#B00E28"/><rect x="45" y="234" width="9" height="10" fill="#D9B04A"/>' +
+      '<path fill="none" stroke="#E8C05C" stroke-width="3.2" d="M49.5 234C43 222 33 225 37 231 39 234 49.5 234 49.5 234 56 222 66 225 62 231 60 234 49.5 234 49.5 234Z"/>' +
+      '<rect x="128" y="248" width="44" height="31" rx="3" fill="#1F5E3B"/><rect x="145" y="248" width="9" height="31" fill="#C8102E"/><rect x="126" y="243" width="48" height="9" rx="3" fill="#174A2F"/><rect x="145" y="243" width="9" height="9" fill="#A00D25"/>' +
+      '<rect x="80" y="256" width="36" height="24" rx="3" fill="#D4A24C"/><rect x="94" y="256" width="8" height="24" fill="#C8102E"/><rect x="78" y="252" width="40" height="8" rx="3" fill="#C29240"/>' +
+      '<path fill="#fff" d="M24 236Q50 229 76 236V238H24ZM126 245Q150 239 174 245V247H126ZM78 254Q98 249 118 254V256H78Z"/>' +
+      '<path fill="url(#xm-star)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" d="M100 1 104.7 12.5 117 13.4 107.6 21.3 110.6 33.4 100 26.8 89.4 33.4 92.4 21.3 83 13.4 95.3 12.5Z"/>' +
+      '</svg>';
+    ORN.forEach(function (p, i) {
+      var o = document.createElement('span');
+      o.className = 'xm-orn' + (p[2] ? ' is-big' : '');
+      o.style.left = (p[0] / 2) + '%'; o.style.top = (p[1] / 2.9) + '%';
+      var k = cols.length ? cols[i % cols.length] : FALLBACK[i % FALLBACK.length];
+      o.style.setProperty('--sw', '#' + String(k).replace('#', ''));
+      box.appendChild(o);
+    });
+  }
 })();
 </script>
 </body>

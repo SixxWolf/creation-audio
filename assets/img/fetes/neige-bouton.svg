@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="24" viewBox="0 0 300 24">
+  <!-- Thème des fêtes : neige posée sur le haut des boutons (tuile centrée, répétée en x si le bouton est très large ; fetes.css).
+       Gouttes loin du centre pour ne jamais toucher le libellé. -->
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#fff"/><stop offset="1" stop-color="#D9E5F0"/></linearGradient></defs>
+  <path fill="url(#g)" d="M0 9C6 4 16 3 26 5S44 1 58 4 80 2 94 5 118 .8 134 3.8 158 2 174 4.4 202 .6 218 3.8 246 2 262 4.6 290 3 300 9V14C294 15 286 14 278 14.6S262 14.2 260 14.6C259.4 14.6 258.8 17.6 256.6 17.6S253.6 16.4 253.4 15C246 14.6 236 15.6 228 14.8S214 14.4 211.6 14.8C211 14.8 210.6 19.6 208 19.6S204.8 17.8 204.6 15.2C192 15.6 176 14.4 160 14.8S130 15.4 116.4 14.8C115.8 14.8 115.2 17.6 113 17.6S109.8 16.4 109.6 15C96 15.6 80 14.4 62.4 14.8C61.8 14.8 61.2 21 58.2 21S54.6 18.8 54.4 15.2C42 15.6 30 14.4 18 14.8S6 15 0 14Z"/>
+</svg>
