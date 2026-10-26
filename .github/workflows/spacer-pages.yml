@@ -1,6 +1,8 @@
 # Création Audio — vraies pages des spacers (référencement Google)
 # Relit les spacers publics dans Supabase et régénère spacer/<slug>.html,
-# le catalogue pré-rendu de spacers.html et sitemap.xml (tools/build-spacer-pages.js).
+# le catalogue pré-rendu de spacers.html et sitemap.xml (tools/build-spacer-pages.js),
+# leurs copies anglaises en/spacer/<slug>.html + en/spacers.html, et les autres
+# pages anglaises en/*.html à partir des pages françaises (tools/build-en.js).
 # Ne commite QUE ces fichiers, et seulement s'ils ont changé (ajout, modif, retrait
 # d'un spacer dans l'admin). Le stock exact n'est pas dans les pages : une vente
 # ne déclenche donc pas de commit.
@@ -14,7 +16,12 @@ on:
     branches: [main]
     paths:
       - 'assets/spacer-catalog.js'
+      - 'assets/i18n.js'
+      - 'assets/i18n-en.js'
       - 'tools/build-spacer-pages.js'
+      - 'tools/build-en.js'
+      - 'tools/i18n/pages.en.json'
+      - '*.html'
       - '.github/workflows/spacer-pages.yml'
 
 permissions:
@@ -35,12 +42,14 @@ jobs:
         with:
           node-version: 20
       - name: Générer les pages
-        run: node tools/build-spacer-pages.js
+        run: |
+          node tools/build-spacer-pages.js
+          node tools/build-en.js
       - name: Publier si quelque chose a changé
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git add -A spacer spacers.html sitemap.xml
+          git add -A spacer spacers.html sitemap.xml en
           if git diff --cached --quiet; then echo "Rien à publier."; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

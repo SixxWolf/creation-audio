@@ -27,8 +27,9 @@
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var esc = window.CASpacers.esc, money = window.CASpacers.money, tierPrice = window.CASpacers.tierPrice;
   function publicUrl(path) { if (!path || !sb) return ''; try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; } catch (e) { return ''; } }
-  function plural(n, one, many) { return n + ' ' + (n > 1 ? many : one); }
-  function errMsg(e) { return (e && e.message) ? e.message : String(e || 'Erreur inconnue'); }
+  var _t = window.CA.t, EN = window.CA.lang === 'en';
+  function plural(n, one, many) { return n + ' ' + _t((EN ? n !== 1 : n > 1) ? many : one); }
+  function errMsg(e) { return (e && e.message) ? _t(e.message) : String(e || _t('Erreur inconnue')); }
 
   var loginSec = $('#dl-login'), gateSec = $('#dl-gate'), mfaSec = $('#dl-mfa'), app = $('#dl-app'),
       mfaForm = $('#dl-mfa-form'), mfaCode = $('#dl-mfa-code'), mfaBtn = $('#dl-mfa-btn'), mfaStatus = $('#dl-mfa-status'),
@@ -47,15 +48,15 @@
   var sc = window.CASpacers.create({
     sb: sb, mode: 'dealer',
     catalogEl: catalogEl, listEl: $('#dl-list'), productEl: productEl,
-    rootLabel: 'Catalogue dealer',
-    addLabel: 'Ajouter à ma commande',
+    rootLabel: _t('Catalogue dealer'),
+    addLabel: _t('Ajouter à ma commande'),
     maxQty: function () { return MAX_QTY; },
     onAdd: function (p, qty, src) { addToCart(p.id, qty, src); },
-    onTitle: function (p) { document.title = p ? p.name + ' — Portail dealer · Création Audio' : TITLE; },
-    assureHtml: '<li>' + ICON.bolt + 'Commande enregistrée directement — Création Audio est avisé</li>' +
-      '<li>' + ICON.print + 'Hors stock ? On l\'imprime sur commande</li>' +
-      '<li>' + ICON.pin + 'Ramassage région de Québec · facturé à la préparation</li>',
-    emptyHint: 'Un véhicule manque ? Écris-le dans la note de ta commande, on s\'en occupe.'
+    onTitle: function (p) { document.title = p ? p.name + _t(' — Portail dealer · Création Audio') : TITLE; },
+    assureHtml: '<li>' + ICON.bolt + _t('Commande enregistrée directement — Création Audio est avisé</li>') +
+      '<li>' + ICON.print + _t('Hors stock ? On l\'imprime sur commande</li>') +
+      '<li>' + ICON.pin + _t('Ramassage région de Québec · facturé à la préparation</li>'),
+    emptyHint: _t('Un véhicule manque ? Écris-le dans la note de ta commande, on s\'en occupe.')
   });
 
   /* ---------- écrans ---------- */
@@ -70,10 +71,10 @@
     if (which === 'app' && email) {
       me = String(email).toLowerCase();
       var isAdmin = me === String((window.CA && window.CA.adminEmail) || '').toLowerCase();
-      hello.innerHTML = 'Connecté : <b>' + esc(email) + '</b> ' +
+      hello.innerHTML = _t('Connecté : <b>') + esc(email) + '</b> ' +
         (isAdmin
-          ? '<span class="dl-badge is-admin">Admin · aperçu</span><span class="dl-admin-note">Tes commandes de test arrivent dans l\'onglet Commandes de l\'admin — annule-les ensuite.</span>'
-          : '<span class="dl-badge">Dealer</span>');
+          ? _t('<span class="dl-badge is-admin">Admin · aperçu</span><span class="dl-admin-note">Tes commandes de test arrivent dans l\'onglet Commandes de l\'admin — annule-les ensuite.</span>')
+          : _t('<span class="dl-badge">Dealer</span>'));
     }
   }
 
@@ -107,14 +108,14 @@
     e.preventDefault();
     var email = (emailI.value || '').trim(), pass = passI.value || '';
     if (!email || !pass || loginBtn.disabled) return;
-    loginBtn.disabled = true; loginStatus.textContent = 'Connexion…';
+    loginBtn.disabled = true; loginStatus.textContent = _t('Connexion…');
     // via le portier : 5 essais puis 15 min de blocage ; compte retiré -> refusé
     window.CA.signIn(email, pass).then(function (r) {
       loginBtn.disabled = false;
       if (!r.ok) { loginStatus.textContent = r.message; return; }
       loginStatus.textContent = ''; passI.value = '';
       afterLogin(email);
-    }, function (err) { loginBtn.disabled = false; loginStatus.textContent = 'Erreur : ' + errMsg(err); });
+    }, function (err) { loginBtn.disabled = false; loginStatus.textContent = _t('Erreur : ') + errMsg(err); });
   });
 
   window.CA.codeInput(mfaCode, mfaForm);
@@ -122,8 +123,8 @@
     e.preventDefault();
     var code = mfaCode.value.replace(/\D/g, '');
     if (mfaBtn.disabled) return;
-    if (code.length !== 6) { mfaStatus.textContent = 'Le code a 6 chiffres.'; return; }
-    mfaBtn.disabled = true; mfaStatus.textContent = 'Vérification…';
+    if (code.length !== 6) { mfaStatus.textContent = _t('Le code a 6 chiffres.'); return; }
+    mfaBtn.disabled = true; mfaStatus.textContent = _t('Vérification…');
     window.CA.mfa.verify(code).then(function (r) {
       mfaBtn.disabled = false;
       if (!r.ok) { mfaStatus.textContent = r.message; mfaCode.select(); return; }
@@ -132,7 +133,7 @@
         var s = res && res.data && res.data.session;
         checkDealer(s && s.user && s.user.email);
       });
-    }, function (err) { mfaBtn.disabled = false; mfaStatus.textContent = 'Erreur : ' + errMsg(err); });
+    }, function (err) { mfaBtn.disabled = false; mfaStatus.textContent = _t('Erreur : ') + errMsg(err); });
   });
 
   function doLogout() { sb.auth.signOut().then(function () { passI.value = ''; closeCart(); show('login'); }); }
@@ -145,14 +146,14 @@
   function load() {
     sb.from('products_dealer').select('*').order('sort_order', { ascending: true }).order('name', { ascending: true })
       .then(function (res) {
-        if (res.error) { $('#dl-list').innerHTML = '<p class="empty">Impossible de charger le catalogue dealer.</p>'; return; }
+        if (res.error) { $('#dl-list').innerHTML = _t('<p class="empty">Impossible de charger le catalogue dealer.</p>'); return; }
         spacers = res.data || [];
         byId = {}; spacers.forEach(function (p) { byId[p.id] = p; });
         sc.setItems(spacers);
         loaded = true;
         applyRoute(); renderCart();
         if (orders.length) renderOrders();   // liens vers les fiches dans « Mes commandes »
-      }, function () { $('#dl-list').innerHTML = '<p class="empty">Erreur réseau.</p>'; });
+      }, function () { $('#dl-list').innerHTML = _t('<p class="empty">Erreur réseau.</p>'); });
   }
 
   /* ---------- routage ---------- */
@@ -169,7 +170,7 @@
     if (/^#\/commandes/.test(h)) {
       sc.hide(); ordersEl.hidden = false; setTab('orders');
       if (view !== 'orders') { window.scrollTo(0, 0); loadOrders(); }
-      view = 'orders'; document.title = 'Mes commandes — Portail dealer · Création Audio';
+      view = 'orders'; document.title = _t('Mes commandes — Portail dealer · Création Audio');
       return;
     }
     if (view === 'orders') flash = null;   // le message « envoyée ✓ » ne sert qu'une fois
@@ -220,7 +221,7 @@
     if (srcEl) flyToCart(srcEl);
     cart[id] = { id: id, qty: n };
     saveCart(); renderCart();
-    toast((qty > 1 ? qty + ' × ' : '') + p.name + ' ajouté' + (editing ? ' (modification ' + editing.number + ')' : '') + '.');
+    toast((qty > 1 ? qty + ' × ' : '') + p.name + _t(' ajouté') + (editing ? _t(' (modification ') + editing.number + ')' : '') + '.');
   }
   function setQty(id, v) {
     if (!cart[id]) return; var n = parseInt(v, 10); if (isNaN(n)) { renderCart(); return; }
@@ -238,9 +239,9 @@
   function total() { return entries().reduce(function (s, it) { return s + lineTotal(it); }, 0); }
   function stockLine(it) {
     var st = byId[it.id].qty | 0;
-    if (st <= 0) return '<span class="citem-made">Sur commande</span>';
-    if (it.qty <= st) return '<span class="citem-ok">En stock</span>';
-    return '<span class="citem-made">' + st + ' en stock · ' + (it.qty - st) + ' sur commande</span>';
+    if (st <= 0) return _t('<span class="citem-made">Sur commande</span>');
+    if (it.qty <= st) return _t('<span class="citem-ok">En stock</span>');
+    return '<span class="citem-made">' + st + _t(' en stock · ') + (it.qty - st) + _t(' sur commande</span>');
   }
 
   var cartPanel = $('#cart-panel'), cartBackdrop = $('#cart-backdrop'), cartItems = $('#cart-items'),
@@ -255,9 +256,9 @@
     var n = count(); cartCount.textContent = n; cartBtn.classList.toggle('has-items', n > 0);
     editBar.hidden = !editing;
     if (editing) editNum.textContent = editing.number || '';
-    $('#cart-title').textContent = editing ? 'Modifier ma commande' : 'Ma commande';
+    $('#cart-title').textContent = editing ? _t('Modifier ma commande') : _t('Ma commande');
     if (!n) {
-      cartItems.innerHTML = '<p class="cart-empty">' + (editing ? 'La commande est vide.<br>Ajoute des spacers, ou annule-la depuis « Mes commandes ».' : 'Ta commande est vide.<br>Ajoute un spacer pour commencer.') + '</p>';
+      cartItems.innerHTML = '<p class="cart-empty">' + (editing ? _t('La commande est vide.<br>Ajoute des spacers, ou annule-la depuis « Mes commandes ».') : _t('Ta commande est vide.<br>Ajoute un spacer pour commencer.')) + '</p>';
     } else {
       cartItems.innerHTML = '';
       entries().forEach(function (it) {
@@ -266,19 +267,19 @@
         var base = +p.sell_price || 0, u = unitOf(it);
         var row = document.createElement('div'); row.className = 'citem';
         row.innerHTML =
-          '<a class="citem-thumb" href="' + esc(sc.hrefOf(p)) + '" aria-label="Voir ' + esc(p.name) + '">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:var(--wash)"></span>') + '</a>' +
+          '<a class="citem-thumb" href="' + esc(sc.hrefOf(p)) + _t('" aria-label="Voir ') + esc(p.name) + '">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:var(--wash)"></span>') + '</a>' +
           '<div class="citem-main">' +
             '<div class="citem-name">' + esc(p.name) + '</div>' +
-            '<div class="citem-type"><span class="citem-unit">' + money(u) + ' / paire' + (u < base ? ' · <em>rabais</em>' : '') + '</span></div>' +
+            '<div class="citem-type"><span class="citem-unit">' + money(u) + _t(' / paire') + (u < base ? _t(' · <em>rabais</em>') : '') + '</span></div>' +
             '<div class="citem-stock">' + stockLine(it) + '</div>' +
             '<div class="citem-qty">' +
-              '<button type="button" class="cq-minus" aria-label="Retirer une paire">&minus;</button>' +
-              '<input type="number" class="cq-val" min="0" max="' + MAX_QTY + '" value="' + it.qty + '" inputmode="numeric" aria-label="Quantité (paires)">' +
-              '<button type="button" class="cq-plus" aria-label="Ajouter une paire">+</button>' +
+              _t('<button type="button" class="cq-minus" aria-label="Retirer une paire">&minus;</button>') +
+              '<input type="number" class="cq-val" min="0" max="' + MAX_QTY + '" value="' + it.qty + _t('" inputmode="numeric" aria-label="Quantité (paires)">') +
+              _t('<button type="button" class="cq-plus" aria-label="Ajouter une paire">+</button>') +
             '</div>' +
           '</div>' +
           '<div class="citem-right">' +
-            '<button type="button" class="citem-del" aria-label="Retirer ' + esc(p.name) + '">&times;</button>' +
+            _t('<button type="button" class="citem-del" aria-label="Retirer ') + esc(p.name) + '">&times;</button>' +
             '<div class="citem-line">' + money(lineTotal(it)) + '</div>' +
           '</div>';
         $('.citem-thumb', row).addEventListener('click', closeCart);
@@ -292,7 +293,7 @@
       });
     }
     cartTotal.textContent = money(total());
-    sendBtn.textContent = editing ? 'Enregistrer les modifications' : 'Envoyer ma commande';
+    sendBtn.textContent = editing ? _t('Enregistrer les modifications') : _t('Envoyer ma commande');
     sendBtn.classList.toggle('is-disabled', n === 0 || sending);
   }
 
@@ -304,7 +305,7 @@
   $('#cart-clear').addEventListener('click', function () {
     function empty() { clearCart(); cartMsg.textContent = ''; }
     if (!count()) { empty(); return; }
-    caDialog.confirm({ title: 'Vider la commande ?', message: 'Les articles ajoutés seront retirés.', ok: 'Vider', danger: true, icon: 'trash' })
+    caDialog.confirm({ title: _t('Vider la commande ?'), message: _t('Les articles ajoutés seront retirés.'), ok: _t('Vider'), danger: true, icon: 'trash' })
       .then(function (ok) { if (ok) empty(); });
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && cartPanel.classList.contains('is-open')) closeCart(); });
@@ -312,8 +313,8 @@
   function stopEditing() { editing = null; saveJSON(EDIT_KEY, null); }
   function resetNote() { noteI.value = ''; saveJSON(NOTE_KEY, null); }
   $('#cart-edit-cancel').addEventListener('click', function () {
-    caDialog.confirm({ title: 'Abandonner la modification ?', message: 'La commande ' + (editing ? editing.number : '') + ' reste telle qu\'envoyée.',
-      ok: 'Abandonner', danger: true }).then(function (ok) {
+    caDialog.confirm({ title: _t('Abandonner la modification ?'), message: _t('La commande ') + (editing ? editing.number : '') + _t(' reste telle qu\'envoyée.'),
+      ok: _t('Abandonner'), danger: true }).then(function (ok) {
       if (!ok) return;
       stopEditing(); clearCart(); resetNote(); cartMsg.textContent = '';
     });
@@ -333,27 +334,27 @@
     var note = (noteI.value || '').trim();
     var wasEditing = editing;
     sending = true; renderCart();
-    cartMsg.className = 'cart-msg'; cartMsg.textContent = wasEditing ? 'Enregistrement…' : 'Envoi de la commande…';
+    cartMsg.className = 'cart-msg'; cartMsg.textContent = wasEditing ? _t('Enregistrement…') : _t('Envoi de la commande…');
     var call = wasEditing
       ? sb.rpc('dealer_update_order', { p_id: wasEditing.id, p_lines: lines, p_note: note || null })
       : sb.rpc('dealer_submit_order', { p_lines: lines, p_note: note || null });
     call.then(function (res) {
       if (res.error) throw res.error;
       var o = Array.isArray(res.data) ? res.data[0] : res.data;
-      if (!o || !o.id) throw new Error('Réponse inattendue du serveur.');
+      if (!o || !o.id) throw new Error(_t('Réponse inattendue du serveur.'));
       sending = false;
       notify(o.id, wasEditing ? 'updated' : 'new');
       stopEditing(); clearCart(); resetNote(); cartMsg.textContent = '';
       closeCart();
-      flash = { id: o.id, text: (wasEditing ? 'Commande ' + o.number + ' mise à jour ✓' : 'Commande ' + o.number + ' envoyée ✓') +
-        ' — Création Audio est avisé. Total dealer : ' + money(o.total) + ' (hors taxes).' };
+      flash = { id: o.id, text: (wasEditing ? _t('Commande ') + o.number + _t(' mise à jour ✓') : _t('Commande ') + o.number + _t(' envoyée ✓')) +
+        _t(' — Création Audio est avisé. Total dealer : ') + money(o.total) + _t(' (hors taxes).') };
       if (/^#\/commandes/.test(location.hash)) loadOrders(); else location.hash = '#/commandes';
     }).then(null, function (err) {
       sending = false;
       var m = errMsg(err);
-      if (/PGRST202|could not find the function/i.test(((err && err.code) || '') + ' ' + m)) m = 'Le système de commande n\'est pas encore activé. Écris-nous en attendant.';
+      if (/PGRST202|could not find the function/i.test(((err && err.code) || '') + ' ' + m)) m = _t('Le système de commande n\'est pas encore activé. Écris-nous en attendant.');
       if (wasEditing && /préparation|annulée|introuvable/i.test(m)) {
-        m += ' Tes changements restent dans le panier : tu peux les envoyer comme nouvelle commande.';
+        m += _t(' Tes changements restent dans le panier : tu peux les envoyer comme nouvelle commande.');
         stopEditing();
       }
       renderCart();
@@ -364,16 +365,16 @@
 
   /* ---------- mes commandes ---------- */
   var STATUS = {
-    'new':       { label: 'Envoyée', hint: 'Reçue par Création Audio — modifiable tant que la préparation n\'a pas commencé.' },
-    'preparing': { label: 'En préparation', hint: 'On prépare / imprime ta commande.' },
-    'ready':     { label: 'Prête à ramasser', hint: 'Ta commande t\'attend.' },
-    'invoiced':  { label: 'Facturée', hint: '' },
-    'cancelled': { label: 'Annulée', hint: '' }
+    'new':       { label: _t('Envoyée'), hint: _t('Reçue par Création Audio — modifiable tant que la préparation n\'a pas commencé.') },
+    'preparing': { label: _t('En préparation'), hint: _t('On prépare / imprime ta commande.') },
+    'ready':     { label: _t('Prête à ramasser'), hint: _t('Ta commande t\'attend.') },
+    'invoiced':  { label: _t('Facturée'), hint: '' },
+    'cancelled': { label: _t('Annulée'), hint: '' }
   };
   var orders = [], flash = null, ordersLoading = false;
   function fmtDate(iso) {
     try {
-      return new Date(iso).toLocaleString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return new Date(iso).toLocaleString(window.CA.locale, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     } catch (e) { return String(iso || '').slice(0, 10); }
   }
   function loadOrders() {
@@ -383,19 +384,19 @@
       .then(function (res) {
         ordersLoading = false;
         if (res.error) {
-          ordersList.innerHTML = '<p class="empty">Impossible de charger tes commandes.</p>';
+          ordersList.innerHTML = _t('<p class="empty">Impossible de charger tes commandes.</p>');
           return;
         }
         orders = res.data || [];
         renderOrders();
-      }, function () { ordersLoading = false; ordersList.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
+      }, function () { ordersLoading = false; ordersList.innerHTML = _t('<p class="empty">Erreur réseau.</p>'); });
   }
   function renderOrders() {
     var active = orders.filter(function (o) { return o.status === 'new' || o.status === 'preparing' || o.status === 'ready'; }).length;
     ordersN.textContent = active; ordersN.hidden = !active;
     ordersFlash.innerHTML = flash ? '<div class="dl-flash">' + esc(flash.text) + '</div>' : '';
     if (!orders.length) {
-      ordersList.innerHTML = '<p class="empty">Aucune commande pour l\'instant.<br><a href="#/">Parcourir le catalogue</a></p>';
+      ordersList.innerHTML = _t('<p class="empty">Aucune commande pour l\'instant.<br><a href="#/">Parcourir le catalogue</a></p>');
       return;
     }
     ordersList.innerHTML = orders.map(function (o) {
@@ -406,7 +407,7 @@
       return '<article class="dl-order is-' + esc(o.status) + (flash && flash.id === o.id ? ' is-flash' : '') + '" data-id="' + esc(o.id) + '">' +
         '<header class="dl-order-head">' +
           '<div class="dl-order-id"><b>' + esc(o.number) + '</b><span>' + esc(fmtDate(o.created_at)) +
-            (o.created_by === 'admin' ? ' · ajoutée par Création Audio' : '') + (o.edited_at ? ' · modifiée' : '') + '</span></div>' +
+            (o.created_by === 'admin' ? _t(' · ajoutée par Création Audio') : '') + (o.edited_at ? _t(' · modifiée') : '') + '</span></div>' +
           '<span class="dl-status is-' + esc(o.status) + '">' + esc(st.label) + '</span>' +
         '</header>' +
         (st.hint ? '<p class="dl-order-hint">' + esc(st.hint) + '</p>' : '') +
@@ -418,12 +419,12 @@
             '<span class="dl-ol-u">' + money(l.unit_price) + '</span>' +
             '<span class="dl-ol-t">' + money(l.line_total) + '</span></div>';
         }).join('') + '</div>' +
-        (o.note ? '<p class="dl-order-note"><b>' + (o.created_by === 'admin' ? 'Note' : 'Ta note') + ' :</b> ' + esc(o.note) + '</p>' : '') +
+        (o.note ? '<p class="dl-order-note"><b>' + (o.created_by === 'admin' ? _t('Note') : _t('Ta note')) + ' :</b> ' + esc(o.note) + '</p>' : '') +
         '<footer class="dl-order-foot">' +
-          '<span class="dl-order-total">' + plural(pairs, 'paire', 'paires') + ' · <b>' + money(o.total) + '</b> <small>hors taxes</small></span>' +
+          '<span class="dl-order-total">' + plural(pairs, 'paire', 'paires') + ' · <b>' + money(o.total) + _t('</b> <small>hors taxes</small></span>') +
           (isNew ? '<span class="dl-order-actions">' +
-            '<button type="button" class="dl-btn js-edit">Modifier</button>' +
-            '<button type="button" class="dl-btn is-danger js-cancel">Annuler</button></span>' : '') +
+            _t('<button type="button" class="dl-btn js-edit">Modifier</button>') +
+            _t('<button type="button" class="dl-btn is-danger js-cancel">Annuler</button></span>') : '') +
         '</footer>' +
       '</article>';
     }).join('');
@@ -438,8 +439,8 @@
     if (editing && editing.id === o.id) { openCart(); return; }
     if (!count()) { load(); return; }
     caDialog.confirm(editing
-      ? { title: 'Abandonner la modification de ' + editing.number + ' ?', message: 'Les changements non envoyés seront perdus.', ok: 'Abandonner', danger: true }
-      : { title: 'Remplacer ta commande en cours ?', message: 'Ta commande non envoyée sera remplacée par ' + o.number + '.', ok: 'Remplacer', icon: 'cart' })
+      ? { title: _t('Abandonner la modification de ') + editing.number + ' ?', message: _t('Les changements non envoyés seront perdus.'), ok: _t('Abandonner'), danger: true }
+      : { title: _t('Remplacer ta commande en cours ?'), message: _t('Ta commande non envoyée sera remplacée par ') + o.number + '.', ok: _t('Remplacer'), icon: 'cart' })
       .then(function (ok) { if (ok) load(); });
     function load() {
       var missing = [];
@@ -452,21 +453,21 @@
       saveJSON(EDIT_KEY, editing); saveCart();
       noteI.value = o.note || ''; try { localStorage.setItem(NOTE_KEY, noteI.value); } catch (e) {}
       cartMsg.className = 'cart-msg';
-      cartMsg.textContent = missing.length ? 'Plus offert, retiré : ' + missing.join(', ') + '.' : '';
+      cartMsg.textContent = missing.length ? _t('Plus offert, retiré : ') + missing.join(', ') + '.' : '';
       renderCart(); openCart();
     }
   }
   function cancelOrder(o, btn) {
-    caDialog.confirm({ title: 'Annuler la commande ' + o.number + ' ?', ok: 'Annuler la commande', danger: true }).then(function (ok) {
+    caDialog.confirm({ title: _t('Annuler la commande ') + o.number + ' ?', ok: _t('Annuler la commande'), danger: true }).then(function (ok) {
       if (!ok) return;
       btn.disabled = true;
       sb.rpc('dealer_cancel_order', { p_id: o.id }).then(function (res) {
         if (res.error) throw res.error;
         if (editing && editing.id === o.id) { stopEditing(); renderCart(); }
         notify(o.id, 'cancelled');
-        flash = { id: o.id, text: 'Commande ' + o.number + ' annulée.' };
+        flash = { id: o.id, text: _t('Commande ') + o.number + _t(' annulée.') };
         loadOrders();
-      }).then(null, function (err) { btn.disabled = false; caDialog.error(errMsg(err), 'Annulation impossible'); loadOrders(); });
+      }).then(null, function (err) { btn.disabled = false; caDialog.error(errMsg(err), _t('Annulation impossible')); loadOrders(); });
     });
   }
 

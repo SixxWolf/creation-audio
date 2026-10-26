@@ -22,19 +22,20 @@
 (function () {
   'use strict';
   var CA = window.CA = window.CA || {};
+  var _t = CA.t, EN = CA.lang === 'en';
   if (CA.msg) return;
 
   var KEY = 'ca-compte-auth', PENDING = 'ca_msg_pending', DRAFT = 'ca_msg_draft';
   var FB = 'https://m.me/61591945465745', EMAIL = 'contact@creationaudio.ca';
   var CODE_TTL = 10 * 60 * 1000, RESEND_MS = 60 * 1000, POLL_MS = 10000;
   var MAX_PHOTOS = 4, MAX_SIDE = 1600;
-  var TOPICS = [['filaments', 'Filaments'], ['spacers', 'Spacers'], ['compte', 'Mon compte'], ['autre', 'Autre']];
+  var TOPICS = [['filaments', _t('Filaments')], ['spacers', _t('Spacers')], ['compte', _t('Mon compte')], ['autre', _t('Autre')]];
   var TOPIC_NAME = {}; TOPICS.forEach(function (t) { TOPIC_NAME[t[0]] = t[1]; });
   var HINT = {
-    filaments: 'Couleur, matériau, quantité…',
-    spacers: 'Véhicule (marque, modèle, année), taille du haut-parleur…',
-    compte: 'Ta question sur ton compte…',
-    autre: 'Ta question…'
+    filaments: _t('Couleur, matériau, quantité…'),
+    spacers: _t('Véhicule (marque, modèle, année), taille du haut-parleur…'),
+    compte: _t('Ta question sur ton compte…'),
+    autre: _t('Ta question…')
   };
   var ROOT = CA.siteRoot || '';
 
@@ -46,7 +47,7 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-  function plural(n, one, many) { return n + ' ' + (n > 1 ? many : one); }
+  function plural(n, one, many) { return n + ' ' + _t((EN ? n !== 1 : n > 1) ? many : one); }
   function uuid() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -55,17 +56,17 @@
   }
   function day(iso) {
     var d = new Date(iso), t = new Date();
-    if (d.toDateString() === t.toDateString()) return 'Aujourd\'hui';
+    if (d.toDateString() === t.toDateString()) return _t('Aujourd\'hui');
     var y = new Date(t); y.setDate(t.getDate() - 1);
-    if (d.toDateString() === y.toDateString()) return 'Hier';
-    return d.toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: d.getFullYear() === t.getFullYear() ? undefined : 'numeric' });
+    if (d.toDateString() === y.toDateString()) return _t('Hier');
+    return d.toLocaleDateString(CA.locale, { day: 'numeric', month: 'long', year: d.getFullYear() === t.getFullYear() ? undefined : 'numeric' });
   }
-  function hour(iso) { return new Date(iso).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' }); }
+  function hour(iso) { return new Date(iso).toLocaleTimeString(CA.locale, { hour: '2-digit', minute: '2-digit' }); }
   function shortDate(iso) {
     var d = new Date(iso);
-    return d.toDateString() === new Date().toDateString() ? hour(iso) : d.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' });
+    return d.toDateString() === new Date().toDateString() ? hour(iso) : d.toLocaleDateString(CA.locale, { day: 'numeric', month: 'short' });
   }
-  function about(c) { return (TOPIC_NAME[c.topic] || 'Question') + (c.ref ? ' · ' + c.ref : ''); }
+  function about(c) { return (TOPIC_NAME[c.topic] || _t('Question')) + (c.ref ? ' · ' + c.ref : ''); }
   function guessTopic() {
     var p = location.pathname;
     if (/spacer/i.test(p)) return 'spacers';
@@ -77,7 +78,7 @@
     var c = String((err && (err.code || err.status)) || '');
     return /^(401|403|PGRST301|42501)$/.test(c) || /jwt|token/i.test((err && err.message) || '');
   }
-  function errText(err) { return (err && err.message) || 'Envoi impossible pour le moment. Réessaie.'; }
+  function errText(err) { return (err && err.message) || _t('Envoi impossible pour le moment. Réessaie.'); }
 
   /* ---------- Supabase (session du compte client, partagée avec compte.html / commande-client.js) ---------- */
   function sb() {
@@ -95,16 +96,16 @@
     if (CA.compteFn) return CA.compteFn(body);
     var cfg = window.CA_SUPABASE || {};
     return fetch(cfg.url + '/functions/v1/compte-code', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey }, body: JSON.stringify(body)
+      method: 'POST', headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey }, body: JSON.stringify(Object.assign({ lang: CA.lang || 'fr' }, body))
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (b) { b = b || {}; b._status = r.status; return b; });
     });
   }
   function rpc(name, args) {
     var c = sb();
-    if (!c) return Promise.reject(new Error('Service indisponible pour le moment.'));
+    if (!c) return Promise.reject(new Error(_t('Service indisponible pour le moment.')));
     return c.rpc(name, args || {}).then(function (res) {
-      if (res.error) { var e = new Error(res.error.message || 'Erreur'); e.code = res.error.code; throw e; }
+      if (res.error) { var e = new Error(res.error.message || _t('Erreur')); e.code = res.error.code; throw e; }
       return res.data;
     });
   }
@@ -132,12 +133,12 @@
   function addFiles(files, statusEl) {
     var list = Array.prototype.slice.call(files || []).filter(function (f) { return /^image\//.test(f.type) || /\.(heic|heif)$/i.test(f.name); });
     var room = MAX_PHOTOS - st.photos.length;
-    if (list.length > room) say(statusEl, 'Au plus ' + MAX_PHOTOS + ' photos par message.', 'bad');
+    if (list.length > room) say(statusEl, _t('Au plus ') + MAX_PHOTOS + _t(' photos par message.'), 'bad');
     list = list.slice(0, Math.max(0, room));
     if (!list.length) return photoJob;
     photoJob = Promise.all([photoJob].concat(list.map(function (f) {
       return shrink(f).then(function (b) { st.photos.push({ blob: b, url: URL.createObjectURL(b) }); },
-        function () { say(statusEl, 'Format de photo non pris en charge : envoie une photo JPEG ou PNG.', 'bad'); });
+        function () { say(statusEl, _t('Format de photo non pris en charge : envoie une photo JPEG ou PNG.'), 'bad'); });
     }))).then(function () { paintThumbs(); });
     return photoJob;
   }
@@ -147,7 +148,7 @@
     $$('.msg-thumbs', panel).forEach(function (box) {
       box.innerHTML = st.photos.map(function (p, i) {
         return '<span class="msg-thumb"><img src="' + esc(p.url) + '" alt=""><button type="button" class="msg-thumb-x" data-i="' + i +
-          '" aria-label="Retirer la photo ' + (i + 1) + '">×</button></span>';
+          _t('" aria-label="Retirer la photo ') + (i + 1) + '">×</button></span>';
       }).join('');
       box.hidden = !st.photos.length;
     });
@@ -163,7 +164,7 @@
     return Promise.all(st.photos.map(function (p) {
       var path = st.uid + '/' + uuid() + '.jpg';
       return c.storage.from('messages').upload(path, p.blob, { contentType: 'image/jpeg', upsert: false }).then(function (r) {
-        if (r.error) throw new Error('Une photo n\'a pas pu être envoyée. Réessaie.');
+        if (r.error) throw new Error(_t('Une photo n\'a pas pu être envoyée. Réessaie.'));
         return path;
       });
     }));
@@ -214,13 +215,13 @@
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-labelledby', 'msg-title');
     panel.innerHTML =
       '<header class="msg-head">' +
-        '<button class="msg-ic msg-back" type="button" aria-label="Retour" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>' +
-        '<div class="msg-head-tx"><h2 id="msg-title">Écris-nous</h2><p class="msg-sub" id="msg-sub"></p></div>' +
-        '<button class="msg-ic msg-x" type="button" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
+        _t('<button class="msg-ic msg-back" type="button" aria-label="Retour" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>') +
+        _t('<div class="msg-head-tx"><h2 id="msg-title">Écris-nous</h2><p class="msg-sub" id="msg-sub"></p></div>') +
+        _t('<button class="msg-ic msg-x" type="button" aria-label="Fermer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>') +
       '</header>' +
       '<div class="msg-main" id="msg-main"></div>' +
-      '<p class="msg-alt">Tu préfères&nbsp;? <a href="' + FB + '" target="_blank" rel="noopener">Messenger</a> · ' +
-        '<a href="mailto:' + EMAIL + '">Courriel</a></p>';
+      _t('<p class="msg-alt">Tu préfères&nbsp;? <a href="') + FB + _t('" target="_blank" rel="noopener">Messenger</a> · ') +
+        '<a href="mailto:' + EMAIL + _t('">Courriel</a></p>');
     document.body.appendChild(backdrop); document.body.appendChild(panel);
     main = $('#msg-main', panel); titleEl = $('#msg-title', panel); subEl = $('#msg-sub', panel);
     backBtn = $('.msg-back', panel); altEl = $('.msg-alt', panel);
@@ -263,7 +264,7 @@
     document.documentElement.classList.add('msg-open');
     void panel.offsetWidth;                                   // reflow : la transition part de translateX(100%)
     panel.classList.add('is-open'); backdrop.classList.add('is-open');
-    main.innerHTML = '<p class="msg-empty">Chargement…</p>'; head('Écris-nous', '', false);
+    main.innerHTML = _t('<p class="msg-empty">Chargement…</p>'); head(_t('Écris-nous'), '', false);
 
     var p = getPending();
     if (p) { restorePending(p); return; }
@@ -309,7 +310,7 @@
     return (c ? c.auth.signOut() : Promise.resolve()).catch(function () {}).then(function () {
       st.signed = false; markSignedIn(false);
       showCompose();
-      say($('.msg-status', main), 'Ta session a expiré : confirme ton courriel pour envoyer.', 'bad');
+      say($('.msg-status', main), _t('Ta session a expiré : confirme ton courriel pour envoyer.'), 'bad');
     });
   }
 
@@ -317,35 +318,35 @@
   function currentTopic() { var r = panel && $('input[name="msg-topic"]:checked', panel); return r ? r.value : (st.ctx.topic || ''); }
   function showCompose() {
     st.view = 'compose'; stopPoll(); clearTimeout(resendT);
-    head('Écris-nous', st.signed ? (st.acct && st.acct.email) || '' : 'On répond ici et par courriel', st.signed && st.convs.length > 0);
+    head(_t('Écris-nous'), st.signed ? (st.acct && st.acct.email) || '' : _t('On répond ici et par courriel'), st.signed && st.convs.length > 0);
     altEl.hidden = false;
     var needName = !st.signed || !String((st.acct && st.acct.name) || '').trim();
     var unread = st.convs.reduce(function (s, c) { return s + (+c.unread || 0); }, 0);
     main.innerHTML =
       '<form class="msg-form" id="msg-compose" novalidate>' +
-        (st.signed && st.convs.length ? '<button type="button" class="msg-convs"><span>Mes conversations</span><b>' + st.convs.length + '</b>' +
+        (st.signed && st.convs.length ? _t('<button type="button" class="msg-convs"><span>Mes conversations</span><b>') + st.convs.length + '</b>' +
           (unread ? '<span class="msg-dot" title="' + plural(unread, 'réponse non lue', 'réponses non lues') + '"></span>' : '') + '</button>' : '') +
-        '<fieldset class="msg-topics"><legend>Sujet</legend><div class="msg-chips">' + TOPICS.map(function (t) {
+        _t('<fieldset class="msg-topics"><legend>Sujet</legend><div class="msg-chips">') + TOPICS.map(function (t) {
           return '<label class="msg-chip"><input type="radio" name="msg-topic" value="' + t[0] + '"' + (st.ctx.topic === t[0] ? ' checked' : '') +
             '><span>' + t[1] + '</span></label>';
         }).join('') + '</div></fieldset>' +
-        (st.ctx.ref ? '<p class="msg-ref"><span>À propos de <b>' + esc(st.ctx.ref) + '</b></span>' +
-          '<button type="button" class="msg-ref-x" aria-label="Retirer ' + esc(st.ctx.ref) + '">×</button></p>' : '') +
-        '<div class="msg-field"><label for="msg-body">Message</label>' +
+        (st.ctx.ref ? _t('<p class="msg-ref"><span>À propos de <b>') + esc(st.ctx.ref) + '</b></span>' +
+          _t('<button type="button" class="msg-ref-x" aria-label="Retirer ') + esc(st.ctx.ref) + '">×</button></p>' : '') +
+        _t('<div class="msg-field"><label for="msg-body">Message</label>') +
           '<textarea id="msg-body" rows="5" maxlength="4000" placeholder="' + esc(HINT[st.ctx.topic] || HINT.autre) + '">' + esc(st.ctx.body) + '</textarea></div>' +
         '<div class="msg-photos"><div class="msg-thumbs" hidden></div>' +
           '<label class="msg-attach"><input type="file" accept="image/*" multiple hidden>' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>' +
-            '<span>Ajouter des photos</span></label></div>' +
+            _t('<span>Ajouter des photos</span></label></div>') +
         (needName ? '<div class="msg-grid' + (st.signed ? ' one' : '') + '">' +
-          '<div class="msg-field"><label for="msg-name">Nom</label><input type="text" id="msg-name" autocomplete="name" maxlength="80"></div>' +
-          (st.signed ? '' : '<div class="msg-field"><label for="msg-email">Courriel</label><input type="email" id="msg-email" inputmode="email" ' +
-            'autocomplete="email" maxlength="254" spellcheck="false" placeholder="ton@courriel.com"></div>') +
+          _t('<div class="msg-field"><label for="msg-name">Nom</label><input type="text" id="msg-name" autocomplete="name" maxlength="80"></div>') +
+          (st.signed ? '' : _t('<div class="msg-field"><label for="msg-email">Courriel</label><input type="email" id="msg-email" inputmode="email" ') +
+            _t('autocomplete="email" maxlength="254" spellcheck="false" placeholder="ton@courriel.com"></div>')) +
         '</div>' : '') +
         '<input type="text" class="msg-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">' +
-        '<button class="msg-send" type="submit">Envoyer</button>' +
+        _t('<button class="msg-send" type="submit">Envoyer</button>') +
         '<p class="msg-status" role="status" aria-live="polite"></p>' +
-        (st.signed ? '' : '<p class="msg-legal">Un code te sera envoyé pour confirmer ton courriel. <a href="' + ROOT + 'confidentialite.html#messagerie">Confidentialité</a></p>') +
+        (st.signed ? '' : _t('<p class="msg-legal">Un code te sera envoyé pour confirmer ton courriel. <a href="') + ROOT + _t('confidentialite.html#messagerie">Confidentialité</a></p>')) +
       '</form>';
     var form = $('#msg-compose', main), ta = $('#msg-body', main), status = $('.msg-status', form);
     paintThumbs();
@@ -376,14 +377,14 @@
     var nameIn = $('#msg-name', form), emailIn = $('#msg-email', form);
     var name = nameIn ? nameIn.value.trim() : '', email = emailIn ? emailIn.value.trim().toLowerCase() : '';
     if (!topic) { say(status, 'Choisis un sujet.', 'bad'); var r = $('input[name="msg-topic"]', form); if (r) r.focus(); return; }
-    if (!body && !st.photos.length) { say(status, 'Écris ton message.', 'bad'); $('#msg-body', form).focus(); return; }
-    if (nameIn && !name) { say(status, 'Entre ton nom.', 'bad'); nameIn.focus(); return; }
-    if (emailIn && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { say(status, 'Entre un courriel valide.', 'bad'); emailIn.focus(); return; }
+    if (!body && !st.photos.length) { say(status, _t('Écris ton message.'), 'bad'); $('#msg-body', form).focus(); return; }
+    if (nameIn && !name) { say(status, _t('Entre ton nom.'), 'bad'); nameIn.focus(); return; }
+    if (emailIn && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { say(status, _t('Entre un courriel valide.'), 'bad'); emailIn.focus(); return; }
     var draft = { topic: topic, ref: st.ctx.ref || '', body: body, name: name };
     var btn = $('.msg-send', form);
     if (st.signed) { sendNew(draft, status, btn); return; }
     // pas connecté : code par courriel, puis envoi
-    btn.disabled = true; st.busy = true; say(status, 'Envoi du code…');
+    btn.disabled = true; st.busy = true; say(status, _t('Envoi du code…'));
     callFn({ action: 'send', email: email, hp: ($('.msg-hp', form) || {}).value || '', purpose: 'message' }).then(function (b) {
       btn.disabled = false; st.busy = false;
       if (!b.ok) { say(status, sendErr(b), 'bad'); return; }
@@ -392,30 +393,32 @@
         setPending(draft);
         showCode(draft);
       });
-    }, function () { btn.disabled = false; st.busy = false; say(status, 'Erreur réseau — réessaie.', 'bad'); });
+    }, function () { btn.disabled = false; st.busy = false; say(status, _t('Erreur réseau — réessaie.'), 'bad'); });
   }
   function sendErr(b) {
     if (b.error === 'wait') {
       var s = Math.max(1, +b.retry_after || 60);
-      return s > 90 ? 'Trop de demandes. Réessaie dans ' + plural(Math.ceil(s / 60), 'minute', 'minutes') + '.' : 'Patiente ' + s + ' s avant de redemander un code.';
+      return s > 90 ? _t('Trop de demandes. Réessaie dans ') + plural(Math.ceil(s / 60), 'minute', 'minutes') + '.' : _t('Patiente ') + s + _t(' s avant de redemander un code.');
     }
-    if (b.error === 'reserved') return 'Ce courriel a sa propre page de connexion.';
-    if (b.error === 'bad_request') return 'Entre un courriel valide.';
-    if (b.error === 'mail') return 'Envoi impossible pour le moment. Réessaie dans un instant.';
-    return 'Service indisponible. Réessaie plus tard.';
+    if (b.error === 'reserved') return _t('Ce courriel a sa propre page de connexion.');
+    if (b.error === 'bad_request') return _t('Entre un courriel valide.');
+    if (b.error === 'mail') return _t('Envoi impossible pour le moment. Réessaie dans un instant.');
+    return _t('Service indisponible. Réessaie plus tard.');
   }
   function sendNew(d, status, btn) {
-    st.busy = true; if (btn) btn.disabled = true; say(status, 'Envoi…');
+    st.busy = true; if (btn) btn.disabled = true; say(status, _t('Envoi…'));
     var nameStep = d.name && !String((st.acct && st.acct.name) || '').trim()
       ? rpc('me_update', { p_name: d.name, p_phone: (st.acct && st.acct.phone) || '' }).then(function (a) { st.acct = a || st.acct; })
       : Promise.resolve();
-    return nameStep.then(upload).then(function (paths) {
+    // langue des courriels de réponse = celle de cette page (customers.lang)
+    var langStep = function () { return rpc('me_set_lang', { p_lang: CA.lang || 'fr' }).then(null, function () {}); };
+    return nameStep.then(langStep).then(upload).then(function (paths) {
       return rpc('msg_start', { p_topic: d.topic, p_ref: d.ref || null, p_page: location.pathname, p_body: d.body, p_photos: paths });
     }).then(function (r) {
       st.busy = false; if (btn) btn.disabled = false;
       clearPhotos(); clearDraft(); st.ctx = { topic: '', ref: '', body: '' };
       changed();
-      return loadConvs().then(function () { showThread(r.conversation_id, 'Envoyé. On te répond ici et par courriel.'); });
+      return loadConvs().then(function () { showThread(r.conversation_id, _t('Envoyé. On te répond ici et par courriel.')); });
     }).catch(function (err) {
       st.busy = false; if (btn) btn.disabled = false;
       if (isAuthError(err)) return lostSession();
@@ -432,17 +435,17 @@
   }
   function showCode(p) {
     st.view = 'code'; stopPoll();
-    head('Confirme ton courriel', '', false);
+    head(_t('Confirme ton courriel'), '', false);
     altEl.hidden = false;
     main.innerHTML =
       '<form class="msg-form" id="msg-code" novalidate>' +
-        '<p class="msg-lead">Code envoyé à <b>' + esc(p.email) + '</b>. Ton message part dès que c\'est confirmé.</p>' +
-        '<div class="msg-field"><label for="msg-code-in">Code à 6 chiffres</label>' +
+        _t('<p class="msg-lead">Code envoyé à <b>') + esc(p.email) + _t('</b>. Ton message part dès que c\'est confirmé.</p>') +
+        _t('<div class="msg-field"><label for="msg-code-in">Code à 6 chiffres</label>') +
           '<input type="text" id="msg-code-in" class="msg-code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false"></div>' +
-        '<button class="msg-send" type="submit">Confirmer et envoyer</button>' +
+        _t('<button class="msg-send" type="submit">Confirmer et envoyer</button>') +
         '<p class="msg-status" role="status" aria-live="polite"></p>' +
-        '<div class="msg-links"><button type="button" class="msg-link" data-act="resend">Renvoyer le code</button>' +
-          '<button type="button" class="msg-link" data-act="edit">Modifier le message</button></div>' +
+        _t('<div class="msg-links"><button type="button" class="msg-link" data-act="resend">Renvoyer le code</button>') +
+          _t('<button type="button" class="msg-link" data-act="edit">Modifier le message</button></div>') +
       '</form>';
     var form = $('#msg-code', main), inp = $('#msg-code-in', form), btn = $('.msg-send', form), status = $('.msg-status', form);
     var resend = $('[data-act="resend"]', form);
@@ -451,18 +454,18 @@
       var cur = getPending(); if (!cur) return;
       var left = Math.ceil((cur.sent + RESEND_MS - Date.now()) / 1000);
       resend.disabled = left > 0;
-      resend.textContent = left > 0 ? 'Renvoyer dans ' + left + ' s' : 'Renvoyer le code';
+      resend.textContent = left > 0 ? _t('Renvoyer dans ') + left + ' s' : _t('Renvoyer le code');
       if (left > 0) resendT = setTimeout(tick, 1000);
     }
     tick();
     resend.addEventListener('click', function () {
       var cur = getPending(); if (!cur) { backToCompose(); return; }
-      resend.disabled = true; say(status, 'Envoi…');
+      resend.disabled = true; say(status, _t('Envoi…'));
       callFn({ action: 'send', email: cur.email, hp: '', purpose: 'message' }).then(function (b) {
         if (!b.ok) { say(status, sendErr(b), 'bad'); tick(); return; }
         cur.sent = Date.now(); cur.at = Date.now(); setPending(cur);
-        say(status, 'Nouveau code envoyé.', 'ok'); inp.value = ''; inp.focus(); tick();
-      }, function () { say(status, 'Erreur réseau — réessaie.', 'bad'); tick(); });
+        say(status, _t('Nouveau code envoyé.'), 'ok'); inp.value = ''; inp.focus(); tick();
+      }, function () { say(status, _t('Erreur réseau — réessaie.'), 'bad'); tick(); });
     });
     $('[data-act="edit"]', form).addEventListener('click', function () { backToCompose(); });
     inp.addEventListener('input', function () {
@@ -472,26 +475,26 @@
     });
     form.addEventListener('submit', function (e) { e.preventDefault(); verify(); });
     function verify() {
-      var cur = getPending(); if (!cur) { backToCompose('Ce code a expiré : renvoie ton message.'); return; }
+      var cur = getPending(); if (!cur) { backToCompose(_t('Ce code a expiré : renvoie ton message.')); return; }
       var code = inp.value.replace(/\D/g, '');
-      if (code.length !== 6) { say(status, 'Entre les 6 chiffres reçus.', 'bad'); inp.focus(); return; }
-      btn.disabled = true; say(status, 'Vérification…');
+      if (code.length !== 6) { say(status, _t('Entre les 6 chiffres reçus.'), 'bad'); inp.focus(); return; }
+      btn.disabled = true; say(status, _t('Vérification…'));
       callFn({ action: 'verify', email: cur.email, code: code }).then(function (b) {
         if (b.session) {
           return sb().auth.setSession(b.session).then(function (s) {
             if (s && s.error) throw s.error;
             setPending(null); clearTimeout(resendT);
             return session().then(function (on) {
-              if (!on) throw new Error('Connexion impossible pour le moment. Réessaie.');
+              if (!on) throw new Error(_t('Connexion impossible pour le moment. Réessaie.'));
               return sendNew(cur, status, btn);
             });
           });
         }
         btn.disabled = false;
-        if (b.error === 'invalid') { say(status, 'Code incorrect · ' + plural(b.left, 'essai restant', 'essais restants') + '.', 'bad'); inp.select(); return; }
-        if (b.error === 'expired') { say(status, 'Ce code n\'est plus valable. Demande un nouveau code.', 'bad'); return; }
-        if (b.error === 'revoked') { say(status, 'Accès retiré. Écris-nous à ' + EMAIL + '.', 'bad'); return; }
-        say(status, 'Vérification impossible pour le moment. Réessaie.', 'bad');
+        if (b.error === 'invalid') { say(status, _t('Code incorrect · ') + plural(b.left, 'essai restant', 'essais restants') + '.', 'bad'); inp.select(); return; }
+        if (b.error === 'expired') { say(status, _t('Ce code n\'est plus valable. Demande un nouveau code.'), 'bad'); return; }
+        if (b.error === 'revoked') { say(status, _t('Accès retiré. Écris-nous à ') + EMAIL + '.', 'bad'); return; }
+        say(status, _t('Vérification impossible pour le moment. Réessaie.'), 'bad');
       }).catch(function (err) { btn.disabled = false; say(status, errText(err), 'bad'); });
     }
     focusFirst('#msg-code-in');
@@ -508,18 +511,18 @@
   /* ---------- vue : mes conversations ---------- */
   function showList() {
     st.view = 'list'; stopPoll();
-    head('Mes conversations', (st.acct && st.acct.email) || '', false);
+    head(_t('Mes conversations'), (st.acct && st.acct.email) || '', false);
     altEl.hidden = false;
-    main.innerHTML = '<div class="msg-list-wrap"><button type="button" class="msg-send msg-new">Nouveau message</button>' +
+    main.innerHTML = _t('<div class="msg-list-wrap"><button type="button" class="msg-send msg-new">Nouveau message</button>') +
       (st.convs.length ? '<ul class="msg-list">' + st.convs.map(function (c) {
         var un = +c.unread || 0;
         return '<li><button type="button" class="msg-row' + (un ? ' is-unread' : '') + '" data-id="' + esc(c.id) + '">' +
           '<span class="msg-row-top"><b>' + esc(about(c)) + '</b><time>' + esc(shortDate(c.updated_at)) + '</time></span>' +
-          '<span class="msg-row-bot"><span class="msg-row-prev">' + (c.last_from === 'client' ? 'Toi : ' : '') + esc(c.last_preview || '') + '</span>' +
+          '<span class="msg-row-bot"><span class="msg-row-prev">' + (c.last_from === 'client' ? _t('Toi : ') : '') + esc(c.last_preview || '') + '</span>' +
           (un ? '<span class="msg-row-n" title="' + plural(un, 'réponse non lue', 'réponses non lues') + '">' + un + '</span>' : '') +
-          (c.status === 'closed' && !un ? '<span class="msg-row-st">Réglée</span>' : '') + '</span>' +
+          (c.status === 'closed' && !un ? _t('<span class="msg-row-st">Réglée</span>') : '') + '</span>' +
         '</button></li>';
-      }).join('') + '</ul>' : '<p class="msg-empty">Aucune conversation pour l\'instant.</p>') + '</div>';
+      }).join('') + '</ul>' : _t('<p class="msg-empty">Aucune conversation pour l\'instant.</p>')) + '</div>';
     $('.msg-new', main).addEventListener('click', function () { st.ctx = { topic: guessTopic(), ref: '', body: '' }; showCompose(); });
     $$('.msg-row', main).forEach(function (b) { b.addEventListener('click', function () { showThread(b.getAttribute('data-id')); }); });
     focusFirst('.msg-new');
@@ -529,18 +532,18 @@
   function showThread(id, notice) {
     st.view = 'thread'; st.conv = { id: id }; st.msgs = [];
     var c0 = st.convs.filter(function (c) { return c.id === id; })[0];
-    head(c0 ? about(c0) : 'Conversation', 'Avec Création Audio', true);
+    head(c0 ? about(c0) : _t('Conversation'), _t('Avec Création Audio'), true);
     altEl.hidden = true;
     clearPhotos();
     main.innerHTML =
-      '<div class="msg-thread" id="msg-thread"><p class="msg-empty">Chargement…</p></div>' +
+      _t('<div class="msg-thread" id="msg-thread"><p class="msg-empty">Chargement…</p></div>') +
       '<form class="msg-reply" id="msg-reply" novalidate>' +
         '<div class="msg-thumbs" hidden></div>' +
         '<div class="msg-reply-row">' +
-          '<label class="msg-attach msg-attach-ic" title="Ajouter des photos"><input type="file" accept="image/*" multiple hidden aria-label="Ajouter des photos">' +
+          _t('<label class="msg-attach msg-attach-ic" title="Ajouter des photos"><input type="file" accept="image/*" multiple hidden aria-label="Ajouter des photos">') +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg></label>' +
-          '<textarea id="msg-reply-in" rows="1" maxlength="4000" placeholder="Ta réponse…" aria-label="Ta réponse"></textarea>' +
-          '<button class="msg-send-ic" type="submit" aria-label="Envoyer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg></button>' +
+          _t('<textarea id="msg-reply-in" rows="1" maxlength="4000" placeholder="Ta réponse…" aria-label="Ta réponse"></textarea>') +
+          _t('<button class="msg-send-ic" type="submit" aria-label="Envoyer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg></button>') +
         '</div>' +
         '<p class="msg-status' + (notice ? ' ok' : '') + '" role="status" aria-live="polite">' + esc(notice || '') + '</p>' +
       '</form>';
@@ -553,7 +556,7 @@
       if (st.busy || st.view !== 'thread') return;
       var body = ta.value.trim(), btn = $('.msg-send-ic', form);
       if (!body && !st.photos.length) { ta.focus(); return; }
-      st.busy = true; btn.disabled = true; say(status, 'Envoi…');
+      st.busy = true; btn.disabled = true; say(status, _t('Envoi…'));
       upload().then(function (paths) {
         return rpc('msg_send', { p_conv: id, p_body: body, p_photos: paths });
       }).then(function (r) {
@@ -579,7 +582,7 @@
       var hadUnread = st.convs.some(function (c) { return c.id === id && c.unread; });
       st.convs.forEach(function (c) { if (c.id === id) c.unread = 0; });
       if (hadUnread) changed();
-      head(about(conv), conv.admin_online ? 'En ligne' : 'Avec Création Audio', true);
+      head(about(conv), conv.admin_online ? _t('En ligne') : _t('Avec Création Audio'), true);
       subEl.classList.toggle('is-online', !!conv.admin_online);
       var same = msgs.length === st.msgs.length && (!msgs.length || msgs[msgs.length - 1].id === st.msgs[st.msgs.length - 1].id);
       if (same && !scroll) return;
@@ -589,7 +592,7 @@
     }, function (err) {
       if (isAuthError(err)) return lostSession();
       var box = $('#msg-thread', main);
-      if (box && !st.msgs.length) box.innerHTML = '<p class="msg-empty">Impossible de charger la conversation. Réessaie.</p>';
+      if (box && !st.msgs.length) box.innerHTML = _t('<p class="msg-empty">Impossible de charger la conversation. Réessaie.</p>');
     });
   }
   function paintThread(scroll, conv) {
@@ -603,14 +606,14 @@
       html += '<div class="msg-b ' + (me ? 'me' : 'them') + '">' +
         ((m.photos || []).length ? '<div class="msg-b-photos">' + m.photos.map(function (p, i) {
           var u = urlCache[p];
-          return u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="Photo ' + (i + 1) + '" loading="lazy"></a>'
-                   : '<span class="msg-b-ph" title="Photo indisponible"></span>';
+          return u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + _t('" alt="Photo ') + (i + 1) + '" loading="lazy"></a>'
+                   : _t('<span class="msg-b-ph" title="Photo indisponible"></span>');
         }).join('') + '</div>' : '') +
         (m.body ? '<p>' + esc(m.body) + '</p>' : '') +
-        '<time>' + (me ? '' : 'Création Audio · ') + esc(hour(m.created_at)) + '</time></div>';
+        '<time>' + (me ? '' : _t('Création Audio · ')) + esc(hour(m.created_at)) + '</time></div>';
     });
-    if (conv && conv.status === 'closed') html += '<p class="msg-day">Conversation réglée · écris pour la rouvrir</p>';
-    box.innerHTML = html || '<p class="msg-empty">Aucun message.</p>';
+    if (conv && conv.status === 'closed') html += _t('<p class="msg-day">Conversation réglée · écris pour la rouvrir</p>');
+    box.innerHTML = html || _t('<p class="msg-empty">Aucun message.</p>');
     if (scroll || nearBottom) box.scrollTop = box.scrollHeight;
   }
   function poll() { if (st.view === 'thread' && !st.busy) refresh(false); }

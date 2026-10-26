@@ -17,7 +17,7 @@
   var CA = window.CA = window.CA || {};
 
   /* ---- messagerie (panneau chargé au besoin) ---- */
-  var MSG_V = 2;
+  var MSG_V = 3;
   var me = document.currentScript && document.currentScript.src || '';
   var ASSETS = me ? me.replace(/nav\.js(\?.*)?$/, '') : 'assets/';
   CA.siteRoot = ASSETS.replace(/assets\/$/, '');
@@ -112,8 +112,10 @@
 (function () {
   'use strict';
   var CA = window.CA = window.CA || {};
-  var KINDS = { promo: 'Promo', event: 'Événement', 'new': 'Nouveauté', update: 'Mise à jour' };
-  var COLS = 'id,kind,title,body,image_path,cta_label,cta_url,promo_code,event_at,starts_at,ends_at,featured,in_bar,sort_order,updated_at';
+  var _t = CA.t || function (s) { return s; };
+  var KINDS = { promo: _t('Promo'), event: _t('Événement'), 'new': _t('Nouveauté'), update: _t('Mise à jour') };
+  // en:i18n = textes anglais (fonction translate) — CA.tr(n, 'title')
+  var COLS = 'id,kind,title,body,image_path,cta_label,cta_url,promo_code,event_at,starts_at,ends_at,featured,in_bar,sort_order,updated_at,en:i18n';
   var KEY = 'ca-news-closed';
 
   function cfg() { return window.CA_SUPABASE || null; }
@@ -178,21 +180,21 @@
     var original = bar.innerHTML, i = 0, timer = null, paused = false;
     bar.classList.add('is-news');
     bar.setAttribute('role', 'region');
-    bar.setAttribute('aria-label', 'Nouvelles');
+    bar.setAttribute('aria-label', _t('Nouvelles'));
     bar.innerHTML =
-      (items.length > 1 ? '<button class="pb-nav pb-prev" type="button" aria-label="Nouvelle précédente">‹</button>' : '') +
+      (items.length > 1 ? '<button class="pb-nav pb-prev" type="button" aria-label="' + _t('Nouvelle précédente') + '">‹</button>' : '') +
       '<div class="pb-item" aria-live="polite"></div>' +
-      (items.length > 1 ? '<button class="pb-nav pb-next" type="button" aria-label="Nouvelle suivante">›</button>' : '') +
-      '<button class="pb-close" type="button" aria-label="Fermer les nouvelles">×</button>';
+      (items.length > 1 ? '<button class="pb-nav pb-next" type="button" aria-label="' + _t('Nouvelle suivante') + '">›</button>' : '') +
+      '<button class="pb-close" type="button" aria-label="' + _t('Fermer les nouvelles') + '">×</button>';
     var slot = bar.querySelector('.pb-item');
 
     function show(k) {
       i = (k + items.length) % items.length;
       var n = items[i], href = CA.newsHref(n.cta_url) || (CA.siteRoot || '') + '#nouvelles';
       slot.innerHTML = '<span class="pb-tag k-' + esc(n.kind) + '">' + esc(KINDS[n.kind] || '') + '</span>' +
-        '<a class="pb-link" href="' + esc(href) + '">' + esc(n.title) +
-          (n.promo_code ? ' <span class="pb-code">Code ' + esc(n.promo_code) + '</span>' : '') +
-          (n.cta_label ? ' <span class="pb-cta">' + esc(n.cta_label) + ' →</span>' : '') +
+        '<a class="pb-link" href="' + esc(href) + '">' + esc(CA.tr(n, 'title')) +
+          (n.promo_code ? ' <span class="pb-code">' + _t('Code') + ' ' + esc(n.promo_code) + '</span>' : '') +
+          (n.cta_label ? ' <span class="pb-cta">' + esc(CA.tr(n, 'cta_label')) + ' →</span>' : '') +
         '</a>';
     }
     function tick() {
@@ -231,7 +233,7 @@
 (function () {
   'use strict';
   var CA = window.CA = window.CA || {};
-  var FETES_V = 1, KEY = 'ca-fetes', PREV = 'ca-fetes-voir', root = document.documentElement;
+  var FETES_V = 2, KEY = 'ca-fetes', PREV = 'ca-fetes-voir', root = document.documentElement;
   var q = /[?&]fetes=([01])/.exec(location.search), preview = q ? q[1] : null;
   try {
     if (q) sessionStorage.setItem(PREV, q[1]);

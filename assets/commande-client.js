@@ -23,6 +23,7 @@ window.CA = window.CA || {};
 (function () {
   'use strict';
   var KEY = 'ca-compte-auth', EDIT = 'ca_v2_order_edit', EDIT_TTL = 6 * 3600 * 1000;
+  var _t = window.CA.t, EN = window.CA.lang === 'en';
   var cfg = window.CA_SUPABASE || {}, client = null;
 
   function session() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
@@ -47,8 +48,8 @@ window.CA = window.CA || {};
   }
   function errMsg(err) {
     var m = (err && err.message) || '', c = String((err && (err.code || err.status)) || '');
-    if (/^(401|403|42501|PGRST301)$/.test(c) || /jwt|token/i.test(m)) return 'Ta session a expiré : reconnecte-toi dans Mon compte.';
-    return m || 'Envoi impossible pour le moment. Réessaie.';
+    if (/^(401|403|42501|PGRST301)$/.test(c) || /jwt|token/i.test(m)) return _t('Ta session a expiré : reconnecte-toi dans Mon compte.');
+    return (m && _t(m)) || _t('Envoi impossible pour le moment. Réessaie.');
   }
 
   // appelle une Edge Function de courriel ; résout toujours (échec ou lenteur : la commande est déjà enregistrée)
@@ -59,13 +60,21 @@ window.CA = window.CA || {};
     return Promise.race([call, new Promise(function (ok) { setTimeout(ok, 5000); })]);
   }
 
+  // langue des courriels : celle de la page où le client commande (customers.lang)
+  var langP = null;
+  function setLang(c) {
+    if (!langP) langP = c.rpc('me_set_lang', { p_lang: window.CA.lang || 'fr' }).then(null, function () {});
+    return Promise.race([langP, new Promise(function (ok) { setTimeout(ok, 2500); })]);
+  }
+  window.CA.custLang = function () { var c = cli(); return c && email() ? setLang(c) : Promise.resolve(); };
+
   function send(lines, note, pickup) {
     var c = cli();
-    if (!c) return Promise.reject(new Error('Service indisponible pour le moment.'));
+    if (!c) return Promise.reject(new Error(_t('Service indisponible pour le moment.')));
     var ed = editing();
-    var call = ed
+    var call = setLang(c).then(function () { return ed
       ? c.rpc('customer_update_order', { p_id: ed.id, p_lines: lines, p_note: note || null, p_pickup: pickup || null })
-      : c.rpc('customer_submit_order', { p_lines: lines, p_note: note || null, p_pickup: pickup || null });
+      : c.rpc('customer_submit_order', { p_lines: lines, p_note: note || null, p_pickup: pickup || null }); });
     return call.then(function (res) {
       if (res.error) throw new Error(errMsg(res.error));
       var r = res.data || {};
@@ -91,8 +100,10 @@ window.CA = window.CA || {};
   }
   function reserve(lines, note, pickup) {
     var c = cli();
-    if (!c) return Promise.reject(new Error('Service indisponible pour le moment.'));
-    return c.rpc('customer_reserve', { p_lines: lines, p_note: note || null, p_pickup: pickup || null }).then(function (res) {
+    if (!c) return Promise.reject(new Error(_t('Service indisponible pour le moment.')));
+    return setLang(c).then(function () {
+      return c.rpc('customer_reserve', { p_lines: lines, p_note: note || null, p_pickup: pickup || null });
+    }).then(function (res) {
       if (res.error) throw new Error(errMsg(res.error));
       var r = res.data || {};
       // confirmation au client + avis à Création Audio : on attend la réponse (5 s max), voir send()
@@ -109,7 +120,8 @@ window.CA = window.CA || {};
   }
   function setPickup(kind, id, pickup) {
     var c = cli();
-    if (!c) return Promise.reject(new Error('Service indisponible pour le moment.'));
+    if (!c) return Promise.reject(new Error(_t('Service indisponible pour le moment.')));
+    setLang(c);
     return c.rpc('customer_set_pickup', { p_kind: kind, p_id: id, p_pickup: pickup }).then(function (res) {
       if (res.error) throw new Error(errMsg(res.error));
       // avis à Création Audio : sans bloquer l'écran
@@ -121,12 +133,19 @@ window.CA = window.CA || {};
   var MOIS_L = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
   var JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   function dOf(d) { var p = String(d || '').split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
-  function hTxt(t) { var p = String(t || '').split(':'); return (+p[0]) + ' h ' + (p[1] || '00'); }
+  function hTxt(v) {
+    var p = String(v || '').split(':');
+    if (EN) return new Date(2000, 0, 1, +p[0], +p[1] || 0).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return (+p[0]) + ' h ' + (p[1] || '00');
+  }
+  function wd(x) { return EN ? x.toLocaleDateString('en-CA', { weekday: 'short' }) : JOURS[x.getDay()].slice(0, 3); }
+  function mo(x) { return EN ? x.toLocaleDateString('en-CA', { month: 'short' }) : MOIS[x.getMonth()]; }
   function mins(t) { var p = String(t || '').split(':'); return (+p[0]) * 60 + (+p[1] || 0); }
   function fmtPickup(d, s, e, short) {
     if (!d) return '';
     var x = dOf(d);
-    var day = short ? JOURS[x.getDay()].slice(0, 3) + '. ' + x.getDate() + ' ' + MOIS[x.getMonth()]
+    var day = EN ? x.toLocaleDateString('en-CA', short ? { weekday: 'short', month: 'short', day: 'numeric' } : { weekday: 'long', month: 'long', day: 'numeric' })
+      : short ? JOURS[x.getDay()].slice(0, 3) + '. ' + x.getDate() + ' ' + MOIS[x.getMonth()]
       : JOURS[x.getDay()] + ' ' + x.getDate() + ' ' + MOIS_L[x.getMonth()];
     return day + (s ? (short ? ' · ' : ', ') + hTxt(s) + (e ? ' – ' + hTxt(e) : '') : '');
   }
@@ -141,11 +160,11 @@ window.CA = window.CA || {};
     var list = [], day = null, sel = null;
     var el = document.createElement('div');
     el.className = 'pk' + (opts.big ? ' pk-lg' : '');
-    el.innerHTML = '<div class="pk-days"><button type="button" class="pk-nav pk-prev" aria-label="Jours précédents">‹</button>' +
-      '<div class="pk-strip" role="listbox" aria-label="Jour de cueillette"></div>' +
-      '<button type="button" class="pk-nav pk-next" aria-label="Jours suivants">›</button></div>' +
+    el.innerHTML = '<div class="pk-days"><button type="button" class="pk-nav pk-prev" aria-label="' + _t('Jours précédents') + '">‹</button>' +
+      '<div class="pk-strip" role="listbox" aria-label="' + _t('Jour de cueillette') + '"></div>' +
+      '<button type="button" class="pk-nav pk-next" aria-label="' + _t('Jours suivants') + '">›</button></div>' +
       (opts.big ? '<p class="pk-dayname"></p>' : '') +
-      '<div class="pk-slots" role="listbox" aria-label="Heure de cueillette"></div>';
+      '<div class="pk-slots" role="listbox" aria-label="' + _t('Heure de cueillette') + '"></div>';
     if (host) host.appendChild(el);
     var strip = el.querySelector('.pk-strip'), slotsEl = el.querySelector('.pk-slots');
     var prev = el.querySelector('.pk-prev'), next = el.querySelector('.pk-next');
@@ -169,7 +188,7 @@ window.CA = window.CA || {};
         var x = dOf(g.d);
         return '<button type="button" role="option" class="pk-day' + (g.d === day ? ' is-on' : '') + (g.open ? '' : ' is-full') +
           '" data-d="' + esc(g.d) + '" aria-selected="' + (g.d === day) + '"' + (g.open ? '' : ' aria-disabled="true"') + '>' +
-          '<small>' + JOURS[x.getDay()].slice(0, 3) + '</small><b>' + x.getDate() + '</b><small>' + MOIS[x.getMonth()] + '</small></button>';
+          '<small>' + wd(x) + '</small><b>' + x.getDate() + '</b><small>' + mo(x) + '</small></button>';
       }).join('');
       // heures aux 15 min ; un saut (ex. 14 h 45 → 16 h) = nouvelle rangée
       var last = null;
@@ -178,7 +197,7 @@ window.CA = window.CA || {};
         var gap = last != null && m - last > 15 ? '<span class="pk-gap" aria-hidden="true"></span>' : '';
         last = m;
         return gap + '<button type="button" role="option" class="pk-slot' + (on ? ' is-on' : '') + (x.full ? ' is-full' : '') +
-          '" data-s="' + esc(x.s) + '" aria-selected="' + on + '"' + (x.full ? ' disabled title="Complet"' : '') + '>' +
+          '" data-s="' + esc(x.s) + '" aria-selected="' + on + '"' + (x.full ? ' disabled title="' + _t('Complet') + '"' : '') + '>' +
           hTxt(x.s) + (x.e ? ' – ' + hTxt(x.e) : '') + '</button>';
       }).join('');
       var dn = el.querySelector('.pk-dayname');

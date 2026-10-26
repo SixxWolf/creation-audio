@@ -15,6 +15,7 @@
    ========================================================= */
 (function () {
   'use strict';
+  var _t = (window.CA && window.CA.t) || function (s) { return s; };   // partagé avec l'admin (sans i18n.js : français)
   var IC = {
     warn: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
     trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>',
@@ -72,7 +73,7 @@
       }
       var foot = el('div', 'dlg-f'), back = null;
       if (kind !== 'alert' && o.cancel !== false) {
-        back = el('button', 'dlg-b dlg-back', o.cancel || 'Retour'); back.type = 'button';
+        back = el('button', 'dlg-b dlg-back', o.cancel || _t('Retour')); back.type = 'button';
         foot.appendChild(back);
       }
       var alt = null;
@@ -81,7 +82,7 @@
         foot.appendChild(alt);
       }
       var go = el('button', 'dlg-b dlg-go' + (o.danger && kind !== 'alert' ? ' is-danger' : ''),
-        o.ok || (kind === 'alert' ? 'Compris' : 'Confirmer'));
+        o.ok || (kind === 'alert' ? _t('Compris') : _t('Confirmer')));
       go.type = 'button';
       foot.appendChild(go);
       box.appendChild(foot);
@@ -147,7 +148,7 @@
     alert: function (o) { return open('alert', o); },
     prompt: function (o) { return open('prompt', o); },
     error: function (err, title) {
-      return open('alert', { title: title || 'Action impossible', message: errText(err), icon: 'warn', danger: true });
+      return open('alert', { title: title || _t('Action impossible'), message: errText(err), icon: 'warn', danger: true });
     },
     toast: toast
   };

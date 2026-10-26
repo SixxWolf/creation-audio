@@ -3,8 +3,9 @@
 // Connexion SANS mot de passe : un code à 6 chiffres envoyé par courriel.
 // Appelée par compte.html (assets/compte.js) — déployée avec verify_jwt = false.
 //
-//  POST { action: 'send', email, hp, purpose? }  purpose 'message' = code demandé par le panneau
-//                                                 « Écris-nous » (assets/messagerie.js) : texte adapté
+//  POST { action: 'send', email, hp, purpose?, lang? }  purpose 'message' = code demandé par le panneau
+//                                                 « Écris-nous » (assets/messagerie.js) : texte adapté ;
+//                                                 lang 'en' = courriel en anglais (page /en/)
 //     -> 200 { ok }                         code envoyé (hp rempli = robot : rien n'est fait)
 //        429 { error: 'wait', retry_after } 1 envoi / 60 s, 5 / h par courriel, 20 / h par IP
 //        403 { error: 'reserved' }          courriel de l'admin (il passe par sa propre page)
@@ -46,31 +47,37 @@ function newCode() {
   return String(buf[0] % 1e6).padStart(6, "0");
 }
 
-function mailContent(code: string, forMessage: boolean) {
-  const subject = (forMessage ? "Ton code pour envoyer ton message : " : "Ton code de connexion : ") + code;
+// Langue = celle de la page qui demande le code (body.lang, 'fr' par défaut)
+function mailContent(code: string, forMessage: boolean, en: boolean) {
+  const L = (fr: string, eng: string) => (en ? eng : fr);
+  const subject = (forMessage ? L("Ton code pour envoyer ton message : ", "Your code to send your message: ")
+                              : L("Ton code de connexion : ", "Your sign-in code: ")) + code;
   const intro = forMessage
-    ? "Voici ton code pour confirmer ton courriel et envoyer ton message à Création Audio"
-    : "Voici ton code pour te connecter à ton compte Création Audio";
+    ? L("Voici ton code pour confirmer ton courriel et envoyer ton message à Création Audio", "Here is your code to confirm your email and send your message to Création Audio")
+    : L("Voici ton code pour te connecter à ton compte Création Audio", "Here is your code to sign in to your Création Audio account");
+  const ignore = L("Si tu n'as pas demandé ce code, ignore simplement ce courriel : personne ne peut se connecter sans lui.",
+                   "If you didn't ask for this code, just ignore this email: no one can sign in without it.");
   const text =
-    "Bonjour,\n\n" +
-    intro + " :\n\n" +
+    L("Bonjour,", "Hello,") + "\n\n" +
+    intro + L(" :", ":") + "\n\n" +
     "    " + code + "\n\n" +
-    "Il expire dans 10 minutes.\n\n" +
-    "Si tu n'as pas demandé ce code, ignore simplement ce courriel : personne ne peut se connecter sans lui.\n\n" +
-    "Création Audio\n" + SITE;
+    L("Il expire dans 10 minutes.", "It expires in 10 minutes.") + "\n\n" +
+    ignore + "\n\n" +
+    "Création Audio\n" + SITE + (en ? "/en/" : "");
   const html =
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#181A1F;line-height:1.5">' +
     '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-    '<h1 style="font-size:22px;margin:0 0 14px">' + (forMessage ? "Confirme ton courriel" : "Ton code de connexion") + "</h1>" +
-    "<p>Bonjour,</p>" +
-    "<p>" + (forMessage ? "Voici ton code pour envoyer ton message" : "Voici ton code pour te connecter à ton compte") + "&nbsp;:</p>" +
+    '<h1 style="font-size:22px;margin:0 0 14px">' + (forMessage ? L("Confirme ton courriel", "Confirm your email") : L("Ton code de connexion", "Your sign-in code")) + "</h1>" +
+    "<p>" + L("Bonjour,", "Hello,") + "</p>" +
+    "<p>" + (forMessage ? L("Voici ton code pour envoyer ton message", "Here is your code to send your message")
+                        : L("Voici ton code pour te connecter à ton compte", "Here is your code to sign in to your account")) + L("&nbsp;:", ":") + "</p>" +
     '<p style="margin:20px 0;font-size:34px;font-weight:700;letter-spacing:.18em;font-family:Consolas,Menlo,monospace;' +
     'background:#F4F3EF;border-radius:12px;padding:14px 20px;display:inline-block">' + code + "</p>" +
-    "<p>Il expire dans <strong>10 minutes</strong>." +
-    (forMessage ? " Tu retrouveras la conversation dans ton compte Création Audio." : "") + "</p>" +
+    "<p>" + L("Il expire dans <strong>10 minutes</strong>.", "It expires in <strong>10 minutes</strong>.") +
+    (forMessage ? L(" Tu retrouveras la conversation dans ton compte Création Audio.", " You'll find the conversation in your Création Audio account.") : "") + "</p>" +
     '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-    '<p style="font-size:12px;color:#6C727C">Si tu n\'as pas demandé ce code, ignore simplement ce courriel&nbsp;: personne ne peut se connecter sans lui. ' +
-    '<a href="' + SITE + '" style="color:#6C727C">creationaudio.ca</a></p>' +
+    '<p style="font-size:12px;color:#6C727C">' + ignore.replace(" : ", "&nbsp;: ") + ' ' +
+    '<a href="' + SITE + (en ? "/en/" : "") + '" style="color:#6C727C">creationaudio.ca</a></p>' +
     "</div>";
   return { subject, text, html };
 }
@@ -105,7 +112,7 @@ Deno.serve(async (req) => {
     const { data: gate, error } = await db.rpc("compte_code_issue", { p_email: email, p_ip: ip, p_code: code });
     if (error || !gate) return json({ error: "unavailable" }, 503);
     if (!gate.allowed) return json({ error: "wait", retry_after: gate.retry_after }, 429);
-    const mail = mailContent(code, body.purpose === "message");
+    const mail = mailContent(code, body.purpose === "message", body.lang === "en");
     try {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",

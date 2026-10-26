@@ -17,6 +17,7 @@
 
   var cfg = window.CA_SUPABASE || {};
   var CA = window.CA = window.CA || {};
+  var _t = CA.t, EN = CA.lang === 'en';
   var KEY = 'ca-compte-auth', PENDING = 'ca_compte_pending';
   var FB = 'https://m.me/61591945465745', EMAIL = 'contact@creationaudio.ca';
   var CODE_TTL = 10 * 60 * 1000, RESEND_MS = 60 * 1000;
@@ -31,7 +32,7 @@
     return fetch(cfg.url + '/functions/v1/compte-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey },
-      body: JSON.stringify(body)
+      body: JSON.stringify(Object.assign({ lang: CA.lang || 'fr' }, body))   // langue du courriel du code
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (b) { b = b || {}; b._status = r.status; return b; });
     });
@@ -48,14 +49,14 @@
     return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')
       .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
-  function money(n) { return (+n || 0).toLocaleString('fr-CA', { style: 'currency', currency: 'CAD' }); }
+  var money = CA.money;
   function fmtDate(d, withYear) {
     if (!d) return '';
     var x = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T12:00:00') : new Date(d);
     if (isNaN(x)) return '';
-    return x.toLocaleDateString('fr-CA', withYear === false ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
+    return x.toLocaleDateString(CA.locale, withYear === false ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
   }
-  function plural(n, one, many) { return n + ' ' + (n > 1 ? many : one); }
+  function plural(n, one, many) { return n + ' ' + _t((EN ? n !== 1 : n > 1) ? many : one); }
   var SPARKLE = /sparkle|galaxy|glitter|paillet/i;
   function swatch(hex, name) {
     if (!hex) return '<span class="sw sw-none" aria-hidden="true"></span>';
@@ -64,9 +65,9 @@
   }
   // « Écris-nous » -> panneau Messagerie (nav.js) ; Messenger et courriel restent au choix
   function askHtml(subject, body) {
-    return '<a class="ask" href="#/messages" data-msg="compte" data-msg-ref="" data-msg-body="' + esc(body) + '">Écris-nous</a>' +
-      '<span class="ask-alt"> ou par <a href="' + FB + '" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:' + EMAIL +
-      '?subject=' + encodeURIComponent(subject) + '&amp;body=' + encodeURIComponent(body) + '">courriel</a></span>';
+    return '<a class="ask" href="#/messages" data-msg="compte" data-msg-ref="" data-msg-body="' + esc(body) + _t('">Écris-nous</a>') +
+      _t('<span class="ask-alt"> ou par <a href="') + FB + _t('" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:') + EMAIL +
+      '?subject=' + encodeURIComponent(subject) + '&amp;body=' + encodeURIComponent(body) + _t('">courriel</a></span>');
   }
 
   /* ---------- écrans ---------- */
@@ -103,27 +104,27 @@
   function sendErr(b) {
     if (b.error === 'wait') {
       var s = Math.max(1, +b.retry_after || 60);
-      return s > 90 ? 'Trop de demandes. Réessaie dans ' + plural(Math.ceil(s / 60), 'minute', 'minutes') + '.'
-                    : 'Patiente ' + s + ' s avant de redemander un code.';
+      return s > 90 ? _t('Trop de demandes. Réessaie dans ') + plural(Math.ceil(s / 60), 'minute', 'minutes') + '.'
+                    : _t('Patiente ') + s + _t(' s avant de redemander un code.');
     }
-    if (b.error === 'reserved') return 'Ce courriel a sa propre page de connexion.';
-    if (b.error === 'bad_request') return 'Entre un courriel valide.';
-    if (b.error === 'mail') return 'Envoi impossible pour le moment. Réessaie dans un instant.';
-    return 'Service indisponible. Réessaie plus tard.';
+    if (b.error === 'reserved') return _t('Ce courriel a sa propre page de connexion.');
+    if (b.error === 'bad_request') return _t('Entre un courriel valide.');
+    if (b.error === 'mail') return _t('Envoi impossible pour le moment. Réessaie dans un instant.');
+    return _t('Service indisponible. Réessaie plus tard.');
   }
   function sendCode(email, statusEl, btn) {
-    btn.disabled = true; say(statusEl, 'Envoi…');
+    btn.disabled = true; say(statusEl, _t('Envoi…'));
     return callFn({ action: 'send', email: email, hp: ($('#acct-hp') || {}).value || '' }).then(function (b) {
       btn.disabled = false;
       if (!b.ok) { say(statusEl, sendErr(b), 'bad'); return false; }
       setPending({ email: email, at: Date.now(), sent: Date.now() });
       return true;
-    }, function () { btn.disabled = false; say(statusEl, 'Erreur réseau — réessaie.', 'bad'); return false; });
+    }, function () { btn.disabled = false; say(statusEl, _t('Erreur réseau — réessaie.'), 'bad'); return false; });
   }
   emailForm.addEventListener('submit', function (e) {
     e.preventDefault();
     var email = (emailIn.value || '').trim().toLowerCase();
-    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { say(emailSt, 'Entre un courriel valide.', 'bad'); emailIn.focus(); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { say(emailSt, _t('Entre un courriel valide.'), 'bad'); emailIn.focus(); return; }
     sendCode(email, emailSt, emailBtn).then(function (ok) { if (ok) { say(emailSt, ''); openCode(); } });
   });
 
@@ -140,13 +141,13 @@
     var p = getPending(); if (!p) return;
     var left = Math.ceil((p.sent + RESEND_MS - Date.now()) / 1000);
     resendBtn.disabled = left > 0;
-    resendBtn.textContent = left > 0 ? 'Renvoyer dans ' + left + ' s' : 'Renvoyer le code';
+    resendBtn.textContent = left > 0 ? _t('Renvoyer dans ') + left + ' s' : _t('Renvoyer le code');
     if (left > 0) resendTimer = setTimeout(tickResend, 1000);
   }
   resendBtn.addEventListener('click', function () {
     var p = getPending(); if (!p) { openLogin(); return; }
     sendCode(p.email, codeSt, resendBtn).then(function (ok) {
-      if (ok) { say(codeSt, 'Nouveau code envoyé.', 'ok'); codeIn.value = ''; codeIn.focus(); }
+      if (ok) { say(codeSt, _t('Nouveau code envoyé.'), 'ok'); codeIn.value = ''; codeIn.focus(); }
       tickResend();
     });
   });
@@ -165,8 +166,8 @@
   function verify() {
     var p = getPending(); if (!p) { openLogin(); return; }
     var code = codeIn.value.replace(/\D/g, '');
-    if (code.length !== 6) { say(codeSt, 'Entre les 6 chiffres reçus.', 'bad'); codeIn.focus(); return; }
-    codeBtn.disabled = true; say(codeSt, 'Vérification…');
+    if (code.length !== 6) { say(codeSt, _t('Entre les 6 chiffres reçus.'), 'bad'); codeIn.focus(); return; }
+    codeBtn.disabled = true; say(codeSt, _t('Vérification…'));
     callFn({ action: 'verify', email: p.email, code: code }).then(function (b) {
       if (b.session) {
         return sb.auth.setSession(b.session).then(function (s) {
@@ -177,11 +178,11 @@
         });
       }
       codeBtn.disabled = false;
-      if (b.error === 'invalid') { say(codeSt, 'Code incorrect · ' + plural(b.left, 'essai restant', 'essais restants') + '.', 'bad'); codeIn.select(); return; }
-      if (b.error === 'expired') { say(codeSt, 'Ce code n\'est plus valable. Demande un nouveau code.', 'bad'); return; }
-      if (b.error === 'revoked') { say(codeSt, 'Accès retiré. Écris-nous à ' + EMAIL + '.', 'bad'); return; }
-      say(codeSt, 'Connexion impossible pour le moment. Réessaie.', 'bad');
-    }).catch(function () { codeBtn.disabled = false; say(codeSt, 'Connexion impossible pour le moment. Réessaie.', 'bad'); });
+      if (b.error === 'invalid') { say(codeSt, _t('Code incorrect · ') + plural(b.left, 'essai restant', 'essais restants') + '.', 'bad'); codeIn.select(); return; }
+      if (b.error === 'expired') { say(codeSt, _t('Ce code n\'est plus valable. Demande un nouveau code.'), 'bad'); return; }
+      if (b.error === 'revoked') { say(codeSt, _t('Accès retiré. Écris-nous à ') + EMAIL + '.', 'bad'); return; }
+      say(codeSt, _t('Connexion impossible pour le moment. Réessaie.'), 'bad');
+    }).catch(function () { codeBtn.disabled = false; say(codeSt, _t('Connexion impossible pour le moment. Réessaie.'), 'bad'); });
   }
 
   function openLogin(email, msg) {
@@ -200,7 +201,7 @@
     return /^(401|403|PGRST301|42501|23503)$/.test(c) || /jwt|token|auth/i.test((err && err.message) || '');
   }
   function boot() {
-    if (!sb) { show('acct-boot'); $('#acct-boot').textContent = 'Service indisponible pour le moment.'; return; }
+    if (!sb) { show('acct-boot'); $('#acct-boot').textContent = _t('Service indisponible pour le moment.'); return; }
     sb.auth.getSession().then(function (r) {
       var s = r && r.data && r.data.session;
       if (!s) {
@@ -212,14 +213,15 @@
       return sb.rpc('me_account').then(function (res) {
         if (res.error) {
           if (isAuthError(res.error)) return sb.auth.signOut().then(function () { signedIn(false); openLogin(); });
-          show('acct-boot'); $('#acct-boot').textContent = 'Impossible de charger ton compte. Réessaie dans un instant.';
+          show('acct-boot'); $('#acct-boot').textContent = _t('Impossible de charger ton compte. Réessaie dans un instant.');
           return;
         }
         acct = res.data || {};
+        if (CA.custLang) CA.custLang();          // langue des courriels = celle de cette page
         if (!String(acct.name || '').trim()) { openWelcome(); return; }
         openHome();
       });
-    }).catch(function () { show('acct-boot'); $('#acct-boot').textContent = 'Impossible de charger ton compte. Réessaie dans un instant.'; });
+    }).catch(function () { show('acct-boot'); $('#acct-boot').textContent = _t('Impossible de charger ton compte. Réessaie dans un instant.'); });
   }
   if (sb && sb.auth.onAuthStateChange) {
     sb.auth.onAuthStateChange(function (ev) {
@@ -237,20 +239,20 @@
   $('#acct-welcome-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var name = $('#acct-w-name').value.trim(), st = $('#acct-w-status'), btn = $('#acct-w-btn');
-    if (!name) { say(st, 'Entre ton nom.', 'bad'); $('#acct-w-name').focus(); return; }
-    btn.disabled = true; say(st, 'Enregistrement…');
+    if (!name) { say(st, _t('Entre ton nom.'), 'bad'); $('#acct-w-name').focus(); return; }
+    btn.disabled = true; say(st, _t('Enregistrement…'));
     sb.rpc('me_update', { p_name: name, p_phone: $('#acct-w-phone').value.trim() }).then(function (res) {
       btn.disabled = false;
-      if (res.error) { say(st, 'Enregistrement impossible. Réessaie.', 'bad'); return; }
+      if (res.error) { say(st, _t('Enregistrement impossible. Réessaie.'), 'bad'); return; }
       acct = res.data || acct;
       openHome();
-    }, function () { btn.disabled = false; say(st, 'Erreur réseau — réessaie.', 'bad'); });
+    }, function () { btn.disabled = false; say(st, _t('Erreur réseau — réessaie.'), 'bad'); });
   });
 
   /* ---------- 4. espace client ---------- */
   function firstName(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
   function openHome() {
-    $('#acct-hello').textContent = 'Bonjour ' + firstName(acct.name);
+    $('#acct-hello').textContent = _t('Bonjour ') + firstName(acct.name);
     $('#acct-sub').textContent = acct.email || '';
     fillInfos();
     show('acct-home');
@@ -294,7 +296,7 @@
   // onglet Commandes = réservations (#acct-resv), commandes en ligne (#acct-cmds) puis factures (#acct-invs)
   var tabEl = $('#acct-orders'), cmdEl = null, ordersEl = null, resvEl = null, myOrders = [], emptyIds = {};
   function loadOrders() {
-    tabEl.innerHTML = '<div id="acct-resv"></div><div id="acct-cmds"></div><div id="acct-invs"><p class="acct-empty">Chargement…</p></div>';
+    tabEl.innerHTML = _t('<div id="acct-resv"></div><div id="acct-cmds"></div><div id="acct-invs"><p class="acct-empty">Chargement…</p></div>');
     cmdEl = $('#acct-cmds'); ordersEl = $('#acct-invs'); resvEl = $('#acct-resv');
     ordersReady = false;
     var slotsP = window.CA.custOrder ? window.CA.custOrder.slots() : Promise.resolve([]);
@@ -310,18 +312,18 @@
       renderCmds(); renderPkv();
       if (!acct.linked) { renderOrders(); return; }
       return sb.rpc('me_invoices').then(function (r2) {
-        if (r2.error) { ordersEl.innerHTML = '<p class="acct-empty">Impossible de charger tes factures. Réessaie plus tard.</p>'; return; }
+        if (r2.error) { ordersEl.innerHTML = _t('<p class="acct-empty">Impossible de charger tes factures. Réessaie plus tard.</p>'); return; }
         invoices = r2.data || [];
         renderOrders();
       });
-    }).then(null, function () { ordersEl.innerHTML = '<p class="acct-empty">Erreur réseau — réessaie.</p>'; });
+    }).then(null, function () { ordersEl.innerHTML = _t('<p class="acct-empty">Erreur réseau — réessaie.</p>'); });
   }
 
   /* ---- commandes en ligne (envoyées depuis la boutique / la page spacers) ---- */
-  var ORD_ST = { 'new': 'Reçue', preparing: 'En préparation', ready: 'Prête', invoiced: 'Facturée', cancelled: 'Annulée' };
+  var ORD_ST = { 'new': _t('Reçue'), preparing: _t('En préparation'), ready: _t('Prête'), invoiced: _t('Facturée'), cancelled: _t('Annulée') };
   function renderCmds() {
     if (!myOrders.length) { cmdEl.innerHTML = ''; return; }
-    cmdEl.innerHTML = '<h2 class="acct-h">Commandes en ligne</h2><div class="ord-list">' + myOrders.map(function (o) {
+    cmdEl.innerHTML = _t('<h2 class="acct-h">Commandes en ligne</h2><div class="ord-list">') + myOrders.map(function (o) {
       var open = o.status !== 'invoiced' && o.status !== 'cancelled';
       var pill = '<span class="ord-pill st-' + esc(o.status) + '">' + esc(ORD_ST[o.status] || o.status) +
         (o.status === 'invoiced' && o.invoice_number ? ' · ' + esc(o.invoice_number) : '') + '</span>';
@@ -334,14 +336,14 @@
         '</summary>' +
         '<div class="ord-body">' +
           '<ul class="ord-lines">' + lines + '</ul>' +
-          '<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>' + money(o.total) + '</span></div></div>' +
+          _t('<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>') + money(o.total) + '</span></div></div>' +
           (open ? pkRow(o.pickup_date ? o : null, !o.has_backorder || o.status === 'ready', o.has_backorder && o.status !== 'ready') : '') +
-          (o.note ? '<p class="ord-note"><span>Note</span>' + esc(o.note) + '</p>' : '') +
-          (o.status === 'new' ? '<div class="ord-acts"><button class="acct-btn ord-edit" type="button">Modifier</button>' +
-            '<button class="acct-btn acct-btn-danger ord-cancel" type="button">Annuler la commande</button></div>' : '') +
+          (o.note ? _t('<p class="ord-note"><span>Note</span>') + esc(o.note) + '</p>' : '') +
+          (o.status === 'new' ? _t('<div class="ord-acts"><button class="acct-btn ord-edit" type="button">Modifier</button>') +
+            _t('<button class="acct-btn acct-btn-danger ord-cancel" type="button">Annuler la commande</button></div>') : '') +
         '</div>' +
       '</details>';
-    }).join('') + '</div>' + (invoices.length || acct.linked ? '<h2 class="acct-h">Factures</h2>' : '');
+    }).join('') + '</div>' + (invoices.length || acct.linked ? _t('<h2 class="acct-h">Factures</h2>') : '');
     $$('.ord', cmdEl).forEach(function (el) {
       var o = myOrders.filter(function (x) { return String(x.id) === el.getAttribute('data-oid'); })[0];
       var ed = $('.ord-edit', el), ca = $('.ord-cancel', el), pk = $('.pk-change', el);
@@ -354,8 +356,8 @@
   function lineLi(l, bo) {
     return '<li>' + swatch(l.hex, (l.name || '') + ' ' + (l.meta || '')) +
       '<span class="ol-tx"><b>' + esc(l.name || '') + '</b>' + (l.meta ? '<small>' + esc(l.meta) + '</small>' : '') +
-        (bo ? '<em class="ol-pend">' + (emptyIds[l.product_id] ? bo + ' à compléter · sans garantie'
-          : bo + ' à commander · ' + (l.ptype === 'spacer' ? 'délai à confirmer' : '3 à 14 jours ouvrables')) + '</em>' : '') + '</span>' +
+        (bo ? '<em class="ol-pend">' + (emptyIds[l.product_id] ? bo + _t(' à compléter · sans garantie')
+          : bo + _t(' à commander · ') + (l.ptype === 'spacer' ? _t('délai à confirmer') : _t('3 à 14 jours ouvrables'))) + '</em>' : '') + '</span>' +
       '<span class="ol-q">' + (+l.qty) + ' × ' + money(l.unit_price) + '</span>' +
       '<span class="ol-t">' + money(l.line_total) + '</span></li>';
   }
@@ -366,8 +368,8 @@
     var key = spacersOnly ? 'ca_v2_cart_spacers' : 'ca_v2_cart', cur = {};
     try { cur = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) {}
     if (!Object.keys(cur).length) { loadIntoCart(); return; }
-    caDialog.confirm({ title: 'Remplacer ton panier ?', message: 'Ton panier actuel sera remplacé par la commande ' + o.number + '.',
-      ok: 'Remplacer', icon: 'cart' }).then(function (ok) { if (ok) loadIntoCart(); });
+    caDialog.confirm({ title: _t('Remplacer ton panier ?'), message: _t('Ton panier actuel sera remplacé par la commande ') + o.number + '.',
+      ok: _t('Remplacer'), icon: 'cart' }).then(function (ok) { if (ok) loadIntoCart(); });
     function loadIntoCart() {
       var cart = {};
       lines.forEach(function (l) {
@@ -390,9 +392,9 @@
   function pkRow(x, can, later) {
     var CO = window.CA.custOrder;
     if (!CO || (!x && !hasSlots)) return '';
-    var txt = x ? CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end) : later ? 'à choisir quand tout sera arrivé' : 'à choisir';
-    return '<p class="ord-note ord-pk' + (x ? '' : ' is-todo') + '"><span>Cueillette</span><b>' + esc(txt) + '</b>' +
-      (can && hasSlots ? '<button class="pk-change" type="button">' + (x ? 'Changer' : 'Choisir') + '</button>' : '') + '</p>';
+    var txt = x ? CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end) : later ? _t('à choisir quand tout sera arrivé') : _t('à choisir');
+    return '<p class="ord-note ord-pk' + (x ? '' : ' is-todo') + _t('"><span>Cueillette</span><b>') + esc(txt) + '</b>' +
+      (can && hasSlots ? '<button class="pk-change" type="button">' + (x ? _t('Changer') : _t('Choisir')) + '</button>' : '') + '</p>';
   }
   /* ---- écran « Ma cueillette » (#/cueillette/c|r/<id>) : la commande à gauche, le calendrier à droite ---- */
   var pkv = null, pkvFor = '', ordersReady = false, resvReady = false;
@@ -402,7 +404,7 @@
     var isC = pkv.kind === 'c', x = (isC ? myOrders : myResv).filter(function (y) { return String(y.id) === pkv.id; })[0];
     if (!x) {
       if (isC ? ordersReady : resvReady) { pkvFor = ''; location.hash = '#/commandes'; return; }
-      host.innerHTML = '<p class="acct-empty">Chargement…</p>'; pkvFor = ''; return;
+      host.innerHTML = _t('<p class="acct-empty">Chargement…</p>'); pkvFor = ''; return;
     }
     var open = isC ? ['new', 'preparing', 'ready'].indexOf(x.status) >= 0 : x.status === 'active' && new Date(x.expires_at) > new Date();
     if (!open) { pkvFor = ''; location.hash = '#/commandes'; return; }
@@ -411,45 +413,45 @@
     pkvFor = key;
     var CO = window.CA.custOrder;
     var later = isC && x.has_backorder && x.status !== 'ready';
-    var title = !isC ? 'Réservation ' + x.number + ' confirmée !'
-      : x.status === 'ready' ? 'Ta commande ' + x.number + ' est prête !' : 'Commande ' + x.number + ' reçue !';
+    var title = !isC ? _t('Réservation ') + x.number + _t(' confirmée !')
+      : x.status === 'ready' ? _t('Ta commande ') + x.number + _t(' est prête !') : _t('Commande ') + x.number + _t(' reçue !');
     var sub = isC ? fmtDate(x.created_at) + ' · ' + plural(itemsOf(x), 'article', 'articles')
-      : 'Gardée jusqu\'au ' + whenTxt(x.expires_at);
+      : _t('Gardée jusqu\'au ') + whenTxt(x.expires_at);
     var lines = (x.lines || []).map(function (l) { return lineLi(l, isC ? (+l.qty_to_order || 0) : 0); }).join('');
     host.innerHTML = '<div class="pkv">' +
       '<section class="pkv-ord">' +
         '<h2 class="pkv-h">' + esc(title) + '</h2><p class="pkv-sub">' + esc(sub) + '</p>' +
         '<ul class="ord-lines">' + lines + '</ul>' +
-        '<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>' + money(x.total) + '</span></div></div>' +
-        (x.note ? '<p class="ord-note"><span>Note</span>' + esc(x.note) + '</p>' : '') +
+        _t('<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>') + money(x.total) + '</span></div></div>' +
+        (x.note ? _t('<p class="ord-note"><span>Note</span>') + esc(x.note) + '</p>' : '') +
       '</section>' +
       '<section class="pkv-pick"></section>' +
     '</div>' +
-    '<p class="pkv-back"><a href="#/commandes">← Mes commandes</a></p>';
+    _t('<p class="pkv-back"><a href="#/commandes">← Mes commandes</a></p>');
     var side = $('.pkv-pick', host);
     if (later) {
       var n = (x.lines || []).reduce(function (s, l) { return s + (+l.qty_to_order || 0); }, 0);
-      side.innerHTML = '<h2 class="pkv-h">Ta cueillette</h2>' +
-        '<p class="pkv-wait">' + esc(plural(n, 'article', 'articles')) + ' à commander chez notre fournisseur. ' +
-        'On t\'écrit dès leur arrivée pour choisir ta date.</p>';
+      side.innerHTML = _t('<h2 class="pkv-h">Ta cueillette</h2>') +
+        '<p class="pkv-wait">' + esc(plural(n, 'article', 'articles')) + _t(' à commander chez notre fournisseur. ') +
+        _t('On t\'écrit dès leur arrivée pour choisir ta date.</p>');
       return;
     }
-    side.innerHTML = '<p class="acct-empty">Chargement des plages…</p>';
+    side.innerHTML = _t('<p class="acct-empty">Chargement des plages…</p>');
     CO.slots(isC ? null : x.expires_at, x.id).then(function (list) {
       if (pkvFor !== key) return;
       if (!list.length) {
-        side.innerHTML = '<h2 class="pkv-h">Ta cueillette</h2><p class="pkv-wait">Aucune plage offerte pour le moment. ' +
-          askHtml('Cueillette ' + x.number, 'Bonjour, pour la cueillette de ' + x.number + ' : ') + '</p>';
+        side.innerHTML = _t('<h2 class="pkv-h">Ta cueillette</h2><p class="pkv-wait">Aucune plage offerte pour le moment. ') +
+          askHtml(_t('Cueillette ') + x.number, _t('Bonjour, pour la cueillette de ') + x.number + ' : ') + '</p>';
         return;
       }
       pickView(list);
     });
     function pickView(list) {
       var had = !!x.pickup_date;
-      side.innerHTML = '<h2 class="pkv-h">' + (had ? 'Changer ma cueillette' : 'Choisis ta cueillette') + '</h2>' +
+      side.innerHTML = '<h2 class="pkv-h">' + (had ? _t('Changer ma cueillette') : _t('Choisis ta cueillette')) + '</h2>' +
         '<div class="pkv-cal"></div>' +
-        '<div class="pkv-foot"><button class="acct-submit pkv-ok" type="button">' + (had ? 'Enregistrer' : 'Confirmer ma cueillette') + '</button>' +
-        (had ? '<button class="acct-btn pkv-keep" type="button">Garder ' + esc(CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end, true)) + '</button>' : '') +
+        '<div class="pkv-foot"><button class="acct-submit pkv-ok" type="button">' + (had ? _t('Enregistrer') : _t('Confirmer ma cueillette')) + '</button>' +
+        (had ? _t('<button class="acct-btn pkv-keep" type="button">Garder ') + esc(CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end, true)) + '</button>' : '') +
         '<p class="pkv-msg" role="status"></p></div>';
       var msg = $('.pkv-msg', side), ok = $('.pkv-ok', side), keep = $('.pkv-keep', side);
       var p = CO.picker($('.pkv-cal', side), { big: true, onChange: function () { msg.textContent = ''; } });
@@ -457,50 +459,50 @@
       if (keep) keep.addEventListener('click', doneView);
       ok.addEventListener('click', function () {
         var v = p.value();
-        if (!v) { msg.textContent = 'Choisis une date et une plage.'; return; }
+        if (!v) { msg.textContent = _t('Choisis une date et une plage.'); return; }
         if (v.d === x.pickup_date && v.s === x.pickup_start) { doneView(); return; }
-        ok.disabled = true; msg.textContent = 'Enregistrement…';
+        ok.disabled = true; msg.textContent = _t('Enregistrement…');
         CO.setPickup(isC ? 'order' : 'reservation', x.id, v).then(function (r) {
           x.pickup_date = r.d || v.d; x.pickup_start = r.s || v.s; x.pickup_end = r.e || v.e;
           doneView();
           if (isC) loadOrders(); else loadResv();   // listes de Mes commandes à jour (l'écran reste tel quel)
         }, function (err) {
-          ok.disabled = false; msg.textContent = (err && err.message) || 'Cueillette non enregistrée. Réessaie.';
+          ok.disabled = false; msg.textContent = (err && err.message) || _t('Cueillette non enregistrée. Réessaie.');
           CO.slots(isC ? null : x.expires_at, x.id).then(function (l2) { if (pkvFor === key) p.load(l2, v); });
         });
       });
     }
     function doneView() {
       side.innerHTML = '<div class="pkv-done"><span class="pkv-check" aria-hidden="true"></span>' +
-        '<h2 class="pkv-h">Cueillette confirmée</h2>' +
+        _t('<h2 class="pkv-h">Cueillette confirmée</h2>') +
         '<p class="pkv-when">' + esc(CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end)) + '</p>' +
-        '<div class="pkv-foot"><a class="acct-submit" href="#/commandes">Mes commandes</a>' +
-        '<button class="acct-btn pkv-change" type="button">Changer</button></div></div>';
+        _t('<div class="pkv-foot"><a class="acct-submit" href="#/commandes">Mes commandes</a>') +
+        _t('<button class="acct-btn pkv-change" type="button">Changer</button></div></div>');
       $('.pkv-change', side).addEventListener('click', function () {
-        side.innerHTML = '<p class="acct-empty">Chargement des plages…</p>';
+        side.innerHTML = _t('<p class="acct-empty">Chargement des plages…</p>');
         CO.slots(isC ? null : x.expires_at, x.id).then(function (l2) { if (pkvFor === key) pickView(l2); });
       });
     }
   }
   function cancelOrder(o, btn) {
-    caDialog.confirm({ title: 'Annuler la commande ' + o.number + ' ?', message: 'Tu pourras en passer une nouvelle au besoin.',
-      ok: 'Annuler la commande', danger: true }).then(function (ok) {
+    caDialog.confirm({ title: _t('Annuler la commande ') + o.number + ' ?', message: _t('Tu pourras en passer une nouvelle au besoin.'),
+      ok: _t('Annuler la commande'), danger: true }).then(function (ok) {
       if (!ok) return;
       btn.disabled = true;
       sb.rpc('customer_cancel_order', { p_id: o.id }).then(function (res) {
-        if (res.error) { btn.disabled = false; caDialog.error(res.error, 'Annulation impossible'); return; }
+        if (res.error) { btn.disabled = false; caDialog.error(res.error, _t('Annulation impossible')); return; }
         if (sb.functions) sb.functions.invoke('customer-order-notify', { body: { order_id: o.id, event: 'cancelled' } }).then(null, function () {});
-        caDialog.toast('Commande ' + o.number + ' annulée');
+        caDialog.toast(_t('Commande ') + o.number + _t(' annulée'));
         loadOrders();
-      }, function () { btn.disabled = false; caDialog.toast('Erreur réseau — réessaie.', 'bad'); });
+      }, function () { btn.disabled = false; caDialog.toast(_t('Erreur réseau — réessaie.'), 'bad'); });
     });
   }
   /* ---- réservations 72 h (client approuvé — panier de la boutique) ---- */
-  var RES_ST = { active: 'Gardée', invoiced: 'Facturée', cancelled: 'Annulée', expired: 'Expirée' };
+  var RES_ST = { active: _t('Gardée'), invoiced: _t('Facturée'), cancelled: _t('Annulée'), expired: _t('Expirée') };
   var myResv = [], resvMeta = {};
   function whenTxt(iso) {
     var d = new Date(iso);
-    return isNaN(d) ? '' : d.toLocaleString('fr-CA', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+    return isNaN(d) ? '' : d.toLocaleString(CA.locale, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
   }
   function loadResv() {
     sb.rpc('me_reservations').then(function (res) {
@@ -513,14 +515,14 @@
   function renderResv() {
     var susp = resvMeta.suspended_until;
     if (!myResv.length && !susp) { resvEl.innerHTML = ''; return; }
-    resvEl.innerHTML = '<h2 class="acct-h">Réservations</h2>' +
-      (susp ? '<p class="resv-susp">Réservations suspendues jusqu\'au ' + esc(fmtDate(susp)) + ' : 2 réservations non récupérées.</p>' : '') +
+    resvEl.innerHTML = _t('<h2 class="acct-h">Réservations</h2>') +
+      (susp ? _t('<p class="resv-susp">Réservations suspendues jusqu\'au ') + esc(fmtDate(susp)) + _t(' : 2 réservations non récupérées.</p>') : '') +
       '<div class="ord-list">' + myResv.map(function (r) {
         var active = r.status === 'active', off = r.status === 'cancelled' || r.status === 'expired';
         var pill = '<span class="ord-pill st-' + esc(r.status) + '">' + esc(RES_ST[r.status] || r.status) +
           (r.status === 'invoiced' && r.invoice_number ? ' · ' + esc(r.invoice_number) : '') + '</span>';
-        var meta = active ? 'jusqu\'au ' + whenTxt(r.expires_at)
-          : r.status === 'expired' ? (r.penalized ? 'non récupérée' : fmtDate(r.created_at))
+        var meta = active ? _t('jusqu\'au ') + whenTxt(r.expires_at)
+          : r.status === 'expired' ? (r.penalized ? _t('non récupérée') : fmtDate(r.created_at))
           : fmtDate(r.created_at);
         var items = (r.lines || []).reduce(function (s, l) { return s + (+l.qty || 0); }, 0);
         var lines = (r.lines || []).map(function (l) { return lineLi(l, 0); }).join('');
@@ -532,10 +534,10 @@
           '</summary>' +
           '<div class="ord-body">' +
             '<ul class="ord-lines">' + lines + '</ul>' +
-            '<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>' + money(r.total) + '</span></div></div>' +
+            _t('<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>') + money(r.total) + '</span></div></div>' +
             (active ? pkRow(r.pickup_date ? r : null, true, false) : '') +
-            (r.note ? '<p class="ord-note"><span>Note</span>' + esc(r.note) + '</p>' : '') +
-            (active ? '<div class="ord-acts"><button class="acct-btn acct-btn-danger resv-cancel" type="button">Annuler la réservation</button></div>' : '') +
+            (r.note ? _t('<p class="ord-note"><span>Note</span>') + esc(r.note) + '</p>' : '') +
+            (active ? _t('<div class="ord-acts"><button class="acct-btn acct-btn-danger resv-cancel" type="button">Annuler la réservation</button></div>') : '') +
           '</div>' +
         '</details>';
       }).join('') + '</div>';
@@ -547,16 +549,16 @@
     });
   }
   function cancelResv(r, btn) {
-    caDialog.confirm({ title: 'Annuler la réservation ' + r.number + ' ?', message: 'Les articles seront remis en vente.',
-      ok: 'Annuler la réservation', danger: true }).then(function (ok) {
+    caDialog.confirm({ title: _t('Annuler la réservation ') + r.number + ' ?', message: _t('Les articles seront remis en vente.'),
+      ok: _t('Annuler la réservation'), danger: true }).then(function (ok) {
       if (!ok) return;
       btn.disabled = true;
       sb.rpc('customer_cancel_reservation', { p_id: r.id }).then(function (res) {
-        if (res.error) { btn.disabled = false; caDialog.error(res.error, 'Annulation impossible'); return; }
+        if (res.error) { btn.disabled = false; caDialog.error(res.error, _t('Annulation impossible')); return; }
         if (sb.functions) sb.functions.invoke('reservation-notify', { body: { reservation_id: r.id, event: 'cancelled' } }).then(null, function () {});
-        caDialog.toast('Réservation ' + r.number + ' annulée');
+        caDialog.toast(_t('Réservation ') + r.number + _t(' annulée'));
         loadResv();
-      }, function () { btn.disabled = false; caDialog.toast('Erreur réseau — réessaie.', 'bad'); });
+      }, function () { btn.disabled = false; caDialog.toast(_t('Erreur réseau — réessaie.'), 'bad'); });
     });
   }
   function pendingOf(inv) {
@@ -569,29 +571,29 @@
     if (!acct.linked) {
       // déjà une commande en ligne : la facture viendra avec (compte relié à la facturation)
       if (myOrders.length) { ordersEl.innerHTML = ''; return; }
-      ordersEl.innerHTML = '<div class="acct-empty"><p>Tes factures apparaîtront ici dès qu\'on aura relié ton compte. Déjà client&nbsp;? ' +
-        askHtml('Relier mon compte', 'Bonjour,\n\nJ\'ai créé mon compte sur creationaudio.ca avec le courriel ' + (acct.email || '') +
-          '. Pouvez-vous le relier à mes achats ?\n\nMerci !') + '</p></div>';
+      ordersEl.innerHTML = _t('<div class="acct-empty"><p>Tes factures apparaîtront ici dès qu\'on aura relié ton compte. Déjà client&nbsp;? ') +
+        askHtml(_t('Relier mon compte'), _t('Bonjour,\n\nJ\'ai créé mon compte sur creationaudio.ca avec le courriel ') + (acct.email || '') +
+          _t('. Pouvez-vous le relier à mes achats ?\n\nMerci !')) + '</p></div>';
       return;
     }
-    if (!invoices.length) { ordersEl.innerHTML = '<p class="acct-empty">Aucune facture pour l\'instant.</p>'; return; }
+    if (!invoices.length) { ordersEl.innerHTML = _t('<p class="acct-empty">Aucune facture pour l\'instant.</p>'); return; }
     ordersEl.innerHTML = '<div class="ord-list">' + invoices.map(function (inv) {
       var pend = pendingOf(inv), n = itemsOf(inv), off = inv.status === 'cancelled';
-      var pill = off ? '<span class="ord-pill off">Annulée</span>'
-        : pend ? '<span class="ord-pill pend">' + pend + ' à venir</span>' : '';
+      var pill = off ? _t('<span class="ord-pill off">Annulée</span>')
+        : pend ? '<span class="ord-pill pend">' + pend + _t(' à venir</span>') : '';
       var lines = (inv.lines || []).map(function (l) {
         var lp = +l.qty_pending || 0;
         return '<li>' + swatch(l.hex, (l.label || '') + ' ' + (l.meta || '')) +
           '<span class="ol-tx"><b>' + esc(l.label || '') + '</b>' + (l.meta ? '<small>' + esc(l.meta) + '</small>' : '') +
-            (lp && !off ? '<em class="ol-pend">' + lp + ' à venir</em>' : '') + '</span>' +
+            (lp && !off ? '<em class="ol-pend">' + lp + _t(' à venir</em>') : '') + '</span>' +
           '<span class="ol-q">' + (+l.qty) + ' × ' + money(l.unit_price) + '</span>' +
           '<span class="ol-t">' + money(l.line_total) + '</span></li>';
       }).join('');
       var tax = inv.tax_enabled
-        ? '<div><span>TPS</span><span>' + money(inv.tax_gst) + '</span></div><div><span>TVQ</span><span>' + money(inv.tax_qst) + '</span></div>' : '';
+        ? _t('<div><span>TPS</span><span>') + money(inv.tax_gst) + _t('</span></div><div><span>TVQ</span><span>') + money(inv.tax_qst) + '</span></div>' : '';
       return '<details class="ord' + (off ? ' is-off' : '') + '" data-id="' + esc(inv.id) + '">' +
         '<summary>' +
-          '<span class="ord-main"><b class="ord-no">' + esc(inv.number || 'Facture') + '</b>' +
+          '<span class="ord-main"><b class="ord-no">' + esc(inv.number || _t('Facture')) + '</b>' +
             '<span class="ord-meta">' + esc(fmtDate(inv.invoice_date)) + ' · ' + plural(n, 'article', 'articles') + '</span></span>' +
           pill +
           '<span class="ord-total">' + money(inv.total) + '</span>' +
@@ -600,11 +602,11 @@
         '<div class="ord-body">' +
           '<ul class="ord-lines">' + lines + '</ul>' +
           '<div class="ord-tot">' +
-            (inv.tax_enabled ? '<div><span>Sous-total</span><span>' + money(inv.subtotal) + '</span></div>' + tax : '') +
-            '<div class="grand"><span>Total</span><span>' + money(inv.total) + '</span></div>' +
+            (inv.tax_enabled ? _t('<div><span>Sous-total</span><span>') + money(inv.subtotal) + '</span></div>' + tax : '') +
+            _t('<div class="grand"><span>Total</span><span>') + money(inv.total) + '</span></div>' +
           '</div>' +
-          (inv.note ? '<p class="ord-note"><span>Note</span>' + esc(inv.note) + '</p>' : '') +
-          '<button class="acct-btn ord-print" type="button">Imprimer / PDF</button>' +
+          (inv.note ? _t('<p class="ord-note"><span>Note</span>') + esc(inv.note) + '</p>' : '') +
+          _t('<button class="acct-btn ord-print" type="button">Imprimer / PDF</button>') +
         '</div>' +
       '</details>';
     }).join('') + '</div>';
@@ -615,8 +617,8 @@
   }
 
   /* ---- réimpression : même document que l'Historique de l'admin ---- */
-  var DEFAULT_CO = { name: 'Création Audio', tagline: 'Audio automobile & impression 3D — Québec', address: '',
-    city: 'Québec, QC', email: EMAIL, phone: '', gst: '', qst: '', logo: '' };
+  var DEFAULT_CO = { name: 'Création Audio', tagline: _t('Audio automobile & impression 3D — Québec'), address: '',
+    city: _t('Québec, QC'), email: EMAIL, phone: '', gst: '', qst: '', logo: '' };
   function loadCompany() {
     if (company) return Promise.resolve(company);
     return sb.rpc('company_public').then(function (res) {
@@ -628,7 +630,7 @@
   function buildDoc(inv, co) {
     var meta = [co.address, co.city, co.email, co.phone].filter(Boolean);
     var billto = (inv.client_name || inv.client_contact || inv.client_address || inv.client_city)
-      ? '<div class="inv-billto"><div class="lbl">Facturé à</div>' +
+      ? _t('<div class="inv-billto"><div class="lbl">Facturé à</div>') +
         (inv.client_name ? '<div class="who">' + esc(inv.client_name) + '</div>' : '') +
         (inv.client_address ? '<div>' + esc(inv.client_address) + '</div>' : '') +
         (inv.client_city ? '<div>' + esc(inv.client_city) + '</div>' : '') +
@@ -639,24 +641,24 @@
         '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num">' + money(l.line_total) + '</td></tr>';
     }).join('');
     var taxLines = inv.tax_enabled
-      ? '<div class="line"><span>TPS' + (co.gst ? ' <span class="taxno">' + esc(co.gst) + '</span>' : '') + '</span><span>' + money(inv.tax_gst) + '</span></div>' +
-        '<div class="line"><span>TVQ' + (co.qst ? ' <span class="taxno">' + esc(co.qst) + '</span>' : '') + '</span><span>' + money(inv.tax_qst) + '</span></div>'
+      ? _t('<div class="line"><span>TPS') + (co.gst ? ' <span class="taxno">' + esc(co.gst) + '</span>' : '') + '</span><span>' + money(inv.tax_gst) + '</span></div>' +
+        _t('<div class="line"><span>TVQ') + (co.qst ? ' <span class="taxno">' + esc(co.qst) + '</span>' : '') + '</span><span>' + money(inv.tax_qst) + '</span></div>'
       : '';
     return '<div class="inv-top">' +
         '<div class="inv-co">' + (co.logo ? '<img class="inv-logo" src="' + esc(co.logo) + '" alt="">' : '') +
           '<div class="inv-co-name">' + esc(co.name) + '</div>' +
           (co.tagline ? '<div class="inv-co-tag">' + esc(co.tagline) + '</div>' : '') +
           (meta.length ? '<div class="inv-co-meta">' + esc(meta.join('\n')) + '</div>' : '') + '</div>' +
-        '<div class="inv-title"><h1>FACTURE</h1><div class="inv-meta">N° ' + esc(inv.number || '—') + '<br>' + esc(fmtDate(inv.invoice_date)) + '</div></div>' +
-      '</div>' + (inv.status === 'cancelled' ? '<div class="inv-cancelled">FACTURE ANNULÉE</div>' : '') + billto +
-      '<table class="inv-table"><thead><tr><th>Description</th><th class="num">Qté</th><th class="num">Prix unit.</th><th class="num">Montant</th></tr></thead>' +
+        _t('<div class="inv-title"><h1>FACTURE</h1><div class="inv-meta">N° ') + esc(inv.number || '—') + '<br>' + esc(fmtDate(inv.invoice_date)) + '</div></div>' +
+      '</div>' + (inv.status === 'cancelled' ? _t('<div class="inv-cancelled">FACTURE ANNULÉE</div>') : '') + billto +
+      _t('<table class="inv-table"><thead><tr><th>Description</th><th class="num">Qté</th><th class="num">Prix unit.</th><th class="num">Montant</th></tr></thead>') +
         '<tbody>' + rows + '</tbody></table>' +
       '<div class="inv-tot">' +
-        '<div class="line"><span>Sous-total</span><span>' + money(inv.subtotal) + '</span></div>' + taxLines +
-        '<div class="line grand"><span>Total</span><span>' + money(inv.total) + '</span></div>' +
+        _t('<div class="line"><span>Sous-total</span><span>') + money(inv.subtotal) + '</span></div>' + taxLines +
+        _t('<div class="line grand"><span>Total</span><span>') + money(inv.total) + '</span></div>' +
       '</div>' +
-      (inv.note ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(inv.note) + '</div>' : '') +
-      '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>';
+      (inv.note ? _t('<div class="inv-pay"><span class="lbl">Note</span>') + esc(inv.note) + '</div>' : '') +
+      _t('<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
   }
   var TITLE = document.title;
   function printInvoice(inv) {
@@ -673,32 +675,32 @@
 
   /* ---- Mes messages (conversations de la Messagerie ; le fil s'ouvre dans le panneau) ---- */
   var msgsEl = $('#acct-msgs'), msgsN = $('#acct-n-msgs');
-  var TOPIC = { filaments: 'Filaments', spacers: 'Spacers', compte: 'Mon compte', autre: 'Autre' };
+  var TOPIC = { filaments: _t('Filaments'), spacers: _t('Spacers'), compte: _t('Mon compte'), autre: _t('Autre') };
   function openMsg(opts) {
     if (CA.loadMsg) CA.loadMsg().then(function (m) { m.open(opts); }, function () { window.open(FB, '_blank', 'noopener'); });
   }
   function loadMsgs() {
     if (!msgsEl) return;
-    if (!msgsEl.innerHTML) msgsEl.innerHTML = '<p class="acct-empty">Chargement…</p>';
+    if (!msgsEl.innerHTML) msgsEl.innerHTML = _t('<p class="acct-empty">Chargement…</p>');
     sb.rpc('me_conversations').then(function (res) {
-      if (res.error) { msgsEl.innerHTML = '<p class="acct-empty">Impossible de charger tes messages. Réessaie plus tard.</p>'; return; }
+      if (res.error) { msgsEl.innerHTML = _t('<p class="acct-empty">Impossible de charger tes messages. Réessaie plus tard.</p>'); return; }
       renderMsgs(res.data || []);
-    }, function () { msgsEl.innerHTML = '<p class="acct-empty">Erreur réseau — réessaie.</p>'; });
+    }, function () { msgsEl.innerHTML = _t('<p class="acct-empty">Erreur réseau — réessaie.</p>'); });
   }
   function renderMsgs(convs) {
     var unread = convs.reduce(function (s, c) { return s + (+c.unread || 0); }, 0);
     msgsN.hidden = !unread; msgsN.textContent = unread;
-    var head = '<div class="cv-head"><button class="acct-btn cv-new" type="button">Nouveau message</button></div>';
+    var head = _t('<div class="cv-head"><button class="acct-btn cv-new" type="button">Nouveau message</button></div>');
     if (!convs.length) {
-      msgsEl.innerHTML = '<div class="acct-empty"><p>Aucun message. Une question sur un filament, un spacer ou ton compte&nbsp;? ' +
-        '<a class="ask" href="#/messages" data-msg="">Écris-nous</a></p></div>';
+      msgsEl.innerHTML = _t('<div class="acct-empty"><p>Aucun message. Une question sur un filament, un spacer ou ton compte&nbsp;? ') +
+        _t('<a class="ask" href="#/messages" data-msg="">Écris-nous</a></p></div>');
       return;
     }
     msgsEl.innerHTML = head + '<ul class="al-list cv-list">' + convs.map(function (c) {
-      var un = +c.unread || 0, title = (TOPIC[c.topic] || 'Question') + (c.ref ? ' · ' + c.ref : '');
+      var un = +c.unread || 0, title = (TOPIC[c.topic] || _t('Question')) + (c.ref ? ' · ' + c.ref : '');
       return '<li class="al cv' + (un ? ' is-unread' : '') + '"><button class="cv-btn" type="button" data-id="' + esc(c.id) + '">' +
-        '<span class="al-tx"><b>' + esc(title) + '</b><small>' + (c.last_from === 'client' ? 'Toi : ' : '') + esc(c.last_preview || '') + '</small></span>' +
-        (un ? '<span class="acct-n">' + un + '</span>' : c.status === 'closed' ? '<span class="cv-st">Réglée</span>' : '') +
+        '<span class="al-tx"><b>' + esc(title) + '</b><small>' + (c.last_from === 'client' ? _t('Toi : ') : '') + esc(c.last_preview || '') + '</small></span>' +
+        (un ? '<span class="acct-n">' + un + '</span>' : c.status === 'closed' ? _t('<span class="cv-st">Réglée</span>') : '') +
         '<span class="al-date">' + esc(fmtDate(c.updated_at, false)) + '</span></button></li>';
     }).join('') + '</ul>';
     $('.cv-new', msgsEl).addEventListener('click', function () { openMsg({ topic: '', ref: '' }); });
@@ -708,34 +710,34 @@
 
   /* ---- Mes alertes (« M'aviser ») ---- */
   var alertsEl = $('#acct-alerts'), alertsN = $('#acct-n-alerts');
-  var KIND = { spool: 'avec bobine', refill: 'recharge' };
+  var KIND = { spool: _t('avec bobine'), refill: 'recharge' };
   function productHref(a) {
     if (a.type === 'spacer') return 'spacers.html';
     if (a.type === 'accessory') return 'boutique.html#/a/' + encodeURIComponent(a.slug || slugify(a.name));
-    return 'boutique.html#/m/' + (a.brand_slug || slugify(a.brand || 'Autres')) + '/' +
-      (a.material_slug || slugify(a.material || 'Autres')) + '/' + (a.slug || slugify(a.name));
+    return 'boutique.html#/m/' + (a.brand_slug || slugify(a.brand || _t('Autres'))) + '/' +
+      (a.material_slug || slugify(a.material || _t('Autres'))) + '/' + (a.slug || slugify(a.name));
   }
   function loadAlerts() {
-    alertsEl.innerHTML = '<p class="acct-empty">Chargement…</p>';
+    alertsEl.innerHTML = _t('<p class="acct-empty">Chargement…</p>');
     sb.rpc('me_waitlist').then(function (res) {
-      if (res.error) { alertsEl.innerHTML = '<p class="acct-empty">Impossible de charger tes alertes. Réessaie plus tard.</p>'; return; }
+      if (res.error) { alertsEl.innerHTML = _t('<p class="acct-empty">Impossible de charger tes alertes. Réessaie plus tard.</p>'); return; }
       alerts = res.data || [];
       renderAlerts();
-    }, function () { alertsEl.innerHTML = '<p class="acct-empty">Erreur réseau — réessaie.</p>'; });
+    }, function () { alertsEl.innerHTML = _t('<p class="acct-empty">Erreur réseau — réessaie.</p>'); });
   }
   function renderAlerts() {
     alertsN.hidden = !alerts.length; alertsN.textContent = alerts.length;
     if (!alerts.length) {
-      alertsEl.innerHTML = '<p class="acct-empty">Aucune alerte. Sur une couleur en rupture, «&nbsp;M\'aviser&nbsp;» t\'ajoute ici. ' +
-        '<a href="boutique.html">Voir les filaments</a></p>';
+      alertsEl.innerHTML = _t('<p class="acct-empty">Aucune alerte. Sur une couleur en rupture, «&nbsp;M\'aviser&nbsp;» t\'ajoute ici. ') +
+        _t('<a href="boutique.html">Voir les filaments</a></p>');
       return;
     }
     alertsEl.innerHTML = '<ul class="al-list">' + alerts.map(function (a) {
       var sub = [a.type === 'filament' ? [a.brand, a.material].filter(Boolean).join(' ') : '', KIND[a.kind] || ''].filter(Boolean).join(' · ');
       return '<li class="al" data-id="' + esc(a.id) + '">' + swatch(a.type === 'filament' ? a.hex : '', (a.material || '') + ' ' + (a.name || '')) +
         '<a class="al-tx" href="' + esc(productHref(a)) + '"><b>' + esc(a.name) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</a>' +
-        '<span class="al-date">Depuis le ' + esc(fmtDate(a.created_at, false)) + '</span>' +
-        '<button class="acct-link al-del" type="button">Retirer</button></li>';
+        _t('<span class="al-date">Depuis le ') + esc(fmtDate(a.created_at, false)) + '</span>' +
+        _t('<button class="acct-link al-del" type="button">Retirer</button></li>');
     }).join('') + '</ul>';
     $$('.al-del', alertsEl).forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -760,15 +762,15 @@
   $('#acct-infos-form').addEventListener('submit', function (e) {
     e.preventDefault();
     var st = $('#acct-i-status'), btn = $('#acct-i-btn'), name = $('#acct-i-name').value.trim();
-    if (!name) { say(st, 'Entre ton nom.', 'bad'); $('#acct-i-name').focus(); return; }
-    btn.disabled = true; say(st, 'Enregistrement…');
+    if (!name) { say(st, _t('Entre ton nom.'), 'bad'); $('#acct-i-name').focus(); return; }
+    btn.disabled = true; say(st, _t('Enregistrement…'));
     sb.rpc('me_update', { p_name: name, p_phone: $('#acct-i-phone').value.trim() }).then(function (res) {
       btn.disabled = false;
-      if (res.error) { say(st, 'Enregistrement impossible. Réessaie.', 'bad'); return; }
+      if (res.error) { say(st, _t('Enregistrement impossible. Réessaie.'), 'bad'); return; }
       acct = res.data || acct;
-      $('#acct-hello').textContent = 'Bonjour ' + firstName(acct.name);
-      say(st, 'Enregistré ✓', 'ok');
-    }, function () { btn.disabled = false; say(st, 'Erreur réseau — réessaie.', 'bad'); });
+      $('#acct-hello').textContent = _t('Bonjour ') + firstName(acct.name);
+      say(st, _t('Enregistré ✓'), 'ok');
+    }, function () { btn.disabled = false; say(st, _t('Erreur réseau — réessaie.'), 'bad'); });
   });
   // photos jointes à ses messages (bucket privé « messages », dossier <uid>/) : effacées avant le compte
   function removeMyPhotos() {
@@ -784,21 +786,21 @@
     }).then(null, function () {});
   }
   $('#acct-delete').addEventListener('click', function () {
-    caDialog.confirm({ title: 'Supprimer ton compte ?', message: 'Ton compte, tes alertes et tes messages seront effacés. Cette action est définitive.',
-      ok: 'Supprimer mon compte', danger: true, icon: 'trash' }).then(function (ok) { if (ok) deleteAccount(); });
+    caDialog.confirm({ title: _t('Supprimer ton compte ?'), message: _t('Ton compte, tes alertes et tes messages seront effacés. Cette action est définitive.'),
+      ok: _t('Supprimer mon compte'), danger: true, icon: 'trash' }).then(function (ok) { if (ok) deleteAccount(); });
   });
   function deleteAccount() {
     var btn = $('#acct-delete'), st = $('#acct-del-status');
-    btn.disabled = true; say(st, 'Suppression…');
+    btn.disabled = true; say(st, _t('Suppression…'));
     removeMyPhotos().then(function () { return sb.rpc('me_delete'); }).then(function (res) {
-      if (res.error) { btn.disabled = false; say(st, 'Suppression impossible. Écris-nous à ' + EMAIL + '.', 'bad'); return; }
+      if (res.error) { btn.disabled = false; say(st, _t('Suppression impossible. Écris-nous à ') + EMAIL + '.', 'bad'); return; }
       return sb.auth.signOut().catch(function () {}).then(function () {
         try { localStorage.removeItem(KEY); } catch (e) {}
         acct = null; signedIn(false); btn.disabled = false; say(st, '');
         history.replaceState(null, '', location.pathname + location.search);
-        openLogin('', 'Ton compte a été supprimé.');
+        openLogin('', _t('Ton compte a été supprimé.'));
       });
-    }, function () { btn.disabled = false; say(st, 'Erreur réseau — réessaie.', 'bad'); });
+    }, function () { btn.disabled = false; say(st, _t('Erreur réseau — réessaie.'), 'bad'); });
   }
 
   boot();

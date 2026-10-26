@@ -42,8 +42,11 @@ function esc(s: unknown) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
 }
-function money(n: unknown) {
-  return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).replace(".", ",") + " $";
+// en = client de la version anglaise (customers.lang) : « $1,049.70 »
+function money(n: unknown, en = false) {
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  if (en) return "$" + v.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v.toFixed(2).replace(".", ",") + " $";
 }
 function plural(n: number, one: string, many: string) { return n + " " + (n > 1 ? many : one); }
 // plage de cueillette -> « jeudi 23 octobre, 13 h – 17 h » (mêmes mots que commande-client.js)
@@ -53,9 +56,15 @@ function hTxt(t: unknown) {
   const p = String(t || "").split(":");
   return Number(p[0]) + " h " + (p[1] || "00");
 }
-function fmtPickup(d: unknown, s: unknown, e: unknown) {
+function hTxtEn(t: unknown) {
+  const p = String(t || "").split(":"), h = Number(p[0]);
+  return ((h % 12) || 12) + ":" + (p[1] || "00") + (h < 12 ? " AM" : " PM");
+}
+function fmtPickup(d: unknown, s: unknown, e: unknown, en = false) {
   if (!d) return "";
   const p = String(d).split("-").map(Number), x = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+  if (en) return x.toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }) +
+    (s ? ", " + hTxtEn(s) + (e ? " – " + hTxtEn(e) : "") : "");
   return JOURS[x.getUTCDay()] + " " + x.getUTCDate() + " " + MOIS[x.getUTCMonth()] + (s ? ", " + hTxt(s) + (e ? " – " + hTxt(e) : "") : "");
 }
 
@@ -65,10 +74,22 @@ type Line = { name: string; meta: string | null; qty: number; unit_price: number
 const BO_DELAY = "3 à 14 jours ouvrables";
 let emptyIds = new Set<string>();   // bobines vides (rempli par requête)
 const isEmpty = (l: Line) => !!l.product_id && emptyIds.has(l.product_id);
-const boLabel = (l: Line, n: number) => isEmpty(l) ? n + " à compléter · sans garantie"
+const BO_DELAY_EN = "3 to 14 business days";
+const boLabel = (l: Line, n: number, en = false) => en
+  ? (isEmpty(l) ? n + " to make · not guaranteed" : n + " to order" + (l.ptype === "spacer" ? "" : " · " + BO_DELAY_EN))
+  : isEmpty(l) ? n + " à compléter · sans garantie"
   : n + " à commander" + (l.ptype === "spacer" ? "" : " · " + BO_DELAY);
 const EMPTY_TXT = "Bobines vides : elles viennent de nos propres impressions, on ne peut pas en commander chez un fournisseur. " +
   "On fera tout notre possible pour compléter ta commande, sans garantie de quantité ni de délai.";
+const EMPTY_TXT_EN = "Empty spools: they come from our own prints, we can't order them from a supplier. " +
+  "We'll do our best to complete your order, with no guarantee on quantity or lead time.";
+// langue des courriels au client : customers.lang (posée par la page utilisée, RPC me_set_lang)
+// deno-lint-ignore no-explicit-any
+async function clientEn(db: any, customerId: string | null) {
+  if (!customerId) return false;
+  const { data } = await db.from("customers").select("lang").eq("id", customerId).maybeSingle();
+  return data?.lang === "en";
+}
 
 const ADMIN_LABEL: Record<string, string> = {
   new: "Nouvelle commande en ligne",
@@ -138,67 +159,80 @@ Deno.serve(async (req) => {
   const items = L.reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const toOrder = L.filter((l) => (Number(l.qty_to_order) || 0) > 0);
   const first = String(order.name || "").trim().split(/\s+/)[0] || "";
-  const accountUrl = SITE + "/compte.html#/commandes";
-  const pickUrl = SITE + "/compte.html#/cueillette/c/" + order.id;   // écran « Choisis ta cueillette »
   const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes/clients";
   const results: Record<string, string> = {};
   const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end);
 
-  // ---- courriel au client (envoi et modification) ----
+  // ---- courriel au client (envoi et modification), dans sa langue ----
   if (event !== "cancelled") {
-    const verb = event === "updated" ? "modifiée" : "reçue";
-    const subject = "Commande " + order.number + " " + verb + " — Création Audio";
+    const en = await clientEn(db, order.customer_id);
+    const T = (fr: string, e: string) => (en ? e : fr);
+    const m = (n: unknown) => money(n, en);
+    const site = SITE + (en ? "/en" : "");
+    const accUrl = site + "/compte.html#/commandes", pkUrl = site + "/compte.html#/cueillette/c/" + order.id;
+    const pkC = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end, en);
+    const verb = event === "updated" ? T("modifiée", "updated") : T("reçue", "received");
+    const subject = T("Commande ", "Order ") + order.number + " " + verb + " — Création Audio";
     const supplierBo = toOrder.some((l) => l.ptype !== "spacer" && !isEmpty(l));
     const emptyBo = toOrder.some(isEmpty);
     const printBo = toOrder.some((l) => l.ptype === "spacer");
     const status = !toOrder.length
-      ? (pk ? "Tout est en stock : on t'attend " + pk + "." : "Tout est en stock : choisis ta plage de cueillette dans ton compte.")
+      ? (pkC ? T("Tout est en stock : on t'attend " + pkC + ".", "Everything is in stock: see you " + pkC + ".")
+             : T("Tout est en stock : choisis ta plage de cueillette dans ton compte.", "Everything is in stock: choose your pickup time slot in your account."))
       : [supplierBo
-        ? "Certains articles ne sont pas en stock : on les commande chez notre fournisseur. Prévois un délai de " + BO_DELAY +
-          " avant la cueillette ; on t'écrit dès leur arrivée pour que tu choisisses ta plage de cueillette."
-        : printBo ? "Certains articles doivent être imprimés : il y aura donc un délai. On te contacte sous peu pour te le confirmer." : "",
-        emptyBo ? EMPTY_TXT : ""].filter(Boolean).join(" ");
-    const toOrderTxt = toOrder.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " : " +
-      boLabel(l, Number(l.qty_to_order))).join("\n");
+        ? T("Certains articles ne sont pas en stock : on les commande chez notre fournisseur. Prévois un délai de " + BO_DELAY +
+            " avant la cueillette ; on t'écrit dès leur arrivée pour que tu choisisses ta plage de cueillette.",
+            "Some items are not in stock: we order them from our supplier. Allow " + BO_DELAY_EN +
+            " before pickup; we'll email you when they arrive so you can choose your pickup time slot.")
+        : printBo ? T("Certains articles doivent être imprimés : il y aura donc un délai. On te contacte sous peu pour te le confirmer.",
+                      "Some items need to be printed, so there will be a lead time. We'll contact you shortly to confirm it.") : "",
+        emptyBo ? T(EMPTY_TXT, EMPTY_TXT_EN) : ""].filter(Boolean).join(" ");
+    const pickupLine = T("Cueillette à Québec · aucun paiement en ligne : tu paies à la cueillette.",
+                         "Pickup in Québec City (or shipping on request) · no online payment: you pay at pickup.");
+    const toOrderTxt = toOrder.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + T(" : ", ": ") +
+      boLabel(l, Number(l.qty_to_order), en)).join("\n");
+    const link = toOrder.length || pkC ? accUrl : pkUrl;
     const text =
-      "Bonjour " + first + ",\n\n" +
-      "Merci ! Ta commande " + order.number + " est bien " + verb + ".\n\n" +
+      T("Bonjour ", "Hello ") + first + ",\n\n" +
+      T("Merci ! Ta commande " + order.number + " est bien " + verb + ".", "Thank you! Your order " + order.number + " has been " + verb + ".") + "\n\n" +
       status + "\n\n" +
-      (toOrder.length ? "Articles à commander :\n" + toOrderTxt + "\n\n" : "") +
-      L.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + money(l.line_total)).join("\n") +
-      "\n\nTotal estimé : " + money(order.total) + "\n" +
-      "Cueillette à Québec · aucun paiement en ligne : tu paies à la cueillette.\n" +
-      (order.note ? "\nTa note : " + order.note + "\n" : "") +
-      "\nTu peux suivre, modifier ou annuler ta commande (tant qu'on ne l'a pas commencée) dans ton compte : " + (toOrder.length || pk ? accountUrl : pickUrl) + "\n\n" +
-      "Création Audio\n" + SITE;
+      (toOrder.length ? T("Articles à commander :", "Items to order:") + "\n" + toOrderTxt + "\n\n" : "") +
+      L.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + m(l.line_total)).join("\n") +
+      "\n\n" + T("Total estimé : ", "Estimated total: ") + m(order.total) + "\n" +
+      pickupLine + "\n" +
+      (order.note ? "\n" + T("Ta note : ", "Your note: ") + order.note + "\n" : "") +
+      "\n" + T("Tu peux suivre, modifier ou annuler ta commande (tant qu'on ne l'a pas commencée) dans ton compte : ",
+               "You can track, edit or cancel your order (until we start on it) in your account: ") + link + "\n\n" +
+      "Création Audio\n" + site + "/";
     const rowsHtml = L.map((l) => {
       const bo = Number(l.qty_to_order) || 0;
       return '<tr>' +
         '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(l.name) + '</strong>' +
           (l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(l.meta) + '</span>' : '') +
-          (bo ? '<br><span style="color:#B23F12;font-size:12px;font-weight:700">' + esc(boLabel(l, bo)) + '</span>' : '') + '</td>' +
+          (bo ? '<br><span style="color:#B23F12;font-size:12px;font-weight:700">' + esc(boLabel(l, bo, en)) + '</span>' : '') + '</td>' +
         '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
-        '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(l.line_total) + '</td>' +
+        '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + m(l.line_total) + '</td>' +
       '</tr>';
     }).join("");
     const html =
       '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
       '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-      '<h1 style="font-size:22px;margin:0 0 10px">Commande ' + esc(order.number) + ' ' + verb + '</h1>' +
-      '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', merci&nbsp;!</p>' +
+      '<h1 style="font-size:22px;margin:0 0 10px">' + T("Commande ", "Order ") + esc(order.number) + ' ' + verb + '</h1>' +
+      '<p style="margin:0 0 14px">' + T("Bonjour " + esc(first) + ", merci&nbsp;!", "Hello " + esc(first) + ", thank you!") + '</p>' +
       '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;' +
         (toOrder.length ? 'background:#FFF3EC;color:#9A4A0E' : 'background:#E7F6EE;color:#16794A') + ';font-weight:700">' + esc(status) + '</p>' +
       '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
-        '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">Article</th><th style="padding:8px 10px;text-align:right">Qté</th>' +
+        '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">' + T("Article", "Item") + '</th><th style="padding:8px 10px;text-align:right">' + T("Qté", "Qty") + '</th>' +
         '<th style="padding:8px 10px;text-align:right">Total</th></tr>' + rowsHtml +
       '</table>' +
-      '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total estimé : ' + money(order.total) + '</strong></p>' +
-      '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">Cueillette à Québec · aucun paiement en ligne : tu paies à la cueillette.</p>' +
-      (order.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Ta note :</strong> ' + esc(order.note) + '</p>' : "") +
-      '<p style="margin:22px 0"><a href="' + (toOrder.length || pk ? accountUrl : pickUrl) + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
-        (toOrder.length || pk ? "Suivre ma commande" : "Choisir ma plage de cueillette") + '</a></p>' +
+      '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>' + T("Total estimé : ", "Estimated total: ") + m(order.total) + '</strong></p>' +
+      '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">' + esc(pickupLine) + '</p>' +
+      (order.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>' + T("Ta note :", "Your note:") + '</strong> ' + esc(order.note) + '</p>' : "") +
+      '<p style="margin:22px 0"><a href="' + link + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
+        (toOrder.length || pkC ? T("Suivre ma commande", "Track my order") : T("Choisir ma plage de cueillette", "Choose my pickup time slot")) + '</a></p>' +
       '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-      '<p style="font-size:12px;color:#6C727C">Tu peux modifier ou annuler ta commande dans ton compte tant qu\'on ne l\'a pas commencée. Une question&nbsp;? Réponds simplement à ce courriel.</p>' +
+      '<p style="font-size:12px;color:#6C727C">' + T("Tu peux modifier ou annuler ta commande dans ton compte tant qu'on ne l'a pas commencée. Une question&nbsp;? Réponds simplement à ce courriel.",
+        "You can edit or cancel your order in your account until we start on it. A question? Just reply to this email.") + '</p>' +
       "</div>";
     try {
       await send(resendKey, from, { to: [order.email], reply_to: REPLY_TO, subject, html, text });
@@ -279,42 +313,47 @@ async function notifyReady(db: any, order: any, resendKey: string | undefined, f
   const { data: lines } = await db.from("customer_order_lines")
     .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype").eq("order_id", order.id).order("sort_order");
   const L = (lines || []) as Line[];
+  const en = await clientEn(db, order.customer_id);
+  const T = (fr: string, e: string) => (en ? e : fr);
+  const m = (n: unknown) => money(n, en);
+  const site = SITE + (en ? "/en" : "");
   const first = String(order.name || "").trim().split(/\s+/)[0] || "";
-  const accountUrl = SITE + "/compte.html#/cueillette/c/" + order.id;   // écran « Choisis ta cueillette »
-  const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end);
-  const subject = "Commande " + order.number + " prête — Création Audio";
+  const accountUrl = site + "/compte.html#/cueillette/c/" + order.id;   // écran « Choisis ta cueillette »
+  const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end, en);
+  const subject = T("Commande " + order.number + " prête", "Order " + order.number + " ready") + " — Création Audio";
   const status = pk
-    ? "On t'attend " + pk + ". Tu peux changer de plage dans ton compte."
-    : "Choisis ta plage de cueillette dans ton compte.";
+    ? T("On t'attend " + pk + ". Tu peux changer de plage dans ton compte.", "See you " + pk + ". You can change the time slot in your account.")
+    : T("Choisis ta plage de cueillette dans ton compte.", "Choose your pickup time slot in your account.");
+  const pickupLine = T("Cueillette à Québec · tu paies à la cueillette.", "Pickup in Québec City · you pay at pickup.");
   const text =
-    "Bonjour " + first + ",\n\n" +
-    "Ta commande " + order.number + " est prête !\n\n" + status + "\n\n" +
-    L.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + money(l.line_total)).join("\n") +
-    "\n\nTotal : " + money(order.total) + "\n" +
-    "Cueillette à Québec · tu paies à la cueillette.\n\n" +
-    (pk ? "Mon compte : " : "Choisir ma plage de cueillette : ") + accountUrl + "\n\n" +
-    "Création Audio\n" + SITE;
+    T("Bonjour ", "Hello ") + first + ",\n\n" +
+    T("Ta commande " + order.number + " est prête !", "Your order " + order.number + " is ready!") + "\n\n" + status + "\n\n" +
+    L.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + m(l.line_total)).join("\n") +
+    "\n\nTotal" + T(" : ", ": ") + m(order.total) + "\n" +
+    pickupLine + "\n\n" +
+    (pk ? T("Mon compte : ", "My account: ") : T("Choisir ma plage de cueillette : ", "Choose my pickup time slot: ")) + accountUrl + "\n\n" +
+    "Création Audio\n" + site + "/";
   const rowsHtml = L.map((l) => '<tr>' +
     '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(l.name) + '</strong>' +
       (l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(l.meta) + '</span>' : '') + '</td>' +
     '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
-    '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(l.line_total) + '</td></tr>').join("");
+    '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + m(l.line_total) + '</td></tr>').join("");
   const html =
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
     '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-    '<h1 style="font-size:22px;margin:0 0 10px">Ta commande ' + esc(order.number) + ' est prête</h1>' +
-    '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ',</p>' +
+    '<h1 style="font-size:22px;margin:0 0 10px">' + T("Ta commande " + esc(order.number) + " est prête", "Your order " + esc(order.number) + " is ready") + '</h1>' +
+    '<p style="margin:0 0 14px">' + T("Bonjour ", "Hello ") + esc(first) + ',</p>' +
     '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#E7F6EE;color:#16794A;font-weight:700">' + esc(status) + '</p>' +
     '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
-      '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">Article</th><th style="padding:8px 10px;text-align:right">Qté</th>' +
+      '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">' + T("Article", "Item") + '</th><th style="padding:8px 10px;text-align:right">' + T("Qté", "Qty") + '</th>' +
       '<th style="padding:8px 10px;text-align:right">Total</th></tr>' + rowsHtml +
     '</table>' +
-    '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total : ' + money(order.total) + '</strong></p>' +
-    '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">Cueillette à Québec · tu paies à la cueillette.</p>' +
+    '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total' + T(" : ", ": ") + m(order.total) + '</strong></p>' +
+    '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">' + esc(pickupLine) + '</p>' +
     '<p style="margin:22px 0"><a href="' + accountUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
-      (pk ? 'Voir ma commande' : 'Choisir ma plage de cueillette') + '</a></p>' +
+      (pk ? T("Voir ma commande", "See my order") : T("Choisir ma plage de cueillette", "Choose my pickup time slot")) + '</a></p>' +
     '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-    '<p style="font-size:12px;color:#6C727C">Une question&nbsp;? Réponds simplement à ce courriel.</p>' +
+    '<p style="font-size:12px;color:#6C727C">' + T("Une question&nbsp;? Réponds simplement à ce courriel.", "A question? Just reply to this email.") + '</p>' +
     "</div>";
   try {
     await send(resendKey, from, { to: [order.email], reply_to: REPLY_TO, subject, html, text });

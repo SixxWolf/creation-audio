@@ -34,8 +34,11 @@ function esc(s: unknown) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
 }
-function money(n: unknown) {
-  return (Math.round((Number(n) || 0) * 100) / 100).toFixed(2).replace(".", ",") + " $";
+// en = client de la version anglaise (customers.lang, posée par me_set_lang) : « $1,049.70 »
+function money(n: unknown, en = false) {
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  if (en) return "$" + v.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v.toFixed(2).replace(".", ",") + " $";
 }
 function plural(n: number, one: string, many: string) { return n + " " + (n > 1 ? many : one); }
 // plage de cueillette -> « jeudi 23 octobre, 13 h – 17 h » (mêmes mots que commande-client.js)
@@ -45,22 +48,28 @@ function hTxt(t: unknown) {
   const p = String(t || "").split(":");
   return Number(p[0]) + " h " + (p[1] || "00");
 }
-function fmtPickup(d: unknown, s: unknown, e: unknown) {
+function hTxtEn(t: unknown) {
+  const p = String(t || "").split(":"), h = Number(p[0]);
+  return ((h % 12) || 12) + ":" + (p[1] || "00") + (h < 12 ? " AM" : " PM");
+}
+function fmtPickup(d: unknown, s: unknown, e: unknown, en = false) {
   if (!d) return "";
   const p = String(d).split("-").map(Number), x = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+  if (en) return x.toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }) +
+    (s ? ", " + hTxtEn(s) + (e ? " – " + hTxtEn(e) : "") : "");
   return JOURS[x.getUTCDay()] + " " + x.getUTCDate() + " " + MOIS[x.getUTCMonth()] + (s ? ", " + hTxt(s) + (e ? " – " + hTxt(e) : "") : "");
 }
 // « jeudi 12 octobre, 14 h 30 » (heure de Québec)
-function when(iso: string) {
+function when(iso: string, en = false) {
   try {
-    return new Intl.DateTimeFormat("fr-CA", {
+    return new Intl.DateTimeFormat(en ? "en-CA" : "fr-CA", {
       timeZone: "America/Toronto", weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit",
     }).format(new Date(iso));
   } catch { return String(iso).slice(0, 16).replace("T", " "); }
 }
-function day(iso: string) {
+function day(iso: string, en = false) {
   try {
-    return new Intl.DateTimeFormat("fr-CA", { timeZone: "America/Toronto", day: "numeric", month: "long", year: "numeric" }).format(new Date(iso));
+    return new Intl.DateTimeFormat(en ? "en-CA" : "fr-CA", { timeZone: "America/Toronto", day: "numeric", month: "long", year: "numeric" }).format(new Date(iso));
   } catch { return String(iso).slice(0, 10); }
 }
 
@@ -69,11 +78,17 @@ type Res = {
   status: string; note: string | null; total: number; expires_at: string; created_at: string; cancelled_by: string | null;
   notified_at: string | null; pickup_date: string | null; pickup_start: string | null; pickup_end: string | null;
 };
-const pkOf = (r: Res) => fmtPickup(r.pickup_date, r.pickup_start, r.pickup_end);
+const pkOf = (r: Res, en = false) => fmtPickup(r.pickup_date, r.pickup_start, r.pickup_end, en);
 const pkLine = (r: Res, label = "Cueillette") => (pkOf(r) ? label + " : " + pkOf(r) + "\n" : "");
 type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number };
 
-type Mailer = { key: string; from: string; adminTo: string };
+type Mailer = { key: string; from: string; adminTo: string; db: SupabaseClient };
+// langue des courriels au client : customers.lang ('en' = version anglaise du site)
+async function isEn(m: Mailer, r: Res) {
+  if (!r.customer_id) return false;
+  const { data } = await m.db.from("customers").select("lang").eq("id", r.customer_id).maybeSingle();
+  return (data as { lang?: string } | null)?.lang === "en";
+}
 async function send(m: Mailer, msg: Record<string, unknown>) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -94,26 +109,29 @@ function box(text: string, tone: "ok" | "warn" | "info") {
   const c = tone === "ok" ? "background:#E7F6EE;color:#16794A" : tone === "warn" ? "background:#FFF3EC;color:#9A4A0E" : "background:#F4F3EF;color:#3A3D45";
   return '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;' + c + ';font-weight:700">' + esc(text) + '</p>';
 }
-function table(L: Line[], total: number) {
+function table(L: Line[], total: number, en = false) {
   return '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
-    '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">Article</th><th style="padding:8px 10px;text-align:right">Qté</th>' +
+    '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">' + (en ? "Item" : "Article") + '</th><th style="padding:8px 10px;text-align:right">' + (en ? "Qty" : "Qté") + '</th>' +
     '<th style="padding:8px 10px;text-align:right">Total</th></tr>' +
     L.map((l) => '<tr>' +
       '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(l.name) + '</strong>' +
         (l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(l.meta) + '</span>' : '') + '</td>' +
       '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(l.line_total) + '</td></tr>').join("") +
+      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(l.line_total, en) + '</td></tr>').join("") +
     '</table>' +
-    '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total estimé : ' + money(total) + '</strong></p>';
+    '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>' + (en ? "Estimated total: " : "Total estimé : ") + money(total, en) + '</strong></p>';
 }
-function linesText(L: Line[]) {
-  return L.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + money(l.line_total)).join("\n");
+function linesText(L: Line[], en = false) {
+  return L.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + money(l.line_total, en)).join("\n");
 }
 function button(href: string, label: string) {
   return '<p style="margin:22px 0"><a href="' + href + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' + esc(label) + '</a></p>';
 }
 const FOOT = '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
   '<p style="font-size:12px;color:#6C727C">Une question&nbsp;? Réponds simplement à ce courriel.</p>';
+const FOOT_EN = '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
+  '<p style="font-size:12px;color:#6C727C">A question? Just reply to this email.</p>';
+const ACCOUNT_URL_EN = SITE + "/en/compte.html#/commandes";
 function first(r: Res) { return String(r.name || "").trim().split(/\s+/)[0] || ""; }
 
 async function linesOf(db: SupabaseClient, id: string) {
@@ -124,6 +142,7 @@ async function linesOf(db: SupabaseClient, id: string) {
 
 // ---- courriels ----
 async function mailNew(m: Mailer, r: Res, L: Line[]) {
+  if (await isEn(m, r)) return mailNewEn(m, r, L);
   const until = when(r.expires_at);
   const subject = "Réservation " + r.number + " confirmée — Création Audio";
   const text = "Bonjour " + first(r) + ",\n\nTa réservation " + r.number + " est confirmée : on garde tes articles jusqu'au " + until + ".\n" + pkLine(r) + "\n" +
@@ -142,6 +161,7 @@ async function mailNew(m: Mailer, r: Res, L: Line[]) {
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
 }
 async function mailReminder(m: Mailer, r: Res, L: Line[]) {
+  if (await isEn(m, r)) return mailReminderEn(m, r, L);
   const until = when(r.expires_at);
   const subject = "Rappel : ta réservation " + r.number + " se termine bientôt";
   const text = "Bonjour " + first(r) + ",\n\nPetit rappel : on garde ta réservation " + r.number + " jusqu'au " + until + ".\n" + pkLine(r, "Ta cueillette") + "\n" +
@@ -158,6 +178,18 @@ async function mailExpired(m: Mailer, r: Res, L: Line[], cust: { no_shows: numbe
   const status = susp
     ? "C'est ta 2e réservation non récupérée : les réservations sont suspendues jusqu'au " + day(susp) + ". Tu peux toujours commander en ligne."
     : "Elle compte comme non récupérée (1 sur 2). À 2, les réservations sont suspendues 60 jours.";
+  if (await isEn(m, r)) {
+    const statusEn = susp
+      ? "This is your 2nd reservation not picked up: reservations are suspended until " + day(susp, true) + ". You can still order online."
+      : "It counts as not picked up (1 of 2). At 2, reservations are suspended for 60 days.";
+    await send(m, { to: [r.email], reply_to: REPLY_TO,
+      subject: "Reservation " + r.number + " expired — Création Audio",
+      text: "Hello " + first(r) + ",\n\nYour reservation " + r.number + " has expired: the items are back on sale.\n\n" + statusEn +
+        "\n\n" + linesText(L, true) + "\n\nSomething came up? Reply to this email.\n\nCréation Audio\n" + SITE + "/en/",
+      html: shell("Création Audio", "Reservation " + r.number + " expired",
+        '<p style="margin:0 0 14px">Hello ' + esc(first(r)) + ', your reservation has expired: the items are back on sale.</p>' +
+        box(statusEn, "warn") + table(L, r.total, true) + FOOT_EN.replace("A question?", "Something came up?")) });
+  } else {
   const subject = "Réservation " + r.number + " expirée — Création Audio";
   const text = "Bonjour " + first(r) + ",\n\nTa réservation " + r.number + " a expiré : les articles sont remis en vente.\n\n" + status +
     "\n\n" + linesText(L) + "\n\nUn imprévu ? Réponds à ce courriel.\n\nCréation Audio\n" + SITE;
@@ -165,6 +197,7 @@ async function mailExpired(m: Mailer, r: Res, L: Line[], cust: { no_shows: numbe
     '<p style="margin:0 0 14px">Bonjour ' + esc(first(r)) + ', ta réservation a expiré : les articles sont remis en vente.</p>' +
     box(status, "warn") + table(L, r.total) + FOOT.replace("Une question&nbsp;?", "Un imprévu&nbsp;?"));
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
+  }
   // avis à Création Audio : le sac préparé peut retourner en tablette
   const aSubject = "Réservation " + r.number + " expirée — " + (r.name || r.email) + (susp ? " (suspendu 60 j)" : "");
   const aText = "Réservation " + r.number + " expirée (non récupérée)" + (susp ? " — réservations suspendues jusqu'au " + day(susp) : "") +
@@ -176,12 +209,55 @@ async function mailExpired(m: Mailer, r: Res, L: Line[], cust: { no_shows: numbe
   await send(m, { to: [adminTo(m, r)], reply_to: r.email, subject: aSubject, html: aHtml, text: aText });
 }
 async function mailAdminCancelled(m: Mailer, r: Res, L: Line[]) {
+  if (await isEn(m, r)) {
+    return await send(m, { to: [r.email], reply_to: REPLY_TO,
+      subject: "Reservation " + r.number + " cancelled — Création Audio",
+      text: "Hello " + first(r) + ",\n\nYour reservation " + r.number + " was cancelled by Création Audio. It doesn't count as not picked up.\n\n" +
+        linesText(L, true) + "\n\nA question? Reply to this email.\n\nCréation Audio\n" + SITE + "/en/",
+      html: shell("Création Audio", "Reservation " + r.number + " cancelled",
+        '<p style="margin:0 0 14px">Hello ' + esc(first(r)) + ',</p>' +
+        box("Your reservation was cancelled by Création Audio. It doesn't count as not picked up.", "info") + table(L, r.total, true) + FOOT_EN) });
+  }
   const subject = "Réservation " + r.number + " annulée — Création Audio";
   const text = "Bonjour " + first(r) + ",\n\nTa réservation " + r.number + " a été annulée par Création Audio. Elle ne compte pas comme non récupérée.\n\n" +
     linesText(L) + "\n\nUne question ? Réponds à ce courriel.\n\nCréation Audio\n" + SITE;
   const html = shell("Création Audio", "Réservation " + r.number + " annulée",
     '<p style="margin:0 0 14px">Bonjour ' + esc(first(r)) + ',</p>' +
     box("Ta réservation a été annulée par Création Audio. Elle ne compte pas comme non récupérée.", "info") + table(L, r.total) + FOOT);
+  await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
+}
+// ---- versions anglaises (client de /en/) ----
+async function mailNewEn(m: Mailer, r: Res, L: Line[]) {
+  const until = when(r.expires_at, true), pk = pkOf(r, true);
+  const subject = "Reservation " + r.number + " confirmed — Création Audio";
+  const rule = "Come before the deadline: after that, the items go back on sale and the reservation counts as not picked up " +
+    "(2 not picked up = reservations suspended for 60 days). Can't make it? Cancel it in your account";
+  const text = "Hello " + first(r) + ",\n\nYour reservation " + r.number + " is confirmed: we're holding your items until " + until + ".\n" +
+    (pk ? "Pickup: " + pk + "\n" : "") + "\n" +
+    linesText(L, true) + "\n\nEstimated total: " + money(r.total, true) + "\nPickup in Québec City · you pay at pickup.\n" +
+    (r.note ? "\nYour note: " + r.note + "\n" : "") +
+    "\n" + rule + ": " + ACCOUNT_URL_EN + "\n\nCréation Audio\n" + SITE + "/en/";
+  const html = shell("Création Audio", "Reservation " + r.number + " confirmed",
+    '<p style="margin:0 0 14px">Hello ' + esc(first(r)) + ', it\'s reserved!</p>' +
+    box((pk ? "Pickup: " + pk + ". " : "") + "We're holding your items until " + until + ".", "ok") + table(L, r.total, true) +
+    '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">Pickup in Québec City · you pay at pickup.</p>' +
+    (r.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Your note:</strong> ' + esc(r.note) + '</p>' : "") +
+    button(ACCOUNT_URL_EN, "See my reservation") +
+    '<p style="font-size:13px;color:#3A3D45">' + esc(rule) + '.</p>' + FOOT_EN);
+  await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
+}
+async function mailReminderEn(m: Mailer, r: Res, L: Line[]) {
+  const until = when(r.expires_at, true), pk = pkOf(r, true);
+  const subject = "Reminder: your reservation " + r.number + " ends soon";
+  const text = "Hello " + first(r) + ",\n\nA quick reminder: we're holding your reservation " + r.number + " until " + until + ".\n" +
+    (pk ? "Your pickup: " + pk + "\n" : "") + "\n" +
+    linesText(L, true) + "\n\nEstimated total: " + money(r.total, true) + "\n\nCan't make it? Cancel it in your account (" + ACCOUNT_URL_EN +
+    "): it won't count as not picked up.\n\nCréation Audio\n" + SITE + "/en/";
+  const html = shell("Création Audio", "Your reservation " + r.number + " ends soon",
+    '<p style="margin:0 0 14px">Hello ' + esc(first(r)) + ',</p>' +
+    box((pk ? "Your pickup: " + pk + ". " : "") + "We're holding it until " + until + ".", "warn") + table(L, r.total, true) +
+    button(ACCOUNT_URL_EN, "See my reservation") +
+    '<p style="font-size:13px;color:#3A3D45">Can\'t make it? Cancel it in your account: it won\'t count as not picked up.</p>' + FOOT_EN);
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
 }
 async function mailAdmin(m: Mailer, r: Res, L: Line[], event: "new" | "cancelled") {
@@ -246,8 +322,9 @@ Deno.serve(async (req) => {
     key,
     from: Deno.env.get("MAIL_FROM") || "Création Audio <avis@creationaudio.ca>",
     adminTo: Deno.env.get("ORDER_NOTIFY_TO") || "contact@creationaudio.ca",
+    db: createClient(url, service),
   };
-  const db = createClient(url, service);
+  const db = m.db;
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* corps invalide */ }

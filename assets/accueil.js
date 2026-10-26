@@ -21,9 +21,8 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-  function money(n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; }
-  // « 20 $ » pour un prix rond, « 15,99 $ » sinon (compteurs compacts)
-  function priceShort(n) { n = +n || 0; return (n % 1 === 0 ? String(n) : n.toFixed(2).replace('.', ',')) + ' $'; }
+  // langue (i18n.js) : 12,99 $ / $12.99 ; « 20 $ » pour un prix rond (compteurs compacts)
+  var CA0 = window.CA || {}, _t = CA0.t, tn = CA0.tn, money = CA0.money, priceShort = CA0.priceShort;
 
   var sb = window.CA && window.CA.sb;
   var BUCKET = 'products';
@@ -117,7 +116,7 @@
   }
   function stockText(p) {
     var s = hasSpool(p), r = hasRefill(p);
-    return s && r ? 'Bobine + recharge' : s ? 'Bobine en stock' : r ? 'Recharge en stock' : '';
+    return s && r ? _t('Bobine + recharge') : s ? _t('Bobine en stock') : r ? _t('Recharge en stock') : '';
   }
 
   var brandSlug = {}, brandOrder = {};
@@ -158,20 +157,20 @@
     hero.setAttribute('data-finish', finishOf(p.material));
     if (spin && !reduceMotion) { spinDeg += 120; spin.style.transform = 'rotate(' + spinDeg + 'deg)'; }
 
-    swMeta.textContent = [p.brand, p.material].filter(Boolean).join(' · ') || 'Filament';
+    swMeta.textContent = [p.brand, p.material].filter(Boolean).join(' · ') || _t('Filament');
     swName.textContent = p.name;
     var fp = fromPrice(p);
-    swPrice.innerHTML = fp != null ? 'dès <b>' + money(fp) + '</b>' : '';
+    swPrice.innerHTML = fp != null ? _t('dès <b>{p}</b>', { p: money(fp) }) : '';
     swStock.textContent = stockText(p);
     card.href = p._url;
-    card.setAttribute('aria-label', 'Voir ' + p.name + (p.material ? ' — ' + p.material : '') + ' dans la boutique');
+    card.setAttribute('aria-label', _t('Voir {x} dans la boutique', { x: p.name + (p.material ? ' — ' + p.material : '') }));
 
     $$('.sw', rail).forEach(function (b, j) {
       b.setAttribute('aria-pressed', j === i ? 'true' : 'false');
       b.tabIndex = j === i ? 0 : -1;               // tabulation « itinérante » : 1 seul arrêt
     });
     centerInRail(rail.children[i]);
-    if (fromUser && live) live.textContent = p.name + (p.material ? ', ' + p.material : '') + (fp != null ? ', dès ' + money(fp) : '');
+    if (fromUser && live) live.textContent = p.name + (p.material ? ', ' + p.material : '') + (fp != null ? ', ' + _t('dès {p}', { p: money(fp) }) : '');
   }
 
   function canPlay() { return !reduceMotion && !userTook && heroVisible && !hovering && !document.hidden && items.length > 1; }
@@ -231,7 +230,7 @@
   var FALLBACK = [
     ['Rouge', '#C12E1F'], ['Orange', '#FF6A13'], ['Jaune', '#FCE300'], ['Vert', '#00AE42'], ['Turquoise', '#00B1B7'],
     ['Bleu', '#0056B8'], ['Violet', '#8671CB'], ['Rose', '#F5547C'], ['Blanc', '#FFFFFF'], ['Gris', '#8E9089'], ['Noir', '#1B1B1B']
-  ].map(function (c) { return { name: c[0], material: 'PLA', brand: '', hex: c[1], _cs: [c[1]], _url: 'boutique.html' }; });
+  ].map(function (c) { return { name: _t(c[0]), material: 'PLA', brand: '', hex: c[1], _cs: [c[1]], _url: 'boutique.html' }; });
 
   /* =========================================================
      Sections alimentées par la base
@@ -257,7 +256,7 @@
       var ba = brandOrder[a.brand] != null ? brandOrder[a.brand] : 99, bb = brandOrder[b.brand] != null ? brandOrder[b.brand] : 99;
       return (ba - bb) || ((a.first.material_sort || 0) - (b.first.material_sort || 0)) || a.material.localeCompare(b.material, 'fr');
     });
-    if (!mats.length) { emptyNote(matGrid, 'Le stock se renouvelle — <a href="boutique.html">voir toute la boutique</a>.'); return 0; }
+    if (!mats.length) { emptyNote(matGrid, _t('Le stock se renouvelle — <a href="boutique.html">voir toute la boutique</a>.')); return 0; }
 
     // Un groupe par marque (ordre des marques de l'admin), chacun avec sa grille de matériaux.
     var brands = [], byBrand = {};
@@ -271,11 +270,11 @@
       return '<section class="mat-brand-group" aria-labelledby="' + id + '">' +
         '<header class="mat-brand-head">' +
           '<h3 class="mat-brand-title" id="' + id + '">' + esc(b) + '</h3>' +
-          '<span class="mat-brand-meta">' + list.length + ' matériau' + (list.length > 1 ? 'x' : '') + ' · ' +
-            nCol + ' couleur' + (nCol > 1 ? 's' : '') + ' en stock</span>' +
+          '<span class="mat-brand-meta">' + tn(list.length, '{n} matériau', '{n} matériaux') + ' · ' +
+            tn(nCol, '{n} couleur en stock', '{n} couleurs en stock') + '</span>' +
           '<span class="mat-brand-rule" aria-hidden="true"></span>' +
-          '<a class="mat-brand-link" href="boutique.html#/m/' + esc(brandSeg(b)) + '" aria-label="Voir tous les filaments ' + esc(b) + '">' +
-            'Voir la marque ' + ARROW + '</a>' +
+          '<a class="mat-brand-link" href="boutique.html#/m/' + esc(brandSeg(b)) + '" aria-label="' + esc(_t('Voir tous les filaments {b}', { b: b })) + '">' +
+            _t('Voir la marque') + ' ' + ARROW + '</a>' +
         '</header>' +
         '<div class="mat-grid">' + list.map(matCard).join('') + '</div>' +
       '</section>';
@@ -290,7 +289,7 @@
     }).join('');
     var mins = g.stock.map(fromPrice).filter(function (v) { return v != null; });
     var min = mins.length ? Math.min.apply(null, mins) : null;
-    var tag = String(g.first.material_desc || '').split(/\r?\n/)[0].trim();
+    var tag = String(CA0.trm(g.first, 'description') || '').split(/\r?\n/)[0].trim();
     if (tag.length > 90) tag = tag.slice(0, 88).replace(/\s+\S*$/, '') + '…';
     var n = g.stock.length;
     return '<a class="mat-card" href="' + esc(matUrl(g.first)) + '">' +
@@ -299,8 +298,8 @@
       '<span class="mat-body">' +
         '<span class="mat-name">' + esc(g.material) + '</span>' +
         (tag ? '<span class="mat-tag">' + esc(tag) + '</span>' : '') +
-        '<span class="mat-foot"><span><b>' + n + '</b> couleur' + (n > 1 ? 's' : '') + ' en stock</span>' +
-          (min != null ? '<span class="mat-price">dès <b>' + priceShort(min) + '</b></span>' : '') + '</span>' +
+        '<span class="mat-foot"><span>' + tn(n, '<b>{n}</b> couleur en stock', '<b>{n}</b> couleurs en stock') + '</span>' +
+          (min != null ? '<span class="mat-price">' + _t('dès <b>{p}</b>', { p: priceShort(min) }) + '</span>' : '') + '</span>' +
       '</span></a>';
   }
 
@@ -315,11 +314,11 @@
         ((a.material_sort || 0) - (b.material_sort || 0)) || ((a.sort_order || 0) - (b.sort_order || 0));
     });
     var top = pool.slice(0, 5);
-    if (!top.length) { emptyNote(popGrid, 'Aucun filament à afficher pour l\'instant.'); return; }
+    if (!top.length) { emptyNote(popGrid, _t('Aucun filament à afficher pour l\'instant.')); return; }
     var ranked = top.some(function (p) { return p._pop > 0; });
     if (!ranked) {                                  // pas encore de ventes : on ne prétend pas à un classement
-      setText('#populaires .eyebrow', 'Sélection');
-      setText('#populaires h2', 'À découvrir');
+      setText('#populaires .eyebrow', _t('Sélection'));
+      setText('#populaires h2', _t('À découvrir'));
     }
     popGrid.innerHTML = top.map(function (p, i) {
       var url = publicUrl(p.image_path), fp = fromPrice(p), ok = inStock(p);
@@ -329,11 +328,11 @@
       return '<a class="pop-card" href="' + esc(filUrl(p)) + '">' +
         '<span class="pop-media">' + media + '</span>' +
         '<span class="pop-body">' +
-          '<span class="pop-meta"><i class="pop-dot" style="background:' + esc(swatchBg(p)) + '"></i><span>' + esc(p.material || 'Filament') + '</span>' +
-            (ranked ? '<b class="pop-rank" aria-label="Rang ' + (i + 1) + '">#' + (i + 1) + '</b>' : '') + '</span>' +
+          '<span class="pop-meta"><i class="pop-dot" style="background:' + esc(swatchBg(p)) + '"></i><span>' + esc(p.material || _t('Filament')) + '</span>' +
+            (ranked ? '<b class="pop-rank" aria-label="' + _t('Rang {n}', { n: i + 1 }) + '">#' + (i + 1) + '</b>' : '') + '</span>' +
           '<span class="pop-name">' + esc(p.name) + '</span>' +
-          '<span class="pop-foot">' + (fp != null ? '<span>dès <b>' + money(fp) + '</b></span>' : '<span></span>') +
-            '<span class="pill ' + (ok ? 'ok' : 'out') + '">' + (ok ? 'En stock' : 'Épuisé') + '</span></span>' +
+          '<span class="pop-foot">' + (fp != null ? '<span>' + _t('dès <b>{p}</b>', { p: money(fp) }) + '</span>' : '<span></span>') +
+            '<span class="pill ' + (ok ? 'ok' : 'out') + '">' + (ok ? _t('En stock') : _t('Épuisé')) + '</span></span>' +
         '</span></a>';
     }).join('');
     done(popGrid);
@@ -350,33 +349,33 @@
     var sMin = minOf(spa), aMin = minOf(acc), thumbs = $('#spa-thumbs');
     if (spa.length) {
       var el = $('#spa-meta');
-      if (el) el.innerHTML = (sMin != null ? 'dès <b>' + money(sMin) + '</b> la paire · ' : '') + spa.length + ' modèle' + (spa.length > 1 ? 's' : '');
+      if (el) el.innerHTML = (sMin != null ? _t('dès <b>{p}</b> la paire', { p: money(sMin) }) + ' · ' : '') + tn(spa.length, '{n} modèle', '{n} modèles');
     }
     if (thumbs) {
       thumbs.innerHTML = spa.filter(function (p) { return p.image_path; }).slice(0, 3).map(function (p) {
         return '<span><img src="' + esc(publicUrl(p.image_path)) + '" alt="" loading="lazy"></span>';
       }).join('');
     }
-    if (aMin != null) { var am = $('#acc-meta'); if (am) am.innerHTML = 'dès <b>' + money(aMin) + '</b>'; }
+    if (aMin != null) { var am = $('#acc-meta'); if (am) am.innerHTML = _t('dès <b>{p}</b>', { p: money(aMin) }); }
   }
 
   function renderStats(fils, nMats) {
     var inS = fils.filter(inStock);
     if (inS.length) setText('#k-stock', inS.length);
     var mins = inS.map(fromPrice).filter(function (v) { return v != null; });
-    if (mins.length) setText('#f-min', 'dès ' + priceShort(Math.min.apply(null, mins)));
-    if (nMats) setText('#f-mats', nMats + ' matériau' + (nMats > 1 ? 'x' : ''));
+    if (mins.length) setText('#f-min', _t('dès {p}', { p: priceShort(Math.min.apply(null, mins)) }));
+    if (nMats) setText('#f-mats', tn(nMats, '{n} matériau', '{n} matériaux'));
   }
 
   function fail() {
     buildRail(FALLBACK, 1);
-    emptyNote(matGrid, 'Catalogue momentanément indisponible — <a href="boutique.html">ouvrir la boutique</a> ou <a class="ask" href="/compte.html#/messages" data-msg="filaments">nous écrire</a>.');
-    emptyNote(popGrid, 'Catalogue momentanément indisponible.');
+    emptyNote(matGrid, _t('Catalogue momentanément indisponible — <a href="boutique.html">ouvrir la boutique</a> ou <a class="ask" href="/compte.html#/messages" data-msg="filaments">nous écrire</a>.'));
+    emptyNote(popGrid, _t('Catalogue momentanément indisponible.'));
   }
 
   function load() {
     if (!sb) { fail(); return; }
-    var cols = 'id,type,name,brand,material,hex,attrs,image_path,slug,material_slug,material_desc,material_sort,sell_price,sell_price_2,qty,qty_2,sort_order';
+    var cols = 'id,type,name,brand,material,hex,attrs,image_path,slug,material_slug,material_desc,material_en,material_sort,sell_price,sell_price_2,qty,qty_2,sort_order';
     Promise.all([
       sb.from('products_public').select(cols).in('type', ['filament', 'spacer', 'accessory']).limit(2000),
       sb.from('brands').select('name,sort_order,slug'),
@@ -423,15 +422,17 @@
   function dayText(v, dateOnly) {
     if (!v) return '';
     var d = dateOnly ? new Date(+v.slice(0, 4), +v.slice(5, 7) - 1, +v.slice(8, 10)) : new Date(v);
-    return isNaN(d) ? '' : d.getDate() + (d.getDate() === 1 ? 'er' : '') + ' ' + MONTHS[d.getMonth()];
+    if (isNaN(d)) return '';
+    if (CA0.lang === 'en') return d.toLocaleDateString('en-CA', { month: 'long', day: 'numeric' });
+    return d.getDate() + (d.getDate() === 1 ? 'er' : '') + ' ' + MONTHS[d.getMonth()];
   }
   function newsMeta(n) {
-    if (n.kind === 'event' && n.event_at) return 'Le ' + dayText(n.event_at, true);
-    if (n.ends_at) return 'Jusqu\'au ' + dayText(n.ends_at);
+    if (n.kind === 'event' && n.event_at) return _t('Le {d}', { d: dayText(n.event_at, true) });
+    if (n.ends_at) return _t('Jusqu\'au {d}', { d: dayText(n.ends_at) });
     return '';
   }
   function copyCode(btn, code) {
-    function ok() { btn.textContent = 'Copié !'; btn.classList.add('is-done'); setTimeout(function () { btn.textContent = 'Copier'; btn.classList.remove('is-done'); }, 1800); }
+    function ok() { btn.textContent = _t('Copié !'); btn.classList.add('is-done'); setTimeout(function () { btn.textContent = _t('Copier'); btn.classList.remove('is-done'); }, 1800); }
     if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(code).then(ok, legacy); return; }
     legacy();
     function legacy() {
@@ -460,13 +461,13 @@
           (img ? '<div class="news-media"><img src="' + esc(img) + '" alt="" loading="lazy"></div>' : '') +
           '<div class="news-body">' +
             '<div class="news-top">' + tag(n) + (meta ? '<span class="news-meta">' + esc(meta) + '</span>' : '') + '</div>' +
-            '<h3>' + esc(n.title) + '</h3>' +
-            (n.body ? '<p>' + esc(n.body).replace(/\n/g, '<br>') + '</p>' : '') +
+            '<h3>' + esc(CA.tr(n, 'title')) + '</h3>' +
+            (n.body ? '<p>' + esc(CA.tr(n, 'body')).replace(/\n/g, '<br>') + '</p>' : '') +
             ((href && n.cta_label) || n.promo_code ? '<div class="news-acts">' +
-              (href && n.cta_label ? '<a class="btn btn-ember" href="' + esc(href) + '">' + esc(n.cta_label) +
+              (href && n.cta_label ? '<a class="btn btn-ember" href="' + esc(href) + '">' + esc(CA.tr(n, 'cta_label')) +
                 ' <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>' : '') +
-              (n.promo_code ? '<span class="news-code"><span>Code</span><b>' + esc(n.promo_code) + '</b>' +
-                '<button type="button" class="news-copy" data-code="' + esc(n.promo_code) + '">Copier</button></span>' : '') +
+              (n.promo_code ? '<span class="news-code"><span>' + _t('Code') + '</span><b>' + esc(n.promo_code) + '</b>' +
+                '<button type="button" class="news-copy" data-code="' + esc(n.promo_code) + '">' + _t('Copier') + '</button></span>' : '') +
             '</div>' : '') +
           '</div>' +
         '</article>';
@@ -477,7 +478,7 @@
           (img ? '<span class="news-thumb"><img src="' + esc(img) + '" alt="" loading="lazy"></span>' : '') +
           '<span class="news-mini-txt">' +
             '<span class="news-top">' + tag(n) + (meta ? '<span class="news-meta">' + esc(meta) + '</span>' : '') + '</span>' +
-            '<span class="news-mini-t">' + esc(n.title) + '</span>' +
+            '<span class="news-mini-t">' + esc(CA.tr(n, 'title')) + '</span>' +
           '</span>' +
           (i === cur && auto ? progHtml() : '') +
         '</button>';
@@ -490,7 +491,7 @@
       function draw() {
         grid.classList.toggle('is-solo', items.length === 1);
         grid.innerHTML = feature(items[cur]) +
-          (items.length > 1 ? '<div class="news-list" role="group" aria-label="Autres nouvelles">' + items.map(mini).join('') + '</div>' : '');
+          (items.length > 1 ? '<div class="news-list" role="group" aria-label="' + _t('Autres nouvelles') + '">' + items.map(mini).join('') + '</div>' : '');
         bindCopy();
         $$('.news-mini', grid).forEach(function (b) {
           b.addEventListener('click', function () {

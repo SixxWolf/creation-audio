@@ -221,11 +221,16 @@ grant execute on function public._held_stock() to anon, authenticated;   -- appe
 -- par_spool, par_refill…) ne sortent jamais — une nouvelle clé attrs
 -- reste privée tant qu'on ne l'ajoute pas ici (et dans products_dealer).
 -- ------------------------------------------------------------
+-- traduction anglaise (site /en/), écrite en coulisse par la fonction « translate » (section LANGUE ANGLAISE)
+alter table public.products  add column if not exists i18n jsonb;
+alter table public.materials add column if not exists i18n jsonb;
 drop view if exists public.products_public;
 create view public.products_public
 with (security_invoker = off) as
   select
     p.id, p.type, p.name, p.material, p.brand, p.code, p.hex,
+    p.i18n - 'stale' as en,            -- textes anglais de la couleur / du spacer / de l'accessoire
+    m.i18n - 'stale' as material_en,   -- textes anglais du matériau
     jsonb_strip_nulls(jsonb_build_object(
       'colors',       p.attrs -> 'colors',
       'img_spool',    p.attrs -> 'img_spool',
@@ -575,6 +580,7 @@ grant execute on function public.is_dealer() to authenticated;
 drop view if exists public.products_dealer;
 create view public.products_dealer with (security_invoker = off) as
   select p.id, p.type, p.name,
+         p.i18n - 'stale' as en,          -- textes anglais (portail /en/dealer.html)
          jsonb_strip_nulls(jsonb_build_object(
            'colors',       p.attrs -> 'colors',
            'img_spool',    p.attrs -> 'img_spool',
@@ -3398,6 +3404,222 @@ grant execute on function public.public_fetes() to anon, authenticated;
 insert into public.admin_settings (key, value)
   values ('fetes', '{"on": true, "from": "2026-12-01", "to": "2027-01-06"}'::jsonb)
   on conflict (key) do nothing;
+
+-- ------------------------------------------------------------
+-- LANGUE ANGLAISE (2026-10-25) — site /en/, traduction automatique
+-- Colonne i18n (products, materials, news) : { h, name?, description?, long_desc?,
+-- category?, title?, body?, cta_label?, s: { "texte court FR": "EN" } } ; écrite
+-- SEULEMENT par la fonction Edge « translate » (Claude), jamais par l'admin.
+-- Déclencheur : quand un texte français affiché change (empreinte md5 ≠ h), la
+-- ligne passe « stale » (l'ancienne traduction reste affichée en attendant).
+-- i18n_tick (aux 5 min) appelle « translate » s'il y a du travail.
+-- ------------------------------------------------------------
+alter table public.news add column if not exists i18n jsonb;
+
+-- texte français à traduire, tel que le site l'affiche ; {} = rien à traduire
+create or replace function public._i18n_src(p_table text, r jsonb)
+returns jsonb language sql immutable set search_path = '' as $$
+  select coalesce(jsonb_strip_nulls(case p_table
+    when 'products' then jsonb_build_object(
+      'name',        case when r ->> 'type' = 'accessory' then nullif(r ->> 'name', '') end,
+      'description', nullif(r -> 'attrs' ->> 'description', ''),
+      'long_desc',   nullif(r -> 'attrs' ->> 'long_desc', ''),
+      'category',    nullif(r -> 'attrs' ->> 'category', ''),
+      'specs',       case when jsonb_typeof(r -> 'attrs' -> 'specs') = 'array'
+                           and jsonb_array_length(r -> 'attrs' -> 'specs') > 0 then r -> 'attrs' -> 'specs' end,
+      'pos',         (select jsonb_agg(distinct f ->> 'pos')
+                        from jsonb_array_elements(case when jsonb_typeof(r -> 'attrs' -> 'fitment') = 'array'
+                                                       then r -> 'attrs' -> 'fitment' else '[]'::jsonb end) f
+                       where coalesce(f ->> 'pos', '') <> ''))
+    when 'materials' then jsonb_build_object(
+      'description', nullif(r ->> 'description', ''),
+      'long_desc',   nullif(r ->> 'long_desc', ''),
+      'specs',       case when jsonb_typeof(r -> 'specs') = 'array' and jsonb_array_length(r -> 'specs') > 0 then r -> 'specs' end)
+    when 'news' then jsonb_build_object(
+      'title', nullif(r ->> 'title', ''), 'body', nullif(r ->> 'body', ''), 'cta_label', nullif(r ->> 'cta_label', ''))
+  end), '{}'::jsonb);
+$$;
+
+create or replace function public._i18n_mark()
+returns trigger language plpgsql set search_path = '' as $$
+declare s jsonb;
+begin
+  s := public._i18n_src(TG_TABLE_NAME, to_jsonb(NEW));
+  if s = '{}'::jsonb then NEW.i18n := null; return NEW; end if;
+  if NEW.i18n is null or NEW.i18n ->> 'h' is distinct from md5(s::text) then
+    NEW.i18n := coalesce(NEW.i18n, '{}'::jsonb) || '{"stale": true}'::jsonb;
+  end if;
+  return NEW;
+end $$;
+drop trigger if exists products_i18n  on public.products;
+drop trigger if exists materials_i18n on public.materials;
+drop trigger if exists news_i18n      on public.news;
+create trigger products_i18n  before insert or update on public.products  for each row execute function public._i18n_mark();
+create trigger materials_i18n before insert or update on public.materials for each row execute function public._i18n_mark();
+create trigger news_i18n      before insert or update on public.news      for each row execute function public._i18n_mark();
+
+-- travail à faire (fonction translate, clé de service) : texte source + empreinte
+create or replace function public.i18n_pending(p_limit integer default 40)
+returns table (tbl text, key jsonb, src jsonb, h text)
+language sql stable security definer set search_path = '' as $$
+  select * from (
+    select 'products'::text, jsonb_build_object('id', p.id), s, md5(s::text)
+      from public.products p, lateral (select public._i18n_src('products', to_jsonb(p)) s) x
+     where (p.i18n ->> 'stale')::boolean is true and p.active
+    union all
+    select 'materials', jsonb_build_object('brand', m.brand, 'name', m.name), s, md5(s::text)
+      from public.materials m, lateral (select public._i18n_src('materials', to_jsonb(m)) s) x
+     where (m.i18n ->> 'stale')::boolean is true
+    union all
+    select 'news', jsonb_build_object('id', n.id), s, md5(s::text)
+      from public.news n, lateral (select public._i18n_src('news', to_jsonb(n)) s) x
+     where (n.i18n ->> 'stale')::boolean is true
+  ) t limit greatest(1, least(p_limit, 200));
+$$;
+revoke all on function public.i18n_pending(integer) from public, anon, authenticated;
+grant execute on function public.i18n_pending(integer) to service_role;
+
+-- écrit la traduction si la source n'a pas bougé depuis (sinon la ligne reste « stale »)
+create or replace function public.i18n_save(p_tbl text, p_key jsonb, p_h text, p_en jsonb)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare v jsonb := (p_en - 'stale' - 'h') || jsonb_build_object('h', p_h); n integer;
+begin
+  if p_tbl = 'products' then
+    update public.products set i18n = v where id = (p_key ->> 'id')::uuid
+       and md5(public._i18n_src('products', to_jsonb(products))::text) = p_h;
+  elsif p_tbl = 'materials' then
+    update public.materials set i18n = v where brand = p_key ->> 'brand' and name = p_key ->> 'name'
+       and md5(public._i18n_src('materials', to_jsonb(materials))::text) = p_h;
+  elsif p_tbl = 'news' then
+    update public.news set i18n = v where id = (p_key ->> 'id')::uuid
+       and md5(public._i18n_src('news', to_jsonb(news))::text) = p_h;
+  else return false; end if;
+  get diagnostics n = row_count;
+  return n > 0;
+end $$;
+revoke all on function public.i18n_save(text, jsonb, text, jsonb) from public, anon, authenticated;
+grant execute on function public.i18n_save(text, jsonb, text, jsonb) to service_role;
+
+create or replace function public.i18n_tick()
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.i18n_pending(1)) then
+    perform net.http_post(
+      url := 'https://cqfmvdknppscazfynoiy.supabase.co/functions/v1/translate',
+      body := '{"cron":true}'::jsonb,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                   'x-cron-key', (select value from private.secrets where key = 'cron_key')),
+      timeout_milliseconds := 120000);
+  end if;
+end $$;
+revoke all on function public.i18n_tick() from public, anon, authenticated;
+select cron.unschedule(jobid) from cron.job where jobname = 'i18n-tick';
+select cron.schedule('i18n-tick', '*/5 * * * *', 'select public.i18n_tick()');
+
+-- amorçage : tout ce qui a du texte est à traduire une première fois
+update public.products  set i18n = '{"stale": true}'::jsonb where i18n is null and public._i18n_src('products',  to_jsonb(products))  <> '{}'::jsonb;
+update public.materials set i18n = '{"stale": true}'::jsonb where i18n is null and public._i18n_src('materials', to_jsonb(materials)) <> '{}'::jsonb;
+update public.news      set i18n = '{"stale": true}'::jsonb where i18n is null and public._i18n_src('news',      to_jsonb(news))      <> '{}'::jsonb;
+
+-- Langue des courriels : celle de la version du site utilisée ('fr' | 'en').
+-- customers.lang / dealers.lang : posées par me_set_lang (pages /en/ ou FR, à chaque
+-- commande, réservation, cueillette, message, ouverture de Mon compte).
+-- waitlist.lang : passée par « M'aviser » (waitlist_subscribe p_lang).
+-- Lues par customer-order-notify, reservation-notify, pickup-notify, message-notify,
+-- waitlist-notify ; compte-code reçoit la langue dans sa requête.
+alter table public.customers add column if not exists lang text not null default 'fr';
+alter table public.dealers   add column if not exists lang text not null default 'fr';
+alter table public.waitlist  add column if not exists lang text not null default 'fr';
+do $$ begin
+  alter table public.customers add constraint customers_lang_chk check (lang in ('fr','en'));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.dealers add constraint dealers_lang_chk check (lang in ('fr','en'));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.waitlist add constraint waitlist_lang_chk check (lang in ('fr','en'));
+exception when duplicate_object then null; end $$;
+
+create or replace function public.me_set_lang(p_lang text)
+returns text language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); v_email text := lower((select auth.jwt()) ->> 'email');
+        v_lang text := case when p_lang = 'en' then 'en' else 'fr' end;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  update public.dealers set lang = v_lang where lower(email) = v_email and lang <> v_lang;
+  if v_email <> 'creationaudio.ca@gmail.com' then
+    insert into public.customers (id, email, lang) values (v_uid, v_email, v_lang)
+      on conflict (id) do update set lang = excluded.lang where public.customers.lang <> excluded.lang;
+  end if;
+  return v_lang;
+end $$;
+revoke all on function public.me_set_lang(text) from public, anon;
+grant execute on function public.me_set_lang(text) to authenticated;
+
+-- « M'aviser » : + langue de la page (courriel de retour en stock dans cette langue)
+drop function if exists public.waitlist_subscribe(uuid, text, text, text);
+create or replace function public.waitlist_subscribe(p_product uuid, p_kind text, p_email text, p_hp text default '', p_lang text default 'fr')
+returns text language plpgsql security definer set search_path = public as $$
+declare v_email text := lower(trim(coalesce(p_email, '')));
+        v_kind  text := nullif(trim(coalesce(p_kind, '')), '');
+        v_lang  text := case when p_lang = 'en' then 'en' else 'fr' end;
+begin
+  -- robot : on fait semblant que tout va bien, sans rien enregistrer
+  if coalesce(p_hp, '') <> '' then return 'ok'; end if;
+  if length(v_email) > 254 or v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$' then return 'invalid'; end if;
+  if v_kind is not null and v_kind not in ('spool','refill','item') then return 'invalid'; end if;
+  if not exists (select 1 from public.products where id = p_product and active) then return 'unavailable'; end if;
+  perform public.waitlist_cleanup();
+  -- anti-pourriel : 5 demandes ouvertes max par courriel, 40 inscriptions/heure au total
+  if (select count(*) from public.waitlist where status = 'open' and source = 'site' and lower(contact) = v_email) >= 5
+     or (select count(*) from public.waitlist where source = 'site' and created_at > now() - interval '1 hour') >= 40 then
+    return 'busy';
+  end if;
+  if exists (select 1 from public.waitlist where status = 'open' and source = 'site' and lower(contact) = v_email
+               and product_id = p_product and coalesce(kind, '') = coalesce(v_kind, '')) then
+    return 'exists';
+  end if;
+  insert into public.waitlist (product_id, kind, contact, source, lang) values (p_product, v_kind, v_email, 'site', v_lang);
+  return 'ok';
+end $$;
+revoke all on function public.waitlist_subscribe(uuid, text, text, text, text) from public;
+grant execute on function public.waitlist_subscribe(uuid, text, text, text, text) to anon, authenticated;
+
+-- ------------------------------------------------------------
+-- CALCULATEUR DE BOÎTES (2026-10-26) — Atelier › Boîtes (cms-boites.js)
+-- Subs perso + projets de boîtes, admin seulement (rien de public). La
+-- bibliothèque Sundown est dans assets/box-subs.js (pas en base).
+-- box_subs.data = fiche T/S en unités de saisie (Re Ω, Le mH, Vas L, Sd cm²,
+--   Mms g, Bl T·m, Xmax mm, dimensions po, disp pi³, coils, zc, wiring, rec*)
+-- box_projects.params = projet complet (cotes en m) + copie de la fiche du sub
+--   (sub: { ref, data }) : un projet reste lisible si le sub est supprimé.
+-- ------------------------------------------------------------
+create table if not exists public.box_subs (
+  id          uuid primary key default gen_random_uuid(),
+  brand       text not null default '',
+  model       text not null default '',
+  data        jsonb not null default '{}'::jsonb,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create table if not exists public.box_projects (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null default '',
+  params      jsonb not null default '{}'::jsonb,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create index if not exists box_projects_updated_idx on public.box_projects (updated_at desc);
+alter table public.box_subs enable row level security;
+alter table public.box_projects enable row level security;
+drop policy if exists box_subs_admin_all on public.box_subs;
+create policy box_subs_admin_all on public.box_subs for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists box_projects_admin_all on public.box_projects;
+create policy box_projects_admin_all on public.box_projects for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.box_subs from anon;
+revoke all on public.box_projects from anon;
 
 -- ------------------------------------------------------------
 -- Vérification

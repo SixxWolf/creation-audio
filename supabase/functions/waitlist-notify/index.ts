@@ -45,18 +45,23 @@ function esc(s: unknown) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
 }
 const KIND_LABEL: Record<string, string> = { spool: "avec bobine", refill: "recharge" };
+const KIND_LABEL_EN: Record<string, string> = { spool: "with spool", refill: "refill" };
 
-type Product = { id: string; type: string; name: string; brand: string | null; material: string | null; slug: string | null };
+type Product = { id: string; type: string; name: string; brand: string | null; material: string | null; slug: string | null;
+  i18n?: { name?: string } | null };
 
-function productUrl(p: Product, brandSlug: string | null, matSlug: string | null) {
-  if (p.type === "spacer") return SITE + "/spacers.html";
-  if (p.type !== "filament") return SITE + "/boutique.html";
+// en = avis demandé depuis la version anglaise (waitlist.lang) -> pages /en/
+function productUrl(p: Product, brandSlug: string | null, matSlug: string | null, en = false) {
+  const base = SITE + (en ? "/en" : "");
+  if (p.type === "spacer") return base + "/spacers.html";
+  if (p.type !== "filament") return base + "/boutique.html";
   const b = brandSlug || slugify(p.brand || "Autres");
   const m = matSlug || slugify(p.material || "Autres");
-  return SITE + "/boutique.html#/m/" + b + "/" + m + "/" + (p.slug || slugify(p.name));
+  return base + "/boutique.html#/m/" + b + "/" + m + "/" + (p.slug || slugify(p.name));
 }
 
-function emailContent(p: Product, kind: string | null, url: string) {
+function emailContent(p: Product, kind: string | null, url: string, en = false) {
+  if (en) return emailContentEn(p, kind, url);
   const what = [p.material, p.name].filter(Boolean).join(" ") + (kind && KIND_LABEL[kind] ? " (" + KIND_LABEL[kind] + ")" : "");
   const subject = "C'est arrivé : " + what + " est de retour en stock";
   const text =
@@ -80,6 +85,34 @@ function emailContent(p: Product, kind: string | null, url: string) {
     '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
     '<p style="font-size:12px;color:#6C727C">Tu reçois ce courriel une seule fois parce que tu as demandé à être avisé(e) du retour de ce produit sur ' +
     '<a href="' + SITE + '" style="color:#6C727C">creationaudio.ca</a>. Ton adresse a maintenant été supprimée de notre liste d\'attente.</p>' +
+    "</div>";
+  return { subject, text, html };
+}
+
+function emailContentEn(p: Product, kind: string | null, url: string) {
+  const name = (p.type === "accessory" && p.i18n?.name) || p.name;
+  const what = [p.material, name].filter(Boolean).join(" ") + (kind && KIND_LABEL_EN[kind] ? " (" + KIND_LABEL_EN[kind] + ")" : "");
+  const subject = "It's here: " + what + " is back in stock";
+  const text =
+    "Hello,\n\n" +
+    "Good news: the " + what + " you were waiting for is back in stock at Création Audio.\n\n" +
+    "See the product: " + url + "\n\n" +
+    "Quantities are limited. To get it, add it to your cart on the site or simply reply to this email.\n\n" +
+    "Thanks and see you soon!\nCréation Audio\n\n" +
+    "—\nYou're getting this email only once because you asked to be notified when this product is back on creationaudio.ca. " +
+    "Your address has now been deleted from our waitlist.";
+  const html =
+    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#181A1F;line-height:1.5">' +
+    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
+    '<h1 style="font-size:22px;margin:0 0 14px">It\'s back in stock!</h1>' +
+    "<p>Hello,</p>" +
+    "<p>Good news: the <strong>" + esc(what) + "</strong> you were waiting for is back in stock.</p>" +
+    '<p style="margin:22px 0"><a href="' + esc(url) + '" style="background:#FF6A2B;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">See the product</a></p>' +
+    "<p>Quantities are limited. To get it, add it to your cart on the site or simply reply to this email.</p>" +
+    "<p>Thanks and see you soon!<br>Création Audio</p>" +
+    '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
+    '<p style="font-size:12px;color:#6C727C">You\'re getting this email only once because you asked to be notified when this product is back on ' +
+    '<a href="' + SITE + '/en/" style="color:#6C727C">creationaudio.ca</a>. Your address has now been deleted from our waitlist.</p>' +
     "</div>";
   return { subject, text, html };
 }
@@ -110,11 +143,11 @@ Deno.serve(async (req) => {
 
   const db = createClient(url, service);
   const { data: rows, error } = await db.from("waitlist")
-    .select("id, product_id, kind, contact, source, status").in("id", ids);
+    .select("id, product_id, kind, contact, source, status, lang").in("id", ids);
   if (error) return json({ error: error.message }, 500);
 
   const pids = [...new Set((rows || []).map((r) => r.product_id))];
-  const { data: prods } = await db.from("products").select("id, type, name, brand, material, slug").in("id", pids.length ? pids : ["00000000-0000-0000-0000-000000000000"]);
+  const { data: prods } = await db.from("products").select("id, type, name, brand, material, slug, i18n").in("id", pids.length ? pids : ["00000000-0000-0000-0000-000000000000"]);
   const { data: brands } = await db.from("brands").select("name, slug");
   const { data: mats } = await db.from("materials").select("brand, name, slug");
   const prodById = new Map((prods || []).map((p) => [p.id, p as Product]));
@@ -127,8 +160,8 @@ Deno.serve(async (req) => {
     if (!r || r.status !== "open" || r.source !== "site" || !r.contact) { results.push({ id, result: "skipped" }); continue; }
     const p = prodById.get(r.product_id);
     if (!p) { results.push({ id, result: "error", error: "Produit introuvable." }); continue; }
-    const link = productUrl(p, brandSlug.get(p.brand || "") ?? null, matSlug.get((p.brand || "") + "|" + (p.material || "")) ?? null);
-    const mail = emailContent(p, r.kind, link);
+    const link = productUrl(p, brandSlug.get(p.brand || "") ?? null, matSlug.get((p.brand || "") + "|" + (p.material || "")) ?? null, r.lang === "en");
+    const mail = emailContent(p, r.kind, link, r.lang === "en");
     try {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",

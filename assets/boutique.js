@@ -12,19 +12,20 @@
   'use strict';
 
   var sb = window.CA && window.CA.sb;
+  var _t = window.CA.t, tn = window.CA.tn;
   var FB = 'https://m.me/61591945465745';
   var EMAIL = 'contact@creationaudio.ca';
   var BUCKET = 'products';
   var CART_KEY = 'ca_v2_cart';
   var STOCK_KEY = 'ca_shop_only_stock';
-  var BASE_TITLE = 'Création Audio — Filaments';
+  var BASE_TITLE = _t('Création Audio — Filaments');
 
   // Accessoires « bobine vide réutilisable » (repli si aucun accessoire dans l'admin).
   var ACC = {
-    spool:   { id: 'spool',   name: 'Bobine vide réutilisable', price: 10,
-               desc: 'En supplément — pour vos recharges · température max 70 °C', img: 'assets/img/spool-reusable.png' },
-    spoolht: { id: 'spoolht', name: 'Bobine vide réutilisable — haute température', price: 10,
-               desc: 'Pour matériaux techniques (ABS…) · température max 90 °C', img: 'assets/img/spool-reusable-ht.png' }
+    spool:   { id: 'spool',   name: _t('Bobine vide réutilisable'), price: 10,
+               desc: _t('En supplément — pour vos recharges · température max 70 °C'), img: 'assets/img/spool-reusable.png' },
+    spoolht: { id: 'spoolht', name: _t('Bobine vide réutilisable — haute température'), price: 10,
+               desc: _t('Pour matériaux techniques (ABS…) · température max 90 °C'), img: 'assets/img/spool-reusable-ht.png' }
   };
 
   var IC = {
@@ -46,8 +47,8 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-  function money(n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; }
-  function plural(n, one, many) { return n + ' ' + (n > 1 ? many : one); }
+  var money = window.CA.money;   // 12,99 $ · $12.99 (i18n.js)
+  function plural(n, one, many) { return n + ' ' + _t((window.CA.lang === 'en' ? n !== 1 : n > 1) ? many : one); }
   function publicUrl(path) {
     if (!path || !sb) return '';
     try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; } catch (e) { return ''; }
@@ -114,9 +115,9 @@
   // client connecté (Mon compte, commande-client.js) : il peut commander au-delà du stock
   // (la part en trop est « à commander » chez le fournisseur : BO_DELAY, confirmé à l'envoi ;
   //  bobines vides = nos propres impressions : « à compléter · sans garantie »)
-  var BO_MAX = 99, BO_DELAY = '3 à 14 jours ouvrables', BO_EMPTY = 'sans garantie';
+  var BO_MAX = 99, BO_DELAY = _t('3 à 14 jours ouvrables'), BO_EMPTY = _t('sans garantie');
   function canBackorder() { return !!(window.CA && window.CA.custOrder && window.CA.custOrder.signedIn()); }
-  function boLabel(n, empty) { return n + (empty ? ' à compléter · ' + BO_EMPTY : ' à commander · ' + BO_DELAY); }
+  function boLabel(n, empty) { return n + (empty ? _t(' à compléter · ') + BO_EMPTY : _t(' à commander · ') + BO_DELAY); }
   function boNote(stock, qty, empty) {
     var n = canBackorder() && stock != null ? qty - Math.max(0, stock | 0) : 0;
     return n > 0 ? '<span class="buy-bo">' + boLabel(n, empty) + '</span>' : '';
@@ -126,8 +127,8 @@
   function tiersOf(p, type) { return type === 'refill' ? p.tiers_2 : p.tiers; }
   function inStockAs(p, type) { return offered(p, type) && stockOf(p, type) > 0; }
   function anyStock(p) { return inStockAs(p, 'spool') || inStockAs(p, 'refill'); }
-  function fmtName(type) { return type === 'refill' ? 'recharge' : 'avec bobine'; }
-  function fmtShort(type) { return type === 'refill' ? 'recharge' : 'bobine'; }
+  function fmtName(type) { return type === 'refill' ? _t('recharge') : _t('avec bobine'); }
+  function fmtShort(type) { return type === 'refill' ? _t('recharge') : _t('bobine'); }
 
   /* ---------- données ---------- */
   var products = [], byId = {}, brandInfo = {}, brands = [], brandByName = {};
@@ -141,16 +142,19 @@
       if (typeof path !== 'string' || !path || seen[path]) return;
       seen[path] = 1; var u = publicUrl(path); if (u) imgs.push(u);
     });
-    return { id: p.id, name: p.name, desc: a.description || '',
+    // textes : traduction anglaise de la base (CA.tr / CA.trs) sur /en/
+    var CA = window.CA;
+    return { id: p.id, name: CA.tr(p, 'name'), desc: CA.tr(p, 'description'),
              price: +p.sell_price || 0, img: imgs[0] || '', imgs: imgs,
              qty: (p.qty == null ? null : (p.qty | 0)),
              tiers: normalizeTiers(p.tiers).filter(function (t) { return t.min > 1; }),
-             cat: String(a.category || '').trim(),
+             cat: String(CA.tr(p, 'category') || '').trim(),
              onFil: a.on_filament === true,
              filBrands: Array.isArray(a.fil_brands) ? a.fil_brands : [],
              slug: p.slug || slugify(p.name),
-             longDesc: a.long_desc || '',
-             specs: Array.isArray(a.specs) ? a.specs.filter(function (s) { return s && (s.k || s.v); }) : [] };
+             longDesc: CA.tr(p, 'long_desc'),
+             specs: Array.isArray(a.specs) ? a.specs.filter(function (s) { return s && (s.k || s.v); })
+               .map(function (s) { return { k: CA.trs(p, s.k), v: CA.trs(p, s.v) }; }) : [] };
   }
   function accOut(a) { return a.qty != null && a.qty <= 0; }
   function accCanBO() { return canBackorder(); }
@@ -158,7 +162,7 @@
   var emptyIds = {};
   function isEmptySpool(a) { return !!(a && emptyIds[a.id]); }
   function accCatKey(a) { return a.cat ? a.cat.toLowerCase() : ''; }
-  function accCatName(a) { return a.cat || 'Autres'; }
+  function accCatName(a) { return a.cat || _t('Autres'); }
   // meilleur palier (le plus bas prix atteignable en quantité), null si aucun
   function accBestTier(a) { return a.tiers.length ? a.tiers[a.tiers.length - 1] : null; }
   // catégories dans l'ordre de l'admin (1er accessoire de chaque) ; sans catégorie = « Autres », en dernier
@@ -223,7 +227,7 @@
       .normalize('NFD').replace(/[̀-ͯ]/g, '')
       .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
-  var norm = function (s) { return s || 'Autres'; };       // matériau/marque absent => « Autres »
+  var norm = function (s) { return s || _t('Autres'); };       // matériau/marque absent => « Autres »
   function brandSlugName(brand) { var b = brandInfo[brand]; return (b && b.slug) || slugify(brand); }
   function matOf(brand, material) { var B = brandByName[brand]; return B ? B.mats[material] || null : null; }
   function matSlugFor(brand, material) {
@@ -307,14 +311,14 @@
   }
 
   function load() {
-    if (!sb) { failCatalog('Boutique momentanément indisponible.'); return; }
+    if (!sb) { failCatalog(_t('Boutique momentanément indisponible.')); return; }
     Promise.all([
       sb.from('products_public').select('*').eq('type', 'filament').order('sort_order', { ascending: true }).order('name', { ascending: true }),
       sb.from('brands').select('*'),
       sb.from('products_public').select('*').eq('type', 'accessory').order('sort_order', { ascending: true })
     ]).then(function (res) {
       var pr = res[0], br = res[1], ac = res[2];
-      if (pr.error) { failCatalog('Impossible de charger la boutique.'); return; }
+      if (pr.error) { failCatalog(_t('Impossible de charger la boutique.')); return; }
       products = pr.data || [];
       byId = {};
       products.forEach(function (p) { byId[p.id] = p; });
@@ -338,7 +342,7 @@
       applyRoute();          // honore l'URL courante (lien direct / retour navigateur)
       renderCart();
       if (canBackorder() && window.CA.custOrder.editing()) openCart();
-    }, function () { failCatalog('Erreur réseau — recharge la page.'); });
+    }, function () { failCatalog(_t('Erreur réseau — recharge la page.')); });
   }
   function failCatalog(msg) {
     catGroups.removeAttribute('aria-busy');
@@ -372,7 +376,10 @@
       B.order.sort(function (a, b) { return B.mats[a].sort - B.mats[b].sort; });
       B.materials = B.order.map(function (n) {
         var m = B.mats[n], f = m.first;
-        m.desc = f.material_desc; m.longDesc = f.material_long_desc; m.specs = f.material_specs;
+        m.desc = window.CA.trm(f, 'description'); m.longDesc = window.CA.trm(f, 'long_desc');
+        m.specs = Array.isArray(f.material_specs) ? f.material_specs.map(function (s) {
+          return s ? { k: window.CA.trs(f, s.k, true), v: window.CA.trs(f, s.v, true) } : s;
+        }) : f.material_specs;
         m.gallery = f.material_gallery; m.matImage = f.material_image;
         m.tierLow = minTierPrice(m);
         return m;
@@ -430,7 +437,7 @@
     renderCatalog();
     showScreen('catalog');
     curMat = null; curColor = null; updateBuybar();
-    document.title = brand ? 'Filaments ' + brand + ' — Création Audio' : BASE_TITLE;
+    document.title = brand ? _t('Filaments ') + brand + _t(' — Création Audio') : BASE_TITLE;
     if (fromProduct && catScrollY != null) window.scrollTo(0, catScrollY);
     else if (sameScreen) {
       // changement de marque : ramène le haut des résultats sous la barre si on l'a dépassée
@@ -453,7 +460,7 @@
 
     // puces de marque (liens réels : clic milieu / partage OK)
     var count = function (items) { return onlyStock ? items.filter(anyStock).length : items.length; };
-    catChips.innerHTML = '<a class="chip" href="#/"' + (!catBrand ? ' aria-current="true"' : '') + '>Toutes <span class="chip-n">' + count(products) + '</span></a>' +
+    catChips.innerHTML = '<a class="chip" href="#/"' + (!catBrand ? ' aria-current="true"' : '') + _t('>Toutes <span class="chip-n">') + count(products) + '</span></a>' +
       brands.map(function (B) {
         return '<a class="chip" href="' + esc(routeFor(B.name)) + '"' + (catBrand === B.name ? ' aria-current="true"' : '') + '>' +
           esc(B.name) + ' <span class="chip-n">' + count(B.items) + '</span></a>';
@@ -469,7 +476,7 @@
         '<header class="cat-ghead">' +
           '<h2 class="cat-gtitle" id="' + id + '">' + esc(B.name) + '</h2>' +
           '<span class="cat-gmeta">' + plural(B.materials.length, 'matériau', 'matériaux') + ' · ' +
-            plural(nStock, 'couleur', 'couleurs') + ' en stock</span>' +
+            plural(nStock, 'couleur', 'couleurs') + _t(' en stock</span>') +
           '<span class="cat-grule" aria-hidden="true"></span>' +
         '</header>' +
         '<div class="cat-grid">' + mats.map(matCard).join('') + '</div>' +
@@ -478,9 +485,9 @@
     catGroups.removeAttribute('aria-busy');
     if (!html) {
       html = '<p class="empty">' + (onlyStock
-        ? 'Rien en stock ' + (catBrand ? 'chez ' + esc(catBrand) + ' ' : '') + 'pour le moment. ' +
-          '<button type="button" class="js-show-all">Voir aussi les ruptures</button> — tu pourras demander à être avisé.'
-        : 'Aucun filament disponible pour le moment.') + '</p>';
+        ? _t('Rien en stock ') + (catBrand ? _t('chez ') + esc(catBrand) + ' ' : '') + _t('pour le moment. ') +
+          _t('<button type="button" class="js-show-all">Voir aussi les ruptures</button> — tu pourras demander à être avisé.')
+        : _t('Aucun filament disponible pour le moment.')) + '</p>';
     }
     catGroups.innerHTML = html;
     var sa = $('.js-show-all', catGroups);
@@ -504,9 +511,9 @@
         (tag ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +
         '<span class="mcard-dots" aria-hidden="true">' + dots + (extra > 0 ? '<em>+' + extra + '</em>' : '') + '</span>' +
         '<span class="mcard-foot">' +
-          '<span class="mcard-price">' + (min != null ? 'dès <b>' + money(min) + '</b>' : '') +
-            (min != null && m.tierLow != null && m.tierLow < min ? '<small>' + money(m.tierLow) + ' en quantité</small>' : '') + '</span>' +
-          (out ? '<span class="pill out">Rupture</span>' : '') +
+          '<span class="mcard-price">' + (min != null ? _t('dès <b>') + money(min) + '</b>' : '') +
+            (min != null && m.tierLow != null && m.tierLow < min ? '<small>' + money(m.tierLow) + _t(' en quantité</small>') : '') + '</span>' +
+          (out ? _t('<span class="pill out">Rupture</span>') : '') +
         '</span>' +
       '</span>' +
     '</a>';
@@ -552,7 +559,7 @@
   }
 
   function renderCrumbs() {
-    crumbsEl.innerHTML = '<a href="#/">Filaments</a>' + IC.chev +
+    crumbsEl.innerHTML = _t('<a href="#/">Filaments</a>') + IC.chev +
       '<a href="' + esc(routeFor(curMat.brand)) + '">' + esc(curMat.brand) + '</a>' + IC.chev +
       '<span aria-current="page">' + esc(curMat.name) + '</span>';
   }
@@ -571,9 +578,9 @@
       if (u) list.push({ url: u, kind: kind, tag: tag || '' });
     }
     var mine = curType === 'refill' ? 'refill' : 'spool', other = mine === 'refill' ? 'spool' : 'refill';
-    add(a['img_' + mine], 'prod', both ? (mine === 'refill' ? 'Recharge' : 'Bobine') : '');
+    add(a['img_' + mine], 'prod', both ? (mine === 'refill' ? _t('Recharge') : _t('Bobine')) : '');
     add(p.image_path, 'prod', '');
-    add(a['img_' + other], 'prod', both ? (other === 'refill' ? 'Recharge' : 'Bobine') : '');
+    add(a['img_' + other], 'prod', both ? (other === 'refill' ? _t('Recharge') : _t('Bobine')) : '');
     galleryOf(curMat).forEach(function (path) { add(path, 'gal', ''); });
     return list;
   }
@@ -581,7 +588,7 @@
   function mediaHtml() {
     var p = curColor, imgs = curImgs, it = imgs[curImg];
     var stage = it
-      ? '<button type="button" class="pdp-stage" aria-label="Agrandir la photo"><img src="' + esc(it.url) + '" alt="' + esc(p.name + ' — ' + curMat.name) + '">' +
+      ? _t('<button type="button" class="pdp-stage" aria-label="Agrandir la photo"><img src="') + esc(it.url) + '" alt="' + esc(p.name + ' — ' + curMat.name) + '">' +
           '<span class="pdp-zoom" aria-hidden="true">' + IC.zoom + '</span></button>'
       : '<div class="pdp-stage no-zoom"><span class="pdp-bigsw" style="background:' + esc(swatchBg(p)) + '"></span></div>';
     var thumbs = '';
@@ -589,10 +596,10 @@
       var MAX = 6, shown = imgs.length > MAX ? imgs.slice(0, MAX - 1) : imgs;
       thumbs = '<div class="pdp-thumbs">' + shown.map(function (t, i) {
         return '<button type="button" class="pdp-thumb' + (t.kind === 'gal' ? ' is-gal' : '') + (i === curImg ? ' is-active' : '') + '" data-i="' + i + '"' +
-          ' aria-label="Photo ' + (i + 1) + ' sur ' + imgs.length + '"' + (i === curImg ? ' aria-current="true"' : '') + '>' +
+          _t(' aria-label="Photo ') + (i + 1) + _t(' sur ') + imgs.length + '"' + (i === curImg ? ' aria-current="true"' : '') + '>' +
           '<img src="' + esc(t.url) + '" alt="" loading="lazy">' + (t.tag ? '<span class="pdp-thumb-tag">' + esc(t.tag) + '</span>' : '') + '</button>';
       }).join('') +
-      (imgs.length > MAX ? '<button type="button" class="pdp-thumb more" data-i="' + (MAX - 1) + '" data-lb="1" aria-label="Voir les ' + imgs.length + ' photos">+' + (imgs.length - MAX + 1) + '</button>' : '') +
+      (imgs.length > MAX ? '<button type="button" class="pdp-thumb more" data-i="' + (MAX - 1) + _t('" data-lb="1" aria-label="Voir les ') + imgs.length + _t(' photos">+') + (imgs.length - MAX + 1) + '</button>' : '') +
       '</div>';
     }
     return stage + thumbs;
@@ -622,13 +629,13 @@
     var st = stockOf(curColor, type), out = st <= 0, on = curType === type;
     return '<button type="button" class="fmt-opt' + (on ? ' is-active' : '') + (out ? ' is-out' : '') + '" data-type="' + type + '" aria-pressed="' + on + '">' +
       '<span class="fmt-name">' + label + '</span>' +
-      '<span class="fmt-meta">' + money(baseOf(curColor, type)) + ' · ' + (out ? 'rupture' : st + ' en stock') + '</span>' +
+      '<span class="fmt-meta">' + money(baseOf(curColor, type)) + ' · ' + (out ? _t('rupture') : st + _t(' en stock')) + '</span>' +
     '</button>';
   }
   function swStockText(p) {
-    if (!offered(p, curType)) return 'offert ' + (curType === 'refill' ? 'avec bobine seulement' : 'en recharge seulement');
+    if (!offered(p, curType)) return _t('offert ') + (curType === 'refill' ? _t('avec bobine seulement') : _t('en recharge seulement'));
     var st = stockOf(p, curType);
-    return st > 0 ? st + ' en stock' : 'rupture en ' + fmtShort(curType);
+    return st > 0 ? st + _t(' en stock') : _t('rupture en ') + fmtShort(curType);
   }
   // palier selon ce qui sera dans le panier après l'ajout (même marque, couleurs, matériaux et formats mélangés)
   function unitNow() { return tierPrice(baseOf(curColor, curType), tiersOf(curColor, curType), curQty + groupQty(curColor, curType)); }
@@ -639,9 +646,9 @@
     var rows = [{ min: 1, price: +baseOf(curColor, curType) || 0 }].concat(tiers);
     var n = curQty + groupQty(curColor, curType), on = 0;
     rows.forEach(function (t, i) { if (n >= t.min) on = i; });
-    var scope = curColor.brand ? 'Bobines et recharges ' + curColor.brand + ' comptent ensemble' : 'Couleurs mélangées';
+    var scope = curColor.brand ? _t('Bobines et recharges ') + curColor.brand + _t(' comptent ensemble') : _t('Couleurs mélangées');
     return '<div class="pdp-tiers">' +
-      '<p class="pdp-tiers-head">Prix selon la quantité <span>' + esc(scope) + '</span></p>' +
+      _t('<p class="pdp-tiers-head">Prix selon la quantité <span>') + esc(scope) + '</span></p>' +
       '<div class="pdp-tiergrid">' + rows.map(function (t, i) {
         return '<div class="pdp-tier' + (i === on ? ' is-on' : '') + '"' + (i === on ? ' aria-current="true"' : '') + '>' +
           '<span class="pt-q">' + (i === 0 ? '1' : t.min + '+') + '</span><span class="pt-p">' + money(t.price) + '</span></div>';
@@ -651,7 +658,7 @@
     var bo = boNote(stockOf(curColor, curType), curQty);
     if (curQty < 2 && unitNow() >= (+baseOf(curColor, curType) || 0)) return bo;
     var base = +baseOf(curColor, curType) || 0, u = unitNow();
-    return curQty + ' × ' + money(u) + ' = <b>' + money(u * curQty) + '</b>' + (u < base ? ' <em>· rabais quantité</em>' : '') + bo;
+    return curQty + ' × ' + money(u) + ' = <b>' + money(u * curQty) + '</b>' + (u < base ? _t(' <em>· rabais quantité</em>') : '') + bo;
   }
 
   function renderConfig() {
@@ -679,7 +686,7 @@
     }).join('');
 
     var descLines = String(m.desc || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
-    var featHtml = descLines.length ? '<div class="pdp-feats"><h2>En bref</h2><ul>' +
+    var featHtml = descLines.length ? _t('<div class="pdp-feats"><h2>En bref</h2><ul>') +
       descLines.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul></div>' : '';
 
     // accessoires cochés « Sur la fiche filament » dans l'admin, pour CETTE marque (aucune marque = toutes)
@@ -687,10 +694,10 @@
       return a.onFil && (!a.filBrands.length || a.filBrands.indexOf(m.brand) !== -1);
     });
     var accCatsHere = accDisp.map(accCatName).filter(function (c, i, all) { return all.indexOf(c) === i; });
-    var accTitle = accCatsHere.length === 1 ? accCatsHere[0] : 'Accessoires suggérés';
+    var accTitle = accCatsHere.length === 1 ? accCatsHere[0] : _t('Accessoires suggérés');
     var accHtml = accDisp.length ? '<div class="pdp-accs" id="pdp-accs">' +
       '<div class="pdp-accs-head"><h2>' + esc(accTitle) + '</h2>' +
-        '<a class="pdp-accs-all" href="#/accessoires">Tous les accessoires ' + IC.arrow + '</a></div>' +
+        _t('<a class="pdp-accs-all" href="#/accessoires">Tous les accessoires ') + IC.arrow + '</a></div>' +
       accDisp.map(function (a) {
       var o = accOut(a), best = accBestTier(a);
       return '<div class="acc">' +
@@ -699,7 +706,7 @@
         '<div class="acc-right"><span class="acc-prices"><span class="acc-price">' + money(a.price) + '</span>' +
             (best ? '<span class="acc-tier">' + best.min + '+ : ' + money(best.price) + '</span>' : '') + '</span>' +
           '<button type="button" class="acc-add" data-acc="' + esc(a.id) + '"' + (o && !accCanBO(a) ? ' disabled' : '') +
-            ' aria-label="' + esc((o && !accCanBO(a) ? 'Rupture : ' : 'Ajouter au panier : ') + a.name) + '">' + (o && !accCanBO(a) ? 'Rupture' : '+ Ajouter') + '</button></div>' +
+            ' aria-label="' + esc((o && !accCanBO(a) ? _t('Rupture : ') : _t('Ajouter au panier : ')) + a.name) + '">' + (o && !accCanBO(a) ? _t('Rupture') : _t('+ Ajouter')) + '</button></div>' +
       '</div>';
     }).join('') + '</div>' : '';
     var spoolHint = accDisp.some(function (a) { return /bobine/i.test(a.cat + ' ' + a.name); });
@@ -710,47 +717,47 @@
         '<div class="pdp-panel">' +
           '<p class="pdp-eyebrow">' + esc(m.brand) + ' · ' + esc(m.name) + '</p>' +
           '<h1 class="pdp-name">' + esc(p.name) + '</h1>' +
-          (p.code ? '<p class="pdp-ref">Réf. ' + esc(p.code) + '</p>' : '') +
+          (p.code ? _t('<p class="pdp-ref">Réf. ') + esc(p.code) + '</p>' : '') +
           '<div class="pdp-priceline">' +
             '<span class="pdp-price">' + money(price) + '<small>/ ' + fmtShort(curType) + '</small></span>' +
-            '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? 'Rupture' : stock + ' en stock') + '</span>' +
+            '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? _t('Rupture') : stock + _t(' en stock')) + '</span>' +
           '</div>' +
-          '<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>' +
+          _t('<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>') +
           '<div class="js-tiers">' + tierGridHtml() + '</div>' +
 
           '<div class="pdp-sec">' +
-            '<p class="pdp-label">Format</p>' +
-            '<div class="fmt">' + fmtOpt('refill', 'Recharge') + fmtOpt('spool', 'Avec bobine') + '</div>' +
-            (curType === 'refill' && spoolHint ? '<p class="fmt-note">' + IC.info + '<span>La recharge n\'a pas de bobine : elle s\'installe sur une bobine réutilisable. ' +
-              '<a href="#pdp-accs" class="js-to-accs">Ajouter une bobine vide</a></span></p>' : '') +
+            _t('<p class="pdp-label">Format</p>') +
+            '<div class="fmt">' + fmtOpt('refill', _t('Recharge')) + fmtOpt('spool', _t('Avec bobine')) + '</div>' +
+            (curType === 'refill' && spoolHint ? '<p class="fmt-note">' + IC.info + _t('<span>La recharge n\'a pas de bobine : elle s\'installe sur une bobine réutilisable. ') +
+              _t('<a href="#pdp-accs" class="js-to-accs">Ajouter une bobine vide</a></span></p>') : '') +
           '</div>' +
 
           '<div class="pdp-sec sw-sec">' +
             '<div class="pdp-label sw-head">' +
-              '<span class="sw-head-tx"><span>Couleur · <b class="js-sw-name">' + esc(p.name) + '</b></span><span class="lbl-sub js-sw-sub">' + esc(swStockText(p)) + '</span></span>' +
-              '<label class="switch"><input type="checkbox" class="js-only-stock"' + (onlyStock ? ' checked' : '') + '><span class="switch-ui" aria-hidden="true"></span>En stock seulement</label>' +
+              _t('<span class="sw-head-tx"><span>Couleur · <b class="js-sw-name">') + esc(p.name) + '</b></span><span class="lbl-sub js-sw-sub">' + esc(swStockText(p)) + '</span></span>' +
+              '<label class="switch"><input type="checkbox" class="js-only-stock"' + (onlyStock ? ' checked' : '') + _t('><span class="switch-ui" aria-hidden="true"></span>En stock seulement</label>') +
             '</div>' +
-            '<div class="sws" role="group" aria-label="Couleurs ' + esc(m.name) + '">' + swatches + '</div>' +
+            _t('<div class="sws" role="group" aria-label="Couleurs ') + esc(m.name) + '">' + swatches + '</div>' +
             (hiddenN ? '<p class="sws-note">' + plural(hiddenN, 'couleur en rupture masquée', 'couleurs en rupture masquées') +
-              ' · <button type="button" class="js-show-all">Tout afficher</button></p>' : '') +
+              _t(' · <button type="button" class="js-show-all">Tout afficher</button></p>') : '') +
           '</div>' +
 
           '<div class="cfg-buy">' +
             (out && !bo ? '' :
             '<div class="qty">' +
-              '<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>' +
-              '<input type="number" class="q-val" aria-label="Quantité" min="1" max="' + (canBackorder() ? BO_MAX : stock) + '" value="' + curQty + '" inputmode="numeric">' +
-              '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
+              _t('<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>') +
+              _t('<input type="number" class="q-val" aria-label="Quantité" min="1" max="') + (canBackorder() ? BO_MAX : stock) + '" value="' + curQty + '" inputmode="numeric">' +
+              _t('<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>') +
             '</div>') +
-            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? '<span>Commander<span class="bo-d"> · 3 à 14 jours</span></span>' : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+            '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? _t('<span>Commander<span class="bo-d"> · 3 à 14 jours</span></span>') : out ? _t('Rupture de stock') : _t('Ajouter au panier')) + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + buySumText() + '</p>' +
           (out && !bo && offered(p, curType) ? notifyHtml(filNotify(p)) : '') +
 
           '<ul class="pdp-assure">' +
-            '<li>' + IC.pin + 'Ramassage local à Québec, sur rendez-vous</li>' +
-            '<li>' + IC.chat + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
-            '<li>' + IC.card + 'Aucun paiement en ligne</li>' +
+            '<li>' + IC.pin + _t('Ramassage local à Québec, sur rendez-vous</li>') +
+            '<li>' + IC.chat + _t('Commande par Messenger ou courriel — on confirme la dispo</li>') +
+            '<li>' + IC.card + _t('Aucun paiement en ligne</li>') +
           '</ul>' +
           featHtml +
           accHtml +
@@ -759,7 +766,7 @@
       detailsHtml() +
       relatedHtml();
 
-    document.title = p.name + ' — ' + m.name + ' ' + m.brand + ' · Création Audio';
+    document.title = p.name + ' — ' + m.name + ' ' + m.brand + _t(' · Création Audio');
     wireConfig();
     observeBuy();
     updateBuybar();
@@ -771,18 +778,18 @@
     var paras = String(m.longDesc || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
     var specs = Array.isArray(m.specs) ? m.specs.filter(function (s) { return s && (s.k || s.v); }) : [];
     var gal = galleryOf(m);
-    if (paras.length) tabs.push({ id: 'desc', label: 'Description',
+    if (paras.length) tabs.push({ id: 'desc', label: _t('Description'),
       html: '<div class="pdp-desc">' + paras.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>' });
-    if (specs.length) tabs.push({ id: 'specs', label: 'Spécifications',
+    if (specs.length) tabs.push({ id: 'specs', label: _t('Spécifications'),
       html: '<dl class="specs">' + specs.map(function (s) { return '<div class="spec"><dt>' + esc(s.k) + '</dt><dd>' + esc(s.v) + '</dd></div>'; }).join('') + '</dl>' });
-    if (gal.length) tabs.push({ id: 'gal', label: 'Galerie', n: gal.length,
+    if (gal.length) tabs.push({ id: 'gal', label: _t('Galerie'), n: gal.length,
       html: '<div class="gal">' + gal.map(function (path, i) {
-        return '<button type="button" class="gal-shot" data-i="' + i + '" aria-label="Agrandir la photo ' + (i + 1) + '">' +
+        return '<button type="button" class="gal-shot" data-i="' + i + _t('" aria-label="Agrandir la photo ') + (i + 1) + '">' +
           '<img src="' + esc(publicUrl(path)) + '" alt="" loading="lazy"></button>';
       }).join('') + '</div>' });
     if (!tabs.length) return '';
     if (!curTab || !tabs.some(function (t) { return t.id === curTab; })) curTab = tabs[0].id;
-    return tabsBlock(tabs, curTab, '', 'Détails du ' + m.name);
+    return tabsBlock(tabs, curTab, '', _t('Détails du ') + m.name);
   }
   // onglets partagés (fiche filament : préfixe '' ; fiche accessoire : 'a') -> ids <pre>tab-x / <pre>panel-x
   function tabsBlock(tabs, cur, pre, label) {
@@ -830,8 +837,8 @@
     pool = pool.slice().sort(function (a, b) { return (b.items.some(anyStock) ? 1 : 0) - (a.items.some(anyStock) ? 1 : 0); }).slice(0, 4);
     if (!pool.length) return '';
     return '<section class="pdp-related" aria-labelledby="rel-title">' +
-      '<div class="rel-head"><h2 id="rel-title">' + (same.length ? 'Autres matériaux ' + esc(m.brand) : 'Explore aussi') + '</h2>' +
-        '<a class="rel-link" href="' + esc(same.length ? routeFor(m.brand) : '#/') + '">Tout voir ' + IC.arrow + '</a></div>' +
+      '<div class="rel-head"><h2 id="rel-title">' + (same.length ? _t('Autres matériaux ') + esc(m.brand) : _t('Explore aussi')) + '</h2>' +
+        '<a class="rel-link" href="' + esc(same.length ? routeFor(m.brand) : '#/') + _t('">Tout voir ') + IC.arrow + '</a></div>' +
       '<div class="cat-grid">' + pool.map(matCard).join('') + '</div>' +
     '</section>';
   }
@@ -850,23 +857,23 @@
   //       the (« le Noir (recharge) » dans la confirmation), uid (préfixe d'id du champ) }
   function filNotify(p) {
     return { id: p.id, kind: curType, what: p.name + ', ' + fmtName(curType),
-             the: 'le ' + p.name + ' (' + fmtName(curType) + ')', uid: 'cfg' };
+             the: _t('le ') + p.name + ' (' + fmtName(curType) + ')', uid: 'cfg' };
   }
   function notifyHtml(o) {
     var done = notifyDone[o.id + '|' + o.kind], fid = o.uid + '-notify-email';
     return '<div class="cfg-notify">' +
-      '<div class="cfg-notify-title">' + IC.bell + 'M\'aviser quand c\'est de retour</div>' +
+      '<div class="cfg-notify-title">' + IC.bell + _t('M\'aviser quand c\'est de retour</div>') +
       (done ? '<p class="cfg-notify-msg ok">' + esc(done) + '</p>' :
       '<form class="cfg-notify-form" novalidate>' +
-        '<label class="sr-only" for="' + fid + '">Ton courriel</label>' +
-        '<input type="email" id="' + fid + '" class="cfg-notify-email" required maxlength="254" autocomplete="email" placeholder="ton@courriel.com" value="' + esc(acctEmail()) + '">' +
+        '<label class="sr-only" for="' + fid + _t('">Ton courriel</label>') +
+        '<input type="email" id="' + fid + _t('" class="cfg-notify-email" required maxlength="254" autocomplete="email" placeholder="ton@courriel.com" value="') + esc(acctEmail()) + '">' +
         '<input type="text" name="website" class="cfg-hp" tabindex="-1" autocomplete="off" aria-hidden="true">' +
-        '<button type="submit" class="cfg-notify-btn">M\'aviser</button>' +
+        _t('<button type="submit" class="cfg-notify-btn">M\'aviser</button>') +
       '</form>' +
       '<p class="cfg-notify-msg" aria-live="polite"></p>' +
-      '<p class="cfg-notify-legal">On utilise ton courriel <strong>uniquement</strong> pour t\'aviser de l\'arrivée de ce produit (' +
-        esc(o.what) + '), puis il est supprimé. ' +
-        '<a href="confidentialite.html#liste-attente">Politique de confidentialité</a></p>') +
+      _t('<p class="cfg-notify-legal">On utilise ton courriel <strong>uniquement</strong> pour t\'aviser de l\'arrivée de ce produit (') +
+        esc(o.what) + _t('), puis il est supprimé. ') +
+        _t('<a href="confidentialite.html#liste-attente">Politique de confidentialité</a></p>')) +
     '</div>';
   }
   function wireNotify(root, o, rerender) {
@@ -877,24 +884,24 @@
       var email = $('.cfg-notify-email', form), btn = $('.cfg-notify-btn', form), msg = $('.cfg-notify-msg', root);
       var val = (email.value || '').trim();
       function say(t, cls) { msg.textContent = t; msg.className = 'cfg-notify-msg' + (cls ? ' ' + cls : ''); }
-      if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(val)) { say('Entre un courriel valide.', 'bad'); email.focus(); return; }
-      if (!sb) { say('Service momentanément indisponible.', 'bad'); return; }
-      btn.disabled = true; say('Envoi…');
-      sb.rpc('waitlist_subscribe', { p_product: p.id, p_kind: type, p_email: val, p_hp: $('.cfg-hp', form).value || '' })
+      if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(val)) { say(_t('Entre un courriel valide.'), 'bad'); email.focus(); return; }
+      if (!sb) { say(_t('Service momentanément indisponible.'), 'bad'); return; }
+      btn.disabled = true; say(_t('Envoi…'));
+      sb.rpc('waitlist_subscribe', { p_product: p.id, p_kind: type, p_email: val, p_hp: $('.cfg-hp', form).value || '', p_lang: window.CA.lang || 'fr' })
         .then(function (res) {
           btn.disabled = false;
           var r = res && !res.error ? res.data : null;
           if (r === 'ok' || r === 'exists') {
             notifyDone[p.id + '|' + type] = r === 'ok'
-              ? '✓ C\'est noté ! On t\'écrit dès que ' + o.the + ' est de retour.'
-              : 'Tu es déjà sur la liste pour ce produit — on t\'écrit dès son arrivée.';
+              ? _t('✓ C\'est noté ! On t\'écrit dès que ') + o.the + _t(' est de retour.')
+              : _t('Tu es déjà sur la liste pour ce produit — on t\'écrit dès son arrivée.');
             rerender();
             return;
           }
-          if (r === 'invalid') say('Ce courriel semble invalide.', 'bad');
-          else if (r === 'busy') say('Trop de demandes pour le moment — réessaie un peu plus tard.', 'bad');
-          else say('Impossible d\'enregistrer ta demande pour le moment. Écris-nous à ' + EMAIL + '.', 'bad');
-        }, function () { btn.disabled = false; say('Erreur réseau — réessaie.', 'bad'); });
+          if (r === 'invalid') say(_t('Ce courriel semble invalide.'), 'bad');
+          else if (r === 'busy') say(_t('Trop de demandes pour le moment — réessaie un peu plus tard.'), 'bad');
+          else say(_t('Impossible d\'enregistrer ta demande pour le moment. Écris-nous à ') + EMAIL + '.', 'bad');
+        }, function () { btn.disabled = false; say(_t('Erreur réseau — réessaie.'), 'bad'); });
     });
   }
 
@@ -942,7 +949,7 @@
     onCartChange = refreshBuy;   // le panier change (ajout, quantité, retrait) -> palier de la fiche à jour
     function setQ(n) {
       if (isNaN(n) || n < 1) n = 1;
-      if (maxStock && n > maxStock) { n = maxStock; toast('Maximum ' + maxStock + ' en stock.'); }
+      if (maxStock && n > maxStock) { n = maxStock; toast(_t('Maximum ') + maxStock + _t(' en stock.')); }
       curQty = n; if (qv) qv.value = n; refreshBuy();
     }
     if (qv) {
@@ -990,7 +997,7 @@
     renderAccs();
     showScreen('accs');
     curMat = null; curColor = null; curAcc = null; updateBuybar();
-    document.title = (accCat ? accCat.name + ' — ' : '') + 'Accessoires · Création Audio';
+    document.title = (accCat ? accCat.name + ' — ' : '') + _t('Accessoires · Création Audio');
     if (fromAcc && accsScrollY != null) window.scrollTo(0, accsScrollY);
     else if (same) {
       var hero = $('.cat-hero', screenAccs);
@@ -1007,7 +1014,7 @@
     $('#acc-st-cats').textContent = accCats.length;
     var shown = function (items) { return onlyStock ? items.filter(function (a) { return !accOut(a); }) : items; };
     accChipsEl.innerHTML = accCats.length < 2 ? '' :
-      '<a class="chip" href="#/accessoires"' + (!accCat ? ' aria-current="true"' : '') + '>Toutes <span class="chip-n">' + shown(accessories).length + '</span></a>' +
+      '<a class="chip" href="#/accessoires"' + (!accCat ? ' aria-current="true"' : '') + _t('>Toutes <span class="chip-n">') + shown(accessories).length + '</span></a>' +
       accCats.map(function (c) {
         return '<a class="chip" href="' + esc(accRouteFor(c)) + '"' + (accCat === c ? ' aria-current="true"' : '') + '>' +
           esc(c.name) + ' <span class="chip-n">' + shown(c.items).length + '</span></a>';
@@ -1020,7 +1027,7 @@
       return '<section class="cat-group" aria-labelledby="' + id + '">' +
         '<header class="cat-ghead">' +
           '<h2 class="cat-gtitle" id="' + id + '">' + esc(c.name) + '</h2>' +
-          '<span class="cat-gmeta">' + plural(c.items.length, 'modèle', 'modèles') + ' · ' + nStock + ' en stock</span>' +
+          '<span class="cat-gmeta">' + plural(c.items.length, 'modèle', 'modèles') + ' · ' + nStock + _t(' en stock</span>') +
           '<span class="cat-grule" aria-hidden="true"></span>' +
         '</header>' +
         '<div class="cat-grid">' + items.map(accCard).join('') + '</div>' +
@@ -1028,9 +1035,9 @@
     }).join('');
     if (!html) {
       html = '<p class="empty">' + (onlyStock && accessories.length
-        ? 'Rien en stock ' + (accCat ? 'dans « ' + esc(accCat.name) + ' » ' : '') + 'pour le moment. ' +
-          '<button type="button" class="js-show-all">Voir aussi les ruptures</button>'
-        : 'Aucun accessoire pour le moment.') + '</p>';
+        ? _t('Rien en stock ') + (accCat ? _t('dans « ') + esc(accCat.name) + ' » ' : '') + _t('pour le moment. ') +
+          _t('<button type="button" class="js-show-all">Voir aussi les ruptures</button>')
+        : _t('Aucun accessoire pour le moment.')) + '</p>';
     }
     accGroupsEl.innerHTML = html;
     var sa = $('.js-show-all', accGroupsEl);
@@ -1049,8 +1056,8 @@
         (tag ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +
         '<span class="mcard-foot">' +
           '<span class="mcard-price"><b>' + money(a.price) + '</b>' +
-            (best ? '<small>' + money(best.price) + ' dès ' + best.min + '</small>' : '') + '</span>' +
-          (out ? '<span class="pill out">Rupture</span>' : '') +
+            (best ? '<small>' + money(best.price) + _t(' dès ') + best.min + '</small>' : '') + '</span>' +
+          (out ? _t('<span class="pill out">Rupture</span>') : '') +
         '</span>' +
       '</span>' +
     '</a>';
@@ -1070,7 +1077,7 @@
   }
   function renderAccCrumbs() {
     var c = accCatOf(curAcc);
-    accCrumbsEl.innerHTML = '<a href="#/accessoires">Accessoires</a>' + IC.chev +
+    accCrumbsEl.innerHTML = _t('<a href="#/accessoires">Accessoires</a>') + IC.chev +
       (c && accCats.length > 1 ? '<a href="' + esc(accRouteFor(c)) + '">' + esc(c.name) + '</a>' + IC.chev : '') +
       '<span aria-current="page">' + esc(curAcc.name) + '</span>';
   }
@@ -1083,7 +1090,7 @@
     var n = accQty + accGroupQty(a), on = 0;
     rows.forEach(function (t, i) { if (n >= t.min) on = i; });
     return '<div class="pdp-tiers">' +
-      '<p class="pdp-tiers-head">Prix selon la quantité' + (a.cat ? ' <span>' + esc(a.cat) + ' : modèles mélangés</span>' : '') + '</p>' +
+      _t('<p class="pdp-tiers-head">Prix selon la quantité') + (a.cat ? ' <span>' + esc(a.cat) + _t(' : modèles mélangés</span>') : '') + '</p>' +
       '<div class="pdp-tiergrid">' + rows.map(function (t, i) {
         return '<div class="pdp-tier' + (i === on ? ' is-on' : '') + '"' + (i === on ? ' aria-current="true"' : '') + '>' +
           '<span class="pt-q">' + (i === 0 ? '1' : t.min + '+') + '</span><span class="pt-p">' + money(t.price) + '</span></div>';
@@ -1092,17 +1099,17 @@
   function accBuySum() {
     var u = accUnitNow(), bo = boNote(curAcc.qty, accQty, isEmptySpool(curAcc));
     if (accQty < 2 && u >= curAcc.price) return bo;
-    return accQty + ' × ' + money(u) + ' = <b>' + money(u * accQty) + '</b>' + (u < curAcc.price ? ' <em>· rabais quantité</em>' : '') + bo;
+    return accQty + ' × ' + money(u) + ' = <b>' + money(u * accQty) + '</b>' + (u < curAcc.price ? _t(' <em>· rabais quantité</em>') : '') + bo;
   }
   function accMediaHtml() {
     var a = curAcc, imgs = a.imgs || [], u = imgs[accImg];
     var stage = u
-      ? '<button type="button" class="pdp-stage" aria-label="Agrandir la photo"><img src="' + esc(u) + '" alt="' + esc(a.name) + '">' +
+      ? _t('<button type="button" class="pdp-stage" aria-label="Agrandir la photo"><img src="') + esc(u) + '" alt="' + esc(a.name) + '">' +
           '<span class="pdp-zoom" aria-hidden="true">' + IC.zoom + '</span></button>'
       : '<div class="pdp-stage no-zoom"><span class="sp-noimg big" aria-hidden="true">' + IC.cart + '</span></div>';
     var thumbs = imgs.length > 1 ? '<div class="pdp-thumbs">' + imgs.map(function (t, i) {
       return '<button type="button" class="pdp-thumb' + (i === accImg ? ' is-active' : '') + '" data-i="' + i + '"' +
-        ' aria-label="Photo ' + (i + 1) + ' sur ' + imgs.length + '"' + (i === accImg ? ' aria-current="true"' : '') + '>' +
+        _t(' aria-label="Photo ') + (i + 1) + _t(' sur ') + imgs.length + '"' + (i === accImg ? ' aria-current="true"' : '') + '>' +
         '<img src="' + esc(t) + '" alt="" loading="lazy"></button>';
     }).join('') + '</div>' : '';
     return stage + thumbs;
@@ -1114,9 +1121,9 @@
     if (accImg >= (a.imgs || []).length) accImg = 0;
     var tabs = [];
     var paras = String(a.longDesc || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
-    if (paras.length) tabs.push({ id: 'desc', label: 'Description',
+    if (paras.length) tabs.push({ id: 'desc', label: _t('Description'),
       html: '<div class="pdp-desc">' + paras.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>' });
-    if (a.specs.length) tabs.push({ id: 'specs', label: 'Spécifications',
+    if (a.specs.length) tabs.push({ id: 'specs', label: _t('Spécifications'),
       html: '<dl class="specs">' + a.specs.map(function (s) { return '<div class="spec"><dt>' + esc(s.k) + '</dt><dd>' + esc(s.v) + '</dd></div>'; }).join('') + '</dl>' });
     if (tabs.length && (!accTab || !tabs.some(function (t) { return t.id === accTab; }))) accTab = tabs[0].id;
     var others = c ? c.items.filter(function (x) { return x !== a; }) : [];
@@ -1129,40 +1136,40 @@
           '<p class="pdp-eyebrow">' + esc(accCatName(a)) + '</p>' +
           '<h1 class="pdp-name">' + esc(a.name) + '</h1>' +
           '<div class="pdp-priceline">' +
-            '<span class="pdp-price">' + money(a.price) + '<small>/ unité</small></span>' +
-            (a.qty != null ? '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? 'Rupture' : a.qty + ' en stock') + '</span>' : '') +
+            '<span class="pdp-price">' + money(a.price) + _t('<small>/ unité</small></span>') +
+            (a.qty != null ? '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? _t('Rupture') : a.qty + _t(' en stock')) + '</span>' : '') +
           '</div>' +
-          '<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>' +
+          _t('<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>') +
           '<div class="js-tiers">' + accTierGridHtml() + '</div>' +
           (a.desc ? '<p class="pdp-lede">' + esc(a.desc) + '</p>' : '') +
           '<div class="cfg-buy">' +
             (out && !bo ? '' :
             '<div class="qty">' +
-              '<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>' +
-              '<input type="number" class="q-val" aria-label="Quantité" min="1"' + (a.qty != null && !accCanBO(a) ? ' max="' + a.qty + '"' : '') + ' value="' + accQty + '" inputmode="numeric">' +
-              '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
+              _t('<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>') +
+              _t('<input type="number" class="q-val" aria-label="Quantité" min="1"') + (a.qty != null && !accCanBO(a) ? ' max="' + a.qty + '"' : '') + ' value="' + accQty + '" inputmode="numeric">' +
+              _t('<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>') +
             '</div>') +
             '<button type="button" class="btn-add"' + (out && !bo ? ' disabled' : '') + '>' + IC.cart + (bo ? (isEmptySpool(a)
-              ? '<span>Ajouter au panier<span class="bo-d"> · ' + BO_EMPTY + '</span></span>'
-              : '<span>Commander<span class="bo-d"> · 3 à 14 jours</span></span>') : out ? 'Rupture de stock' : 'Ajouter au panier') + '</button>' +
+              ? _t('<span>Ajouter au panier<span class="bo-d"> · ') + BO_EMPTY + '</span></span>'
+              : _t('<span>Commander<span class="bo-d"> · 3 à 14 jours</span></span>')) : out ? _t('Rupture de stock') : _t('Ajouter au panier')) + '</button>' +
           '</div>' +
           '<p class="buy-sum" aria-live="polite">' + accBuySum() + '</p>' +
           (out && !bo ? notifyHtml(accNotify(a)) : '') +
           '<ul class="pdp-assure">' +
-            '<li>' + IC.pin + 'Ramassage local à Québec, sur rendez-vous</li>' +
-            '<li>' + IC.chat + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
-            '<li>' + IC.card + 'Aucun paiement en ligne</li>' +
+            '<li>' + IC.pin + _t('Ramassage local à Québec, sur rendez-vous</li>') +
+            '<li>' + IC.chat + _t('Commande par Messenger ou courriel — on confirme la dispo</li>') +
+            '<li>' + IC.card + _t('Aucun paiement en ligne</li>') +
           '</ul>' +
         '</div>' +
       '</div>' +
-      (tabs.length ? tabsBlock(tabs, accTab, 'a', 'Détails de ' + a.name) : '') +
+      (tabs.length ? tabsBlock(tabs, accTab, 'a', _t('Détails de ') + a.name) : '') +
       (others.length ? '<section class="pdp-related" aria-labelledby="arel-title">' +
-        '<div class="rel-head"><h2 id="arel-title">Autres ' + esc(accCatName(a).toLowerCase()) + '</h2>' +
-          '<a class="rel-link" href="' + esc(accRouteFor(c)) + '">Tout voir ' + IC.arrow + '</a></div>' +
+        _t('<div class="rel-head"><h2 id="arel-title">Autres ') + esc(accCatName(a).toLowerCase()) + '</h2>' +
+          '<a class="rel-link" href="' + esc(accRouteFor(c)) + _t('">Tout voir ') + IC.arrow + '</a></div>' +
         '<div class="cat-grid">' + others.map(accCard).join('') + '</div>' +
       '</section>' : '');
 
-    document.title = a.name + ' — Accessoires · Création Audio';
+    document.title = a.name + _t(' — Accessoires · Création Audio');
     wireAcc();
   }
 
@@ -1187,7 +1194,7 @@
     onCartChange = refresh;
     function setQ(n) {
       if (isNaN(n) || n < 1) n = 1;
-      if (!accCanBO(a) && a.qty != null && a.qty > 0 && n > a.qty) { n = a.qty; toast('Maximum ' + a.qty + ' en stock.'); }
+      if (!accCanBO(a) && a.qty != null && a.qty > 0 && n > a.qty) { n = a.qty; toast(_t('Maximum ') + a.qty + _t(' en stock.')); }
       accQty = n; if (qv) qv.value = n; refresh();
     }
     if (qv) {
@@ -1225,7 +1232,7 @@
       bbSw.style.background = swatchBg(curColor);
       bbName.textContent = curColor.name;
       bbMeta.textContent = money(unitNow()) + (curQty > 1 ? ' × ' + curQty : '') + ' · ' + fmtName(curType) + ' · ' + curMat.name;
-      bbBtn.textContent = bo ? 'Commander' : out ? 'M\'aviser' : 'Ajouter';
+      bbBtn.textContent = bo ? _t('Commander') : out ? _t('M\'aviser') : _t('Ajouter');
       bbBtn.classList.toggle('is-notify', out && !bo);
     }
     buybar.hidden = !show;
@@ -1253,11 +1260,11 @@
     var multi = urls.length > 1;
     var ov = document.createElement('div');
     ov.className = 'lb';
-    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Photo agrandie');
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', _t('Photo agrandie'));
     ov.innerHTML = '<img alt="">' +
-      '<button type="button" class="lb-btn lb-close" aria-label="Fermer">&times;</button>' +
-      (multi ? '<button type="button" class="lb-btn lb-prev" aria-label="Photo précédente">&#8249;</button>' +
-               '<button type="button" class="lb-btn lb-next" aria-label="Photo suivante">&#8250;</button>' +
+      _t('<button type="button" class="lb-btn lb-close" aria-label="Fermer">&times;</button>') +
+      (multi ? _t('<button type="button" class="lb-btn lb-prev" aria-label="Photo précédente">&#8249;</button>') +
+               _t('<button type="button" class="lb-btn lb-next" aria-label="Photo suivante">&#8250;</button>') +
                '<div class="lb-count" aria-live="polite"></div>' : '');
     var img = $('img', ov), cnt = $('.lb-count', ov);
     function show() { img.src = urls[i]; if (cnt) cnt.textContent = (i + 1) + ' / ' + urls.length; }
@@ -1333,11 +1340,11 @@
   function addToCart(id, type, qty) {
     var p = byId[id]; if (!p) return;
     var max = canBackorder() ? BO_MAX : stockOf(p, type), k = keyOf(id, type), cur = cart[k] ? cart[k].qty : 0;
-    if (cur >= max) { toast('Maximum ' + max + ' en stock.'); return; }
+    if (cur >= max) { toast(_t('Maximum ') + max + _t(' en stock.')); return; }
     var next = Math.min(cur + (qty || 1), max);
     cart[k] = { id: id, type: type, qty: next };
     saveCart(); renderCart();
-    toast(p.name + ' — ' + fmtShort(type) + ' ajouté au panier.');
+    toast(p.name + ' — ' + fmtShort(type) + _t(' ajouté au panier.'));
   }
   // qty absente = « + Ajouter » du bloc de la fiche filament (1 de plus, le panier pulse) ;
   // qty donnée = fiche accessoire (la photo vole déjà vers le panier)
@@ -1346,26 +1353,26 @@
     var k = keyOf(id, 'accessory');
     var cur = cart[k] ? cart[k].qty : 0;
     var max = accCanBO(a) ? BO_MAX : (a.qty == null ? Infinity : a.qty);
-    if (cur >= max) { toast('Maximum ' + max + ' en stock.'); return; }
+    if (cur >= max) { toast(_t('Maximum ') + max + _t(' en stock.')); return; }
     emptyCheck(a, cur, Math.min(cur + (qty || 1), max), function (next) {
       cur = cart[k] ? cart[k].qty : 0;   // un échange a pu toucher la ligne
       if (next <= cur) return;
       cart[k] = { id: id, type: 'accessory', qty: next };
       saveCart(); renderCart();
       if (!qty) pulseCart();
-      toast(a.name + (next - cur > 1 ? ' ×' + (next - cur) : '') + ' ajouté au panier.');
+      toast(a.name + (next - cur > 1 ? ' ×' + (next - cur) : '') + _t(' ajouté au panier.'));
     });
   }
   function changeQty(k, delta) {
     if (!cart[k]) return;
     var max = maxOf(cart[k]); var next = cart[k].qty + delta;
-    if (next > max) { toast('Maximum ' + max + ' en stock.'); next = max; }
+    if (next > max) { toast(_t('Maximum ') + max + _t(' en stock.')); next = max; }
     commitQty(k, next);
   }
   function setQty(k, val) {
     if (!cart[k]) return;
     var n = parseInt(val, 10); if (isNaN(n)) { renderCart(); return; }
-    var max = maxOf(cart[k]); if (n > max) { toast('Maximum ' + max + ' en stock.'); n = max; }
+    var max = maxOf(cart[k]); if (n > max) { toast(_t('Maximum ') + max + _t(' en stock.')); n = max; }
     commitQty(k, n);
   }
   function commitQty(k, n) {
@@ -1411,24 +1418,24 @@
       cands.forEach(function (c) {
         var row = document.createElement('div'); row.className = 'es-swap';
         row.innerHTML = '<span class="citem-sw" style="background:' + esc(swatchBg(c.p)) + '"></span>' +
-          '<span class="es-tx"><b>' + esc(filLabel(c.p)) + '</b> — recharge ×' + c.it.qty + ' · La version avec bobine est en stock.</span>' +
-          '<button type="button" class="es-btn">Ajouter la version avec bobine</button>';
+          '<span class="es-tx"><b>' + esc(filLabel(c.p)) + _t('</b> — recharge ×') + c.it.qty + _t(' · La version avec bobine est en stock.</span>') +
+          _t('<button type="button" class="es-btn">Ajouter la version avec bobine</button>');
         $('.es-btn', row).addEventListener('click', function () {
           var n = doSwap(c.p, Math.max(1, next - st - swapped), null);
           swapped += n; renderCart();
-          this.disabled = true; this.textContent = n ? '✓ ' + plural(n, 'bobine', 'bobines') : 'Plus en stock';
+          this.disabled = true; this.textContent = n ? '✓ ' + plural(n, 'bobine', 'bobines') : _t('Plus en stock');
         });
         body.appendChild(row);
       });
     }
     var miss = next - st;
     caDialog.confirm({
-      title: 'Bobines vides : stock limité',
-      message: (st ? 'Il nous en reste ' + st + '. ' : 'Il ne nous en reste aucune. ') +
-        'Nos bobines vides viennent de nos propres impressions : on ne peut pas en commander chez un fournisseur. ' +
-        'On fera tout notre possible pour compléter ta commande, mais on ne peut pas garantir ' +
-        (miss > 1 ? 'les ' + miss + ' qui manquent' : 'celle qui manque') + ' ni le délai.',
-      ok: 'Compris, ajouter', cancel: 'Retour', icon: 'warn', body: body
+      title: _t('Bobines vides : stock limité'),
+      message: (st ? _t('Il nous en reste ') + st + '. ' : _t('Il ne nous en reste aucune. ')) +
+        _t('Nos bobines vides viennent de nos propres impressions : on ne peut pas en commander chez un fournisseur. ') +
+        _t('On fera tout notre possible pour compléter ta commande, mais on ne peut pas garantir ') +
+        (miss > 1 ? _t('les ') + miss + _t(' qui manquent') : _t('celle qui manque')) + _t(' ni le délai.'),
+      ok: _t('Compris, ajouter'), cancel: _t('Retour'), icon: 'warn', body: body
     }).then(function (ok) {
       if (ok === true) { emptyWarned[a.id] = true; done(Math.max(cur, next - swapped)); }
       else if (cancel) cancel(); else if (swapped) renderCart();
@@ -1444,11 +1451,11 @@
       var n = Math.min(c.it.qty, spoolFree(c.p), it.qty - Math.max(0, a.qty | 0));
       var row = document.createElement('div'); row.className = 'es-swap';
       row.innerHTML = '<span class="citem-sw" style="background:' + esc(swatchBg(c.p)) + '"></span>' +
-        '<span class="es-tx">ⓘ <b>' + esc(filLabel(c.p)) + '</b> existe avec bobine.</span>' +
-        '<button type="button" class="es-btn">Échanger ' + plural(n, 'recharge', 'recharges') + '</button>';
+        '<span class="es-tx">ⓘ <b>' + esc(filLabel(c.p)) + _t('</b> existe avec bobine.</span>') +
+        _t('<button type="button" class="es-btn">Échanger ') + plural(n, 'recharge', 'recharges') + '</button>';
       $('.es-btn', row).addEventListener('click', function () {
         var done = doSwap(c.p, n, a); renderCart();
-        if (done) toast(plural(done, 'recharge échangée', 'recharges échangées') + ' contre la version avec bobine.');
+        if (done) toast(plural(done, 'recharge échangée', 'recharges échangées') + _t(' contre la version avec bobine.'));
       });
       box.appendChild(row);
     });
@@ -1481,15 +1488,15 @@
     var st = it.type === 'accessory' ? m.qty : stockOf(m, it.type);
     var n = st == null ? 0 : it.qty - Math.max(0, st | 0);
     if (n <= 0) return '';
-    return ' · <span class="citem-bo">' + (it.type === 'accessory' && isEmptySpool(m) ? boLabel(n, true) : n + ' à commander · 3 à 14 jours') + '</span>';
+    return ' · <span class="citem-bo">' + (it.type === 'accessory' && isEmptySpool(m) ? boLabel(n, true) : n + _t(' à commander · 3 à 14 jours')) + '</span>';
   }
   function renderCart() {
     var n = count();
     cartCount.textContent = n;
     cartBtn.classList.toggle('has-items', n > 0);
-    cartBtn.setAttribute('aria-label', n ? 'Ouvrir le panier (' + plural(n, 'article', 'articles') + ')' : 'Ouvrir le panier');
+    cartBtn.setAttribute('aria-label', n ? _t('Ouvrir le panier (') + plural(n, 'article', 'articles') + ')' : _t('Ouvrir le panier'));
     if (!n) {
-      cartItems.innerHTML = '<p class="cart-empty">Ton panier est vide.<br>Choisis une couleur, puis « Ajouter au panier ».</p>';
+      cartItems.innerHTML = _t('<p class="cart-empty">Ton panier est vide.<br>Choisis une couleur, puis « Ajouter au panier ».</p>');
     } else {
       cartItems.innerHTML = '';
       // accessoires en dernier
@@ -1502,17 +1509,17 @@
             '<div class="citem-thumb">' + thumbHtml(it) + '</div>' +
             '<div class="citem-main">' +
               '<div class="citem-name">' + esc(m.name) + '</div>' +
-              '<div class="citem-type">' + (it.type === 'accessory' ? esc(m.cat || 'Accessoire')
+              '<div class="citem-type">' + (it.type === 'accessory' ? esc(m.cat || _t('Accessoire'))
                 : esc((m.brand ? m.brand + ' ' : '') + (m.material || '')) + ' · ' + typeLabel(it)) +
                 ' · <span class="citem-unit">' + money(unitOf(it)) + '/u</span>' + boTag(it) + '</div>' +
               '<div class="citem-qty">' +
-                '<button type="button" class="cq-minus" aria-label="Retirer un">&minus;</button>' +
-                '<input type="number" class="cq-val" aria-label="Quantité" min="0" ' + (isFinite(max) ? 'max="' + max + '" ' : '') + 'value="' + it.qty + '" inputmode="numeric">' +
-                '<button type="button" class="cq-plus" aria-label="Ajouter un"' + (isFinite(max) && it.qty >= max ? ' disabled' : '') + '>+</button>' +
+                _t('<button type="button" class="cq-minus" aria-label="Retirer un">&minus;</button>') +
+                _t('<input type="number" class="cq-val" aria-label="Quantité" min="0" ') + (isFinite(max) ? 'max="' + max + '" ' : '') + 'value="' + it.qty + '" inputmode="numeric">' +
+                _t('<button type="button" class="cq-plus" aria-label="Ajouter un"') + (isFinite(max) && it.qty >= max ? ' disabled' : '') + '>+</button>' +
               '</div>' +
             '</div>' +
             '<div class="citem-right">' +
-              '<button type="button" class="citem-del" aria-label="Supprimer ' + esc(m.name) + '">&times;</button>' +
+              _t('<button type="button" class="citem-del" aria-label="Supprimer ') + esc(m.name) + '">&times;</button>' +
               '<div class="citem-line">' + money(lineTotal(it)) + '</div>' +
             '</div>';
           var k = keyOf(it.id, it.type);
@@ -1579,15 +1586,15 @@
     entries().forEach(function (it) {
       var m = metaOf(it); if (!m) return;
       if (it.type === 'accessory') { extras.push('- ' + m.name + ' ×' + it.qty + ' — ' + money(lineTotal(it))); return; }
-      var mat = (m.brand ? m.brand + ' ' : '') + (m.material || 'Autres');
+      var mat = (m.brand ? m.brand + ' ' : '') + (m.material || _t('Autres'));
       if (!groups[mat]) { groups[mat] = []; order.push(mat); }
-      var label = m.name + (m.code ? ' (' + m.code + ')' : '') + ' — ' + (it.type === 'refill' ? 'Recharge' : 'Avec bobine');
+      var label = m.name + (m.code ? ' (' + m.code + ')' : '') + ' — ' + (it.type === 'refill' ? _t('Recharge') : _t('Avec bobine'));
       groups[mat].push('- ' + label + ' ×' + it.qty + ' — ' + money(lineTotal(it)));
     });
     var blocks = order.map(function (mat) { return '*** ' + String(mat).toUpperCase() + ' ***\n' + groups[mat].join('\n'); });
-    if (extras.length) blocks.push('*** ACCESSOIRES ***\n' + extras.join('\n'));
-    return 'Bonjour,\n\nJe souhaite commander le filament suivant :\n\n' + blocks.join('\n\n') +
-      '\n\nTotal estimé : ' + money(total()) + '\nRamassage : région de Québec.\n\nMerci !';
+    if (extras.length) blocks.push(_t('*** ACCESSOIRES ***\n') + extras.join('\n'));
+    return _t('Bonjour,\n\nJe souhaite commander le filament suivant :\n\n') + blocks.join('\n\n') +
+      _t('\n\nTotal estimé : ') + money(total()) + _t('\nRamassage : région de Québec.\n\nMerci !');
   }
   function copyText(txt) {
     if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).catch(function () { fallbackCopy(txt); });
@@ -1602,14 +1609,14 @@
   orderBtn.addEventListener('click', function () {
     if (count() === 0) return;
     copyText(orderText());
-    cartMsg.textContent = 'Liste copiée ✓ — colle-la dans Messenger et envoie.';
+    cartMsg.textContent = _t('Liste copiée ✓ — colle-la dans Messenger et envoie.');
     window.open(FB, '_blank', 'noopener');
   });
   if (emailBtn) emailBtn.addEventListener('click', function () {
     if (count() === 0) return;
-    var subject = 'Commande filaments — Création Audio';
+    var subject = _t('Commande filaments — Création Audio');
     window.location.href = 'mailto:' + EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(orderText());
-    cartMsg.textContent = 'Ton logiciel de courriel s\'ouvre avec ta liste.';
+    cartMsg.textContent = _t('Ton logiciel de courriel s\'ouvre avec ta liste.');
   });
 
   /* ---------- commande en ligne (client connecté — assets/commande-client.js) ----------
@@ -1635,14 +1642,14 @@
     orderBtn.classList.toggle('cart-email', on);   // Messenger passe en secondaire
     if (editBar) { editBar.hidden = !ed; if (ed && editNum) editNum.textContent = ed.number; }
     if (sendBtn) {
-      sendBtn.textContent = ed ? 'Enregistrer les modifications' : 'Envoyer ma commande';
+      sendBtn.textContent = ed ? _t('Enregistrer les modifications') : _t('Envoyer ma commande');
       sendBtn.classList.toggle('is-disabled', count() === 0);
     }
     if (resvBtn) {
       var showR = !!(on && !ed && resvInfo && resvInfo.can), why = '';
       if (showR && resvInfo.suspendedUntil) {
-        why = 'Réservations suspendues jusqu\'au ' + new Date(resvInfo.suspendedUntil).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long' }) + '.';
-      } else if (showR && count() && overStock().length) why = 'Réserver : articles en stock seulement.';
+        why = _t('Réservations suspendues jusqu\'au ') + new Date(resvInfo.suspendedUntil).toLocaleDateString(window.CA.locale, { day: 'numeric', month: 'long' }) + '.';
+      } else if (showR && count() && overStock().length) why = _t('Réserver : articles en stock seulement.');
       resvBtn.hidden = !showR;
       resvBtn.classList.toggle('is-disabled', !count() || !!why);
       if (resvWhy) { resvWhy.hidden = !showR || !why; resvWhy.textContent = why; }
@@ -1653,17 +1660,17 @@
   }
   if (resvBtn) resvBtn.addEventListener('click', function () {
     if (!count() || resvBtn.disabled || resvBtn.classList.contains('is-disabled')) return;
-    var until = new Date(Date.now() + 72 * 3600 * 1000).toLocaleString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
-    caDialog.confirm({ title: 'Réserver jusqu\'au ' + until + ' ?',
-      message: 'Si tu ne passes pas à temps, elle compte comme non récupérée (2 = réservations suspendues 60 jours). Tu peux l\'annuler dans ton compte.',
-      ok: 'Réserver', icon: 'cart' }).then(function (ok) {
+    var until = new Date(Date.now() + 72 * 3600 * 1000).toLocaleString(window.CA.locale, { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+    caDialog.confirm({ title: _t('Réserver jusqu\'au ') + until + ' ?',
+      message: _t('Si tu ne passes pas à temps, elle compte comme non récupérée (2 = réservations suspendues 60 jours). Tu peux l\'annuler dans ton compte.'),
+      ok: _t('Réserver'), icon: 'cart' }).then(function (ok) {
       if (!ok) return;
       var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
-      resvBtn.disabled = true; cartMsg.textContent = 'Réservation…';
+      resvBtn.disabled = true; cartMsg.textContent = _t('Réservation…');
       window.CA.custOrder.reserve(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
         cart = {}; saveCart(); if (noteIn) noteIn.value = '';
         goPickup('r', r.id);
-      }, function (err) { resvBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Réservation impossible. Réessaie.'; });
+      }, function (err) { resvBtn.disabled = false; cartMsg.textContent = (err && err.message) || _t('Réservation impossible. Réessaie.'); });
     });
   });
   if (sendBtn) sendBtn.addEventListener('click', function () {
@@ -1681,32 +1688,32 @@
     bo = bo.filter(function (it) { return !isEmptyLine(it); });
     var one = bo.length === 1, n1 = one ? boN(bo[0]) : 0, many = !one || n1 > 1;
     var msg = !bo.length ? '' : one
-        ? (n1 > 1 ? n1 + ' × ' : '') + label(bo[0]) + (n1 > 1 ? ' ne sont pas en stock. On les commande' : ' n\'est pas en stock. On le commande') +
-          ' chez notre fournisseur : compte ' + BO_DELAY + ' avant la cueillette. On t\'écrit dès ' + (n1 > 1 ? 'leur arrivée.' : 'qu\'il est arrivé.')
-        : 'Ces articles ne sont pas en stock :\n' + bo.map(function (it) { return '• ' + boN(it) + ' × ' + label(it); }).join('\n') +
-          '\nOn les commande chez notre fournisseur : compte ' + BO_DELAY + ' avant la cueillette. On t\'écrit dès leur arrivée.';
-    if (emp.length) msg += (msg ? '\n\n' : '') + 'Bobines vides à compléter, ' + BO_EMPTY + ' :\n' +
+        ? (n1 > 1 ? n1 + ' × ' : '') + label(bo[0]) + (n1 > 1 ? _t(' ne sont pas en stock. On les commande') : _t(' n\'est pas en stock. On le commande')) +
+          _t(' chez notre fournisseur : compte ') + BO_DELAY + _t(' avant la cueillette. On t\'écrit dès ') + (n1 > 1 ? _t('leur arrivée.') : _t('qu\'il est arrivé.'))
+        : _t('Ces articles ne sont pas en stock :\n') + bo.map(function (it) { return '• ' + boN(it) + ' × ' + label(it); }).join('\n') +
+          _t('\nOn les commande chez notre fournisseur : compte ') + BO_DELAY + _t(' avant la cueillette. On t\'écrit dès leur arrivée.');
+    if (emp.length) msg += (msg ? '\n\n' : '') + _t('Bobines vides à compléter, ') + BO_EMPTY + ' :\n' +
       emp.map(function (it) { return '• ' + boN(it) + ' × ' + metaOf(it).name; }).join('\n') +
-      '\nOn fera tout notre possible pour les compléter.';
+      _t('\nOn fera tout notre possible pour les compléter.');
     caDialog.confirm({
-      title: !bo.length ? 'Bobines vides : stock limité' : many ? 'Articles à commander' : 'Article à commander',
+      title: !bo.length ? _t('Bobines vides : stock limité') : many ? _t('Articles à commander') : _t('Article à commander'),
       message: msg,
-      ok: 'Compris, envoyer', icon: 'clock'
+      ok: _t('Compris, envoyer'), icon: 'clock'
     }).then(function (ok) { if (ok) sendOrder(); });
   });
   function isEmptyLine(it) { return it.type === 'accessory' && isEmptySpool(accById[it.id]); }
   function sendOrder() {
     var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
-    sendBtn.disabled = true; cartMsg.textContent = 'Envoi…';
+    sendBtn.disabled = true; cartMsg.textContent = _t('Envoi…');
     window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
       cart = {}; saveCart(); if (noteIn) noteIn.value = '';
       goPickup('c', r.id);
-    }, function (err) { sendBtn.disabled = false; cartMsg.textContent = (err && err.message) || 'Envoi impossible. Réessaie.'; });
+    }, function (err) { sendBtn.disabled = false; cartMsg.textContent = (err && err.message) || _t('Envoi impossible. Réessaie.'); });
   }
   if (editCancel) editCancel.addEventListener('click', function () {
     window.CA.custOrder.cancelEdit();
     cart = {}; saveCart(); renderCart();
-    cartMsg.textContent = 'Modification annulée : ta commande reste telle quelle.';
+    cartMsg.textContent = _t('Modification annulée : ta commande reste telle quelle.');
   });
 
   /* ---------- toast ---------- */
@@ -1753,7 +1760,7 @@
       });
       if (trimmed.length) {
         saveCart();
-        toast('Stock mis à jour : ' + trimmed.filter(Boolean).join(', ') + ' — quantité ajustée dans ton panier.');
+        toast(_t('Stock mis à jour : ') + trimmed.filter(Boolean).join(', ') + _t(' — quantité ajustée dans ton panier.'));
       }
       if (trimmed.length || !focusedIn(cartItems)) renderCart();
       if (!screenCatalog.hidden && !focusedIn(catGroups)) renderCatalog();

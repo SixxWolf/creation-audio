@@ -28,8 +28,13 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-  function money(n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; }
-  function plural(n, one, many) { return n + ' ' + (n > 1 ? many : one); }
+  // langue (i18n.js ; chargé aussi par tools/build-spacer-pages.js) : CA.t, 12,99 $ / $12.99
+  var CA0 = window.CA || {}, EN = CA0.lang === 'en';
+  var _t = CA0.t || function (s, v) { return v ? String(s).replace(/\{(\w+)\}/g, function (m, k) { return v[k] == null ? m : v[k]; }) : s; };
+  var money = CA0.money || function (n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; };
+  var tr = CA0.tr || function (r, f) { return (r.attrs || {})[f] || ''; };
+  var trs = CA0.trs || function (r, s) { return s; };
+  function plural(n, one, many) { return n + ' ' + _t((EN ? n !== 1 : n > 1) ? many : one); }
   function norm(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function slugify(s) {
     return norm(s).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'spacer';
@@ -55,15 +60,19 @@
   }
   function yearsText(r) {
     if (r.from && r.to) return r.from === r.to ? String(r.from) : r.from + '–' + r.to;
-    if (r.from) return r.from + ' et +';
-    if (r.to) return 'jusqu\'à ' + r.to;
+    if (r.from) return r.from + _t(' et +');
+    if (r.to) return _t('jusqu\'à ') + r.to;
     return '';
   }
   function specsOf(p) {
     var s = p && p.attrs && Array.isArray(p.attrs.specs) ? p.attrs.specs : [];
-    return s.filter(function (x) { return x && (x.k || x.v); });
+    return s.filter(function (x) { return x && (x.k || x.v); })
+      .map(function (x) { return { k: trs(p, x.k), v: trs(p, x.v) }; });
   }
-  function sizeOf(p) { return String(p && p.attrs && p.attrs.speaker_size || '').trim(); }
+  function sizeOf(p) {
+    var s = String(p && p.attrs && p.attrs.speaker_size || '').trim();
+    return EN ? s.replace(/(\d),(\d)/g, '$1.$2') : s;
+  }
   // pièces d'origine remplacées [{brand, ref}] (« Remplace PAC HKSB110 ») ; vide = conception Création Audio
   function replacesOf(p) {
     var r = p && p.attrs && Array.isArray(p.attrs.replaces) ? p.attrs.replaces : [];
@@ -101,13 +110,13 @@
   // spk = des marques de haut-parleurs sont aussi citées (liste « Haut-parleurs »)
   function legalHtml(brands, spk) {
     if (!brands.length && !spk) return '';
-    var names = brands.length > 1 ? brands.slice(0, -1).join(', ') + ' et ' + brands[brands.length - 1] : brands[0];
+    var names = brands.length > 1 ? brands.slice(0, -1).join(', ') + _t(' et ') + brands[brands.length - 1] : brands[0];
     var txt = !brands.length
-      ? 'Les marques de haut-parleurs citées appartiennent à leurs propriétaires respectifs. Création Audio n\'est affiliée à aucun de ces fabricants ; elles indiquent seulement la compatibilité.'
+      ? _t('Les marques de haut-parleurs citées appartiennent à leurs propriétaires respectifs. Création Audio n\'est affiliée à aucun de ces fabricants ; elles indiquent seulement la compatibilité.')
       : brands.length > 1 || spk
-        ? (spk ? brands.join(', ') + ' et les marques de haut-parleurs citées' : names) +
-          ' sont des marques de leurs propriétaires respectifs. Création Audio n\'est affiliée à aucun de ces fabricants ; les références indiquent seulement la compatibilité.'
-        : names + ' est une marque de son propriétaire. Création Audio n\'est pas affiliée à ce fabricant ; la référence indique seulement la compatibilité.';
+        ? (spk ? brands.join(', ') + _t(' et les marques de haut-parleurs citées') : names) +
+          _t(' sont des marques de leurs propriétaires respectifs. Création Audio n\'est affiliée à aucun de ces fabricants ; les références indiquent seulement la compatibilité.')
+        : names + _t(' est une marque de son propriétaire. Création Audio n\'est pas affiliée à ce fabricant ; la référence indique seulement la compatibilité.');
     return '<p class="sp-legal">' + esc(txt) + '</p>';
   }
   function hasSpeakers(list) { return list.some(function (p) { return speakersOf(p).length > 0; }); }
@@ -142,22 +151,22 @@
     var mail = 'mailto:' + CONTACT.email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     if (!(window.CA && window.CA.loadMsg)) {
       return '<a class="ask" href="' + esc(CONTACT.messenger) + '" target="_blank" rel="noopener">' + esc(label) + '</a>' +
-        '<span class="ask-alt"> ou <a href="' + esc(mail) + '">par courriel</a></span>';
+        _t('<span class="ask-alt"> ou <a href="') + esc(mail) + _t('">par courriel</a></span>');
     }
-    return '<a class="ask" href="/compte.html#/messages" data-msg="spacers" data-msg-ref="' +
+    return '<a class="ask" href="' + (EN ? '/en' : '') + '/compte.html#/messages" data-msg="spacers" data-msg-ref="' +
         esc(ref || '') + '" data-msg-body="' + esc(body) + '">' + esc(label) + '</a>' +
-      '<span class="ask-alt"> ou par <a href="' + esc(CONTACT.messenger) + '" target="_blank" rel="noopener">Messenger</a> · <a href="' +
-        esc(mail) + '">courriel</a></span>';
+      _t('<span class="ask-alt"> ou par <a href="') + esc(CONTACT.messenger) + _t('" target="_blank" rel="noopener">Messenger</a> · <a href="') +
+        esc(mail) + _t('">courriel</a></span>');
   }
 
   // options de la boutique publique : spacers.html ET pages générées (même rendu à l'octet près)
   var PUBLIC = {
-    addLabel: 'Ajouter au panier',
-    assureHtml: '<li>' + IC.pin + 'Ramassage local à Québec, sur rendez-vous</li>' +
-      '<li>' + IC.chat + 'Commande par Messenger ou courriel — on confirme la dispo</li>' +
-      '<li>' + IC.card + 'Aucun paiement en ligne</li>',
-    emptyHint: 'Ton véhicule n\'y est pas ? On en imprime sur mesure : ' +
-      askLink('écris-nous', 'Spacer sur mesure', 'Bonjour,\n\nJe cherche un spacer pour mon véhicule.\nVéhicule (marque, modèle, année) : \nTaille du haut-parleur : \n\nMerci !') + '.'
+    addLabel: _t('Ajouter au panier'),
+    assureHtml: '<li>' + IC.pin + _t('Ramassage local à Québec, sur rendez-vous</li>') +
+      '<li>' + IC.chat + _t('Commande par Messenger ou courriel — on confirme la dispo</li>') +
+      '<li>' + IC.card + _t('Aucun paiement en ligne</li>'),
+    emptyHint: _t('Ton véhicule n\'y est pas ? On en imprime sur mesure : ') +
+      askLink(_t('écris-nous'), _t('Spacer sur mesure'), _t('Bonjour,\n\nJe cherche un spacer pour mon véhicule.\nVéhicule (marque, modèle, année) : \nTaille du haut-parleur : \n\nMerci !')) + '.'
   };
 
   function create(o) {
@@ -184,9 +193,9 @@
     // (rendu statique des pages générées : sans le nombre, qui bouge à chaque vente — le JS le remet)
     function stockBadge(p) {
       var st = p.qty | 0;
-      if (st > 0 && o.staticRender) return { cls: 'ok', text: 'En stock' };
-      if (st > 0) return { cls: 'ok', text: isDealer ? st + ' en stock' : plural(st, 'paire en stock', 'paires en stock') };
-      return isDealer || bo() ? { cls: 'order', text: 'Sur commande' } : { cls: 'out', text: 'Rupture de stock' };
+      if (st > 0 && o.staticRender) return { cls: 'ok', text: _t('En stock') };
+      if (st > 0) return { cls: 'ok', text: isDealer ? st + _t(' en stock') : plural(st, 'paire en stock', 'paires en stock') };
+      return isDealer || bo() ? { cls: 'order', text: _t('Sur commande') } : { cls: 'out', text: _t('Rupture de stock') };
     }
 
     /* ---------- données ---------- */
@@ -275,14 +284,14 @@
     function priceRows(p) {
       var rows = [{ min: 1, price: +p.sell_price || 0 }].concat(tiersFor(p));
       return rows.map(function (t, i) {
-        var label = t.min === 1 ? '1 paire' : (t.min + '+ paires');
-        return '<div class="sp-pr' + (i === 0 ? ' base' : '') + '">' + (i === 0 && !isDealer ? '' : label + ' : ') + money(t.price) +
-          (i === 0 && !isDealer ? ' <small>/ paire</small>' : '') + '</div>';
+        var label = t.min === 1 ? _t('1 paire') : (t.min + _t('+ paires'));
+        return '<div class="sp-pr' + (i === 0 ? _t(' base') : '') + '">' + (i === 0 && !isDealer ? '' : label + ' : ') + money(t.price) +
+          (i === 0 && !isDealer ? _t(' <small>/ paire</small>') : '') + '</div>';
       }).join('');
     }
     function cardHtml(p) {
       var url = publicUrl(p.image_path), sz = sizeOf(p), fit = fitmentOf(p), b = stockBadge(p);
-      var desc = p.attrs && p.attrs.description ? String(p.attrs.description) : '';
+      var desc = String(tr(p, 'description') || '');
       var noAdd = !isDealer && !bo() && (p.qty | 0) <= 0, refs = replacesOf(p), spk = speakersOf(p);
       var tags = (sz ? '<span class="sp-tag">' + esc(sz) + '</span>' : '') +
         (fit.length ? '<span class="sp-tag is-fit">' + IC.car + plural(fit.length, 'véhicule', 'véhicules') + '</span>' : '') +
@@ -295,7 +304,7 @@
           '<div class="sp-body">' +
             (tags ? '<div class="sp-tags">' + tags + '</div>' : '') +
             '<h3>' + esc(p.name) + '</h3>' +
-            (refs.length ? '<p class="sp-repl">Remplace ' + esc(refs.map(refLabel).join(' · ')) + '</p>' : '') +
+            (refs.length ? _t('<p class="sp-repl">Remplace ') + esc(refs.map(refLabel).join(' · ')) + '</p>' : '') +
             (desc ? '<p class="sp-desc">' + esc(desc) + '</p>' : '') +
             '<span class="sp-stock ' + b.cls + '">' + esc(b.text) + '</span>' +
           '</div>' +
@@ -303,8 +312,8 @@
         '<div class="sp-buy">' +
           '<div class="sp-prices">' + priceRows(p) + '</div>' +
           '<button class="add-btn sp-add" type="button" data-id="' + esc(p.id) + '"' + (noAdd ? ' disabled' : '') +
-            ' aria-label="' + esc((noAdd ? 'Rupture : ' : (o.addLabel || 'Ajouter') + ' : ') + p.name) + '">' +
-            (noAdd ? 'Rupture de stock' : esc(o.addLabel || 'Ajouter')) + '</button>' +
+            ' aria-label="' + esc((noAdd ? _t('Rupture : ') : (o.addLabel || _t('Ajouter')) + ' : ') + p.name) + '">' +
+            (noAdd ? _t('Rupture de stock') : esc(o.addLabel || _t('Ajouter'))) + '</button>' +
         '</div>' +
       '</article>';
     }
@@ -323,11 +332,11 @@
     function shellHtml(chips, count, grid, legal) {
       return '<div class="spc-bar">' +
           '<div class="spc-search">' + IC.search +
-            '<label class="sr-only" for="spc-q">Chercher un véhicule ou un code</label>' +
-            '<input type="search" id="spc-q" placeholder="Véhicule ou code — ex. civic 2008" autocomplete="off" enterkeyhint="search">' +
-            '<button type="button" class="spc-clear" aria-label="Effacer la recherche" hidden>&times;</button>' +
+            _t('<label class="sr-only" for="spc-q">Chercher un véhicule ou un code</label>') +
+            _t('<input type="search" id="spc-q" placeholder="Véhicule ou code — ex. civic 2008" autocomplete="off" enterkeyhint="search">') +
+            _t('<button type="button" class="spc-clear" aria-label="Effacer la recherche" hidden>&times;</button>') +
           '</div>' +
-          '<div class="cat-chips spc-chips" role="group" aria-label="Taille du haut-parleur"' + (chips ? '' : ' hidden') + '>' + (chips || '') + '</div>' +
+          _t('<div class="cat-chips spc-chips" role="group" aria-label="Taille du haut-parleur"') + (chips ? '' : ' hidden') + '>' + (chips || '') + '</div>' +
         '</div>' +
         '<p class="spc-count" aria-live="polite">' + (count || '') + '</p>' +
         '<div class="shop-grid spc-grid">' + (grid || '') + '</div>' +
@@ -351,7 +360,7 @@
       var list = sizes();
       if (!list.length) return '';
       if (size !== 'all' && !list.some(function (s) { return s.size === size; })) size = 'all';
-      return '<button type="button" class="chip" data-size="all" aria-current="' + (size === 'all') + '">Toutes <span class="chip-n">' + items.length + '</span></button>' +
+      return '<button type="button" class="chip" data-size="all" aria-current="' + (size === 'all') + _t('">Toutes <span class="chip-n">') + items.length + '</span></button>' +
         list.map(function (s) {
           return '<button type="button" class="chip" data-size="' + esc(s.size) + '" aria-current="' + (size === s.size) + '">' +
             esc(s.size) + ' <span class="chip-n">' + s.n + '</span></button>';
@@ -367,19 +376,19 @@
     }
     function countText(n) {
       return (q || size !== 'all')
-        ? plural(n, 'spacer trouvé', 'spacers trouvés') + ' sur ' + items.length
+        ? plural(n, 'spacer trouvé', 'spacers trouvés') + _t(' sur ') + items.length
         : plural(items.length, 'spacer', 'spacers');
     }
     function renderGrid() {
       var grid = $('.spc-grid', catalogEl), cnt = $('.spc-count', catalogEl), legal = $('.spc-legal', catalogEl);
       if (!grid) return;
       if (legal) legal.innerHTML = legalHtml(refBrands(items), hasSpeakers(items));
-      if (!items.length) { grid.innerHTML = '<p class="empty">Aucun spacer disponible pour le moment.</p>'; if (cnt) cnt.textContent = ''; return; }
+      if (!items.length) { grid.innerHTML = _t('<p class="empty">Aucun spacer disponible pour le moment.</p>'); if (cnt) cnt.textContent = ''; return; }
       var list = filtered();
       if (cnt) cnt.textContent = countText(list.length);
       if (!list.length) {
-        grid.innerHTML = '<p class="empty">Aucun spacer ne correspond' + (q ? ' à « ' + esc(q) + ' »' : '') + '.<br>' +
-          '<button type="button" class="spc-reset">Tout afficher</button>' + (o.emptyHint ? '<br>' + o.emptyHint : '') + '</p>';
+        grid.innerHTML = _t('<p class="empty">Aucun spacer ne correspond') + (q ? ' à « ' + esc(q) + ' »' : '') + '.<br>' +
+          _t('<button type="button" class="spc-reset">Tout afficher</button>') + (o.emptyHint ? '<br>' + o.emptyHint : '') + '</p>';
         $('.spc-reset', grid).addEventListener('click', function () {
           q = ''; size = 'all';
           var i = $('#spc-q', catalogEl); if (i) i.value = '';
@@ -423,12 +432,12 @@
     function mediaHtml() {
       var u = curImgs[curImg];
       var stage = u
-        ? '<button type="button" class="pdp-stage" aria-label="Agrandir la photo"><img src="' + esc(u) + '" alt="' + esc(curP.name) + '">' +
+        ? _t('<button type="button" class="pdp-stage" aria-label="Agrandir la photo"><img src="') + esc(u) + '" alt="' + esc(curP.name) + '">' +
             '<span class="pdp-zoom" aria-hidden="true">' + IC.zoom + '</span></button>'
         : '<div class="pdp-stage no-zoom"><span class="sp-noimg big">' + IC.photo + '</span></div>';
       var thumbs = curImgs.length > 1 ? '<div class="pdp-thumbs">' + curImgs.map(function (t, i) {
         return '<button type="button" class="pdp-thumb' + (i === curImg ? ' is-active' : '') + '" data-i="' + i + '"' +
-          ' aria-label="Photo ' + (i + 1) + ' sur ' + curImgs.length + '"' + (i === curImg ? ' aria-current="true"' : '') + '>' +
+          _t(' aria-label="Photo ') + (i + 1) + _t(' sur ') + curImgs.length + '"' + (i === curImg ? ' aria-current="true"' : '') + '>' +
           '<img src="' + esc(t) + '" alt="" loading="lazy"></button>';
       }).join('') + '</div>' : '';
       return stage + thumbs;
@@ -452,10 +461,10 @@
       var rows = [{ min: 1, price: base }].concat(tiers);
       var active = 0;
       rows.forEach(function (t, i) { if (curQty >= t.min) active = i; });
-      return '<div class="sp-tiertable" role="table" aria-label="Prix selon la quantité">' +
+      return _t('<div class="sp-tiertable" role="table" aria-label="Prix selon la quantité">') +
         rows.map(function (t, i) {
           var next = rows[i + 1];
-          var lbl = next ? (t.min === next.min - 1 ? plural(t.min, 'paire', 'paires') : t.min + ' à ' + (next.min - 1) + ' paires') : t.min + ' paires et +';
+          var lbl = next ? (t.min === next.min - 1 ? plural(t.min, 'paire', 'paires') : t.min + _t(' à ') + (next.min - 1) + _t(' paires')) : t.min + _t(' paires et +');
           var pct = base > 0 && t.price < base ? Math.round((1 - t.price / base) * 100) : 0;
           return '<div class="sp-tr' + (i === active ? ' is-active' : '') + '" role="row">' +
             '<span role="cell">' + esc(lbl) + '</span>' +
@@ -465,37 +474,37 @@
     function buySumText(p) {
       var u = unit(p, curQty), base = +p.sell_price || 0;
       if (curQty < 2) return '';
-      return curQty + ' × ' + money(u) + ' = <b>' + money(u * curQty) + '</b>' + (u < base ? ' <em>· rabais quantité</em>' : '');
+      return curQty + ' × ' + money(u) + ' = <b>' + money(u * curQty) + '</b>' + (u < base ? _t(' <em>· rabais quantité</em>') : '');
     }
     function madeNote(p) {
       if (!isDealer && !bo()) return '';
       var st = p.qty | 0, extra = curQty - st;
       if (extra <= 0) return '';
-      return st > 0 ? st + ' en stock · ' + plural(extra, 'paire sera imprimée', 'paires seront imprimées') + ' sur commande'
-        : 'Imprimé sur commande — on te confirme le délai.';
+      return st > 0 ? st + _t(' en stock · ') + plural(extra, 'paire sera imprimée', 'paires seront imprimées') + _t(' sur commande')
+        : _t('Imprimé sur commande — on te confirme le délai.');
     }
     // spécifications à droite, sous le bouton d'achat (plus d'onglet : visibles d'un coup d'œil)
     function specsPanel(p) {
       var specs = specsOf(p);
       if (!specs.length) return '';
-      return '<section class="sp-specs" aria-label="Spécifications"><p class="sp-specs-t">Spécifications</p><dl>' +
+      return _t('<section class="sp-specs" aria-label="Spécifications"><p class="sp-specs-t">Spécifications</p><dl>') +
         specs.map(function (s) { return '<div><dt>' + esc(s.k) + '</dt><dd>' + esc(s.v) + '</dd></div>'; }).join('') + '</dl></section>';
     }
 
-    var SPK = { ok: { cls: 'ok', label: 'Confirmé' }, partial: { cls: 'order', label: 'Compatible*' } };
+    var SPK = { ok: { cls: 'ok', label: _t('Confirmé') }, partial: { cls: 'order', label: _t('Compatible*') } };
     function spkPill(fit) { var s = SPK[fit] || SPK.ok; return '<span class="pill ' + s.cls + '">' + s.label + '</span>'; }
     // « Écris-nous… » de la fiche : courriel pré-rempli avec le nom du spacer
     function askHtml(p, label, question, field) {
-      return askLink(label, 'Compatibilité — ' + p.name,
-        'Bonjour,\n\nEst-ce que le spacer ' + p.name + ' ' + question + ' ?\n' + field + ' : \n\nMerci !', p.name);
+      return askLink(label, _t('Compatibilité — ') + p.name,
+        _t('Bonjour,\n\nEst-ce que le spacer ') + p.name + ' ' + question + (EN ? '?\n' : ' ?\n') + field + _t(' : \n\nMerci !'), p.name);
     }
     // ce que veut dire chaque ajustement (sous le tableau de la section Haut-parleurs)
     function spkLegend(p) {
       return '<div class="spk-legend">' +
-        '<p>' + spkPill('ok') + '<span>Testé par Création Audio : le haut-parleur s\'installe parfaitement et arrive au même niveau que l\'adaptateur. 100 % compatible.</span></p>' +
-        '<p>' + spkPill('partial') + '<span>Testé : le haut-parleur s\'installe et fonctionne bien, mais l\'ajustement n\'est pas parfait. Par exemple, il n\'arrive pas tout à fait au même niveau que l\'adaptateur.</span></p>' +
-        '<p class="spk-legend-more">Ton haut-parleur n\'est pas dans la liste ? ' +
-          askHtml(p, 'Écris-nous le modèle avant de commander', 'convient à mon haut-parleur', 'Marque et modèle du haut-parleur') + '</p>' +
+        '<p>' + spkPill('ok') + _t('<span>Testé par Création Audio : le haut-parleur s\'installe parfaitement et arrive au même niveau que l\'adaptateur. 100 % compatible.</span></p>') +
+        '<p>' + spkPill('partial') + _t('<span>Testé : le haut-parleur s\'installe et fonctionne bien, mais l\'ajustement n\'est pas parfait. Par exemple, il n\'arrive pas tout à fait au même niveau que l\'adaptateur.</span></p>') +
+        _t('<p class="spk-legend-more">Ton haut-parleur n\'est pas dans la liste ? ') +
+          askHtml(p, _t('Écris-nous le modèle avant de commander'), _t('convient à mon haut-parleur'), _t('Marque et modèle du haut-parleur')) + '</p>' +
       '</div>';
     }
 
@@ -509,26 +518,26 @@
     }
     function detailsHtml(p) {
       var secs = [], fit = fitmentOf(p), spk = speakersOf(p);
-      var paras = String((p.attrs && p.attrs.long_desc) || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
-      if (paras.length) secs.push(secHtml('desc', 'Description', 0,
+      var paras = String(tr(p, 'long_desc') || '').split(/\n\s*\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+      if (paras.length) secs.push(secHtml('desc', _t('Description'), 0,
         '<div class="pdp-desc">' + paras.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>'));
       if (fit.length) {
         var sorted = fit.slice().sort(function (a, b) { return a.make.localeCompare(b.make, 'fr') || a.model.localeCompare(b.model, 'fr') || (a.from || 0) - (b.from || 0); });
         var anyPos = sorted.some(function (r) { return r.pos; }), more = sorted.length > FIT_SHOW;
-        secs.push(secHtml('compat', 'Compatibilité', fit.length,
-          '<div class="fit-wrap' + (more && !fitOpen ? ' is-collapsed' : '') + '"><table class="fit-table"><thead><tr><th>Marque</th><th>Modèle</th><th>Années</th>' + (anyPos ? '<th>Emplacement</th>' : '') + '</tr></thead><tbody>' +
+        secs.push(secHtml('compat', _t('Compatibilité'), fit.length,
+          '<div class="fit-wrap' + (more && !fitOpen ? ' is-collapsed' : '') + _t('"><table class="fit-table"><thead><tr><th>Marque</th><th>Modèle</th><th>Années</th>') + (anyPos ? _t('<th>Emplacement</th>') : '') + '</tr></thead><tbody>' +
             sorted.map(function (r, i) {
               var cls = i >= FIT_SHOW ? ' class="fit-x"' : (i === FIT_SHOW - 1 && more ? ' class="fit-cut"' : '');
               return '<tr' + cls + '><td>' + esc(r.make) + '</td><td>' + esc(r.model) + '</td><td class="yrs">' + esc(yearsText(r) || '—') + '</td>' +
-                (anyPos ? '<td>' + esc(r.pos || '—') + '</td>' : '') + '</tr>';
+                (anyPos ? '<td>' + esc(r.pos ? trs(p, r.pos) : '—') + '</td>' : '') + '</tr>';
             }).join('') + '</tbody></table></div>' +
           (more ? '<button type="button" class="fit-more" data-n="' + sorted.length + '" aria-expanded="' + !!fitOpen + '">' +
-            (fitOpen ? 'Voir moins' : 'Voir les ' + sorted.length + ' véhicules') + '</button>' : '') +
-          '<p class="fit-note">Vérifie toujours la taille et la profondeur de ton haut-parleur. Un doute ? ' +
-            askHtml(p, 'Écris-nous avant de commander', 'convient à mon véhicule', 'Véhicule (marque, modèle, année)') + '</p>'));
+            (fitOpen ? _t('Voir moins') : _t('Voir les ') + sorted.length + _t(' véhicules')) + '</button>' : '') +
+          _t('<p class="fit-note">Vérifie toujours la taille et la profondeur de ton haut-parleur. Un doute ? ') +
+            askHtml(p, _t('Écris-nous avant de commander'), _t('convient à mon véhicule'), _t('Véhicule (marque, modèle, année)')) + '</p>'));
       }
-      if (spk.length) secs.push(secHtml('spk', 'Haut-parleurs', spk.length,
-        '<div class="fit-wrap"><table class="fit-table spk-table"><thead><tr><th>Haut-parleur</th><th>Ajustement</th></tr></thead><tbody>' +
+      if (spk.length) secs.push(secHtml('spk', _t('Haut-parleurs'), spk.length,
+        _t('<div class="fit-wrap"><table class="fit-table spk-table"><thead><tr><th>Haut-parleur</th><th>Ajustement</th></tr></thead><tbody>') +
           spk.map(function (x) { return '<tr><td>' + esc(x.model) + '</td><td>' + spkPill(x.fit) + '</td></tr>'; }).join('') +
           '</tbody></table></div>' + spkLegend(p)));
       return secs.length ? '<div class="pdp-details sp-details" id="sp-details">' + secs.join('') + '</div>' : '';
@@ -540,8 +549,8 @@
       pool = pool.slice(0, 4);
       if (!pool.length) return '';
       return '<section class="pdp-related" aria-labelledby="sp-rel-title">' +
-        '<div class="rel-head"><h2 id="sp-rel-title">' + (sz && pool.every(function (x) { return sizeOf(x) === sz; }) ? 'Autres spacers ' + esc(sz) : 'Autres spacers') + '</h2>' +
-          '<a class="rel-link" href="' + esc(rootHref) + '">Tout le catalogue ' + IC.arrow + '</a></div>' +
+        '<div class="rel-head"><h2 id="sp-rel-title">' + (sz && pool.every(function (x) { return sizeOf(x) === sz; }) ? _t('Autres spacers ') + esc(sz) : _t('Autres spacers')) + '</h2>' +
+          '<a class="rel-link" href="' + esc(rootHref) + _t('">Tout le catalogue ') + IC.arrow + '</a></div>' +
         '<div class="shop-grid">' + pool.map(cardHtml).join('') + '</div>' +
       '</section>';
     }
@@ -549,8 +558,8 @@
     // pièce d'origine remplacée (« Remplace PAC HKSB110 ») ou conception maison
     function replHtml(p) {
       var refs = replacesOf(p);
-      if (!refs.length) return '<p class="sp-repl is-own">Conception Création Audio</p>';
-      return '<p class="sp-repl">Remplace ' + refs.map(function (x) { return '<b>' + esc(refLabel(x)) + '</b>'; }).join(' · ') + '</p>';
+      if (!refs.length) return _t('<p class="sp-repl is-own">Conception Création Audio</p>');
+      return _t('<p class="sp-repl">Remplace ') + refs.map(function (x) { return '<b>' + esc(refLabel(x)) + '</b>'; }).join(' · ') + '</p>';
     }
     function productHtml() {
       var p = curP, b = stockBadge(p), max = maxQty(p), blocked = max <= 0;
@@ -559,29 +568,29 @@
       curImgs = imagesOf(p);
       if (curImg >= curImgs.length) curImg = 0;
       var sz = sizeOf(p);
-      var desc = p.attrs && p.attrs.description ? String(p.attrs.description) : '';
-      return '<nav class="crumbs" aria-label="Fil d\'Ariane"><a href="' + esc(rootHref) + '">' + esc(o.rootLabel || 'Spacers') + '</a>' + IC.chev +
+      var desc = String(tr(p, 'description') || '');
+      return _t('<nav class="crumbs" aria-label="Fil d\'Ariane"><a href="') + esc(rootHref) + '">' + esc(o.rootLabel || _t('Spacers')) + '</a>' + IC.chev +
           '<span aria-current="page">' + esc(p.name) + '</span></nav>' +
         '<div class="pdp">' +
           '<div class="pdp-media">' + mediaHtml() + '</div>' +
           '<div class="pdp-panel">' +
-            '<p class="pdp-eyebrow">Spacer' + (sz ? ' · ' + esc(sz) : '') + ' · vendu par paire</p>' +
+            _t('<p class="pdp-eyebrow">Spacer') + (sz ? ' · ' + esc(sz) : '') + _t(' · vendu par paire</p>') +
             '<h1 class="pdp-name">' + esc(p.name) + '</h1>' +
             replHtml(p) +
             (desc ? '<p class="sp-summary">' + esc(desc) + '</p>' : '') +
             '<div class="pdp-priceline">' +
-              '<span class="pdp-price">' + money(p.sell_price) + '<small>/ paire</small></span>' +
+              '<span class="pdp-price">' + money(p.sell_price) + _t('<small>/ paire</small></span>') +
               '<span class="pill ' + (b.cls === 'ok' ? 'ok' : b.cls === 'order' ? 'order' : 'bad') + '">' + esc(b.text) + '</span>' +
             '</div>' +
             '<div class="sp-tiers-box">' + tierTableHtml(p) + '</div>' +
             '<div class="cfg-buy">' +
               (blocked ? '' :
               '<div class="qty">' +
-                '<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>' +
-                '<input type="number" class="q-val" aria-label="Quantité (paires)" min="1" max="' + max + '" value="' + curQty + '" inputmode="numeric">' +
-                '<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>' +
+                _t('<button type="button" class="q-minus" aria-label="Diminuer la quantité">&minus;</button>') +
+                _t('<input type="number" class="q-val" aria-label="Quantité (paires)" min="1" max="') + max + '" value="' + curQty + '" inputmode="numeric">' +
+                _t('<button type="button" class="q-plus" aria-label="Augmenter la quantité">+</button>') +
               '</div>') +
-              '<button type="button" class="btn-add"' + (blocked ? ' disabled' : '') + '>' + IC.cart + (blocked ? 'Rupture de stock' : esc(o.addLabel || 'Ajouter')) + '</button>' +
+              '<button type="button" class="btn-add"' + (blocked ? ' disabled' : '') + '>' + IC.cart + (blocked ? _t('Rupture de stock') : esc(o.addLabel || _t('Ajouter'))) + '</button>' +
             '</div>' +
             '<p class="buy-sum" aria-live="polite">' + buySumText(p) + '</p>' +
             '<p class="sp-made" aria-live="polite">' + esc(madeNote(p)) + '</p>' +
@@ -643,7 +652,7 @@
         var wrap = fm.previousElementSibling;
         if (wrap) wrap.classList.toggle('is-collapsed', !fitOpen);
         fm.setAttribute('aria-expanded', String(fitOpen));
-        fm.textContent = fitOpen ? 'Voir moins' : 'Voir les ' + fm.getAttribute('data-n') + ' véhicules';
+        fm.textContent = fitOpen ? _t('Voir moins') : _t('Voir les ') + fm.getAttribute('data-n') + _t(' véhicules');
         if (!fitOpen && wrap && wrap.getBoundingClientRect().top < 0) wrap.scrollIntoView({ block: 'start' });
       });
       var rel = $('.pdp-related', productEl); if (rel) wireAdds(rel);
@@ -685,11 +694,11 @@
       var i = Math.max(0, Math.min(idx || 0, urls.length - 1)), back = document.activeElement, multi = urls.length > 1;
       var ov = document.createElement('div');
       ov.className = 'lb';
-      ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Photo agrandie');
+      ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', _t('Photo agrandie'));
       ov.innerHTML = '<img alt="">' +
-        '<button type="button" class="lb-btn lb-close" aria-label="Fermer">&times;</button>' +
-        (multi ? '<button type="button" class="lb-btn lb-prev" aria-label="Photo précédente">&#8249;</button>' +
-                 '<button type="button" class="lb-btn lb-next" aria-label="Photo suivante">&#8250;</button>' +
+        _t('<button type="button" class="lb-btn lb-close" aria-label="Fermer">&times;</button>') +
+        (multi ? _t('<button type="button" class="lb-btn lb-prev" aria-label="Photo précédente">&#8249;</button>') +
+                 _t('<button type="button" class="lb-btn lb-next" aria-label="Photo suivante">&#8250;</button>') +
                  '<div class="lb-count" aria-live="polite"></div>' : '');
       var img = $('img', ov), cnt = $('.lb-count', ov);
       function show() { img.src = urls[i]; if (cnt) cnt.textContent = (i + 1) + ' / ' + urls.length; }

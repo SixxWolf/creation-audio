@@ -33,9 +33,16 @@ function hTxt(t: unknown) {
   const p = String(t || "").split(":");
   return Number(p[0]) + " h " + (p[1] || "00");
 }
-function fmtPickup(d: unknown, s: unknown, e: unknown) {
+function hTxtEn(t: unknown) {
+  const p = String(t || "").split(":"), h = Number(p[0]);
+  return ((h % 12) || 12) + ":" + (p[1] || "00") + (h < 12 ? " AM" : " PM");
+}
+// en = client de la version anglaise (customers.lang) : « Thursday, October 23, 1:00 PM – 5:00 PM »
+function fmtPickup(d: unknown, s: unknown, e: unknown, en = false) {
   if (!d) return "";
   const p = String(d).split("-").map(Number), x = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+  if (en) return x.toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }) +
+    (s ? ", " + hTxtEn(s) + (e ? " – " + hTxtEn(e) : "") : "");
   return JOURS[x.getUTCDay()] + " " + x.getUTCDate() + " " + MOIS[x.getUTCMonth()] + (s ? ", " + hTxt(s) + (e ? " – " + hTxt(e) : "") : "");
 }
 
@@ -108,19 +115,39 @@ Deno.serve(async (req) => {
   const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes/" + (kind === "reservation" ? "reservations" : "clients");
   const results: Record<string, string> = {};
 
-  // ---- au client ----
-  const cText =
+  // ---- au client, dans sa langue ----
+  const { data: cust } = await db.from("customers").select("lang").eq("id", uid).maybeSingle();
+  const en = cust?.lang === "en";
+  let cText: string, cHtml: string, cSubject: string;
+  if (en) {
+    const pkE = fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end, true);
+    const whatE = (kind === "reservation" ? "reservation " : "order ") + x.number;
+    const accE = SITE + "/en/compte.html#/cueillette/" + (kind === "reservation" ? "r/" : "c/") + id;
+    cSubject = "Pickup " + pkE + " — Création Audio";
+    cText = "Hello " + first + ",\n\n" +
+      "Got it: your pickup for " + whatE + " is " + pkE + ".\n\n" +
+      "You can change it in your account: " + accE + "\n\n" +
+      "Création Audio\n" + SITE + "/en/";
+    cHtml = wrap("Création Audio", "Pickup confirmed",
+      '<p style="margin:0 0 14px">Hello ' + esc(first) + ', got it for ' + esc(whatE) + '.</p>' +
+      box("See you " + pkE + ".") + btn(accE, "See my order") +
+      '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
+      '<p style="font-size:12px;color:#6C727C">You can change your time slot in your account. A question? Just reply to this email.</p>');
+  } else {
+    cSubject = "Cueillette " + pk + " — Création Audio";
+    cText =
     "Bonjour " + first + ",\n\n" +
     "C'est noté : ta cueillette pour " + what.toLowerCase() + " est " + pk + ".\n\n" +
     "Tu peux la changer dans ton compte : " + accountUrl + "\n\n" +
     "Création Audio\n" + SITE;
-  const cHtml = wrap("Création Audio", "Cueillette confirmée",
+    cHtml = wrap("Création Audio", "Cueillette confirmée",
     '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', c\'est noté pour ' + esc(what.toLowerCase()) + '.</p>' +
     box("On t'attend " + pk + ".") + btn(accountUrl, "Voir ma commande") +
     '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
     '<p style="font-size:12px;color:#6C727C">Tu peux changer ta plage dans ton compte. Une question&nbsp;? Réponds simplement à ce courriel.</p>');
+  }
   try {
-    await send(resendKey, from, { to: [x.email], reply_to: REPLY_TO, subject: "Cueillette " + pk + " — Création Audio", html: cHtml, text: cText });
+    await send(resendKey, from, { to: [x.email], reply_to: REPLY_TO, subject: cSubject, html: cHtml, text: cText });
     results.client = "sent";
   } catch (e) { results.client = "error: " + String((e as Error).message || e); }
 

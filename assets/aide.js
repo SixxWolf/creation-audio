@@ -12,6 +12,7 @@
    ========================================================= */
 (function () {
   'use strict';
+  var _t = (window.CA && window.CA.t) || function (s) { return s; };   // partagé avec l'admin (sans i18n.js : français)
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -37,10 +38,10 @@
 
     root.classList.add('ah');
     root.innerHTML =
-      '<div class="ah-search"><input type="search" class="ah-q" placeholder="' + esc(o.placeholder || 'Rechercher un tutoriel…') +
-        '" aria-label="Rechercher un tutoriel" autocomplete="off" spellcheck="false"></div>' +
+      '<div class="ah-search"><input type="search" class="ah-q" placeholder="' + esc(o.placeholder || _t('Rechercher un tutoriel…')) +
+        _t('" aria-label="Rechercher un tutoriel" autocomplete="off" spellcheck="false"></div>') +
       '<div class="ah-cols">' +
-        '<nav class="ah-nav" aria-label="Tutoriels"></nav>' +
+        _t('<nav class="ah-nav" aria-label="Tutoriels"></nav>') +
         '<article class="ah-doc" aria-live="polite"></article>' +
       '</div>';
     var q = root.querySelector('.ah-q'), nav = root.querySelector('.ah-nav'), doc = root.querySelector('.ah-doc');
@@ -57,23 +58,23 @@
             (cur && cur.id === t.id ? ' aria-current="true"' : '') + '>' + esc(t.title) + '</a>';
         }).join('') + '</div>';
       }).join('');
-      nav.innerHTML = html || '<p class="ah-none">Aucun tutoriel pour « ' + esc(term) + ' ».</p>';
+      nav.innerHTML = html || _t('<p class="ah-none">Aucun tutoriel pour « ') + esc(term) + ' ».</p>';
     }
 
     function renderDoc() {
       var t = cur;
       root.classList.toggle('has-doc', !!t);
       if (!t) {
-        doc.innerHTML = '<p class="ah-pick">Choisis un tutoriel.</p>';
+        doc.innerHTML = _t('<p class="ah-pick">Choisis un tutoriel.</p>');
         return;
       }
       doc.innerHTML =
-        '<button type="button" class="ah-back">← Tous les tutoriels</button>' +
+        _t('<button type="button" class="ah-back">← Tous les tutoriels</button>') +
         '<header class="ah-head">' +
           '<div><p class="ah-eyebrow">' + esc(t.group) + '</p><h2>' + esc(t.title) + '</h2>' +
           (t.intro ? '<p class="ah-intro">' + fmt(t.intro) + '</p>' : '') + '</div>' +
           (t.go ? '<a class="ah-go" href="' + esc(t.go.href) + '"' + (t.go.blank ? ' target="_blank" rel="noopener"' : '') + '>' +
-            esc(t.go.label || 'Y aller') + ' <span aria-hidden="true">→</span></a>' : '') +
+            esc(t.go.label || _t('Y aller')) + ' <span aria-hidden="true">→</span></a>' : '') +
         '</header>' +
         '<ol class="ah-steps">' + t.steps.map(function (s) { return '<li>' + fmt(s) + '</li>'; }).join('') + '</ol>' +
         (t.tip ? '<p class="ah-tip">' + fmt(t.tip) + '</p>' : '');

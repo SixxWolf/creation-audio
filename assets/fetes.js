@@ -17,6 +17,7 @@
 (function () {
   'use strict';
   var CA = window.CA = window.CA || {};
+  var _t = CA.t || function (s) { return s; };
   if (CA.fetes) return;
 
   var root = document.documentElement;
@@ -124,8 +125,8 @@
     var w = snowWanted();
     snowBtns.forEach(function (b) {
       b.setAttribute('aria-pressed', String(w));
-      b.title = w ? 'Couper la neige' : 'Faire neiger';
-      if (b.classList.contains('xm-drawer-snow')) b.lastChild.textContent = w ? 'Couper la neige' : 'Faire neiger';
+      b.title = w ? _t('Couper la neige') : _t('Faire neiger');
+      if (b.classList.contains('xm-drawer-snow')) b.lastChild.textContent = w ? _t('Couper la neige') : _t('Faire neiger');
     });
   }
   function toggleSnow() {
@@ -138,7 +139,7 @@
     var top = $('.home-top');
     if (top && !$('.xm-snow-btn', top)) {
       var b = el('button', 'xm-snow-btn', FLAKE_IC);
-      b.type = 'button'; b.setAttribute('aria-label', 'Neige');
+      b.type = 'button'; b.setAttribute('aria-label', _t('Neige'));
       var before = $('.home-account', top) || $('.cart-btn', top) || $('.nav-burger', top);
       if (before) top.insertBefore(b, before); else top.appendChild(b);
       b.addEventListener('click', toggleSnow);

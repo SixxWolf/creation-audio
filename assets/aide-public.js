@@ -4,144 +4,145 @@
    ========================================================= */
 (function () {
   'use strict';
-  var GROUPS = ['Commander', 'Spacers', 'Mon compte', 'Après l\'achat', 'Dealers'];
+  var _t = window.CA.t;    // tutoriels anglais : assets/i18n-en.js (libellés = boutons de la version anglaise)
+  var GROUPS = ['Commander', _t('Spacers'), _t('Mon compte'), _t('Après l\'achat'), _t('Dealers')];
   var TUTOS = [
     /* ---- Commander ---- */
-    { id: 'commander', group: 'Commander', title: 'Commander sans compte',
-      go: { href: 'boutique.html', label: 'Magasiner' }, keys: 'messenger courriel panier liste',
+    { id: 'commander', group: _t('Commander'), title: _t('Commander sans compte'),
+      go: { href: 'boutique.html', label: _t('Magasiner') }, keys: _t('messenger courriel panier liste'),
       steps: [
         'Ouvre la **Boutique** et choisis un matériau, puis une couleur.',
-        'Choisis le format : **bobine** ou **recharge**, et la quantité.',
-        'Clique [Ajouter au panier]. Répète pour chaque article.',
-        'Ouvre le panier et clique [Copier ma liste & écrire sur Messenger] — ou [Écrire par courriel].',
-        'On te confirme la disponibilité et le moment du ramassage.',
-        'Tu paies au ramassage, à Québec.'
+        _t('Choisis le format : **bobine** ou **recharge**, et la quantité.'),
+        _t('Clique [Ajouter au panier]. Répète pour chaque article.'),
+        _t('Ouvre le panier et clique [Copier ma liste & écrire sur Messenger] — ou [Écrire par courriel].'),
+        _t('On te confirme la disponibilité et le moment du ramassage.'),
+        _t('Tu paies au ramassage, à Québec.')
       ] },
-    { id: 'commander-en-ligne', group: 'Commander', title: 'Commander en ligne avec ton compte',
-      go: { href: 'compte.html', label: 'Mon compte' }, keys: 'envoyer commande connecte',
+    { id: 'commander-en-ligne', group: _t('Commander'), title: _t('Commander en ligne avec ton compte'),
+      go: { href: 'compte.html', label: _t('Mon compte') }, keys: _t('envoyer commande connecte'),
       steps: [
         'Connecte-toi dans **Mon compte** (voir « Créer un compte »).',
-        'Ajoute tes articles au panier, comme d\'habitude.',
-        'Dans le panier, ajoute une note au besoin (moment de ramassage, question…).',
+        _t('Ajoute tes articles au panier, comme d\'habitude.'),
+        _t('Dans le panier, ajoute une note au besoin (moment de ramassage, question…).'),
         'Clique [Envoyer ma commande].',
-        'Tu reçois une confirmation par courriel. On t\'écrit quand c\'est prêt.',
-        'Suis ta commande dans **Mon compte › Commandes**.'
+        _t('Tu reçois une confirmation par courriel. On t\'écrit quand c\'est prêt.'),
+        _t('Suis ta commande dans **Mon compte › Commandes**.')
       ] },
-    { id: 'rupture', group: 'Commander', title: 'Commander un article en rupture',
-      go: { href: 'boutique.html', label: 'Boutique' }, keys: 'stock delai fournisseur commander',
+    { id: 'rupture', group: _t('Commander'), title: _t('Commander un article en rupture'),
+      go: { href: 'boutique.html', label: _t('Boutique') }, keys: _t('stock delai fournisseur commander'),
       steps: [
         'Connecte-toi dans **Mon compte**.',
-        'Sur la fiche, choisis le format en rupture et clique [Commander · 3 à 14 jours].',
-        'Envoie ta commande : une fenêtre te rappelle les articles à commander et le délai.',
+        _t('Sur la fiche, choisis le format en rupture et clique [Commander · 3 à 14 jours].'),
+        _t('Envoie ta commande : une fenêtre te rappelle les articles à commander et le délai.'),
         'Clique [Compris, envoyer].',
-        'On commande chez notre fournisseur et on t\'écrit dès l\'arrivée.'
+        _t('On commande chez notre fournisseur et on t\'écrit dès l\'arrivée.')
       ],
-      tip: 'Délai : 3 à 14 jours ouvrables pour les filaments et accessoires. Spacers : délai à confirmer.' },
-    { id: 'modifier-commande', group: 'Commander', title: 'Modifier ou annuler une commande',
-      go: { href: 'compte.html#/commandes', label: 'Mes commandes' }, keys: 'changer annulation',
+      tip: _t('Délai : 3 à 14 jours ouvrables pour les filaments et accessoires. Spacers : délai à confirmer.') },
+    { id: 'modifier-commande', group: _t('Commander'), title: _t('Modifier ou annuler une commande'),
+      go: { href: 'compte.html#/commandes', label: _t('Mes commandes') }, keys: _t('changer annulation'),
       steps: [
         'Ouvre **Mon compte › Commandes**.',
-        'Sur ta commande, clique [Modifier] : ton panier se remplit avec ses articles.',
-        'Ajuste le panier, puis clique [Enregistrer les modifications].',
-        'Pour tout annuler : [Annuler la commande].'
+        _t('Sur ta commande, clique [Modifier] : ton panier se remplit avec ses articles.'),
+        _t('Ajuste le panier, puis clique [Enregistrer les modifications].'),
+        _t('Pour tout annuler : [Annuler la commande].')
       ],
-      tip: 'Possible tant que la commande est « Nouvelle ». Ensuite, écris-nous.' },
-    { id: 'reserver', group: 'Commander', title: 'Réserver 72 h',
-      go: { href: 'boutique.html', label: 'Boutique' }, keys: 'reservation garder',
+      tip: _t('Possible tant que la commande est « Nouvelle ». Ensuite, écris-nous.') },
+    { id: 'reserver', group: _t('Commander'), title: _t('Réserver 72 h'),
+      go: { href: 'boutique.html', label: _t('Boutique') }, keys: _t('reservation garder'),
       steps: [
         'Connecte-toi dans **Mon compte** (réservé aux clients approuvés).',
-        'Ajoute des articles **en stock** au panier.',
-        'Clique [Réserver 72 h], puis [Réserver].',
-        'Les articles sont gardés pour toi 72 h. Tu reçois un rappel par courriel.',
-        'Passe les chercher avant l\'échéance — ou [Annuler la réservation] dans **Mon compte › Commandes**.'
+        _t('Ajoute des articles **en stock** au panier.'),
+        _t('Clique [Réserver 72 h], puis [Réserver].'),
+        _t('Les articles sont gardés pour toi 72 h. Tu reçois un rappel par courriel.'),
+        _t('Passe les chercher avant l\'échéance — ou [Annuler la réservation] dans **Mon compte › Commandes**.')
       ],
-      tip: 'Deux réservations non récupérées suspendent les réservations 60 jours.' },
-    { id: 'aviser', group: 'Commander', title: 'Être avisé du retour en stock',
-      go: { href: 'boutique.html', label: 'Boutique' }, keys: 'alerte attente rupture m aviser',
+      tip: _t('Deux réservations non récupérées suspendent les réservations 60 jours.') },
+    { id: 'aviser', group: _t('Commander'), title: _t('Être avisé du retour en stock'),
+      go: { href: 'boutique.html', label: _t('Boutique') }, keys: _t('alerte attente rupture m aviser'),
       steps: [
         'Sur la fiche d\'une couleur, choisis le format en rupture.',
-        'Entre ton courriel et clique [M\'aviser].',
-        'Tu reçois un courriel dès que ça rentre.',
-        'Connecté ? Tes alertes sont dans **Mon compte › Alertes**.'
+        _t('Entre ton courriel et clique [M\'aviser].'),
+        _t('Tu reçois un courriel dès que ça rentre.'),
+        _t('Connecté ? Tes alertes sont dans **Mon compte › Alertes**.')
       ] },
 
     /* ---- Spacers ---- */
-    { id: 'trouver-spacer', group: 'Spacers', title: 'Trouver le spacer de ton véhicule',
-      go: { href: 'spacers.html', label: 'Spacers' }, keys: 'adaptateur haut-parleur vehicule annee',
+    { id: 'trouver-spacer', group: _t('Spacers'), title: _t('Trouver le spacer de ton véhicule'),
+      go: { href: 'spacers.html', label: _t('Spacers') }, keys: _t('adaptateur haut-parleur vehicule annee'),
       steps: [
         'Ouvre **Spacers**.',
-        'Tape ton véhicule et l\'année dans la recherche (ex. « civic 2008 ») — ou un code de pièce.',
-        'Filtre par taille de haut-parleur au besoin.',
-        'Ouvre la fiche : vérifie **Compatibilité** (véhicule, années, emplacement).',
-        'Regarde **Haut-parleurs** : « Confirmé » = ajustement parfait, « Compatible* » = fonctionne avec un ajustement imparfait.',
-        'Ajoute au panier et commande comme un filament.'
+        _t('Tape ton véhicule et l\'année dans la recherche (ex. « civic 2008 ») — ou un code de pièce.'),
+        _t('Filtre par taille de haut-parleur au besoin.'),
+        _t('Ouvre la fiche : vérifie **Compatibilité** (véhicule, années, emplacement).'),
+        _t('Regarde **Haut-parleurs** : « Confirmé » = ajustement parfait, « Compatible* » = fonctionne avec un ajustement imparfait.'),
+        _t('Ajoute au panier et commande comme un filament.')
       ],
-      tip: 'Ton véhicule n\'est pas listé ? Écris-nous avec la marque, le modèle et l\'année.' },
+      tip: _t('Ton véhicule n\'est pas listé ? Écris-nous avec la marque, le modèle et l\'année.') },
 
     /* ---- Mon compte ---- */
-    { id: 'compte', group: 'Mon compte', title: 'Créer un compte ou te connecter',
-      go: { href: 'compte.html', label: 'Mon compte' }, keys: 'connexion code inscription',
+    { id: 'compte', group: _t('Mon compte'), title: _t('Créer un compte ou te connecter'),
+      go: { href: 'compte.html', label: _t('Mon compte') }, keys: _t('connexion code inscription'),
       steps: [
         'Ouvre **Mon compte** (icône en haut à droite).',
-        'Entre ton courriel et clique [Recevoir mon code].',
-        'Copie le code à 6 chiffres reçu par courriel (valide 10 minutes).',
+        _t('Entre ton courriel et clique [Recevoir mon code].'),
+        _t('Copie le code à 6 chiffres reçu par courriel (valide 10 minutes).'),
         'Clique [Me connecter].',
-        'Première fois : entre ton nom, puis [Continuer].'
+        _t('Première fois : entre ton nom, puis [Continuer].')
       ],
-      tip: 'Aucun mot de passe. Code pas reçu ? Vérifie les indésirables ou clique [Renvoyer le code].' },
-    { id: 'factures', group: 'Mon compte', title: 'Retrouver tes factures',
-      go: { href: 'compte.html#/commandes', label: 'Mes commandes' }, keys: 'historique achats facture',
+      tip: _t('Aucun mot de passe. Code pas reçu ? Vérifie les indésirables ou clique [Renvoyer le code].') },
+    { id: 'factures', group: _t('Mon compte'), title: _t('Retrouver tes factures'),
+      go: { href: 'compte.html#/commandes', label: _t('Mes commandes') }, keys: _t('historique achats facture'),
       steps: [
         'Connecte-toi dans **Mon compte**.',
-        'Ouvre **Commandes** : tes factures et commandes y sont listées.',
-        'Des achats d\'avant ton compte manquent ? Écris-nous : on relie ton historique.'
+        _t('Ouvre **Commandes** : tes factures et commandes y sont listées.'),
+        _t('Des achats d\'avant ton compte manquent ? Écris-nous : on relie ton historique.')
       ] },
-    { id: 'messagerie', group: 'Mon compte', title: 'Nous écrire',
-      go: { href: 'compte.html#/messages', label: 'Messagerie' }, keys: 'message question contact photo',
+    { id: 'messagerie', group: _t('Mon compte'), title: _t('Nous écrire'),
+      go: { href: 'compte.html#/messages', label: _t('Messagerie') }, keys: _t('message question contact photo'),
       steps: [
         'Clique un lien **Écris-nous** sur le site, ou ouvre **Mon compte › Messages**.',
-        'Connecte-toi si ce n\'est pas fait.',
-        'Écris ton message. Joins des photos au besoin.',
-        'Envoie. Tu reçois un courriel quand on répond.'
+        _t('Connecte-toi si ce n\'est pas fait.'),
+        _t('Écris ton message. Joins des photos au besoin.'),
+        _t('Envoie. Tu reçois un courriel quand on répond.')
       ],
-      tip: 'Aussi possible par Messenger ou à contact@creationaudio.ca.' },
-    { id: 'profil', group: 'Mon compte', title: 'Modifier ton profil ou supprimer ton compte',
-      go: { href: 'compte.html#/infos', label: 'Profil' }, keys: 'nom telephone suppression',
+      tip: _t('Aussi possible par Messenger ou à contact@creationaudio.ca.') },
+    { id: 'profil', group: _t('Mon compte'), title: _t('Modifier ton profil ou supprimer ton compte'),
+      go: { href: 'compte.html#/infos', label: _t('Profil') }, keys: _t('nom telephone suppression'),
       steps: [
         'Ouvre **Mon compte › Profil**.',
-        'Modifie ton nom ou ton téléphone, puis enregistre.',
-        'Pour supprimer ton compte : [Supprimer mon compte], puis confirme.'
+        _t('Modifie ton nom ou ton téléphone, puis enregistre.'),
+        _t('Pour supprimer ton compte : [Supprimer mon compte], puis confirme.')
       ],
-      tip: 'Les factures sont gardées 6 ans, comme l\'exige la loi.' },
+      tip: _t('Les factures sont gardées 6 ans, comme l\'exige la loi.') },
 
     /* ---- Après l'achat ---- */
-    { id: 'ramassage', group: 'Après l\'achat', title: 'Ramasser ta commande',
-      go: { href: './#contact', label: 'Nous joindre' }, keys: 'cueillette paiement quebec',
+    { id: 'ramassage', group: _t('Après l\'achat'), title: _t('Ramasser ta commande'),
+      go: { href: './#contact', label: _t('Nous joindre') }, keys: _t('cueillette paiement quebec'),
       steps: [
         'Attends notre message : on confirme que c\'est prêt et le moment.',
-        'Passe à Québec, secteur des Saules.',
-        'Tu paies sur place. Garde ton numéro de facture.'
+        _t('Passe à Québec, secteur des Saules.'),
+        _t('Tu paies sur place. Garde ton numéro de facture.')
       ] },
-    { id: 'retour', group: 'Après l\'achat', title: 'Retourner ou échanger un article',
-      go: { href: 'retours.html', label: 'Politique de retour' }, keys: 'remboursement echange defaut',
+    { id: 'retour', group: _t('Après l\'achat'), title: _t('Retourner ou échanger un article'),
+      go: { href: 'retours.html', label: _t('Politique de retour') }, keys: _t('remboursement echange defaut'),
       steps: [
         'Vérifie la politique : spacers retournables 14 jours, filaments vendus fermes.',
-        'Écris-nous avec ton **numéro de facture**, le produit et la raison.',
-        'Défaut ? Joins des photos.',
-        'On organise l\'échange, le remplacement ou le remboursement.'
+        _t('Écris-nous avec ton **numéro de facture**, le produit et la raison.'),
+        _t('Défaut ? Joins des photos.'),
+        _t('On organise l\'échange, le remplacement ou le remboursement.')
       ] },
 
     /* ---- Dealers ---- */
-    { id: 'dealer', group: 'Dealers', title: 'Commander comme dealer',
-      go: { href: 'dealer.html', label: 'Portail dealer' }, keys: 'revendeur gros prix',
+    { id: 'dealer', group: _t('Dealers'), title: _t('Commander comme dealer'),
+      go: { href: 'dealer.html', label: _t('Portail dealer') }, keys: _t('revendeur gros prix'),
       steps: [
         'Ouvre le **Portail dealer** et connecte-toi (courriel, mot de passe, puis code).',
-        'Cherche par véhicule ou par code, puis ajoute les quantités.',
-        'Ouvre [Ma commande], ajoute une note au besoin.',
+        _t('Cherche par véhicule ou par code, puis ajoute les quantités.'),
+        _t('Ouvre [Ma commande], ajoute une note au besoin.'),
         'Clique [Envoyer ma commande].',
-        'Suis-la dans **Mes commandes** : modifiable ou annulable tant qu\'elle est « Nouvelle ».'
+        _t('Suis-la dans **Mes commandes** : modifiable ou annulable tant qu\'elle est « Nouvelle ».')
       ],
-      tip: 'Pas encore dealer ? Écris-nous pour ouvrir un compte.' }
+      tip: _t('Pas encore dealer ? Écris-nous pour ouvrir un compte.') }
   ];
 
   var root = document.getElementById('aide');

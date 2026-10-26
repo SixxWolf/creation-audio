@@ -13,6 +13,10 @@
        + window.CA_SPACER_PAGES + liste JSON-LD, entre les
        repères <!-- spacers:head --> et <!-- spacers:list -->.
      - sitemap.xml : une URL par page (repère spacers:urls).
+     - en/spacer/<slug>.html + en/spacers.html : les mêmes en
+       anglais (gabarit traduit par build-en.js, catalogue rendu
+       avec i18n.js + i18n-en.js, textes de la base : p.en) ;
+       hreflang fr-CA / en-CA d'une fiche vers sa jumelle.
    Pages des spacers retirés/masqués : supprimées (la 404
    renvoie vers le catalogue). N'écrit que ce qui a changé.
    Lancé par .github/workflows/spacer-pages.yml (aux 6 h et à
@@ -24,6 +28,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const EN = require('./build-en.js');   // translatePage : gabarit anglais (textes, liens, lang="en")
 
 const ROOT = path.resolve(__dirname, '..');
 const SITE = 'https://creationaudio.ca/';
@@ -56,10 +61,12 @@ async function fetchSpacers(c) {
 }
 
 /* ---------- rendu : on exécute spacer-catalog.js tel quel ---------- */
-function loadCatalog() {
+function loadCatalog(lang) {
   // CA.loadMsg présent comme sur le site (nav.js) : les « Écris-nous » pré-rendus ouvrent la Messagerie
-  const ctx = { window: { CA: { loadMsg: function () {} } }, console };
+  const ctx = { window: { CA: { loadMsg: function () {} }, CA_LANG: lang }, console };
   vm.createContext(ctx);
+  // anglais : CA.t / CA.money / CA.tr comme sur les pages /en/ (le français garde les replis du catalogue)
+  if (lang === 'en') ['assets/i18n.js', 'assets/i18n-en.js'].forEach((f) => vm.runInContext(read(f), ctx, { filename: f }));
   vm.runInContext(read('assets/spacer-catalog.js'), ctx, { filename: 'assets/spacer-catalog.js' });
   if (!ctx.window.CASpacers) throw new Error('spacer-catalog.js : window.CASpacers absent');
   return ctx.window.CASpacers;
@@ -121,6 +128,31 @@ function seoTexts(CAS, p) {
   if (desc.length > 300) desc = desc.slice(0, 297).replace(/\s+\S*$/, '') + '…';
   return { title, desc, size, makes, refs };
 }
+// textes traduits en coulisse (fonction Supabase « translate ») : p.en ou attrs.en
+const enOf = (p) => p.en || (p.attrs && p.attrs.en) || {};
+function seoTextsEn(CAS, p) {
+  const size = CAS.sizeOf(p), makes = makesOf(CAS, p), refs = CAS.replacesOf(p).map(CAS.refLabel);
+  const makeNames = makes.slice(0, 3).map((m) => m.make);
+  const spkAll = CAS.speakersOf(p), spk = spkAll.map((x) => x.model);
+  const spkOk = spkAll.filter((x) => x.fit === 'ok').map((x) => x.model);
+  const spkPartial = spkAll.filter((x) => x.fit === 'partial').map((x) => x.model);
+  const universal = !makeNames.length && !spk.length && /universel/i.test(String((p.attrs && p.attrs.long_desc) || ''));
+  const head = 'Speaker spacer' + (size ? ' ' + size : '') +
+    (makeNames.length ? ' ' + makeNames.join(' / ') : (spk.length ? ' for ' + spk.slice(0, 2).join(' / ') : (universal ? ', universal' : '')));
+  const codeIsRef = CAS.replacesOf(p).some((x) => flat(x.ref) === flat(p.name));
+  const title = head + (refs.length ? ' – replaces ' + refs.join(', ') : '') + (codeIsRef ? '' : ' | ' + p.name) + ' · Création Audio';
+  const vehicles = makes.slice(0, 3).map((m) => m.make + (m.models.length ? ' (' + m.models.slice(0, 3).join(', ') + (m.models.length > 3 ? '…' : '') + ')' : ''));
+  const summary = String(enOf(p).description || '').replace(/\s+/g, ' ').trim();
+  let desc = '3D-printed' + (size ? ' ' + size : '') + ' speaker spacer' +
+    (vehicles.length ? ' for ' + vehicles.join(', ')
+      : spk.length ? [spkOk.length ? ', tested and confirmed with ' + spkOk.join(', ') : '',
+          spkPartial.length ? (spkOk.length ? '; ' : ', ') + 'compatible with ' + spkPartial.join(', ') + ' (imperfect fit)' : ''].join('')
+      : (summary ? ' — ' + summary : '')) + '.' +
+    (refs.length ? ' Replaces part ' + refs.join(', ') + '.' : ' Designed by Création Audio.') +
+    ' Sold in pairs, pickup in Québec City or shipping across Canada on request.';
+  if (desc.length > 300) desc = desc.slice(0, 297).replace(/\s+\S*$/, '') + '…';
+  return { title, desc, size, makes, refs };
+}
 
 /* ---------- gabarit ---------- */
 function block(html, name, inner) {
@@ -142,16 +174,30 @@ function relink(html) {
   });
 }
 
-function pageHtml(tpl, CAS, c, sc, p, slug, pagesList) {
-  const t = seoTexts(CAS, p), url = SITE + DIR + '/' + slug + '.html';
+// hreflang : chaque page pointe vers sa jumelle (le gabarit pointe vers spacers.html)
+function setAlternates(html, frUrl, enUrl) {
+  return html.replace(/(<link rel="alternate" hreflang="(fr-CA|en-CA|x-default)" href=")[^"]*(")/g,
+    (m, a, l, b) => a + esc(l === 'en-CA' ? enUrl : frUrl) + b);
+}
+// gabarit anglais : les textes générés (fiche, liste, description) sont vidés AVANT la traduction
+// (ils seront remplacés par leur version anglaise), sinon ils finiraient dans tools/i18n/missing.json
+function blankMeta(html, names) {
+  return html.replace(new RegExp('(<meta (?:name|property)="(?:' + names.join('|') + ')" content=")[^"]*(")', 'g'), '$1$2');
+}
+
+function pageHtml(tpl, CAS, c, sc, p, slug, pagesList, en) {
+  const t = en ? seoTextsEn(CAS, p) : seoTexts(CAS, p);
+  const frUrl = SITE + DIR + '/' + slug + '.html', enUrl = SITE + 'en/' + DIR + '/' + slug + '.html';
+  const url = en ? enUrl : frUrl, home = en ? SITE + 'en/' : SITE;
   const imgs = [p.image_path].concat(p.attrs && Array.isArray(p.attrs.gallery) ? p.attrs.gallery : [])
     .filter((x) => typeof x === 'string' && x).map((x) => fakeSb(c).storage.from('products').getPublicUrl(x).data.publicUrl);
   const price = +p.sell_price;
+  const longDesc = en ? enOf(p).long_desc : (p.attrs && p.attrs.long_desc);
   const product = {
     '@type': 'Product', name: t.title.replace(/ · Création Audio$/, ''), sku: p.name, mpn: p.name,
     brand: { '@type': 'Brand', name: 'Création Audio' },
-    category: 'Adaptateur de haut-parleur', url,
-    description: String((p.attrs && p.attrs.long_desc) || '').replace(/\s+/g, ' ').trim() || t.desc
+    category: en ? 'Speaker adapter' : 'Adaptateur de haut-parleur', url,
+    description: String(longDesc || '').replace(/\s+/g, ' ').trim() || t.desc
   };
   if (imgs.length) product.image = imgs;
   if (price > 0) {
@@ -164,16 +210,25 @@ function pageHtml(tpl, CAS, c, sc, p, slug, pagesList) {
   }
   const crumbs = {
     '@type': 'BreadcrumbList', itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Accueil', item: SITE },
-      { '@type': 'ListItem', position: 2, name: 'Spacers', item: SITE + 'spacers.html' },
+      { '@type': 'ListItem', position: 1, name: en ? 'Home' : 'Accueil', item: home },
+      { '@type': 'ListItem', position: 2, name: 'Spacers', item: home + 'spacers.html' },
       { '@type': 'ListItem', position: 3, name: p.name, item: url }
     ]
   };
 
   let h = relink(tpl);
+  if (en) {
+    h = blankMeta(h, ['description', 'og:title', 'og:description', 'twitter:title', 'twitter:description'])
+      .replace(/<title>[\s\S]*?<\/title>/, '<title></title>')
+      .replace(/<main class="shop" id="main">[\s\S]*?<\/main>/, '<main class="shop" id="main"></main>');
+    h = EN.translatePage(h, DIR + '/' + slug + '.html');
+  } else {
+    h = h.replace(/href="\.\.\/en\/spacers\.html"/g, 'href="../en/' + DIR + '/' + slug + '.html"');   // lien EN : la même fiche
+  }
   h = h.replace(/<title>[\s\S]*?<\/title>/, '<title>' + esc(t.title) + '</title>');
   h = setAttrOf(h, 'name="description"', 'content', t.desc);
   h = setAttrOf(h, 'rel="canonical"', 'href', url);
+  h = setAlternates(h, frUrl, enUrl);
   h = setAttrOf(h, 'property="og:type"', 'content', 'product');
   h = setAttrOf(h, 'property="og:url"', 'content', url);
   h = setAttrOf(h, 'property="og:title"', 'content', t.title);
@@ -193,16 +248,17 @@ function pageHtml(tpl, CAS, c, sc, p, slug, pagesList) {
   return h;
 }
 
-function catalogHead(CAS, items, slugOf, pagesList) {
+function catalogHead(CAS, items, slugOf, pagesList, en) {
   const list = {
-    '@context': 'https://schema.org', '@type': 'ItemList', name: 'Spacers et adaptateurs de haut-parleurs — Création Audio',
+    '@context': 'https://schema.org', '@type': 'ItemList',
+    name: en ? 'Speaker spacers and adapters — Création Audio' : 'Spacers et adaptateurs de haut-parleurs — Création Audio',
     itemListElement: items.filter((p) => pagesList.indexOf(slugOf(p)) !== -1).map((p, i) => ({
-      '@type': 'ListItem', position: i + 1, url: SITE + DIR + '/' + slugOf(p) + '.html', name: p.name
+      '@type': 'ListItem', position: i + 1, url: SITE + (en ? 'en/' : '') + DIR + '/' + slugOf(p) + '.html', name: p.name
     }))
   };
   return '<script>window.CA_SPACER_PAGES=' + JSON.stringify(pagesList) + ';</script>\n' + jsonLd(list);
 }
-function catalogDesc(CAS, items) {
+function catalogDesc(CAS, items, en) {
   const count = new Map(), brands = new Set();
   items.forEach((p) => {
     makesOf(CAS, p).forEach((m) => count.set(m.make, (count.get(m.make) || 0) + 1));
@@ -210,21 +266,24 @@ function catalogDesc(CAS, items) {
   });
   const makes = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'fr')).slice(0, 6).map((x) => x[0]);
   const b = [...brands].sort((x, y) => x.localeCompare(y, 'fr'));
-  const bTxt = b.length > 1 ? b.slice(0, -1).join(', ') + ' et ' + b[b.length - 1] : b[0];
+  const and = en ? ' and ' : ' et ';
+  const bTxt = b.length > 1 ? b.slice(0, -1).join(', ') + and + b[b.length - 1] : b[0];
+  if (en) return '3D-printed speaker spacers and adapters' + (makes.length ? ' for ' + makes.join(', ') + ' and more' : '') +
+    (bTxt ? ', replacing ' + bTxt + ' parts' : '') + '. Sold in pairs, made in Québec, shipping across Canada on request.';
   return 'Spacers et adaptateurs de haut-parleurs imprimés 3D' + (makes.length ? ' pour ' + makes.join(', ') + ' et plus' : '') +
     (bTxt ? ', en remplacement des pièces ' + bTxt : '') + '. Vendus par paire, ramassage à Québec.';
 }
 
 /* ---------- sitemap ---------- */
-function sitemapUrls(old, pages, changed, today) {
+// locs : [{ loc, changed }] (une URL française + son anglaise par spacer)
+function sitemapUrls(old, locs, today) {
   const prev = {};
   const re = /<loc>([^<]+)<\/loc>\s*<lastmod>([^<]+)<\/lastmod>/g;
   let m;
   while ((m = re.exec(old))) prev[m[1]] = m[2];
-  return pages.map((s) => {
-    const loc = SITE + DIR + '/' + s + '.html';
-    const lastmod = changed.has(s) || !prev[loc] ? today : prev[loc];
-    return '  <url>\n    <loc>' + loc + '</loc>\n    <lastmod>' + lastmod + '</lastmod>\n' +
+  return locs.map((x) => {
+    const lastmod = x.changed || !prev[x.loc] ? today : prev[x.loc];
+    return '  <url>\n    <loc>' + x.loc + '</loc>\n    <lastmod>' + lastmod + '</lastmod>\n' +
       '    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>';
   }).join('\n');
 }
@@ -239,58 +298,78 @@ function writeIfChanged(rel, html) {
   written.push(rel);
   return true;
 }
+const htmlIn = (d) => (fs.existsSync(file(d)) ? fs.readdirSync(file(d)).filter((f) => /\.html$/.test(f)) : []);
+
+// une langue : spacer/*.html + spacers.html (fr) ou en/spacer/*.html + en/spacers.html (en)
+function buildLang(lang, c, items, tpl, slugOf, pagesList, pages) {
+  const en = lang === 'en', pre = en ? 'en/' : '';
+  const CAS = loadCatalog(lang);
+  const onPage = renderer(CAS, c, items, pages, true);
+  const changed = new Set();
+  items.forEach((p) => {
+    const s = slugOf(p);
+    if (!pages.has(s)) { if (!en) console.warn('  ! slug non publiable « ' + s + ' » (' + p.name + ') : fiche laissée sur spacers.html#/s/'); return; }
+    if (writeIfChanged(pre + DIR + '/' + s + '.html', pageHtml(tpl, CAS, c, onPage, p, s, pagesList, en))) changed.add(s);
+  });
+  htmlIn(pre + DIR).forEach((f) => {
+    const s = f.replace(/\.html$/, '');
+    if (pages.has(s)) return;
+    const rel = pre + DIR + '/' + f;
+    if (read(rel).indexOf('data-spacer="') === -1) return;   // pas une page générée : on n'y touche pas
+    fs.unlinkSync(file(rel)); removed.push(rel);
+  });
+
+  // catalogue pré-rendu + liste des pages publiées
+  const onCatalog = renderer(CAS, c, items, pages, false);
+  let cat = tpl;
+  if (en) {
+    cat = blankMeta(block(block(cat, 'spacers:head', ''), 'spacers:list', ''), ['description', 'og:description']);
+    cat = EN.translatePage(cat, 'spacers.html');
+  }
+  cat = block(cat, 'spacers:head', catalogHead(CAS, items, slugOf, pagesList, en));
+  cat = block(cat, 'spacers:list', onCatalog.staticCatalog());
+  if (items.length) {
+    const d = catalogDesc(CAS, items, en);
+    cat = setAttrOf(cat, 'name="description"', 'content', d);
+    cat = setAttrOf(cat, 'property="og:description"', 'content', d);
+  }
+  writeIfChanged(pre + 'spacers.html', cat);
+  return changed;
+}
 
 async function main() {
   const allowEmpty = process.argv.indexOf('--allow-empty') !== -1;
   const c = supaConfig();
   const items = await fetchSpacers(c);
-  const dir = file(DIR);
-  const existing = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /\.html$/.test(f)) : [];
+  const existing = htmlIn(DIR);
   // garde-fou : une base injoignable ou une vue vide ne doit jamais effacer toutes les pages
   if (!items.length && existing.length && !allowEmpty) throw new Error('0 spacer reçu alors que ' + existing.length + ' pages existent — arrêt (--allow-empty pour forcer)');
 
-  const CAS = loadCatalog();
-  const probe = renderer(CAS, c, items, new Set(), false);
+  const probe = renderer(loadCatalog('fr'), c, items, new Set(), false);
   const slugOf = (p) => probe.slugOf(p);
   const pagesList = items.map(slugOf).filter((s) => SLUG_OK.test(s));
   const pages = new Set(pagesList);
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1) une page par spacer
+  // 1) français, puis 2) anglais (même gabarit spacers.html, traduit par build-en.js)
   const tpl = read('spacers.html');
-  const onPage = renderer(CAS, c, items, pages, true);
-  const changed = new Set();
-  items.forEach((p) => {
-    const s = slugOf(p);
-    if (!pages.has(s)) { console.warn('  ! slug non publiable « ' + s + ' » (' + p.name + ') : fiche laissée sur spacers.html#/s/'); return; }
-    if (writeIfChanged(DIR + '/' + s + '.html', pageHtml(tpl, CAS, c, onPage, p, s, pagesList))) changed.add(s);
-  });
-  existing.forEach((f) => {
-    const s = f.replace(/\.html$/, '');
-    if (pages.has(s)) return;
-    const rel = DIR + '/' + f;
-    if (read(rel).indexOf('data-spacer="') === -1) return;   // pas une page générée : on n'y touche pas
-    fs.unlinkSync(file(rel)); removed.push(rel);
-  });
-
-  // 2) catalogue pré-rendu + liste des pages publiées
-  const onCatalog = renderer(CAS, c, items, pages, false);
-  let cat = block(tpl, 'spacers:head', catalogHead(CAS, items, slugOf, pagesList));
-  cat = block(cat, 'spacers:list', onCatalog.staticCatalog());
-  if (items.length) {
-    const d = catalogDesc(CAS, items);
-    cat = setAttrOf(cat, 'name="description"', 'content', d);
-    cat = setAttrOf(cat, 'property="og:description"', 'content', d);
-  }
-  writeIfChanged('spacers.html', cat);
+  const changedFr = buildLang('fr', c, items, tpl, slugOf, pagesList, pages);
+  const changedEn = buildLang('en', c, items, tpl, slugOf, pagesList, pages);
+  const miss = EN.reportMissing('spacers');
 
   // 3) sitemap
   const sm = read('sitemap.xml');
-  writeIfChanged('sitemap.xml', block(sm, 'spacers:urls', sitemapUrls(sm, pagesList, changed, today)));
+  const locs = [];
+  pagesList.forEach((s) => {
+    locs.push({ loc: SITE + DIR + '/' + s + '.html', changed: changedFr.has(s) });
+    locs.push({ loc: SITE + 'en/' + DIR + '/' + s + '.html', changed: changedEn.has(s) });
+  });
+  writeIfChanged('sitemap.xml', block(sm, 'spacers:urls', sitemapUrls(sm, locs, today)));
 
-  console.log(items.length + ' spacers · ' + pagesList.length + ' pages · ' +
-    (written.length ? 'écrit : ' + written.join(', ') : 'rien de changé') +
-    (removed.length ? ' · supprimé : ' + removed.join(', ') : ''));
+  console.log(items.length + ' spacers · ' + pagesList.length + ' pages (fr + en) · ' +
+    (written.length ? 'écrit : ' + written.length + ' fichier(s)' : 'rien de changé') +
+    (removed.length ? ' · supprimé : ' + removed.join(', ') : '') +
+    (miss ? ' · ' + miss + ' texte(s) sans traduction → tools/i18n/missing.json' : ''));
 }
 
 main().catch((e) => { console.error('Échec : ' + (e && e.message ? e.message : e)); process.exit(1); });

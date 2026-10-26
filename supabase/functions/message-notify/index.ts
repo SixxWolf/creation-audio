@@ -6,6 +6,7 @@
 //    Création Audio qui regroupe toute la série (photos en liens signés 7 jours).
 //  - série de réponses de l'ADMIN non lue par le client depuis 5 min -> UN avis
 //    au client (conversation lancée par l'admin : « Message de Création Audio »).
+//    Langue de l'avis au client : customers.lang ('en' = version anglaise du site).
 // Quelqu'un dans le fil lit en direct (relecture aux 10 s) -> rien n'est dû.
 // Lire ou répondre remet *_unread_since / *_notified_at à null (déclencheur
 // SQL) : le prochain message réarme l'avis. Chaque avis est réclamé en base
@@ -23,6 +24,7 @@ const REPLY_TO = "contact@creationaudio.ca";
 const DELAY_MS = 5 * 60 * 1000;          // non lu depuis 5 min -> courriel
 const MAX_AGE_MS = 2 * 86400 * 1000;     // série plus vieille : jamais avisée (ménage)
 const TOPIC: Record<string, string> = { filaments: "Filaments", spacers: "Spacers", compte: "Mon compte", autre: "Autre" };
+const TOPIC_EN: Record<string, string> = { filaments: "Filaments", spacers: "Spacers", compte: "My account", autre: "Other" };
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -38,8 +40,9 @@ function esc(s: unknown) {
 }
 const nl2br = (s: string) => esc(s).replace(/\r?\n/g, "<br>");
 const nPhotos = (n: number) => n + " photo" + (n > 1 ? "s" : "");
+let HOUR_LOC = "fr-CA";   // en-CA le temps d'un avis à un client de la version anglaise
 const hour = (iso: string) =>
-  new Date(iso).toLocaleTimeString("fr-CA", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit" });
+  new Date(iso).toLocaleTimeString(HOUR_LOC, { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit" });
 
 type Mailer = { key: string; from: string; adminTo: string };
 type Conv = { id: string; customer_id: string; topic: string; ref: string | null; page: string | null;
@@ -120,10 +123,11 @@ async function mailAdmin(db: SupabaseClient, m: Mailer, conv: Conv) {
 
 // ---- série de l'admin -> avis au client ----
 async function mailClient(db: SupabaseClient, m: Mailer, conv: Conv) {
-  const { data: cust } = await db.from("customers").select("email, name").eq("id", conv.customer_id).maybeSingle();
+  const { data: cust } = await db.from("customers").select("email, name, lang").eq("id", conv.customer_id).maybeSingle();
   if (!cust) return;
   const list = await series(db, conv.id, "admin", conv.client_unread_since!);
   if (!list.length) return;
+  if (cust.lang === "en") return await mailClientEn(db, m, conv, cust, list);
   const about = (TOPIC[conv.topic] || "Question") + (conv.ref ? " · " + conv.ref : "");
   const photos = photosOf(list);
   const threadUrl = SITE + "/compte.html#/messages/" + conv.id;
@@ -166,6 +170,46 @@ async function mailClient(db: SupabaseClient, m: Mailer, conv: Conv) {
     '<p style="font-size:12px;color:#6C727C">Réponds dans la messagerie pour garder tout le fil au même endroit. ' +
     '<a href="' + SITE + '" style="color:#6C727C">creationaudio.ca</a></p>');
   await send(m, { to: [cust.email], reply_to: REPLY_TO, subject: "Création Audio t'a répondu — " + about, html, text });
+}
+
+// ---- version anglaise (client de /en/, customers.lang) ----
+async function mailClientEn(db: SupabaseClient, m: Mailer, conv: Conv, cust: { email: string; name: string | null }, list: Msg[]) {
+  HOUR_LOC = "en-CA";
+  try {
+    const about = (TOPIC_EN[conv.topic] || "Question") + (conv.ref ? " · " + conv.ref : "");
+    const photos = photosOf(list);
+    const nPh = (n: number) => n + " photo" + (n > 1 ? "s" : "");
+    const threadUrl = SITE + "/en/compte.html#/messages/" + conv.id;
+    const photoNote = photos.length
+      ? '<p style="margin:8px 0 0;color:#6C727C;font-size:13px">' + nPh(photos.length) + " in the conversation.</p>" : "";
+    const foot = '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
+      '<p style="font-size:12px;color:#6C727C">Reply in the messages to keep the whole thread in one place. ' +
+      '<a href="' + SITE + '/en/" style="color:#6C727C">creationaudio.ca</a></p>';
+    const { count: fromClient } = await db.from("messages").select("id", { count: "exact", head: true })
+      .eq("conversation_id", conv.id).eq("sender", "client");
+    if (!fromClient) {
+      const text = asText(list) + "\n" + (photos.length ? "\n" + nPh(photos.length) + " in the conversation.\n" : "") +
+        "\nSee and reply: " + threadUrl + "\n\n" + SITE + "/en/";
+      const html = box(eyebrow("Création Audio") +
+        '<h1 style="font-size:22px;margin:0 0 14px">' + (list.length > 1 ? list.length + " new messages" : "New message") + "</h1>" +
+        quotes(list) + photoNote + button(threadUrl, "See and reply") + foot);
+      await send(m, { to: [cust.email], reply_to: REPLY_TO, subject: "Message from Création Audio", html, text });
+      return;
+    }
+    const first = String(cust.name || "").trim().split(/\s+/)[0] || "";
+    const text =
+      "Hello" + (first ? " " + first : "") + ",\n\n" +
+      "We replied to your question (" + about + "):\n\n" +
+      asText(list) + "\n" +
+      (photos.length ? "\n" + nPh(photos.length) + " in the conversation.\n" : "") +
+      "\nSee and reply: " + threadUrl + "\n\nCréation Audio\n" + SITE + "/en/";
+    const html = box(eyebrow("Création Audio") +
+      '<h1 style="font-size:22px;margin:0 0 10px">We replied</h1>' +
+      '<p style="margin:0 0 14px">Hello' + (first ? " " + esc(first) : "") + ", here is our reply to your question <strong>" +
+        esc(about) + "</strong>:</p>" +
+      quotes(list) + photoNote + button(threadUrl, "See and reply") + foot);
+    await send(m, { to: [cust.email], reply_to: REPLY_TO, subject: "Création Audio replied — " + about, html, text });
+  } finally { HOUR_LOC = "fr-CA"; }
 }
 
 // ---- tick : séries dues, chacune réclamée en base avant l'envoi ----

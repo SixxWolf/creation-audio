@@ -15,14 +15,16 @@ window.CA = window.CA || {};
 
   var cfg = window.CA_SUPABASE || {};
   function sb() { return window.CA.sb; }   // lu à l'appel (le mode démo remplace le client)
-  function plural(n, one, many) { return n + ' ' + (n > 1 ? many : one); }
+  // partagé avec l'admin (sans i18n.js : français)
+  var _t = (window.CA && window.CA.t) || function (s) { return s; }, EN = !!(window.CA && window.CA.lang === 'en');
+  function plural(n, one, many) { return n + ' ' + _t((EN ? n !== 1 : n > 1) ? many : one); }
 
   // Repli si le portier est injoignable (non déployé, panne) : connexion directe.
   // Sans risque : un compte déjà converti a un mot de passe dérivé que seul le portier connaît.
   function direct(email, pass) {
     return sb().auth.signInWithPassword({ email: email, password: pass }).then(function (res) {
       if (!res.error) return { ok: true };
-      return { ok: false, message: res.error.status === 400 ? 'Courriel ou mot de passe incorrect.' : 'Connexion impossible. Réessaie.' };
+      return { ok: false, message: res.error.status === 400 ? _t('Courriel ou mot de passe incorrect.') : _t('Connexion impossible. Réessaie.') };
     });
   }
 
@@ -38,15 +40,15 @@ window.CA = window.CA || {};
       b = b || {};
       if (b.session) {
         return sb().auth.setSession(b.session).then(function (s) {
-          return s.error ? { ok: false, message: 'Connexion impossible. Réessaie.' } : { ok: true };
+          return s.error ? { ok: false, message: _t('Connexion impossible. Réessaie.') } : { ok: true };
         });
       }
       if (b.error === 'locked') {
-        return { ok: false, message: 'Trop d\'essais. Réessaie dans ' + plural(Math.max(1, Math.ceil((b.retry_after || 0) / 60)), 'minute', 'minutes') + '.' };
+        return { ok: false, message: _t('Trop d\'essais. Réessaie dans ') + plural(Math.max(1, Math.ceil((b.retry_after || 0) / 60)), 'minute', 'minutes') + '.' };
       }
-      if (b.error === 'invalid') return { ok: false, message: 'Identifiants incorrects · ' + plural(b.left, 'essai restant', 'essais restants') + '.' };
-      if (b.error === 'revoked') return { ok: false, message: 'Accès retiré. Contacte Création Audio.' };
-      if (b.error === 'bad_request') return { ok: false, message: 'Courriel ou mot de passe invalide.' };
+      if (b.error === 'invalid') return { ok: false, message: _t('Identifiants incorrects · ') + plural(b.left, 'essai restant', 'essais restants') + '.' };
+      if (b.error === 'revoked') return { ok: false, message: _t('Accès retiré. Contacte Création Audio.') };
+      if (b.error === 'bad_request') return { ok: false, message: _t('Courriel ou mot de passe invalide.') };
       return direct(email, pass);
     }, function () { return direct(email, pass); });
   };
@@ -54,7 +56,7 @@ window.CA = window.CA || {};
   /* ---------- double authentification (TOTP) ---------- */
   function verified(f) { return f && f.status === 'verified'; }
   function codeError(e) {
-    if (e && (e.status === 429 || /rate/i.test(e.code || ''))) return 'Trop d\'essais. Patiente une minute.';
+    if (e && (e.status === 429 || /rate/i.test(e.code || ''))) return _t('Trop d\'essais. Patiente une minute.');
     return 'Code invalide.';
   }
   function factors() {
