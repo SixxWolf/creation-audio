@@ -1,0 +1,38 @@
+/* Facture / reçu imprimable d'une commande dealer (doc-print.js) — papier clair, jetons figés */
+.doc-print { display:none; }
+@media print {
+  body.doc-printing > *:not(.doc-print) { display:none !important; }
+  body.doc-printing { background:#fff !important; }
+  body.doc-printing .doc-print { display:block; color:#181A1F; font-size:12pt; font-family:system-ui, -apple-system, "Segoe UI", sans-serif; }
+  @page { margin:14mm; }
+}
+.doc-print .inv-top { display:flex; justify-content:space-between; gap:20px; align-items:flex-start;
+  border-bottom:2px solid #181A1F; padding-bottom:16px; margin-bottom:16px; }
+.doc-print .inv-logo { max-height:56px; max-width:200px; object-fit:contain; margin-bottom:8px; display:block; }
+.doc-print .inv-co-name { font-size:1.2rem; font-weight:700; }
+.doc-print .inv-co-tag { color:#6C727C; font-size:.85rem; margin-top:2px; }
+.doc-print .inv-co-meta { color:#6C727C; font-size:.8rem; margin-top:8px; white-space:pre-line; line-height:1.5; }
+.doc-print .inv-title { text-align:right; flex:none; }
+.doc-print .inv-title h1 { margin:0; font-size:1.5rem; letter-spacing:.04em; }
+.doc-print .inv-meta { color:#6C727C; font-size:.85rem; margin-top:6px; font-variant-numeric:tabular-nums; }
+.doc-print .inv-cancelled { margin:0 0 14px; padding:8px; text-align:center; font-weight:700; letter-spacing:.1em;
+  color:#B42A19; border:2px solid #B42A19; border-radius:8px; }
+.doc-print .inv-billto { margin-bottom:12px; }
+.doc-print .inv-billto .lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#6C727C; }
+.doc-print .inv-billto .who { font-weight:700; font-size:1.02rem; }
+.doc-print .inv-table { width:100%; border-collapse:collapse; margin-bottom:14px; }
+.doc-print .inv-table th { text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.05em;
+  color:#6C727C; font-weight:700; padding:8px; border-bottom:1.5px solid #E7E7E2; }
+.doc-print .inv-table th.num, .doc-print .inv-table td.num { text-align:right; width:1%; white-space:nowrap; }
+.doc-print .inv-table td { padding:9px 8px; border-bottom:1px solid #E7E7E2; vertical-align:middle; font-size:.9rem; }
+.doc-print .inv-mat { color:#6C727C; font-size:.78rem; }
+.doc-print .inv-tot { margin-left:auto; width:min(320px, 100%); }
+.doc-print .inv-tot .line { display:flex; justify-content:space-between; padding:5px 0; font-variant-numeric:tabular-nums; }
+.doc-print .inv-tot .taxno { color:#6C727C; font-size:.75rem; font-weight:400; }
+.doc-print .inv-tot .grand { border-top:2px solid #181A1F; margin-top:6px; padding-top:10px; font-weight:700; font-size:1.1rem; }
+.doc-print .inv-pay { margin-top:16px; background:#F6F6F4; border-radius:10px; padding:10px 13px; font-size:.88rem; }
+.doc-print .inv-pay .lbl { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#6C727C; margin-right:8px; }
+.doc-print .inv-paid { margin-top:18px; display:flex; align-items:center; gap:14px; padding:10px 14px;
+  border:2px solid #1F7A3D; border-radius:10px; color:#1F7A3D; }
+.doc-print .inv-paid b { font-size:1.2rem; letter-spacing:.12em; }
+.doc-print .inv-foot { margin-top:18px; color:#6C727C; font-size:.78rem; text-align:center; border-top:1px solid #E7E7E2; padding-top:12px; }

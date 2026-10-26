@@ -85,6 +85,8 @@
 .dl-status.is-new { color:#9A4A0E; background:#FFF3EC; }
 .dl-status.is-preparing { color:#1D5FA8; background:#E8F1FB; }
 .dl-status.is-ready { color:#16794A; background:var(--good-wash); }
+.dl-status.is-paid { color:#16794A; background:var(--good-wash); }
+.dl-order-unpaid { font-size:.85rem; color:var(--muted); font-weight:600; }
 .dl-status.is-invoiced { color:var(--ink-2); background:var(--wash-2); }
 .dl-status.is-cancelled { color:#B42A19; background:var(--bad-wash); }
 .dl-order-hint { margin:6px 0 0; font-size:.84rem; color:var(--muted); }

@@ -2857,7 +2857,7 @@ returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v jsonb := '[]'::jsonb; r record;
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
-  for r in update public.dealer_orders set status = 'ready', invoice_id = null, updated_at = now()
+  for r in update public.dealer_orders set status = 'ready', invoice_id = null, paid_at = null, updated_at = now()
             where invoice_id = p_invoice and status = 'invoiced' returning number loop
     v := v || jsonb_build_object('kind', 'dealer', 'number', r.number, 'status', 'ready');
   end loop;
@@ -3716,6 +3716,39 @@ create policy box_projects_admin_all on public.box_projects for all to authentic
   using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
 revoke all on public.box_subs from anon;
 revoke all on public.box_projects from anon;
+
+-- ------------------------------------------------------------
+-- FACTURE + REÇU DES COMMANDES DEALER (2026-10-26)
+-- paid_at = virement confirmé par l'admin ; le dealer imprime sa facture (commande
+-- facturée) et, une fois paid_at posé, son reçu. Document SANS coûts ni marge.
+-- ------------------------------------------------------------
+alter table public.dealer_orders add column if not exists paid_at timestamptz;
+
+create or replace function public.dealer_order_docs(p_id uuid)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare o public.dealer_orders; i public.invoices; v_email text := lower((select auth.jwt()) ->> 'email');
+begin
+  select * into o from public.dealer_orders where id = p_id;
+  if not found or o.invoice_id is null then return null; end if;
+  if not (public.is_admin() or (lower(o.dealer_email) = v_email and public.is_dealer())) then
+    raise exception 'Accès refusé.' using errcode = '42501';
+  end if;
+  select * into i from public.invoices where id = o.invoice_id;
+  if not found then return null; end if;
+  return jsonb_build_object(
+    'number', o.number, 'paid_at', o.paid_at,
+    'invoice', jsonb_build_object(
+      'id', i.id, 'number', i.number, 'invoice_date', i.invoice_date, 'status', i.status,
+      'client_name', i.client_name, 'client_contact', i.client_contact,
+      'client_address', i.client_address, 'client_city', i.client_city, 'note', i.note,
+      'tax_enabled', i.tax_enabled, 'subtotal', i.subtotal, 'tax_gst', i.tax_gst, 'tax_qst', i.tax_qst, 'total', i.total,
+      'lines', coalesce((select jsonb_agg(jsonb_build_object(
+          'label', l.label, 'meta', l.meta, 'qty', l.qty, 'unit_price', l.unit_price, 'line_total', l.line_total)
+          order by l.sort_order, l.id) from public.invoice_lines l where l.invoice_id = i.id), '[]'::jsonb)),
+    'company', public.company_public());
+end $$;
+revoke all on function public.dealer_order_docs(uuid) from public, anon;
+grant execute on function public.dealer_order_docs(uuid) to authenticated;
 
 -- ------------------------------------------------------------
 -- Vérification

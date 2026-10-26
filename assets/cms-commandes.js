@@ -178,13 +178,15 @@
   function actionsFor(o) {
     var b = function (act, label, cls) {
       return '<button type="button" class="btn ' + (cls || 'btn-ghost') + ' btn-sm" data-act="' + act + '"' +
-        (act === 'invoice' ? ' data-ic="receipt"' : act === 'edit' ? ' data-ic="edit"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
+        (act === 'invoice' || act === 'doc-invoice' || act === 'doc-receipt' ? ' data-ic="receipt"' : act === 'pay' ? ' data-ic="check"' : act === 'edit' ? ' data-ic="edit"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
     };
     switch (o.status) {
       case 'new': return b('preparing', 'Commencer la préparation', 'btn-accent') + b('invoice', 'Facturer') + b('edit', 'Modifier') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'preparing': return b('ready', 'Marquer prête', 'btn-accent') + b('invoice', 'Facturer') + b('edit', 'Modifier') + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'ready': return b('invoice', 'Facturer', 'btn-accent') + b('edit', 'Modifier') + b('preparing', '↩ En préparation') + b('cancel', 'Annuler', 'btn-ghost co-danger');
-      case 'invoiced': return o.invoice_id ? b('see-invoice', 'Voir la facture') : '';
+      case 'invoiced': return (o.invoice_id ? b('see-invoice', 'Voir la facture') + b('doc-invoice', 'Imprimer la facture') : '') +
+        (o.paid_at ? b('doc-receipt', 'Imprimer le reçu') + b('unpay', '↩ Virement non reçu')
+                   : b('pay', 'Virement confirmé', 'btn-accent'));
       case 'cancelled': return b('new', 'Rouvrir') + b('delete', 'Supprimer', 'btn-ghost co-danger');
     }
     return '';
@@ -201,7 +203,7 @@
       return;
     }
     listEl.innerHTML = list.map(function (o) {
-      var st = STATUS[o.status] || { label: o.status };
+      var st = o.status === 'invoiced' && o.paid_at ? { label: 'Payée' } : (STATUS[o.status] || { label: o.status });
       var lines = linesOf(o), pairs = 0, toPrint = 0;
       var rows = lines.map(function (l) {
         var p = l.product_id ? stock[l.product_id] : null, s = p ? (p.qty | 0) : 0;
@@ -275,6 +277,32 @@
       if (window.CA.invoiceFromOrder(o, linesOf(o)) !== false) location.hash = '#facturation';
       return;
     }
+    if (what === 'pay' || what === 'unpay') {
+      var paid = what === 'pay';
+      caDialog.confirm(paid
+        ? { title: 'Virement reçu pour ' + o.number + ' ?', message: (o.dealer_name || o.dealer_email) + ' pourra imprimer son reçu.', ok: 'Confirmer le virement', icon: 'check' }
+        : { title: 'Retirer la confirmation de ' + o.number + ' ?', message: 'Le reçu ne sera plus offert au dealer.', ok: 'Retirer', danger: true }).then(function (ok) {
+        if (!ok) return;
+        btn.disabled = true;
+        sb.from('dealer_orders').update({ paid_at: paid ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
+          .eq('id', o.id).select('id').then(function (res) {
+            if (res.error) throw res.error;
+            if (!res.data || !res.data.length) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
+            load();
+          }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
+      });
+      return;
+    }
+    if (what === 'doc-invoice' || what === 'doc-receipt') {
+      if (!window.CA.docPrint) { caDialog.error('Impression indisponible.'); return; }
+      btn.disabled = true;
+      sb.rpc('dealer_order_docs', { p_id: o.id }).then(function (res) {
+        btn.disabled = false;
+        if (res.error || !res.data) throw res.error || new Error('Document introuvable.');
+        window.CA.docPrint(what === 'doc-receipt' ? 'receipt' : 'invoice', res.data);
+      }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
+      return;
+    }
     if (what === 'see-invoice') {
       if (window.CA.focusInvoice) window.CA.focusInvoice(o.invoice_id);
       location.hash = '#historique';
@@ -290,6 +318,7 @@
   function setStatus(o, what, btn) {
     var patch = { status: what === 'cancel' ? 'cancelled' : what, updated_at: new Date().toISOString() };
     patch.cancelled_by = what === 'cancel' ? 'admin' : null;
+    if (what === 'cancel') patch.paid_at = null;
     btn.disabled = true;
     sb.from('dealer_orders').update(patch).eq('id', o.id).select('id').then(function (res) {
       if (res.error) throw res.error;

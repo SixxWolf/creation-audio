@@ -400,7 +400,7 @@
       return;
     }
     ordersList.innerHTML = orders.map(function (o) {
-      var st = STATUS[o.status] || { label: o.status, hint: '' };
+      var st = o.status === 'invoiced' && o.paid_at ? { label: _t('Payée'), hint: '' } : (STATUS[o.status] || { label: o.status, hint: '' });
       var lines = (o.dealer_order_lines || []).slice().sort(function (a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
       var pairs = lines.reduce(function (s, l) { return s + (l.qty | 0); }, 0);
       var isNew = o.status === 'new';
@@ -408,7 +408,7 @@
         '<header class="dl-order-head">' +
           '<div class="dl-order-id"><b>' + esc(o.number) + '</b><span>' + esc(fmtDate(o.created_at)) +
             (o.created_by === 'admin' ? _t(' · ajoutée par Création Audio') : '') + (o.edited_at ? _t(' · modifiée') : '') + '</span></div>' +
-          '<span class="dl-status is-' + esc(o.status) + '">' + esc(st.label) + '</span>' +
+          '<span class="dl-status is-' + (st.label === _t('Payée') ? 'paid' : esc(o.status)) + '">' + esc(st.label) + '</span>' +
         '</header>' +
         (st.hint ? '<p class="dl-order-hint">' + esc(st.hint) + '</p>' : '') +
         '<div class="dl-order-lines">' + lines.map(function (l) {
@@ -425,6 +425,10 @@
           (isNew ? '<span class="dl-order-actions">' +
             _t('<button type="button" class="dl-btn js-edit">Modifier</button>') +
             _t('<button type="button" class="dl-btn is-danger js-cancel">Annuler</button></span>') : '') +
+          (o.status === 'invoiced' && o.invoice_id ? '<span class="dl-order-actions">' +
+            _t('<button type="button" class="dl-btn js-doc" data-kind="invoice">Facture</button>') +
+            (o.paid_at ? _t('<button type="button" class="dl-btn js-doc" data-kind="receipt">Reçu</button>') : _t('<span class="dl-order-unpaid">Paiement à venir</span>')) +
+            '</span>' : '') +
         '</footer>' +
       '</article>';
     }).join('');
@@ -433,7 +437,21 @@
       var ed = $('.js-edit', el), ca = $('.js-cancel', el);
       if (ed) ed.addEventListener('click', function () { editOrder(o); });
       if (ca) ca.addEventListener('click', function () { cancelOrder(o, ca); });
+      $$('.js-doc', el).forEach(function (b) {
+        b.addEventListener('click', function () { printDoc(o, b); });
+      });
     });
+  }
+  // facture / reçu : relu à chaque clic (le reçu n'existe qu'une fois le virement confirmé)
+  function printDoc(o, btn) {
+    var kind = btn.getAttribute('data-kind');
+    btn.disabled = true;
+    sb.rpc('dealer_order_docs', { p_id: o.id }).then(function (res) {
+      btn.disabled = false;
+      if (res.error || !res.data) throw res.error || new Error(_t('Document introuvable.'));
+      if (kind === 'receipt' && !res.data.paid_at) { caDialog.alert({ message: _t('Le reçu sera disponible une fois ton virement confirmé.') }); loadOrders(); return; }
+      window.CA.docPrint(kind, res.data);
+    }).then(null, function (err) { btn.disabled = false; caDialog.error(errMsg(err), _t('Impression impossible')); });
   }
   function editOrder(o) {
     if (editing && editing.id === o.id) { openCart(); return; }
