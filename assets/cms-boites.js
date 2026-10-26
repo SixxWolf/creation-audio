@@ -860,7 +860,7 @@
     g.panels.forEach(function (p) {
       var f = begin(), a = sc(p.x0, p.y0, p.z1), b = sc(p.x1, p.y1, p.z0);
       box(B, a, b);
-      var part = { kind: 'panel', outer: p.role !== 'port' && p.role !== 'brace', col: col, tex: tex,
+      var part = { kind: 'panel', outer: p.role !== 'port' && p.role !== 'brace', glass: p.role === 'top', col: col, tex: tex,
         ex: [p.ex[0], p.ex[1], -p.ex[2]], c: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2] };
       if (p.holes && p.holes.length) {
         part.holes = p.holes.map(function (h) { return [h.x - W / 2, h.y - H / 2, h.r]; });
@@ -976,7 +976,7 @@
       gl.uniform1f(GL.u.winR, p.win ? p.win[4] : 0); gl.uniform1f(GL.u.hasWin, p.win ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, p.first, p.count);
     };
-    MESH.parts.forEach(function (p) { if (UI.xray && p.kind === 'panel' && p.outer) trans.push(p); else drawPart(p, 1); });
+    MESH.parts.forEach(function (p) { if (p.kind === 'panel' && (p.glass || (UI.xray && p.outer))) trans.push(p); else drawPart(p, 1); });
     if (trans.length) {
       trans.forEach(function (p) { var c = [p.c[0] + p.ex[0] * amt, p.c[1] + p.ex[1] * amt, p.c[2] + p.ex[2] * amt], d = v3sub(c, C.eye); p.dist = v3dot(d, d); });
       trans.sort(function (a, b) { return b.dist - a.dist; });
