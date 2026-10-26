@@ -186,10 +186,10 @@
     if (listLoading) return listLoading;
     var t = today(), now = Date.now();
     listLoading = Promise.all([
-      sb.from('customer_orders').select('id,number,name,email,phone,status,pickup_date,pickup_start,pickup_end')
+      sb.from('customer_orders').select('id,number,name,email,phone,status,pickup_date,pickup_start,pickup_end,pickup_req')
         .in('status', ['new', 'preparing', 'ready']).or('pickup_date.gte.' + t + ',and(status.eq.ready,pickup_date.is.null)')
         .order('pickup_date', { ascending: true }).limit(300),
-      sb.from('customer_reservations').select('id,number,name,email,status,expires_at,pickup_date,pickup_start,pickup_end')
+      sb.from('customer_reservations').select('id,number,name,email,status,expires_at,pickup_date,pickup_start,pickup_end,pickup_req')
         .eq('status', 'active').gte('pickup_date', t).limit(300)
     ]).then(function (rs) {
       var err = rs[0].error || rs[1].error;
@@ -209,12 +209,14 @@
       '<span class="cq-who"><b>' + esc(who) + '</b><small>' + esc(it.number) + (it.phone ? ' · ' + esc(it.phone) : '') + '</small></span>' +
       '<span class="co-status is-' + (it.kind === 'resv' ? 'ready' : esc(it.status)) + '">' +
         (it.kind === 'resv' ? 'Réservation' : esc(STATUS[it.status] || it.status)) + '</span>' +
+      (it.pickup_req && it.pickup_req.state === 'pending' ? '<span class="co-status is-new">Exception</span>' : '') +
     '</button>';
   }
   function render(items, todo) {
     var t = today(), tm = new Date(); tm.setDate(tm.getDate() + 1); tm = ymd(tm);
     var nToday = items.filter(function (it) { return it.pickup_date === t; }).length;
-    var badge = $('#cq-n'); if (badge) { badge.textContent = nToday; badge.hidden = !nToday; }
+    var nReq = items.concat(todo).filter(function (it) { return it.pickup_req && it.pickup_req.state === 'pending'; }).length;
+    var badge = $('#cq-n'); if (badge) { badge.textContent = nToday + nReq; badge.hidden = !(nToday + nReq); }
     items.sort(function (a, b) {
       var ka = a.pickup_date + hm(a.pickup_start), kb = b.pickup_date + hm(b.pickup_start);
       return ka < kb ? -1 : ka > kb ? 1 : String(a.number).localeCompare(String(b.number));

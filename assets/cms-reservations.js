@@ -199,6 +199,7 @@
     }).join('');
     $$('.co-card', listEl).forEach(function (card) {
       var r = resv.filter(function (x) { return x.id === card.getAttribute('data-id'); })[0];
+      if (CA.bindPickupReq) CA.bindPickupReq(card, r, 'reservation', load);
       $$('[data-act]', card).forEach(function (btn) {
         btn.addEventListener('click', function () { act(r, btn.getAttribute('data-act'), btn); });
       });

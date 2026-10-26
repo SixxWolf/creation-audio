@@ -16,6 +16,7 @@
    Cueillette (plages réglées dans l'admin, Commandes › Cueillettes — RPC pickup_slots) :
      slots(until, self) -> Promise([{ d, s, e, full }])  (until : échéance ISO ; self : sa commande/réservation)
      setPickup(kind 'order'|'reservation', id, pickup) -> Promise({ d, s, e })  (+ avis par courriel, EF pickup-notify)
+     requestPickup(kind, id, { d, s, note }) -> Promise({ d, s, note, state })  (exception : l'admin répond, EF pickup-request-notify)
      picker(host, { onChange }) -> { load(slots, cur), value(), has(), clear(), el }  jours + plages (cueillette.css)
      fmtPickup(d, s, e [, short]) -> « jeudi 23 octobre, 13 h – 17 h »
    ========================================================= */
@@ -126,6 +127,17 @@ window.CA = window.CA || {};
       if (res.error) throw new Error(errMsg(res.error));
       // avis à Création Audio : sans bloquer l'écran
       c.functions.invoke('pickup-notify', { body: { kind: kind, id: id } }).then(null, function () {});
+      return res.data || {};
+    });
+  }
+  // demande d'exception : jour ouvrable + heure libre, l'admin approuve ou refuse (RPC customer_request_pickup)
+  function requestPickup(kind, id, req) {
+    var c = cli();
+    if (!c) return Promise.reject(new Error(_t('Service indisponible pour le moment.')));
+    setLang(c);
+    return c.rpc('customer_request_pickup', { p_kind: kind, p_id: id, p_req: req }).then(function (res) {
+      if (res.error) throw new Error(errMsg(res.error));
+      c.functions.invoke('pickup-request-notify', { body: { kind: kind, id: id, event: 'request' } }).then(null, function () {});
       return res.data || {};
     });
   }
@@ -240,6 +252,6 @@ window.CA = window.CA || {};
     signedIn: function () { return !!email(); },
     email: email, editing: editing, cancelEdit: cancelEdit, send: send,
     reserveInfo: reserveInfo, reserve: reserve,
-    slots: slots, setPickup: setPickup, picker: picker, fmtPickup: fmtPickup
+    slots: slots, setPickup: setPickup, requestPickup: requestPickup, picker: picker, fmtPickup: fmtPickup
   };
 })();

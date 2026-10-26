@@ -146,6 +146,10 @@
 .pkv-foot { display:flex; align-items:center; flex-wrap:wrap; gap:10px 12px; margin-top:20px; }
 .pkv-foot .acct-submit { width:auto; text-decoration:none; }
 .pkv-foot .acct-btn { margin-top:0; height:46px; }
+.pkv-req { margin:14px 0 0; padding:10px 13px; background:var(--wash); border-radius:var(--radius-sm); font-size:.9rem; color:var(--ink-2); }
+.pkv-req.is-no { color:var(--bad); background:var(--bad-wash); }
+.pkv-ex { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0 14px; }
+.pkv-ex-w { grid-column:1 / -1; }
 .pkv-msg { flex-basis:100%; margin:0; min-height:1.3em; font-size:.88rem; color:var(--bad); }
 .pkv-msg:empty { display:none; }
 .pkv-done { display:flex; flex-direction:column; align-items:center; text-align:center; padding:12px 0 4px; }

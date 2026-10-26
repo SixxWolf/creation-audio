@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 1;
+window.CA_EN_V = 2;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -524,6 +524,20 @@ window.CA_EN = (function (pairs) {
   [`Confirmer ma cueillette`, `Confirm my pickup`],
   [`<button class="acct-btn pkv-keep" type="button">Garder `, `<button class="acct-btn pkv-keep" type="button">Keep `],
   [`Choisis une date et une plage.`, `Choose a date and a time slot.`],
+  [`<div class="pkv-foot"><button class="acct-btn pkv-exc" type="button">Demander une exception</button></div>`, `<div class="pkv-foot"><button class="acct-btn pkv-exc" type="button">Request an exception</button></div>`],
+  [`<button class="acct-btn pkv-exc" type="button">Demander une exception</button>`, `<button class="acct-btn pkv-exc" type="button">Request an exception</button>`],
+  [`<p class="pkv-req">Demande en attente : <b>`, `<p class="pkv-req">Request pending: <b>`],
+  [`<p class="pkv-req is-no">Demande refusée : <b>`, `<p class="pkv-req is-no">Request declined: <b>`],
+  [`<h2 class="pkv-h">Demander une exception</h2>`, `<h2 class="pkv-h">Request an exception</h2>`],
+  [`<div class="field"><label for="pkx-d">Jour</label><input type="date" id="pkx-d" min="`, `<div class="field"><label for="pkx-d">Day</label><input type="date" id="pkx-d" min="`],
+  [`<div class="field"><label for="pkx-t">Heure</label><input type="time" id="pkx-t" step="900"></div>`, `<div class="field"><label for="pkx-t">Time</label><input type="time" id="pkx-t" step="900"></div>`],
+  [`<div class="field pkv-ex-w"><label for="pkx-n">Mot (facultatif)</label><input type="text" id="pkx-n" maxlength="300"></div>`, `<div class="field pkv-ex-w"><label for="pkx-n">Note (optional)</label><input type="text" id="pkx-n" maxlength="300"></div>`],
+  [`Envoyer la demande`, `Send request`],
+  [`Choisis un jour et une heure.`, `Choose a day and a time.`],
+  [`<h2 class="pkv-h">Demande envoyée</h2>`, `<h2 class="pkv-h">Request sent</h2>`],
+  [`<p class="pkv-wait">On te répond par courriel.</p>`, `<p class="pkv-wait">We'll reply by email.</p>`],
+  [`<div class="pkv-foot"><a class="acct-submit" href="#/commandes">Mes commandes</a></div></div>`, `<div class="pkv-foot"><a class="acct-submit" href="#/commandes">My orders</a></div></div>`],
+  [`Demande non envoyée. Réessaie.`, `Request not sent. Try again.`],
   [`Cueillette non enregistrée. Réessaie.`, `Pickup not saved. Try again.`],
   [`<h2 class="pkv-h">Cueillette confirmée</h2>`, `<h2 class="pkv-h">Pickup confirmed</h2>`],
   [`<div class="pkv-foot"><a class="acct-submit" href="#/commandes">Mes commandes</a>`, `<div class="pkv-foot"><a class="acct-submit" href="#/commandes">My orders</a>`],

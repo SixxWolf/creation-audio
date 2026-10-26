@@ -1713,6 +1713,7 @@ alter table public.customer_orders add column if not exists pickup_date        d
 alter table public.customer_orders add column if not exists pickup_start       time;
 alter table public.customer_orders add column if not exists pickup_end         time;
 alter table public.customer_orders add column if not exists pickup_notified_at timestamptz;
+alter table public.customer_orders add column if not exists pickup_req         jsonb;   -- demande d'exception (voir CUEILLETTE)
 alter table public.customer_orders add column if not exists ready_notified_at  timestamptz;   -- courriel « commande prête » (EF customer-order-notify, event ready)
 alter table public.customer_orders add column if not exists stock_hold boolean not null default false;   -- stock retiré du site en attendant le paiement (voir _held_stock)
 create index if not exists customer_orders_customer_idx on public.customer_orders (customer_id, created_at desc);
@@ -1895,6 +1896,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
       'id', o.id, 'number', o.number, 'status', o.status, 'created_at', o.created_at, 'edited_at', o.edited_at,
       'note', o.note, 'total', o.total, 'has_backorder', o.has_backorder, 'cancelled_by', o.cancelled_by,
       'pickup_date', o.pickup_date, 'pickup_start', to_char(o.pickup_start, 'HH24:MI'), 'pickup_end', to_char(o.pickup_end, 'HH24:MI'),
+      'pickup_req', o.pickup_req,
       'invoice_number', (select i.number from public.invoices i where i.id = o.invoice_id),
       'lines', coalesce((
         select jsonb_agg(jsonb_build_object(
@@ -2019,6 +2021,7 @@ alter table public.customer_reservations add column if not exists pickup_date   
 alter table public.customer_reservations add column if not exists pickup_start       time;
 alter table public.customer_reservations add column if not exists pickup_end         time;
 alter table public.customer_reservations add column if not exists pickup_notified_at timestamptz;
+alter table public.customer_reservations add column if not exists pickup_req         jsonb;
 create index if not exists customer_reservations_customer_idx on public.customer_reservations (customer_id, created_at desc);
 create index if not exists customer_reservations_status_idx on public.customer_reservations (status, expires_at);
 create table if not exists public.customer_reservation_lines (
@@ -2138,6 +2141,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
           'status', case when r.status = 'active' and r.expires_at <= now() then 'expired' else r.status end,
           'created_at', r.created_at, 'expires_at', r.expires_at, 'note', r.note, 'total', r.total,
           'pickup_date', r.pickup_date, 'pickup_start', to_char(r.pickup_start, 'HH24:MI'), 'pickup_end', to_char(r.pickup_end, 'HH24:MI'),
+          'pickup_req', r.pickup_req,
           'penalized', r.penalized or (r.status = 'active' and r.expires_at <= now()), 'cancelled_by', r.cancelled_by,
           'invoice_number', (select i.number from public.invoices i where i.id = r.invoice_id),
           'lines', coalesce((
@@ -2421,6 +2425,76 @@ revoke all on function public.pickup_slots(timestamptz, uuid)              from 
 revoke all on function public.customer_set_pickup(text, uuid, jsonb)       from public, anon;
 grant execute on function public.pickup_slots(timestamptz, uuid)           to authenticated;
 grant execute on function public.customer_set_pickup(text, uuid, jsonb)    to authenticated;
+
+-- Demande d'exception : le client propose un jour ouvrable (lundi-vendredi, aujourd'hui ou plus tard) et
+-- une heure libre, hors plages, préavis et capacité. pickup_req = { d, s, note, at, state: 'pending' | 'refused', reply }.
+-- La plage déjà choisie reste valide tant que l'admin n'a pas répondu (admin_decide_pickup).
+create or replace function public.customer_request_pickup(p_kind text, p_id uuid, p_req jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); v_d date; v_s time; v_note text; v_req jsonb; o public.customer_orders; r public.customer_reservations;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  if coalesce(p_req ->> 'd', '') !~ '^\d{4}-\d{2}-\d{2}$' or coalesce(p_req ->> 's', '') !~ '^\d{2}:\d{2}$' then
+    raise exception 'Choisis une date et une heure.';
+  end if;
+  v_d := (p_req ->> 'd')::date; v_s := (p_req ->> 's')::time;
+  v_note := left(trim(coalesce(p_req ->> 'note', '')), 300);
+  if v_d < (now() at time zone 'America/Toronto')::date or extract(isodow from v_d) > 5 then
+    raise exception 'Choisis un jour ouvrable, à partir d''aujourd''hui.';
+  end if;
+  if v_d + v_s <= (now() at time zone 'America/Toronto') then raise exception 'Cette heure est déjà passée.'; end if;
+  v_req := jsonb_build_object('d', v_d, 's', to_char(v_s, 'HH24:MI'), 'note', v_note, 'at', now(), 'state', 'pending');
+  if p_kind = 'reservation' then
+    select * into r from public.customer_reservations where id = p_id and customer_id = v_uid for update;
+    if not found then raise exception 'Réservation introuvable.'; end if;
+    if r.status <> 'active' or r.expires_at <= now() then raise exception 'Cette réservation n''est plus active.'; end if;
+    if (v_d + v_s) at time zone 'America/Toronto' >= r.expires_at then raise exception 'Choisis une heure avant l''échéance de ta réservation.'; end if;
+    update public.customer_reservations set pickup_req = v_req, updated_at = now() where id = p_id;
+  else
+    select * into o from public.customer_orders where id = p_id and customer_id = v_uid for update;
+    if not found then raise exception 'Commande introuvable.'; end if;
+    if o.status not in ('new', 'preparing', 'ready') then raise exception 'Cette commande est fermée.'; end if;
+    update public.customer_orders set pickup_req = v_req, updated_at = now() where id = p_id;
+  end if;
+  return v_req;
+end $$;
+
+-- Réponse de l'admin : approuver = la demande devient la cueillette (sans regarder la capacité) ;
+-- refuser = la demande reste visible côté client avec le mot de l'admin (state 'refused').
+create or replace function public.admin_decide_pickup(p_kind text, p_id uuid, p_ok boolean, p_reply text default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_req jsonb; v_reply text := left(trim(coalesce(p_reply, '')), 300);
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  if p_kind = 'reservation' then
+    select pickup_req into v_req from public.customer_reservations where id = p_id for update;
+  else
+    select pickup_req into v_req from public.customer_orders where id = p_id for update;
+  end if;
+  if v_req is null or v_req ->> 'state' <> 'pending' then raise exception 'Aucune demande en attente.'; end if;
+  if p_kind = 'reservation' then
+    update public.customer_reservations
+       set pickup_date = case when p_ok then (v_req ->> 'd')::date else pickup_date end,
+           pickup_start = case when p_ok then (v_req ->> 's')::time else pickup_start end,
+           pickup_end = case when p_ok then null else pickup_end end,
+           pickup_req = case when p_ok then null else v_req || jsonb_build_object('state', 'refused', 'reply', v_reply) end,
+           updated_at = now()
+     where id = p_id;
+  else
+    update public.customer_orders
+       set pickup_date = case when p_ok then (v_req ->> 'd')::date else pickup_date end,
+           pickup_start = case when p_ok then (v_req ->> 's')::time else pickup_start end,
+           pickup_end = case when p_ok then null else pickup_end end,
+           pickup_req = case when p_ok then null else v_req || jsonb_build_object('state', 'refused', 'reply', v_reply) end,
+           updated_at = now()
+     where id = p_id;
+  end if;
+  return v_req;
+end $$;
+revoke all on function public.customer_request_pickup(text, uuid, jsonb) from public, anon;
+revoke all on function public.admin_decide_pickup(text, uuid, boolean, text) from public, anon;
+grant execute on function public.customer_request_pickup(text, uuid, jsonb) to authenticated;
+grant execute on function public.admin_decide_pickup(text, uuid, boolean, text) to authenticated;
 
 -- ============================================================
 -- MESSAGERIE (questions filaments / spacers / compte)

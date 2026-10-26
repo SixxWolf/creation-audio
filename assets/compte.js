@@ -441,19 +441,63 @@
       if (pkvFor !== key) return;
       if (!list.length) {
         side.innerHTML = _t('<h2 class="pkv-h">Ta cueillette</h2><p class="pkv-wait">Aucune plage offerte pour le moment. ') +
-          askHtml(_t('Cueillette ') + x.number, _t('Bonjour, pour la cueillette de ') + x.number + ' : ') + '</p>';
+          askHtml(_t('Cueillette ') + x.number, _t('Bonjour, pour la cueillette de ') + x.number + ' : ') + '</p>' +
+          reqHtml() + _t('<div class="pkv-foot"><button class="acct-btn pkv-exc" type="button">Demander une exception</button></div>');
+        $('.pkv-exc', side).addEventListener('click', exView);
         return;
       }
       pickView(list);
     });
+    // état d'une demande d'exception : en attente ou refusée (le mot de Théo)
+    function reqHtml() {
+      var q = x.pickup_req;
+      if (!q || !q.d) return '';
+      var t = esc(CO.fmtPickup(q.d, q.s));
+      return q.state === 'pending' ? _t('<p class="pkv-req">Demande en attente : <b>') + t + '</b></p>'
+        : _t('<p class="pkv-req is-no">Demande refusée : <b>') + t + '</b>' + (q.reply ? ' — ' + esc(q.reply) : '') + '</p>';
+    }
+    // formulaire : jour ouvrable + heure libre, l'admin répond par courriel
+    function exView() {
+      var now = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
+      var today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+      side.innerHTML = _t('<h2 class="pkv-h">Demander une exception</h2>') +
+        '<div class="pkv-ex">' +
+          _t('<div class="field"><label for="pkx-d">Jour</label><input type="date" id="pkx-d" min="') + today + '"></div>' +
+          _t('<div class="field"><label for="pkx-t">Heure</label><input type="time" id="pkx-t" step="900"></div>') +
+          _t('<div class="field pkv-ex-w"><label for="pkx-n">Mot (facultatif)</label><input type="text" id="pkx-n" maxlength="300"></div>') +
+        '</div>' +
+        '<div class="pkv-foot"><button class="acct-submit pkv-ok" type="button">' + _t('Envoyer la demande') + '</button>' +
+        '<button class="acct-btn pkv-back2" type="button">' + _t('Retour') + '</button>' +
+        '<p class="pkv-msg" role="status"></p></div>';
+      var msg = $('.pkv-msg', side), ok = $('.pkv-ok', side);
+      $('.pkv-back2', side).addEventListener('click', function () { pkvFor = ''; renderPkv(); });
+      ok.addEventListener('click', function () {
+        var d = $('#pkx-d', side).value, t = $('#pkx-t', side).value;
+        if (!d || !t) { msg.textContent = _t('Choisis un jour et une heure.'); return; }
+        ok.disabled = true; msg.textContent = _t('Envoi…');
+        CO.requestPickup(isC ? 'order' : 'reservation', x.id, { d: d, s: t, note: $('#pkx-n', side).value }).then(function (q) {
+          x.pickup_req = q;
+          side.innerHTML = '<div class="pkv-done"><span class="pkv-check" aria-hidden="true"></span>' +
+            _t('<h2 class="pkv-h">Demande envoyée</h2>') +
+            '<p class="pkv-when">' + esc(CO.fmtPickup(q.d, q.s)) + '</p>' +
+            _t('<p class="pkv-wait">On te répond par courriel.</p>') +
+            _t('<div class="pkv-foot"><a class="acct-submit" href="#/commandes">Mes commandes</a></div></div>');
+          if (isC) loadOrders(); else loadResv();
+        }, function (err) {
+          ok.disabled = false; msg.textContent = (err && err.message) || _t('Demande non envoyée. Réessaie.');
+        });
+      });
+    }
     function pickView(list) {
       var had = !!x.pickup_date;
       side.innerHTML = '<h2 class="pkv-h">' + (had ? _t('Changer ma cueillette') : _t('Choisis ta cueillette')) + '</h2>' +
-        '<div class="pkv-cal"></div>' +
+        '<div class="pkv-cal"></div>' + reqHtml() +
         '<div class="pkv-foot"><button class="acct-submit pkv-ok" type="button">' + (had ? _t('Enregistrer') : _t('Confirmer ma cueillette')) + '</button>' +
         (had ? _t('<button class="acct-btn pkv-keep" type="button">Garder ') + esc(CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end, true)) + '</button>' : '') +
+        _t('<button class="acct-btn pkv-exc" type="button">Demander une exception</button>') +
         '<p class="pkv-msg" role="status"></p></div>';
       var msg = $('.pkv-msg', side), ok = $('.pkv-ok', side), keep = $('.pkv-keep', side);
+      $('.pkv-exc', side).addEventListener('click', exView);
       var p = CO.picker($('.pkv-cal', side), { big: true, onChange: function () { msg.textContent = ''; } });
       p.load(list, had ? { d: x.pickup_date, s: x.pickup_start } : null);
       if (keep) keep.addEventListener('click', doneView);

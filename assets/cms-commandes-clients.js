@@ -52,8 +52,36 @@
       (x.pickup_start ? ', ' + CA.hourTxt(x.pickup_start) + (x.pickup_end ? ' – ' + CA.hourTxt(x.pickup_end) : '') : '');
   };
   CA.pickupLine = function (x) {
-    var t = CA.fmtPickup(x);
-    return t ? '<p class="co-pk"><b>Cueillette :</b> ' + esc(t) + '</p>' : '';
+    var t = CA.fmtPickup(x), q = x && x.pickup_req;
+    var req = q && q.state === 'pending'
+      ? '<div class="co-pk is-req"><p><b>Demande d\'exception :</b> ' + esc(CA.fmtPickup({ pickup_date: q.d, pickup_start: q.s })) + '</p>' +
+        (q.note ? '<p class="co-pk-note">' + esc(q.note) + '</p>' : '') +
+        '<div class="co-pk-act"><button type="button" class="btn btn-accent btn-sm" data-pkreq="yes" data-ic="check">Approuver</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-pkreq="no">Refuser</button></div></div>' : '';
+    return (t ? '<p class="co-pk"><b>Cueillette :</b> ' + esc(t) + '</p>' : '') + req;
+  };
+  // boutons Approuver / Refuser d'une demande (cartes Clients en ligne et Réservations) ; kind : 'order' | 'reservation'
+  CA.bindPickupReq = function (card, x, kind, reload) {
+    var q = x && x.pickup_req;
+    Array.prototype.slice.call(card.querySelectorAll('[data-pkreq]')).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var yes = btn.getAttribute('data-pkreq') === 'yes';
+        var when = CA.fmtPickup({ pickup_date: q.d, pickup_start: q.s });
+        (yes ? Promise.resolve('') : caDialog.prompt({ title: 'Refuser la demande ?', message: (x.name || x.email) + ' — ' + when,
+          placeholder: 'Mot pour le client (facultatif)', ok: 'Refuser' })).then(function (reply) {
+          if (reply === null) return;
+          btn.disabled = true;
+          sb.rpc('admin_decide_pickup', { p_kind: kind, p_id: x.id, p_ok: yes, p_reply: reply || null }).then(function (res) {
+            if (res.error) throw res.error;
+            sb.functions.invoke('pickup-request-notify', { body: { kind: kind, id: x.id, event: yes ? 'approved' : 'refused' } }).then(function (r) {
+              if (r && r.error) caDialog.toast('Courriel au client non envoyé.', 'bad');
+              else caDialog.toast(yes ? 'Approuvée — client prévenu.' : 'Refusée — client prévenu.');
+            }, function () { caDialog.toast('Courriel au client non envoyé.', 'bad'); });
+            reload();
+          }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
+        });
+      });
+    });
   };
   var STATUS = { 'new': 'Nouvelle', preparing: 'En préparation', ready: 'Prête', invoiced: 'Facturée', cancelled: 'Annulée' };
   var OPEN = { 'new': 1, preparing: 1, ready: 1 };
@@ -269,6 +297,7 @@
     $$('.co-card', listEl).forEach(function (card) {
       var o = orders.filter(function (x) { return x.id === card.getAttribute('data-id'); })[0];
       if (card.classList.contains('is-editing')) { bindEditor(card, o); return; }
+      CA.bindPickupReq(card, o, 'order', load);
       $$('[data-act]', card).forEach(function (btn) {
         btn.addEventListener('click', function () { act(o, btn.getAttribute('data-act'), btn); });
       });
