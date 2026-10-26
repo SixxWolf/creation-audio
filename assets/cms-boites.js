@@ -274,13 +274,25 @@
     out.fb = Math.ceil(hi * 10) / 10;
     return out;
   }
+  function scrollParent(n) {
+    for (n = n.parentElement; n && n !== document.body; n = n.parentElement) {
+      var o = getComputedStyle(n).overflowY;
+      if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+    }
+    return document.scrollingElement;
+  }
   function render() {
     if (!S.res) return;
+    var ae = document.activeElement, top0 = ae && ae.closest && ae.closest('#bx-app') && ae.getBoundingClientRect().top;
     renderSubInfo(); renderBox(); renderPort(); renderBuild(); renderSummary();
     build3d(); draw3d();
     if (UI.view === 'plan') renderPlan();
     renderChart(); renderCuts(); projStatus();
     syncFields();
+    if (top0 !== false && top0 != null && ae.isConnected) {   // la case active reste à la même place à l'écran quand les avertissements changent la hauteur au-dessus
+      var d = ae.getBoundingClientRect().top - top0;
+      if (Math.abs(d) > 0.5) scrollParent(ae).scrollTop += d;
+    }
   }
   function rep(rows) {
     return rows.filter(Boolean).map(function (r) {
