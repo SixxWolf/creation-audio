@@ -794,9 +794,9 @@
   /*  Unités et formats                                                  */
   /* ------------------------------------------------------------------ */
   function gcd(a, b) { return b ? gcd(b, a % b) : a; }
-  // pouces avec fraction au 1/16 : 14 3/4
+  // pouces avec fraction au 1/8 : 14 3/4
   function frac(inches, den) {
-    den = den || 16;
+    den = den || 8;
     var neg = inches < 0; inches = Math.abs(inches);
     var whole = Math.floor(inches + 1e-9), nn = Math.round((inches - whole) * den);
     if (nn === den) { whole++; nn = 0; }

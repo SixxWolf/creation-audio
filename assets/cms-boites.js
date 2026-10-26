@@ -95,8 +95,9 @@
   /*  Préférences d'affichage, unités                                    */
   /* ------------------------------------------------------------------ */
   var PREF_LS = 'bx-prefs', DRAFT_LS = 'bx-draft';
-  var UI = { units: 'in', den: 16, view: '3d', metric: 'spl', cabin: false, xray: false, dims: true };
+  var UI = { units: 'in', den: 8, view: '3d', metric: 'spl', cabin: false, xray: false, dims: true };
   try { merge(UI, JSON.parse(localStorage.getItem(PREF_LS) || '{}')); } catch (e) {}
+  if (UI.den !== 0) UI.den = 8;
   function savePrefs() { try { localStorage.setItem(PREF_LS, JSON.stringify(UI)); } catch (e) {} }
 
   function mm() { return UI.units === 'mm'; }
