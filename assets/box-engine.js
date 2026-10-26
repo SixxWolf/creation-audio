@@ -475,7 +475,7 @@
   /*  Assistant                                                          */
   /* ------------------------------------------------------------------ */
   // Repères d'écoute (auto) : accord, surface d'évent par pi³ net, vitesse max, Qtc scellée.
-  // vol = plage de volume autour de la recommandation, area / areaMax = po² par pi³ net,
+  // vol = plage de volume autour de la recommandation, area / areaMax = in² par pi³ net,
   // vmax = vitesse d'évent visée à pleine puissance (m/s), w = poids de la régularité.
   var GOALS = {
     sq:    { name: 'SQ', fb: [26, 34], vol: [0.85, 1.2], area: 12, areaMax: 18, vmax: 17, qtc: 0.707, sealed: 1.2, band: [22, 80], w: 2.0, mid: [25, 60] },
@@ -484,7 +484,7 @@
     spl:   { name: 'SPL', fb: [36, 48], vol: [1.1, 1.6], area: 20, areaMax: 26, vmax: 32, qtc: 1.0, sealed: 0.75, band: [35, 60], w: 0.15, mid: [38, 55] }
   };
   var SIZE_DB = 1;   // pénalité de taille : 1 dB par doublement de volume
-  var AREA_IN2_FT3 = (IN * IN) / FT3;    // po²/pi³ → m²/m³
+  var AREA_IN2_FT3 = (IN * IN) / FT3;    // in²/pi³ → m²/m³
 
   function parseVol(s) {
     // « 1.75cu ft », « 0.75–1.0 cu ft », « 5-6 CU FT » → pi³ (milieu d'une plage) ; texte = null
@@ -538,7 +538,7 @@
 
     var fq = freqs(15, 120, 70);
     var areaFor = function (vb, ratio) { return ratio * vb / FT3 * IN * IN; };
-    // surface visée imposée (po²/ft³) : remplace celle de l'objectif
+    // surface visée imposée (in²/ft³) : remplace celle de l'objectif
     var aR = inp.area > 0 ? inp.area : G.area, aRMax = inp.area > 0 ? inp.area : G.areaMax;
     function score(vb, fb, area) {
       var s = simulate({ ts: ts, n: n, coil: inp.coil, link: inp.link, watts: watts, type: type, vb: vb,

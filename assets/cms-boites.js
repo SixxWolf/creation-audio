@@ -102,11 +102,11 @@
   function mm() { return UI.units === 'mm'; }
   function inch(x) { return UI.den ? E.frac(x, UI.den) : fmt(x, 2); }
   function lenBare(m) { return mm() ? fmt(m * 1000, Math.abs(m) < 0.1 ? 1 : 0) : inch(m / IN); }
-  function lenTxt(m) { return m == null || !isFinite(m) ? '—' : lenBare(m) + (mm() ? ' mm' : ' po'); }
-  function dims3(a, b, c) { return [a, b, c].map(lenBare).join(' × ') + (mm() ? ' mm' : ' po'); }
+  function lenTxt(m) { return m == null || !isFinite(m) ? '—' : lenBare(m) + (mm() ? ' mm' : ' in'); }
+  function dims3(a, b, c) { return [a, b, c].map(lenBare).join(' × ') + (mm() ? ' mm' : ' in'); }
   function volTxt(m3) { return m3 == null || !isFinite(m3) ? '—' : mm() ? fmt(m3 / LITRE, 1) + ' L' : fmt(m3 / FT3, 2) + ' ft³'; }
-  function ratioTxt(r) { return mm() ? fmt(r * RATIO_MM, 1) + ' cm²/L' : fmt(r, 1) + ' po²/ft³'; }
-  function areaTxt(m2) { return mm() ? fmt(m2 / 1e-4, 0) + ' cm²' : fmt(m2 / (IN * IN), 1) + ' po²'; }
+  function ratioTxt(r) { return mm() ? fmt(r * RATIO_MM, 1) + ' cm²/L' : fmt(r, 1) + ' in²/ft³'; }
+  function areaTxt(m2) { return mm() ? fmt(m2 / 1e-4, 0) + ' cm²' : fmt(m2 / (IN * IN), 1) + ' in²'; }
   function hz(f, d) { return fmt(f, d == null ? (f < 100 ? 1 : 0) : d) + ' Hz'; }
   function ohm(z) {
     var v = +(+z).toFixed(z < 1 ? 2 : 1), d = Math.abs(v - Math.round(v)) < 1e-9 ? 0 : Math.abs(v * 10 - Math.round(v * 10)) < 1e-9 ? 1 : 2;
@@ -128,7 +128,7 @@
   }
   // pouces : « 14 3/4 », « 14-3/4 », « 3/4 », « 14,75 », « 14 3/4" »
   function parseIn(s) {
-    s = String(s == null ? '' : s).trim().replace(/,/g, '.').replace(/(["″]|po)$/, '').trim();
+    s = String(s == null ? '' : s).trim().replace(/,/g, '.').replace(/(["″]|po|in)$/, '').trim();
     if (!s) return null;
     var m = /^(\d+(?:\.\d+)?|\.\d+)?\s*(?:-?\s*(\d+)\s*\/\s*(\d+))?$/.exec(s);
     if (!m || (m[1] == null && m[2] == null)) return NaN;
@@ -145,7 +145,7 @@
   /*  Projet (document) et état                                          */
   /* ------------------------------------------------------------------ */
   var SHEETS = { '4x8': [96, 48], '5x5': [60, 60], '4x4': [48, 48] };
-  var RATIO_MM = (IN * IN / 1e-4) / (FT3 / 0.001);   // po²/ft³ → cm²/L
+  var RATIO_MM = (IN * IN / 1e-4) / (FT3 / 0.001);   // in²/ft³ → cm²/L
   var THICK = [0.5, 0.625, 0.75, 1];
   var TYPE_NAMES = { sealed: 'Scellée', slot: 'Évent fente', round: 'Évent rond' };
   var DEF_SUB = 'sd-sa12v3-d2';
@@ -390,7 +390,7 @@
           '<button class="fx-seg-btn" type="button" data-v="2" role="radio" aria-checked="false">Double</button></div></div>';
       }
       var input = '<input type="text" ' + (f.t === 'text' ? '' : 'inputmode="decimal" class="num" ') + 'id="' + id + '" data-k="' + f.k + '" autocomplete="off">';
-      var unit = f.t === 'len' ? (mm() ? 'mm' : 'po') : f.t === 'vol' ? (mm() ? 'L' : 'ft³') : f.u;
+      var unit = f.t === 'len' ? (mm() ? 'mm' : 'in') : f.t === 'vol' ? (mm() ? 'L' : 'ft³') : f.u;
       return '<div class="field"><label class="lbl" for="' + id + '">' + esc(f.l) + '</label>' +
         (unit ? '<span class="unit" data-unit="' + esc(unit) + '"' + (f.t === 'len' ? ' data-len' : f.t === 'vol' ? ' data-vol' : '') + '>' + input + '</span>' : input) + '</div>';
     }).join('');
@@ -570,7 +570,7 @@
       markDirty();
       if (!f.prop) schedule();
     };
-    // espace max : appliqué à la validation seulement (taper « 30 » ne doit pas plafonner à 3 po en passant)
+    // espace max : appliqué à la validation seulement (taper « 30 » ne doit pas plafonner à 3 in en passant)
     f.el.addEventListener('input', function () { if (!f.lazy) take(); });
     f.el.addEventListener('change', function () { if (f.lazy) take(); showField(f); });
   });
@@ -647,9 +647,9 @@
   }
   function sheetUI() { el.sheetDims.hidden = D.sheet.id !== 'custom'; }
   function unitsUI() {
-    $$('[data-len]', panel).forEach(function (s) { s.setAttribute('data-unit', mm() ? 'mm' : 'po'); });
+    $$('[data-len]', panel).forEach(function (s) { s.setAttribute('data-unit', mm() ? 'mm' : 'in'); });
     $$('[data-vol]', panel).forEach(function (s) { s.setAttribute('data-unit', mm() ? 'L' : 'ft³'); });
-    $$('[data-ratio]', panel).forEach(function (s) { s.setAttribute('data-unit', mm() ? 'cm²/L' : 'po²/ft³'); });
+    $$('[data-ratio]', panel).forEach(function (s) { s.setAttribute('data-unit', mm() ? 'cm²/L' : 'in²/ft³'); });
     el.denF.hidden = mm();
   }
   function nearT() {
