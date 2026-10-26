@@ -575,6 +575,46 @@
     f.el.addEventListener('input', function () { if (!f.lazy) take(); });
     f.el.addEventListener('change', function () { if (f.lazy) take(); showField(f); });
   });
+  /* Molette sur les champs numériques */
+  function spinKind(inp) {
+    for (var i = 0; i < FIELDS.length; i++) if (FIELDS[i].el === inp) return { k: FIELDS[i].k, d: FIELDS[i].d };
+    var kk = inp.getAttribute && inp.getAttribute('data-k'), f = kk && tsDef(kk);
+    return f && f.t !== 'text' && f.t !== 'seg' ? { k: f.t } : null;
+  }
+  function spinStep(inp, dir, big) {
+    var kd = spinKind(inp);
+    if (!kd || inp.readOnly) return false;
+    var txt = inp.value.trim() || inp.placeholder || '', m = big ? 10 : 1, v, step, out;
+    if (kd.k === 'len' || kd.k === 'vol') {
+      v = kd.k === 'len' ? parseLen(txt) : parseVolF(txt);
+      if (v == null) v = 0;
+      if (isNaN(v)) return false;
+      step = (kd.k === 'len' ? (mm() ? 0.001 : IN / 8) : (mm() ? 0.5 * LITRE : 0.01 * FT3)) * (kd.k === 'len' && !mm() && big ? 8 : m);
+      var n = v / step;
+      v = (dir > 0 ? Math.floor(n + 1e-9) + 1 : Math.ceil(n - 1e-9) - 1) * step;
+      if (v < 0) v = 0;
+      out = kd.k === 'len' ? lenField(v) : volField(v);
+    } else {
+      v = parseNum(txt);
+      if (v == null) v = 0;
+      if (isNaN(v)) return false;
+      step = (kd.d === 0 ? 1 : v < 1 ? 0.01 : v < 10 ? 0.1 : 1) * m;
+      var q = v / step;
+      v = (dir > 0 ? Math.floor(q + 1e-9) + 1 : Math.ceil(q - 1e-9) - 1) * step;
+      if (v < 0) v = 0;
+      out = numField(v, 3);
+    }
+    inp.value = out;
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+  var bxRoot = document.querySelector('.bx') || document;
+  bxRoot.addEventListener('wheel', function (e) {
+    var inp = e.target;
+    if (!inp || inp.tagName !== 'INPUT' || inp !== document.activeElement || !spinKind(inp)) return;
+    if (spinStep(inp, e.deltaY < 0 ? 1 : -1, e.shiftKey)) e.preventDefault();
+  }, { passive: false });
   function placeholders() {
     el.ql.placeholder = D.P.type === 'sealed' ? '100' : '10';
     el.watts.placeholder = fmt(((D.rec && D.rec.rms) || 500) * D.n);
