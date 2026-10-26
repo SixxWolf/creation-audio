@@ -456,7 +456,7 @@
 
       function tag(n) { return '<span class="news-tag k-' + esc(n.kind) + '">' + esc(KINDS[n.kind] || '') + '</span>'; }
       function feature(n) {
-        var img = CA.newsImg(n.image_path), meta = newsMeta(n), href = CA.newsHref(n.cta_url);
+        var img = CA.newsImg(CA.tr(n, 'img') || n.image_path), meta = newsMeta(n), href = CA.newsHref(n.cta_url);
         return '<article class="news-feat k-' + esc(n.kind) + (img ? '' : ' no-img') + '">' +
           (img ? '<div class="news-media"><img src="' + esc(img) + '" alt="" loading="lazy"></div>' : '') +
           '<div class="news-body">' +
@@ -473,7 +473,7 @@
         '</article>';
       }
       function mini(n, i) {
-        var img = CA.newsImg(n.image_path), meta = newsMeta(n);
+        var img = CA.newsImg(CA.tr(n, 'img') || n.image_path), meta = newsMeta(n);
         return '<button type="button" class="news-mini' + (i === cur ? ' is-on' : '') + '" data-i="' + i + '" aria-pressed="' + (i === cur) + '">' +
           (img ? '<span class="news-thumb"><img src="' + esc(img) + '" alt="" loading="lazy"></span>' : '') +
           '<span class="news-mini-txt">' +

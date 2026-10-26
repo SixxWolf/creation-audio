@@ -3565,7 +3565,8 @@ begin
     update public.materials set i18n = v where brand = p_key ->> 'brand' and name = p_key ->> 'name'
        and md5(public._i18n_src('materials', to_jsonb(materials))::text) = p_h;
   elsif p_tbl = 'news' then
-    update public.news set i18n = v where id = (p_key ->> 'id')::uuid
+    -- « img » = visuel anglais (assets/news/<id8>-en.png), posé à la main : conservé à la re-traduction
+    update public.news set i18n = jsonb_strip_nulls(jsonb_build_object('img', i18n -> 'img')) || v where id = (p_key ->> 'id')::uuid
        and md5(public._i18n_src('news', to_jsonb(news))::text) = p_h;
   else return false; end if;
   get diagnostics n = row_count;
