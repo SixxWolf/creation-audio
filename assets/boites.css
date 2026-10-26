@@ -98,13 +98,6 @@ body[data-tab="boites"] main { max-width:none; padding-bottom:24px; }
 .bx-ts { margin-bottom:12px; }
 .bx-ts .unit > input { padding-right:46px; }
 
-/* proposition de l'assistant */
-.bx-prop { margin-top:14px; padding:12px 14px; background:color-mix(in srgb, var(--ember) 7%, var(--paper));
-  border:1px solid color-mix(in srgb, var(--ember) 35%, var(--line)); border-radius:12px; }
-.bx-prop[hidden] { display:none; }
-.bx-prop .bx-rep { margin-bottom:10px; }
-.bx-prop .bx-rep > div { border-top-color:color-mix(in srgb, var(--ember) 18%, var(--line)); }
-.bx-prop .bx-list { margin-bottom:10px; }
 .bx-ref { margin:0 0 14px; font-size:.86rem; color:var(--ink-2); }
 .bx-ref:empty { display:none; }
 .bx-ref b { color:var(--ink); font-weight:700; }

@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
-<link rel="stylesheet" href="assets/boites.css?v=4">
+<link rel="stylesheet" href="assets/boites.css?v=5">
 <link rel="stylesheet" href="assets/dialog.css?v=1">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}}catch(e){}</script>
@@ -2318,6 +2318,7 @@
               <select id="bx-sub"></select>
             </div>
             <div class="bx-kv" id="bx-sub-rep"></div>
+            <p class="bx-ref" id="bx-ref"></p>
             <div class="bx-f">
               <span class="lbl">Nombre</span>
               <div class="fx-seg bx-seg" id="bx-n" role="radiogroup" aria-label="Nombre de subs">
@@ -2341,6 +2342,16 @@
                 <span class="unit" data-unit="V"><input type="text" id="bx-volts" class="num" readonly tabindex="-1"></span>
               </div>
             </div>
+            <div class="grid bx-grid">
+              <div class="field">
+                <label class="lbl" for="bx-veh">Véhicule</label>
+                <select id="bx-veh"></select>
+              </div>
+              <div class="field" id="bx-fc-f" hidden>
+                <label class="lbl" for="bx-fc">Gain de cabine</label>
+                <span class="unit" data-unit="Hz"><input type="text" inputmode="decimal" id="bx-fc" class="num" autocomplete="off"></span>
+              </div>
+            </div>
             <details class="bx-more" id="bx-ts-box">
               <summary>Paramètres T/S <span class="bx-more-n" id="bx-ts-n"></span></summary>
               <div class="grid bx-grid bx-ts" id="bx-ts"></div>
@@ -2354,59 +2365,7 @@
           </details>
 
           <details class="al-card al-acc bx-step" open>
-            <summary class="al-card-head"><span class="al-ic al-step">2</span> Objectif <span class="al-note">assistant</span></summary>
-            <p class="bx-ref" id="bx-ref"></p>
-            <div class="bx-f">
-              <span class="lbl">Écoute</span>
-              <div class="fx-seg bx-seg" id="bx-goal" role="radiogroup" aria-label="Objectif d'écoute">
-                <button class="fx-seg-btn" type="button" data-v="sq" role="radio" aria-checked="false">SQ</button>
-                <button class="fx-seg-btn is-active" type="button" data-v="daily" role="radio" aria-checked="true">Polyvalent</button>
-                <button class="fx-seg-btn" type="button" data-v="sql" role="radio" aria-checked="false">SQL</button>
-                <button class="fx-seg-btn" type="button" data-v="spl" role="radio" aria-checked="false">SPL</button>
-              </div>
-            </div>
-            <div class="bx-f">
-              <span class="lbl">Type</span>
-              <div class="fx-seg bx-seg" id="bx-atype" role="radiogroup" aria-label="Type proposé">
-                <button class="fx-seg-btn is-active" type="button" data-v="auto" role="radio" aria-checked="true">Auto</button>
-                <button class="fx-seg-btn" type="button" data-v="sealed" role="radio" aria-checked="false">Scellée</button>
-                <button class="fx-seg-btn" type="button" data-v="slot" role="radio" aria-checked="false">Fente</button>
-                <button class="fx-seg-btn" type="button" data-v="round" role="radio" aria-checked="false">Rond</button>
-              </div>
-            </div>
-            <div class="bx-f">
-              <span class="lbl">Espace max</span>
-              <div class="grid bx-grid3">
-                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-max-w" class="num" placeholder="L" aria-label="Largeur max" autocomplete="off"></span>
-                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-max-h" class="num" placeholder="H" aria-label="Hauteur max" autocomplete="off"></span>
-                <span class="unit" data-unit="po" data-len><input type="text" inputmode="decimal" id="bx-max-d" class="num" placeholder="P" aria-label="Profondeur max" autocomplete="off"></span>
-              </div>
-            </div>
-            <div class="grid bx-grid">
-              <div class="field">
-                <label class="lbl" for="bx-veh">Véhicule</label>
-                <select id="bx-veh"></select>
-              </div>
-              <div class="field" id="bx-fc-f" hidden>
-                <label class="lbl" for="bx-fc">Gain de cabine</label>
-                <span class="unit" data-unit="Hz"><input type="text" inputmode="decimal" id="bx-fc" class="num" autocomplete="off"></span>
-              </div>
-            </div>
-            <div class="bx-row">
-              <button class="btn btn-accent btn-sm" type="button" id="bx-propose" data-ic="play">Proposer</button>
-            </div>
-            <div class="bx-prop" id="bx-prop" hidden>
-              <div class="bx-rep" id="bx-prop-rep"></div>
-              <ul class="bx-list" id="bx-prop-why"></ul>
-              <div class="bx-row">
-                <button class="btn btn-accent btn-sm" type="button" id="bx-apply" data-ic="check">Appliquer</button>
-                <button class="btn btn-ghost btn-sm" type="button" id="bx-prop-x">Ignorer</button>
-              </div>
-            </div>
-          </details>
-
-          <details class="al-card al-acc bx-step" open>
-            <summary class="al-card-head"><span class="al-ic al-step">3</span> Boîte <span class="al-note" id="bx-box-sum"></span></summary>
+            <summary class="al-card-head"><span class="al-ic al-step">2</span> Boîte <span class="al-note" id="bx-box-sum"></span></summary>
             <div class="field">
               <label class="lbl" for="bx-type">Type</label>
               <select id="bx-type">
@@ -2453,7 +2412,7 @@
           </details>
 
           <details class="al-card al-acc bx-step" open id="bx-port-step">
-            <summary class="al-card-head"><span class="al-ic al-step">4</span> Évent <span class="al-note" id="bx-port-sum"></span></summary>
+            <summary class="al-card-head"><span class="al-ic al-step">3</span> Évent <span class="al-note" id="bx-port-sum"></span></summary>
             <div class="grid bx-grid">
               <div class="field">
                 <label class="lbl" for="bx-fb">Accord</label>
@@ -2497,7 +2456,7 @@
           </details>
 
           <details class="al-card al-acc bx-step" open>
-            <summary class="al-card-head"><span class="al-ic al-step">5</span> Construction <span class="al-note" id="bx-build-sum"></span></summary>
+            <summary class="al-card-head"><span class="al-ic al-step">4</span> Construction <span class="al-note" id="bx-build-sum"></span></summary>
             <div class="bx-f">
               <span class="lbl">Épaisseur</span>
               <div class="fx-seg bx-seg" id="bx-t" role="radiogroup" aria-label="Épaisseur du bois">
@@ -2546,7 +2505,7 @@
           </details>
 
           <details class="al-card al-acc bx-step" open>
-            <summary class="al-card-head"><span class="al-ic al-step">6</span> Coupes <span class="al-note" id="bx-cut-note"></span></summary>
+            <summary class="al-card-head"><span class="al-ic al-step">5</span> Coupes <span class="al-note" id="bx-cut-note"></span></summary>
             <div class="bx-f">
               <span class="lbl">Feuille</span>
               <div class="fx-seg bx-seg" id="bx-sheet" role="radiogroup" aria-label="Feuille">
@@ -2854,7 +2813,7 @@
 <!-- Boîtes : moteur sans DOM + bibliothèque Sundown, puis l'onglet -->
 <script src="assets/box-engine.js?v=4"></script>
 <script src="assets/box-subs.js?v=1"></script>
-<script src="assets/cms-boites.js?v=8"></script>
+<script src="assets/cms-boites.js?v=9"></script>
 <script src="assets/cms-production.js?v=11"></script>
 <script src="assets/cms-aujourdhui.js?v=1"></script>
 <script src="assets/cms-nouvelles.js?v=4"></script>

@@ -1,9 +1,8 @@
 /* =========================================================
    Création Audio — Boîtes (onglet admin, groupe Atelier)
    Calculateur de boîtes de sub : ① sub + ampli (bibliothèque Sundown,
-   Mes subs, éditeur T/S vérifié), ② assistant (objectif d'écoute + espace
-   max + véhicule), ③ boîte (scellée, évent fente, évent rond ; cotes ou
-   volume visé), ④ évent, ⑤ construction, ⑥ coupes. Centre : aperçu 3D
+   Mes subs, éditeur T/S vérifié, véhicule), ② boîte (scellée, évent fente,
+   évent rond ; cotes ou volume visé), ③ évent, ④ construction, ⑤ coupes. Centre : aperçu 3D
    (WebGL, sans bibliothèque) ou plan coté (SVG) ; droite : courbes à la
    WinISD (superposition de projets) et feuilles de coupe imprimables.
    Calculs : box-engine.js (sans DOM). Bibliothèque : box-subs.js.
@@ -24,8 +23,7 @@
     sub: $('#bx-sub'), subRep: $('#bx-sub-rep'), subSum: $('#bx-sub-sum'), wiring: $('#bx-wiring'), watts: $('#bx-watts'), volts: $('#bx-volts'),
     tsBox: $('#bx-ts-box'), ts: $('#bx-ts'), tsN: $('#bx-ts-n'), tsNotes: $('#bx-ts-notes'),
     subSave: $('#bx-sub-save'), subNew: $('#bx-sub-new'), subDel: $('#bx-sub-del'),
-    ref: $('#bx-ref'), maxW: $('#bx-max-w'), maxH: $('#bx-max-h'), maxD: $('#bx-max-d'), veh: $('#bx-veh'), fcF: $('#bx-fc-f'), fc: $('#bx-fc'),
-    propose: $('#bx-propose'), prop: $('#bx-prop'), propRep: $('#bx-prop-rep'), propWhy: $('#bx-prop-why'), apply: $('#bx-apply'), propX: $('#bx-prop-x'),
+    ref: $('#bx-ref'), veh: $('#bx-veh'), fcF: $('#bx-fc-f'), fc: $('#bx-fc'),
     type: $('#bx-type'), vtF: $('#bx-vt-f'), vt: $('#bx-vt'), w: $('#bx-w'), h: $('#bx-h'), d: $('#bx-d'),
     boxRep: $('#bx-box-rep'), boxWarn: $('#bx-box-warn'), boxSum: $('#bx-box-sum'),
     portStep: $('#bx-port-step'), portSum: $('#bx-port-sum'), fb: $('#bx-fb'), pw: $('#bx-pw'), dp: $('#bx-dp'), wall: $('#bx-wall'), k: $('#bx-k'),
@@ -164,7 +162,7 @@
   function subName(r) { return r ? (r.model || 'Sub sans nom') + (r.coil ? ' · ' + r.coil : '') : 'Sub'; }
 
   var D, S = {
-    tsc: null, recDirty: false, res: null, prop: null, overlays: [], explode: 0,
+    tsc: null, recDirty: false, res: null, overlays: [], explode: 0,
     proj: { id: null, name: '' }, dirty: false, saved: [], my: [], volOk: true
   };
   var draft = null;
@@ -476,9 +474,6 @@
   /* ------------------------------------------------------------------ */
   var FIELDS = [
     { el: el.watts, k: 'num', get: function () { return D.watts; }, set: function (v) { D.watts = v; }, empty: true, min: 1, d: 0 },
-    { el: el.maxW, k: 'len', get: function () { return D.max.w; }, set: function (v) { D.max.w = v; }, empty: true, min: 2 * IN, prop: true },
-    { el: el.maxH, k: 'len', get: function () { return D.max.h; }, set: function (v) { D.max.h = v; }, empty: true, min: 2 * IN, prop: true },
-    { el: el.maxD, k: 'len', get: function () { return D.max.d; }, set: function (v) { D.max.d = v; }, empty: true, min: 2 * IN, prop: true },
     { el: el.fc, k: 'num', get: function () { return D.fc; }, set: function (v) { D.fc = v; }, min: 10, max: 200, d: 0 },
     { el: el.vt, k: 'vol', get: function () { return D.vt; }, set: function (v) { D.vt = v; }, min: 0.05 * FT3 },
     { el: el.w, k: 'len', get: function () { return D.P.w; }, set: function (v) { D.P.w = v; }, min: 3 * IN },
@@ -523,10 +518,8 @@
     placeholders();
   }
 
-  onSeg('bx-units', function (v) { UI.units = v; savePrefs(); unitsUI(); syncFields(); syncTS(); render(); if (S.prop) renderProp(); });
+  onSeg('bx-units', function (v) { UI.units = v; savePrefs(); unitsUI(); syncFields(); syncTS(); render(); });
   onSeg('bx-n', function (v) { D.n = +v; fillWiring(false); markDirty(); schedule(); });
-  onSeg('bx-goal', function (v) { D.goal = v; markDirty(); });
-  onSeg('bx-atype', function (v) { D.atype = v; markDirty(); });
   onSeg('bx-mode', function (v) {
     if (v === 'vol' && S.res && S.res.g.net > 0) D.vt = S.res.g.net;
     D.mode = v; modeUI(); syncFields(); markDirty(); schedule();
@@ -540,7 +533,7 @@
     if (SHEETS[v]) { D.sheet.L = SHEETS[v][0] * IN; D.sheet.W = SHEETS[v][1] * IN; }
     sheetUI(); syncFields(); markDirty(); schedule();
   });
-  onSeg('bx-den', function (v) { UI.den = +v; savePrefs(); syncFields(); syncTS(); render(); if (S.prop) renderProp(); });
+  onSeg('bx-den', function (v) { UI.den = +v; savePrefs(); syncFields(); syncTS(); render(); });
   onSeg('bx-view', function (v) { UI.view = v; savePrefs(); viewUI(); });
 
   el.type.addEventListener('change', function () {
@@ -592,7 +585,7 @@
     return best == null ? '' : String(best);
   }
   function syncAll() {
-    setSeg('bx-units', UI.units); setSeg('bx-n', String(D.n)); setSeg('bx-goal', D.goal); setSeg('bx-atype', D.atype);
+    setSeg('bx-units', UI.units); setSeg('bx-n', String(D.n));
     setSeg('bx-mode', D.mode); setSeg('bx-side', D.P.port.side); setSeg('bx-np', String(D.P.port.np)); setSeg('bx-t', nearT());
     setSeg('bx-layers', String(D.P.layers)); setSeg('bx-sheet', D.sheet.id); setSeg('bx-den', String(UI.den)); setSeg('bx-view', UI.view);
     el.brace.checked = !!D.P.brace; el.flare.checked = !!D.P.port.flare; el.grain.checked = !!D.sheet.grain;
@@ -605,7 +598,7 @@
   }
 
   /* ------------------------------------------------------------------ */
-  /*  ②  Assistant                                                       */
+  /*  Boîte de départ (proposée pour le sub)                             */
   /* ------------------------------------------------------------------ */
   function proposeNow() {
     return E.propose({
@@ -622,44 +615,9 @@
     if (Q.type === 'round') { P.port.dp = Q.port.dp; P.port.np = Q.port.np; P.port.flare = Q.port.flare; }
     D.mode = 'dims';
   }
-  function renderProp() {
-    var r = S.prop;
-    if (!r) return;
-    var g = r.g, vented = r.type !== 'sealed';
-    el.propRep.innerHTML = rep([
-      ['Type', TYPE_NAMES[r.type]],
-      ['Volume net', volTxt(r.vb)],
-      vented ? ['Accord', hz(g.port ? g.port.fb : r.fb, 1)] : null,
-      vented && g.port ? ['Évent', areaTxt(g.port.Sp) + ' · ' + lenTxt(g.port.L)] : null,
-      ['Cotes', dims3(r.P.w, r.P.h, r.P.d)],
-      r.ok ? null : ['État', g.err[0] || 'à revoir', 'bad']
-    ]);
-    el.propWhy.innerHTML = r.why.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('');
-    el.prop.hidden = false;
-  }
-  function closeProp() { S.prop = null; el.prop.hidden = true; removeOverlay('prop'); }
-  el.propose.addEventListener('click', function () {
-    if (!S.tsc.ok) { toast('Paramètres T/S incomplets', 'bad'); return; }
-    el.propose.disabled = true; el.propose.textContent = 'Calcul…';
-    setTimeout(function () {
-      var r = null;
-      try { r = proposeNow(); } catch (e) { if (window.console) console.error(e); }
-      el.propose.disabled = false; el.propose.textContent = 'Proposer';
-      if (!r) { toast('Proposition impossible', 'bad'); return; }
-      S.prop = r; renderProp();
-      removeOverlay('prop');
-      var sim = E.run(runInput(r.P), S.tsc.ts, { f: FQ }).sim;
-      if (sim) addOverlay({ key: 'prop', name: 'Proposition', sim: sim, dash: '2 4', vented: r.type !== 'sealed', quiet: true });
-    }, 30);
-  });
-  el.apply.addEventListener('click', function () {
-    if (!S.prop) return;
-    applyProp(S.prop); closeProp(); syncAll(); markDirty(); schedule();
-  });
-  el.propX.addEventListener('click', closeProp);
 
   /* ------------------------------------------------------------------ */
-  /*  ③ ④ ⑤  Rapports                                                    */
+  /*  Rapports                                                           */
   /* ------------------------------------------------------------------ */
   function renderBox() {
     var g = S.res.g;
@@ -1296,7 +1254,7 @@
     var b = e.target.closest('[data-rm]');
     if (!b) return;
     var key = b.getAttribute('data-rm');
-    if (key === 'prop') closeProp(); else removeOverlay(key);
+    removeOverlay(key);
   });
   el.metric.addEventListener('change', function () { UI.metric = el.metric.value; savePrefs(); renderChart(); });
   el.cabin.addEventListener('change', function () { UI.cabin = el.cabin.checked; savePrefs(); renderChart(); });
@@ -1458,7 +1416,6 @@
   }
   function afterLoad() {
     S.tsc = E.completeTS(D.rec);
-    S.prop = null; el.prop.hidden = true;
     S.overlays = S.overlays.filter(function (o) { return o.key !== 'prop'; });
     fillSubs(); fillWiring(false); buildTS(); syncAll(); fillProjects(); schedule();
   }
@@ -1570,7 +1527,7 @@
   new MutationObserver(function () { if (app.offsetParent) { draw3d(); renderChart(); } })
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style'] });
 
-  // Premier passage : sans brouillon, l'assistant propose une boîte pour le sub par défaut.
+  // Premier passage : sans brouillon, on part d'une boîte proposée pour le sub par défaut.
   if (!draft && S.tsc.ok) { try { applyProp(proposeNow()); } catch (e) {} S.dirty = false; }
   fillVehicles(); fillSubs(); fillWiring(false); buildTS(); syncAll(); fillProjects();
   compute(); render();
