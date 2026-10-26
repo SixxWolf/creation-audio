@@ -156,7 +156,7 @@
       sub: 'lib:' + DEF_SUB, rec: null,
       n: 1, coil: null, link: 'parallel', watts: null,
       goal: 'daily', atype: 'auto', max: { w: null, h: null, d: null }, vehicle: 'sedan', fc: 50,
-      P: { type: 'slot', w: 30 * IN, h: 15 * IN, d: 18 * IN, t: 0.75 * IN, layers: 1, n: 1, fb: 34, brace: false, stuff: 0, ql: null,
+      P: { type: 'slot', w: 30 * IN, h: 15 * IN, d: 18 * IN, t: 0.75 * IN, layers: 1, mount: 'overlay', n: 1, fb: 34, brace: false, stuff: 0, ql: null,
         port: { side: 'left', pw: 2.5 * IN, dp: 4 * IN, np: 1, wall: 0.25 * IN, flare: true, k: 0.732, soft: true, rad: 0.375 * IN } },
       mode: 'dims', vt: null, ratio: null, mat: 'mdf', finish: 'raw',
       sheet: { id: '4x8', L: 96 * IN, W: 48 * IN, kerf: 0.125 * IN, trim: 0, grain: false }
@@ -648,6 +648,7 @@
   onSeg('bx-np', function (v) { D.P.port.np = +v; markDirty(); schedule(); });
   onSeg('bx-t', function (v) { D.P.t = +v * IN; markDirty(); schedule(); });
   onSeg('bx-layers', function (v) { D.P.layers = +v; markDirty(); schedule(); });
+  onSeg('bx-mount', function (v) { D.P.mount = v; markDirty(); schedule(); });
   onSeg('bx-sheet', function (v) {
     D.sheet.id = v;
     if (SHEETS[v]) { D.sheet.L = SHEETS[v][0] * IN; D.sheet.W = SHEETS[v][1] * IN; }
@@ -716,7 +717,7 @@
   function syncAll() {
     setSeg('bx-units', UI.units); setSeg('bx-n', String(D.n));
     setSeg('bx-mode', D.mode); setSeg('bx-side', D.P.port.side); setSeg('bx-np', String(D.P.port.np)); setSeg('bx-t', nearT());
-    setSeg('bx-layers', String(D.P.layers)); setSeg('bx-sheet', D.sheet.id); setSeg('bx-den', String(UI.den)); setSeg('bx-view', UI.view);
+    setSeg('bx-layers', String(D.P.layers)); setSeg('bx-mount', D.P.mount === 'inset' ? 'inset' : 'overlay'); setSeg('bx-sheet', D.sheet.id); setSeg('bx-den', String(UI.den)); setSeg('bx-view', UI.view);
     el.brace.checked = !!D.P.brace; el.flare.checked = !!D.P.port.flare; el.soft.checked = D.P.port.soft !== false; el.grain.checked = !!D.sheet.grain;
     el.xray.checked = !!UI.xray; el.dims.checked = !!UI.dims;
     el.stuff.value = Math.round((D.P.stuff || 0) * 100); el.stuffV.textContent = el.stuff.value + ' %';
@@ -1446,6 +1447,8 @@
       if (n.k === 'win') return 'fenêtre ' + lenBare(n.w) + ' × ' + lenTxt(n.h);
       if (n.k === 'bevel') return 'chanfrein 45° · jambe ' + lenTxt(n.c);
       if (n.k === 'round') return 'coin arrondi ' + lenTxt(n.r);
+      if (n.k === 'edge') return 'arête de la fente arrondie ' + lenTxt(n.r);
+      if (n.k === 'notch') return 'encoche ' + lenBare(n.w) + ' × ' + lenTxt(n.d) + ' (côté façade)';
       return '';
     }).filter(Boolean).join(' · ');
   }

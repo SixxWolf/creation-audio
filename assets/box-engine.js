@@ -153,7 +153,9 @@
     var pw = P.type === 'slot' ? Math.max(pos(pp.pw) || IN, 0.25 * IN) : 0;
     g.side = side;
 
-    // façade : entre les côtés (et le mur d'évent pour une fente)
+    // façade : recouvrement (défaut, elle repose sur les chants : butée vers l'arrière) ou encastrée
+    // entre les côtés (et le mur d'évent pour une fente). g.baffle = zone utile intérieure.
+    g.overlay = P.mount !== 'inset';
     var bx0 = t, bx1 = W - t;
     if (P.type === 'slot') bx0 = 2 * t + pw;
     g.baffle = { x0: bx0, x1: bx1, w: bx1 - bx0 };
@@ -287,30 +289,48 @@
   function panels(g, P) {
     var W = g.W, H = g.H, D = g.D, t = g.t, out = [];
     var add = function (o) { out.push(o); };
-    add({ role: 'bottom', name: 'Dessous', x0: 0, x1: W, y0: 0, y1: t, z0: 0, z1: D, cut: [W, D], ex: [0, -1, 0] });
-    add({ role: 'top', name: 'Dessus', x0: 0, x1: W, y0: H - t, y1: H, z0: 0, z1: D, cut: [W, D], ex: [0, 1, 0] });
-    add({ role: 'side', name: 'Côté gauche', x0: 0, x1: t, y0: t, y1: H - t, z0: 0, z1: D, cut: [D, H - 2 * t], ex: [-1, 0, 0] });
-    add({ role: 'side', name: 'Côté droit', x0: W - t, x1: W, y0: t, y1: H - t, z0: 0, z1: D, cut: [D, H - 2 * t], ex: [1, 0, 0] });
+    var ov = g.overlay, tf = g.tf, slotP = P.type === 'slot';
+    var zf = ov ? tf : 0;                                   // avant des côtés / dessus / dessous (la façade les recouvre)
+    var zfL = ov && !slotP ? tf : 0;                        // côté de la fente : reste à z = 0 (sortie d'évent)
+    var tb = function (name, role, y0, y1, ey) {
+      var o = { role: role, name: name, x0: 0, x1: W, y0: y0, y1: y1, z0: ov && !slotP ? tf : 0, z1: D, cut: [W, D - (ov && !slotP ? tf : 0)], ex: [0, ey, 0] };
+      if (ov && slotP) {                                    // encoche : la façade commence à la fente
+        o.poly = [[0, 0], [0, D], [W, D], [W, tf], [t + P.port.pw, tf], [t + P.port.pw, 0]];
+        o.notes = [{ k: 'notch', w: W - t - P.port.pw, d: tf }];
+      }
+      return o;
+    };
+    add(tb('Dessous', 'bottom', 0, t, -1));
+    add(tb('Dessus', 'top', H - t, H, 1));
+    add({ role: 'side', name: 'Côté gauche', x0: 0, x1: t, y0: t, y1: H - t, z0: zfL, z1: D, cut: [D - zfL, H - 2 * t], ex: [-1, 0, 0] });
+    add({ role: 'side', name: 'Côté droit', x0: W - t, x1: W, y0: t, y1: H - t, z0: zf, z1: D, cut: [D - zf, H - 2 * t], ex: [1, 0, 0] });
     add({ role: 'back', name: 'Arrière', x0: t, x1: W - t, y0: t, y1: H - t, z0: D - t, z1: D, cut: [W - 2 * t, H - 2 * t], ex: [0, 0, 1] });
     var holes = (g.subs || []).map(function (s) { return { x: s.x, y: s.y, r: g.cut / 2 }; });
     if (g.port && g.port.shape === 'round') g.port.ys.forEach(function (y) { holes.push({ x: g.port.x, y: y, r: g.port.dp / 2 + g.port.wall }); });
+    var fx0 = ov ? (slotP ? t + P.port.pw : 0) : g.baffle.x0, fx1 = ov ? W : g.baffle.x1;
+    var fy0 = ov ? 0 : t, fy1 = ov ? H : H - t;
     for (var i = 0; i < g.layers; i++) {
-      add({ role: 'baffle', name: g.layers > 1 ? 'Façade ' + (i + 1) : 'Façade', layer: i, x0: g.baffle.x0, x1: g.baffle.x1, y0: t, y1: H - t,
-        z0: i * t, z1: (i + 1) * t, cut: [g.baffle.w, H - 2 * t], holes: holes, ex: [0, 0, -1 - (g.layers - 1 - i) * 0.6] });
+      add({ role: 'baffle', name: g.layers > 1 ? 'Façade ' + (i + 1) : 'Façade', layer: i, x0: fx0, x1: fx1, y0: fy0, y1: fy1,
+        z0: i * t, z1: (i + 1) * t, cut: [fx1 - fx0, fy1 - fy0], holes: holes, ex: [0, 0, -1 - (g.layers - 1 - i) * 0.6] });
     }
     var p = g.port;
     if (p && p.shape !== 'round') {
-      var mur = { role: 'port', name: 'Mur d\'évent', x0: t + p.pw, x1: 2 * t + p.pw, y0: t, y1: H - t, z0: 0, z1: p.wall1, cut: [p.wall1, H - 2 * t], ex: [0.25, 0, -0.2] };
+      var mz0 = ov ? tf : 0;                                // recouvrement : le mur commence derrière la façade
+      var mur = { role: 'port', name: 'Mur d\'évent', x0: t + p.pw, x1: 2 * t + p.pw, y0: t, y1: H - t, z0: mz0, z1: p.wall1, cut: [p.wall1 - mz0, H - 2 * t], ex: [0.25, 0, -0.2] };
       if (p.soft && p.rad > 0.0005) {                      // sortie : arête du mur côté fente et arête intérieure du côté gauche arrondies
         var rr = p.rad, k0, side = out.filter(function (q) { return q.name === 'Côté gauche'; })[0];
-        mur.poly = [[mur.x1, 0], [mur.x1, mur.z1], [mur.x0, mur.z1], [mur.x0, rr]];
-        for (k0 = 1; k0 <= 8; k0++) { var a0 = Math.PI * (1 + k0 / 16); mur.poly.push([mur.x0 + rr + rr * Math.cos(a0), rr + rr * Math.sin(a0)]); }
-        mur.notes = [{ k: 'round', r: rr }];
+        if (!ov) {
+          mur.poly = [[mur.x1, 0], [mur.x1, mur.z1], [mur.x0, mur.z1], [mur.x0, rr]];
+          for (k0 = 1; k0 <= 8; k0++) { var a0 = Math.PI * (1 + k0 / 16); mur.poly.push([mur.x0 + rr + rr * Math.cos(a0), rr + rr * Math.sin(a0)]); }
+          mur.notes = [{ k: 'round', r: rr }];
+        } else {                                           // l'arête côté fente est celle de la façade (calibre de toupie)
+          out.forEach(function (q) { if (q.role === 'baffle' && q.layer === 0) q.notes = [{ k: 'edge', r: rr }]; });
+        }
         side.poly = [[0, 0], [0, D], [t, D], [t, rr]];
         for (k0 = 1; k0 <= 8; k0++) { var a1 = 2 * Math.PI - Math.PI / 2 * k0 / 8; side.poly.push([t - rr + rr * Math.cos(a1), rr + rr * Math.sin(a1)]); }
         side.notes = [{ k: 'round', r: rr }];
       }
-      add(mur);
+      if (mur.cut[0] > 0.0005) add(mur);
       if (p.shape === 'L') {
         var ret = { role: 'port', name: 'Retour d\'évent', x0: t + p.pw, x1: t + p.pw + p.wall2, y0: t, y1: H - t,
           z0: g.zb - p.pw - t, z1: g.zb - p.pw, cut: [p.wall2, H - 2 * t], ex: [0.2, 0, 0.35] };
@@ -355,10 +375,10 @@
     var groups = [], key = function (p) { return p.role + ':' + round(Math.max(p.cut[0], p.cut[1]) * 1e4) + 'x' + round(Math.min(p.cut[0], p.cut[1]) * 1e4); };
     var names = { bottom: 'Dessus / dessous', top: 'Dessus / dessous', side: 'Côtés', back: 'Arrière', baffle: 'Façade', port: null, brace: 'Renfort' };
     (g.panels || []).forEach(function (p) {
-      var role = p.role === 'top' ? 'bottom' : p.role, k = key({ role: role, cut: p.cut }) + (p.notes ? '|' + p.name : '');
+      var role = p.role === 'top' ? 'bottom' : p.role, own = p.notes && role !== 'bottom', k = key({ role: role, cut: p.cut }) + (own ? '|' + p.name : '');
       var grp = groups.filter(function (x) { return x.k === k; })[0];
       if (!grp) {
-        grp = { k: k, role: role, name: (p.notes ? p.name : names[p.role]) || p.name, a: Math.max(p.cut[0], p.cut[1]), b: Math.min(p.cut[0], p.cut[1]), qty: 0, notes: [] };
+        grp = { k: k, role: role, name: (own ? p.name : names[p.role]) || p.name, a: Math.max(p.cut[0], p.cut[1]), b: Math.min(p.cut[0], p.cut[1]), qty: 0, notes: [] };
         if (p.role === 'baffle' && p.holes && p.holes.length) {
           var subH = (g.subs || []).length, ports = p.holes.length - subH;
           if (subH) grp.notes.push({ k: 'hole', n: subH, d: g.cut });
