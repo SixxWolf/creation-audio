@@ -290,25 +290,17 @@
     var W = g.W, H = g.H, D = g.D, t = g.t, out = [];
     var add = function (o) { out.push(o); };
     var ov = g.overlay, tf = g.tf, slotP = P.type === 'slot';
-    var zf = ov ? tf : 0;                                   // avant des côtés / dessus / dessous (la façade les recouvre)
+    var zf = ov ? tf : 0;                                   // avant des côtés (la façade, entre dessus et dessous, les recouvre)
     var zfL = ov && !slotP ? tf : 0;                        // côté de la fente : reste à z = 0 (sortie d'évent)
-    var tb = function (name, role, y0, y1, ey) {
-      var o = { role: role, name: name, x0: 0, x1: W, y0: y0, y1: y1, z0: ov && !slotP ? tf : 0, z1: D, cut: [W, D - (ov && !slotP ? tf : 0)], ex: [0, ey, 0] };
-      if (ov && slotP) {                                    // encoche : la façade commence à la fente
-        o.poly = [[0, 0], [0, D], [W, D], [W, tf], [t + P.port.pw, tf], [t + P.port.pw, 0]];
-        o.notes = [{ k: 'notch', w: W - t - P.port.pw, d: tf }];
-      }
-      return o;
-    };
-    add(tb('Dessous', 'bottom', 0, t, -1));
-    add(tb('Dessus', 'top', H - t, H, 1));
+    add({ role: 'bottom', name: 'Dessous', x0: 0, x1: W, y0: 0, y1: t, z0: 0, z1: D, cut: [W, D], ex: [0, -1, 0] });
+    add({ role: 'top', name: 'Dessus', x0: 0, x1: W, y0: H - t, y1: H, z0: 0, z1: D, cut: [W, D], ex: [0, 1, 0] });
     add({ role: 'side', name: 'Côté gauche', x0: 0, x1: t, y0: t, y1: H - t, z0: zfL, z1: D, cut: [D - zfL, H - 2 * t], ex: [-1, 0, 0] });
     add({ role: 'side', name: 'Côté droit', x0: W - t, x1: W, y0: t, y1: H - t, z0: zf, z1: D, cut: [D - zf, H - 2 * t], ex: [1, 0, 0] });
     add({ role: 'back', name: 'Arrière', x0: t, x1: W - t, y0: t, y1: H - t, z0: D - t, z1: D, cut: [W - 2 * t, H - 2 * t], ex: [0, 0, 1] });
     var holes = (g.subs || []).map(function (s) { return { x: s.x, y: s.y, r: g.cut / 2 }; });
     if (g.port && g.port.shape === 'round') g.port.ys.forEach(function (y) { holes.push({ x: g.port.x, y: y, r: g.port.dp / 2 + g.port.wall }); });
     var fx0 = ov ? (slotP ? t + P.port.pw : 0) : g.baffle.x0, fx1 = ov ? W : g.baffle.x1;
-    var fy0 = ov ? 0 : t, fy1 = ov ? H : H - t;
+    var fy0 = t, fy1 = H - t;
     for (var i = 0; i < g.layers; i++) {
       add({ role: 'baffle', name: g.layers > 1 ? 'Façade ' + (i + 1) : 'Façade', layer: i, x0: fx0, x1: fx1, y0: fy0, y1: fy1,
         z0: i * t, z1: (i + 1) * t, cut: [fx1 - fx0, fy1 - fy0], holes: holes, ex: [0, 0, -1 - (g.layers - 1 - i) * 0.6] });

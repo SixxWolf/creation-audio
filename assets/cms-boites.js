@@ -1447,9 +1447,7 @@
       if (n.k === 'win') return 'fenêtre ' + lenBare(n.w) + ' × ' + lenTxt(n.h);
       if (n.k === 'bevel') return 'chanfrein 45° · jambe ' + lenTxt(n.c);
       if (n.k === 'round') return 'coin arrondi ' + lenTxt(n.r);
-      if (n.k === 'edge') return 'arête de la fente arrondie ' + lenTxt(n.r);
-      if (n.k === 'notch') return 'encoche ' + lenBare(n.w) + ' × ' + lenTxt(n.d) + ' (côté façade)';
-      return '';
+      if (n.k === 'edge') return 'arête de la fente arrondie ' + lenTxt(n.r);      return '';
     }).filter(Boolean).join(' · ');
   }
   function sheetFig(s, i, uid) {
