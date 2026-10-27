@@ -1463,10 +1463,25 @@
     s.pieces.forEach(function (q) {
       var x = q.x * 1000, y = q.y * 1000, w = q.w * 1000, h = q.h * 1000, m = Math.min(w, h), fs = Math.max(30, Math.min(k * 0.09, m * 0.42));
       o += '<g data-l="' + esc(q.label) + '"><rect class="sh-pc" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"/>';
-      var big = m > fs * 2.2 && w > fs * 4.5, cx = x + w / 2, cy = y + h / 2;
-      o += '<text class="sh-l" x="' + cx + '" y="' + (big ? cy - fs * 0.15 : cy) + '" font-size="' + fs + '" text-anchor="middle" dominant-baseline="central">' + esc(q.label) + '</text>';
-      if (big) o += '<text class="sh-d" x="' + cx + '" y="' + (cy + fs * 0.85) + '" font-size="' + fs * 0.46 + '" text-anchor="middle" dominant-baseline="central">' +
-        esc(lenBare(q.w) + ' × ' + lenBare(q.h)) + '</text>';
+      var cx = x + w / 2, cy = y + h / 2, dim = esc(lenBare(q.w) + ' × ' + lenBare(q.h)), cw = 0.58 * dim.length, minD = k * 0.022;
+      // cote sur chaque pièce : sous la lettre, sinon tournée sur une pièce étroite, sinon à côté de la lettre ; lettre seule si vraiment trop petit
+      var stack = function (a, b) {                          // a = largeur dispo, b = hauteur dispo
+        var d = Math.min(fs * 0.46, a * 0.88 / cw), f = Math.min(fs, b * 0.5);
+        return d >= minD && f + d * 1.5 <= b * 0.92 ? { d: d, f: f } : null;
+      };
+      var st = stack(w, h), rot = !st && h > w ? stack(h, w) : null, lay = st || rot;
+      if (lay) {
+        o += '<g' + (rot ? ' transform="rotate(-90 ' + cx + ' ' + cy + ')"' : '') + '>';
+        o += '<text class="sh-l" x="' + cx + '" y="' + (cy - lay.d * 0.6) + '" font-size="' + lay.f + '" text-anchor="middle" dominant-baseline="central">' + esc(q.label) + '</text>';
+        o += '<text class="sh-d" x="' + cx + '" y="' + (cy + lay.f * 0.55) + '" font-size="' + lay.d + '" text-anchor="middle" dominant-baseline="central">' + dim + '</text></g>';
+      } else {
+        var r = h > w, a = r ? h : w, b = r ? w : h, d = Math.min(fs * 0.46, b * 0.55,a * 0.88 / (cw + 0.58 * 2 + 1.1 * q.label.length));
+        o += '<g' + (r ? ' transform="rotate(-90 ' + cx + ' ' + cy + ')"' : '') + '>';
+        if (d >= minD) o += '<text x="' + cx + '" y="' + cy + '" text-anchor="middle" dominant-baseline="central"><tspan class="sh-l" font-size="' + d * 1.6 + '">' + esc(q.label) +
+          '</tspan><tspan class="sh-d" font-size="' + d + '" dx="' + d * 0.5 + '">' + dim + '</tspan></text>';
+        else o += '<text class="sh-l" x="' + cx + '" y="' + cy + '" font-size="' + fs + '" text-anchor="middle" dominant-baseline="central">' + esc(q.label) + '</text>';
+        o += '</g>';
+      }
       o += '</g>';
     });
     return o + '</svg></figure>';

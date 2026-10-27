@@ -294,9 +294,10 @@
     var zfL = ov && !slotP ? t : 0;                       // côté de la fente : reste à z = 0 (sortie d'évent)
     add({ role: 'bottom', name: 'Dessous', x0: 0, x1: W, y0: 0, y1: t, z0: 0, z1: D, cut: [W, D], ex: [0, -1, 0] });
     add({ role: 'top', name: 'Dessus', x0: 0, x1: W, y0: H - t, y1: H, z0: 0, z1: D, cut: [W, D], ex: [0, 1, 0] });
-    add({ role: 'side', name: 'Côté gauche', x0: 0, x1: t, y0: t, y1: H - t, z0: zfL, z1: D, cut: [D - zfL, H - 2 * t], ex: [-1, 0, 0] });
-    add({ role: 'side', name: 'Côté droit', x0: W - t, x1: W, y0: t, y1: H - t, z0: zf, z1: D, cut: [D - zf, H - 2 * t], ex: [1, 0, 0] });
-    add({ role: 'back', name: 'Arrière', x0: t, x1: W - t, y0: t, y1: H - t, z0: D - t, z1: D, cut: [W - 2 * t, H - 2 * t], ex: [0, 0, 1] });
+    // arrière en recouvrement comme la façade : pleine largeur entre dessus et dessous, les côtés butent dessus
+    add({ role: 'side', name: 'Côté gauche', x0: 0, x1: t, y0: t, y1: H - t, z0: zfL, z1: D - t, cut: [D - t - zfL, H - 2 * t], ex: [-1, 0, 0] });
+    add({ role: 'side', name: 'Côté droit', x0: W - t, x1: W, y0: t, y1: H - t, z0: zf, z1: D - t, cut: [D - t - zf, H - 2 * t], ex: [1, 0, 0] });
+    add({ role: 'back', name: 'Arrière', x0: 0, x1: W, y0: t, y1: H - t, z0: D - t, z1: D, cut: [W, H - 2 * t], ex: [0, 0, 1] });
     var holes = (g.subs || []).map(function (s) { return { x: s.x, y: s.y, r: g.cut / 2 }; });
     if (g.port && g.port.shape === 'round') g.port.ys.forEach(function (y) { holes.push({ x: g.port.x, y: y, r: g.port.dp / 2 + g.port.wall }); });
     var fx0 = ov ? (slotP ? t + P.port.pw : 0) : g.baffle.x0, fx1 = ov ? W : g.baffle.x1;
@@ -319,7 +320,7 @@
         } else {                                           // l'arête côté fente est celle de la façade (calibre de toupie)
           out.forEach(function (q) { if (q.role === 'baffle' && q.layer === 0) q.notes = [{ k: 'edge', r: rr }]; });
         }
-        side.poly = [[0, 0], [0, D], [t, D], [t, rr]];
+        side.poly = [[0, 0], [0, D - t], [t, D - t], [t, rr]];
         for (k0 = 1; k0 <= 8; k0++) { var a1 = 2 * Math.PI - Math.PI / 2 * k0 / 8; side.poly.push([t - rr + rr * Math.cos(a1), rr + rr * Math.sin(a1)]); }
         side.notes = [{ k: 'round', r: rr }];
       }
