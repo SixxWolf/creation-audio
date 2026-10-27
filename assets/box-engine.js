@@ -290,8 +290,8 @@
     var W = g.W, H = g.H, D = g.D, t = g.t, out = [];
     var add = function (o) { out.push(o); };
     var ov = g.overlay, tf = g.tf, slotP = P.type === 'slot';
-    var zf = ov ? tf : 0;                                   // avant des côtés (la façade, entre dessus et dessous, les recouvre)
-    var zfL = ov && !slotP ? tf : 0;                        // côté de la fente : reste à z = 0 (sortie d'évent)
+    var zf = ov ? t : 0;                                    // avant des côtés : la façade 1 (recouvrement) les couvre ; la façade 2, encastrée, loge entre eux
+    var zfL = ov && !slotP ? t : 0;                       // côté de la fente : reste à z = 0 (sortie d'évent)
     add({ role: 'bottom', name: 'Dessous', x0: 0, x1: W, y0: 0, y1: t, z0: 0, z1: D, cut: [W, D], ex: [0, -1, 0] });
     add({ role: 'top', name: 'Dessus', x0: 0, x1: W, y0: H - t, y1: H, z0: 0, z1: D, cut: [W, D], ex: [0, 1, 0] });
     add({ role: 'side', name: 'Côté gauche', x0: 0, x1: t, y0: t, y1: H - t, z0: zfL, z1: D, cut: [D - zfL, H - 2 * t], ex: [-1, 0, 0] });
@@ -302,12 +302,13 @@
     var fx0 = ov ? (slotP ? t + P.port.pw : 0) : g.baffle.x0, fx1 = ov ? W : g.baffle.x1;
     var fy0 = t, fy1 = H - t;
     for (var i = 0; i < g.layers; i++) {
-      add({ role: 'baffle', name: g.layers > 1 ? 'Façade ' + (i + 1) : 'Façade', layer: i, x0: fx0, x1: fx1, y0: fy0, y1: fy1,
-        z0: i * t, z1: (i + 1) * t, cut: [fx1 - fx0, fy1 - fy0], holes: holes, ex: [0, 0, -1 - (g.layers - 1 - i) * 0.6] });
+      var lx0 = ov && i > 0 ? g.baffle.x0 : fx0, lx1 = ov && i > 0 ? g.baffle.x1 : fx1;   // double façade : la 2e est toujours encastrée
+      add({ role: 'baffle', name: g.layers > 1 ? 'Façade ' + (i + 1) : 'Façade', layer: i, x0: lx0, x1: lx1, y0: fy0, y1: fy1,
+        z0: i * t, z1: (i + 1) * t, cut: [lx1 - lx0, fy1 - fy0], holes: holes, ex: [0, 0, -1 - (g.layers - 1 - i) * 0.6] });
     }
     var p = g.port;
     if (p && p.shape !== 'round') {
-      var mz0 = ov ? tf : 0;                                // recouvrement : le mur commence derrière la façade
+      var mz0 = ov ? t : 0;                                 // recouvrement : le mur commence derrière la façade 1 (la 2e, encastrée, le touche)
       var mur = { role: 'port', name: 'Mur d\'évent', x0: t + p.pw, x1: 2 * t + p.pw, y0: t, y1: H - t, z0: mz0, z1: p.wall1, cut: [p.wall1 - mz0, H - 2 * t], ex: [0.25, 0, -0.2] };
       if (p.soft && p.rad > 0.0005) {                      // sortie : arête du mur côté fente et arête intérieure du côté gauche arrondies
         var rr = p.rad, k0, side = out.filter(function (q) { return q.name === 'Côté gauche'; })[0];
@@ -365,7 +366,7 @@
   // Pièces à couper (regroupées), lettre A, B, C…
   function pieces(g) {
     var groups = [], key = function (p) { return p.role + ':' + round(Math.max(p.cut[0], p.cut[1]) * 1e4) + 'x' + round(Math.min(p.cut[0], p.cut[1]) * 1e4); };
-    var names = { bottom: 'Dessus / dessous', top: 'Dessus / dessous', side: 'Côtés', back: 'Arrière', baffle: 'Façade', port: null, brace: 'Renfort' };
+    var names = { bottom: 'Dessus / dessous', top: 'Dessus / dessous', side: 'Côtés', back: 'Arrière', baffle: g.layers > 1 && g.overlay ? null : 'Façade', port: null, brace: 'Renfort' };
     (g.panels || []).forEach(function (p) {
       var role = p.role === 'top' ? 'bottom' : p.role, own = p.notes && role !== 'bottom', k = key({ role: role, cut: p.cut }) + (own ? '|' + p.name : '');
       var grp = groups.filter(function (x) { return x.k === k; })[0];
