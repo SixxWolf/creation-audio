@@ -675,12 +675,16 @@
     var date = /^\d{4}-\d{2}-\d{2}$/.test(dateI.value.trim()) ? dateI.value.trim() : todayISO();
     var order = current, rc = editingReceipt, oldLines = editingOldLines;
     var tax = order ? (+order.tax_rate || 0) : 0;
+    // coupon avant taxes : retiré au prorata de chaque ligne (part du sous-total de la commande)
+    var sub = order ? (order.lines || []).reduce(function (s, l) { return s + (l.unit_cost != null ? l.qty * l.unit_cost : 0); }, 0) : 0;
+    var disc = order ? Math.min(+order.discount || 0, sub) : 0;
+    var share = sub > 0 ? 1 - disc / sub : 1;
     var newLines = null;
     var newLinesFor = function (receiptId) {
       return valid.map(function (r) {
         var f = bcProd(r.productId), kind = fitKind(f, r.kind);
         // prix payé : celui de la commande + taxes du fournisseur ; hors commande / sans commande : le coût connu
-        var cost = r.oldCost != null ? r.oldCost : (r.unitCost != null ? r.unitCost * (1 + tax / 100) : costOf(f, kind));
+        var cost = r.oldCost != null ? r.oldCost : (r.unitCost != null ? r.unitCost * share * (1 + tax / 100) : costOf(f, kind));
         return { receipt_id: receiptId, product_id: r.productId, label: f ? bcLabel(f) : null, kind: kind, qty: r.qty,
           unit_cost: cost != null ? round2(cost) : null };
       });

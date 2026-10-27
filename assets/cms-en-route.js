@@ -334,6 +334,16 @@
   }
   if (taxI) taxI.addEventListener('input', function () { taxI.dataset.touched = '1'; renderSum(); });
 
+  var discI = $('#po-disc');   // coupon ($, avant taxes) : réparti au prorata à la réception
+  function discVal() { var v = parseFloat(String(discI && discI.value || '').replace(',', '.')); return isFinite(v) && v > 0 ? round2(v) : 0; }
+  function fmtDisc(v) { return +v > 0 ? String((+v).toFixed(2)).replace('.', ',') : ''; }
+  // « Coupon -$25.00 », « Discount (-$25.00) »… dans le texte collé
+  function findCoupon(text) {
+    var m = /(?:discount|coupon|promo|rabais)[\s\S]{0,80}?[-−]\s*\$\s*(\d[\d,]*(?:\.\d{1,2})?)/i.exec(text);
+    return m ? parseFloat(m[1].replace(/,/g, '')) : 0;
+  }
+  if (discI) discI.addEventListener('input', function () { discI.dataset.touched = '1'; renderSum(); });
+
   var rows = [];             // { label, productId, kind, qty, unitCost, how, picked }
   var editingId = null;      // commande en cours de modification
   var editingReceived = {};  // pid|kind -> qté déjà reçue (gardée à la modification)
@@ -348,6 +358,7 @@
       numberI.value = order.order_number || '';
       dateI.value = order.ordered_at || todayISO();
       if (taxI) { taxI.value = fmtTax(order.tax_rate); taxI.dataset.touched = '1'; }
+      if (discI) { discI.value = fmtDisc(order.discount); discI.dataset.touched = '1'; }
       rows = order.lines.map(function (l) {
         var k = (l.product_id || '') + '|' + kindOf(l.kind);
         editingReceived[k] = (editingReceived[k] || 0) + (l.qty_received | 0);
@@ -359,6 +370,7 @@
     } else {
       pasteI.value = ''; numberI.value = ''; dateI.value = todayISO();
       if (taxI) { taxI.value = ''; delete taxI.dataset.touched; }
+      if (discI) { discI.value = ''; delete discI.dataset.touched; }
       rows = []; reviewEl.hidden = true;
       setTimeout(function () { pasteI.focus(); }, 30);
     }
@@ -423,6 +435,7 @@
       // garde les lignes ajoutées à la main, remplace ce qui avait été lu
       rows = rows.filter(function (r) { return r.how === 'saisi'; }).concat(res.rows);
       if (taxI && !taxI.dataset.touched) taxI.value = fmtTax(taxDefault(supplierOf(rows)));
+      if (discI && !discI.dataset.touched) discI.value = fmtDisc(findCoupon(text));
       sortRows();
       renderRows();
       var miss = rows.filter(function (r) { return !r.productId && r.how !== 'hors'; }).length;
@@ -505,9 +518,9 @@
   function renderSum() {
     var n = 0, tot = 0, priced = false;
     rows.forEach(function (r) { if (r.productId && r.qty > 0) { n += r.qty; if (r.unitCost != null) { tot += r.unitCost * r.qty; priced = true; } } });
-    var tx = taxVal();
+    var tx = taxVal(), dc = Math.min(discVal(), tot);
     sumEl.innerHTML = n ? n + ' article' + (n > 1 ? 's' : '') +
-      (priced ? ' · <b>' + money(tot * (1 + tx / 100)) + '</b>' + (tx ? ' taxes incl.' : '') : '') : '';
+      (priced ? (dc ? ' · coupon −' + money(dc) : '') + ' · <b>' + money((tot - dc) * (1 + tx / 100)) + '</b>' + (tx ? ' taxes incl.' : '') : '') : '';
   }
 
   saveBtn.addEventListener('click', function () { save(false); });
@@ -561,7 +574,7 @@
       taxes = Object.assign({}, taxes || {}); taxes[supplier] = tax;
       sb.from('admin_settings').upsert({ key: 'taxes_fournisseur', value: taxes, updated_at: new Date().toISOString() }).then(function () {}, function () {});
     }
-    var head = { order_number: num, supplier: supplier, ordered_at: date, tax_rate: tax };
+    var head = { order_number: num, supplier: supplier, ordered_at: date, tax_rate: tax, discount: discVal() };
     var chain = editingId
       ? sb.from('supplier_orders').update(head).eq('id', editingId).select().then(function (res) {
           if (res.error || !res.data || !res.data.length) throw (res.error || new Error('Modification refusée (permissions).'));
@@ -598,11 +611,15 @@
       var tot = 0, got = 0;
       o.lines.forEach(function (l) { tot += l.qty | 0; got += Math.min(l.qty | 0, l.qty_received | 0); });
       var lis = inv() ? inv().orderLinesHtml(o.lines) : '';
+      var sub = 0, priced = false;
+      o.lines.forEach(function (l) { if (l.unit_cost != null) { sub += l.qty * l.unit_cost; priced = true; } });
+      var dc = Math.min(+o.discount || 0, sub);
+      var paid = priced ? money((sub - dc) * (1 + (+o.tax_rate || 0) / 100)) + (dc ? ' (coupon −' + money(dc) + ')' : '') : '';
       return '<div class="po-order" data-id="' + esc(o.id) + '">' +
         '<div class="po-order-head">' +
           '<button type="button" class="po-toggle" aria-expanded="false">' +
             '<span class="po-num">' + esc(o.order_number || 'Sans n°') + '</span>' +
-            '<span class="po-meta">' + esc([o.supplier, o.ordered_at].filter(Boolean).join(' · ')) + '</span>' +
+            '<span class="po-meta">' + esc([o.supplier, o.ordered_at, paid].filter(Boolean).join(' · ')) + '</span>' +
             '<span class="po-prog">' + (got ? got + ' / ' + tot + ' reçus' : tot + ' article' + (tot > 1 ? 's' : '')) + '</span>' +
           '</button>' +
           '<span class="po-acts">' +

@@ -2836,6 +2836,8 @@ revoke all on public.supplier_order_lines from anon;
 alter table public.supplier_orders add column if not exists tax_rate numeric(6,3) not null default 0;
 alter table public.receipts add column if not exists supplier_order_id uuid references public.supplier_orders(id) on delete set null;
 create index if not exists receipts_supplier_order_idx on public.receipts (supplier_order_id);
+-- Coupon / rabais de la commande ($, avant taxes) : réparti au prorata des lignes à la réception (2026-10-27)
+alter table public.supplier_orders add column if not exists discount numeric(10,2) not null default 0;
 update public.supplier_orders set tax_rate = 14.975 where supplier ilike 'bambu%' and tax_rate = 0;
 update public.supplier_orders set order_number = ltrim(order_number, '#') where order_number like '#%';
 update public.receipt_lines rl
