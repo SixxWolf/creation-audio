@@ -114,8 +114,8 @@
         '<div class="mat-main">' +
           '<div class="mat-name">' + esc(d.name || d.email) + ' <span class="person-tag">Portail dealer</span></div>' +
           '<div class="person-meta">' +
-            '<span class="pm pm-mail">' + esc(d.email) + '</span>' +
-            (d.phone ? '<span class="pm pm-tel">' + esc(d.phone) + '</span>' : '') +
+            '<span class="pm pm-mail">' + CA.pv(d.email) + '</span>' +
+            (d.phone ? '<span class="pm pm-tel">' + CA.pv(d.phone) + '</span>' : '') +
             (loc ? '<span class="pm pm-loc">' + esc(loc) + '</span>' : '') +
           '</div>' +
         '</div>' +

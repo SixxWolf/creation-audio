@@ -116,7 +116,7 @@
       r[1].forEach(function (o) { out.push({ g: 'order', title: o.number + ' · ' + (o.dealer_name || o.dealer_email || ''), meta: 'Dealer', hay: o.number + ' ' + (o.dealer_name || '') + ' ' + (o.dealer_email || ''), num: o.number, hash: '#commandes', id: o.id }); });
       r[2].forEach(function (o) { out.push({ g: 'order', title: o.number + ' · ' + (o.name || o.email || ''), meta: 'Client en ligne', hay: o.number + ' ' + (o.name || '') + ' ' + (o.email || ''), num: o.number, hash: '#commandes/clients', id: o.id }); });
       r[3].forEach(function (o) { out.push({ g: 'order', title: o.number + ' · ' + (o.name || o.email || ''), meta: 'Réservation', hay: o.number + ' ' + (o.name || '') + ' ' + (o.email || ''), num: o.number, hash: '#commandes/reservations', id: o.id }); });
-      r[4].forEach(function (c) { out.push({ g: 'client', title: c.name || c.email || 'Client', meta: [c.email, c.phone].filter(Boolean).join(' · '), hay: [c.name, c.email, c.phone].join(' '), hash: '#clients', id: c.id }); });
+      r[4].forEach(function (c) { out.push({ g: 'client', title: c.name || c.email || 'Client', meta: (c.email || c.phone) ? 'Courriel et téléphone masqués' : '', hay: [c.name, c.email, c.phone].join(' '), hash: '#clients', id: c.id }); });
       r[5].forEach(function (c) {
         var k = c.customers || {};
         out.push({ g: 'conv', title: k.name || k.email || 'Client', meta: c.last_preview || '', hay: [k.name, k.email, c.last_preview].join(' '), hash: '#messages/' + c.id });

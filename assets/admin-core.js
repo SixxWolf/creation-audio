@@ -62,6 +62,38 @@ window.CA = window.CA || {};
     return '<span class="person-av" style="--h:' + h + '" aria-hidden="true">' + ini.toUpperCase().replace(/[<>&"']/g, '') + '</span>';
   };
 
+  // Courriel / téléphone d'un client : masqués (••••) tant qu'on n'a pas cliqué dessus (un client peut être
+  // devant l'écran). Un clic montre la valeur ~15 s, puis elle se recache (ou au changement de page).
+  // CA.pv(valeur) -> HTML ; le clic est géré ici (capture : n'ouvre pas la ligne parente).
+  var PV_MS = 15000;
+  function pvEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  window.CA.pv = function (v) {
+    v = String(v == null ? '' : v).trim();
+    if (!v) return '';
+    return '<span class="pv" role="button" tabindex="0" data-v="' + pvEsc(v) + '" title="Cliquer pour afficher">•••••</span>';
+  };
+  function pvHide(el) {
+    clearTimeout(el._pvT);
+    el.textContent = '•••••'; el.classList.remove('is-shown'); el.title = 'Cliquer pour afficher';
+  }
+  function pvToggle(el) {
+    if (el.classList.contains('is-shown')) return pvHide(el);
+    el.textContent = el.getAttribute('data-v'); el.classList.add('is-shown'); el.title = 'Cliquer pour cacher';
+    clearTimeout(el._pvT); el._pvT = setTimeout(function () { pvHide(el); }, PV_MS);
+  }
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest && e.target.closest('.pv');
+    if (!el) return;
+    e.preventDefault(); e.stopPropagation(); pvToggle(el);
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var el = e.target.classList && e.target.classList.contains('pv') ? e.target : null;
+    if (!el) return;
+    e.preventDefault(); pvToggle(el);
+  });
+  window.addEventListener('hashchange', function () { $$('.pv.is-shown').forEach(pvHide); });
+
   // Écriture d'un produit SANS écraser ce qu'un autre onglet a changé depuis l'ouverture
   // (vente, réception, coût moyen, code-barres appris…) : relit qty / qty_2 / attrs en base
   // juste avant d'écrire.

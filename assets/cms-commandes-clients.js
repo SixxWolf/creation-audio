@@ -319,7 +319,7 @@
             (o.status === 'cancelled' ? '<span class="co-edited">' + (o.cancelled_by === 'client' ? 'par le client' : 'par toi') + '</span>' : '') +
           '</div>' +
           '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') +
-            '<span><b>' + esc(who) + '</b><small>' + esc(o.email) + (o.phone ? ' · ' + esc(o.phone) : '') + ' · ' + esc(ago(o.created_at)) + '</small></span></div>' +
+            '<span><b>' + esc(who) + '</b><small>' + CA.pv(o.email) + (o.phone ? ' · ' + CA.pv(o.phone) : '') + ' · ' + esc(ago(o.created_at)) + '</small></span></div>' +
         '</header>' +
         (OPEN[o.status] ? CA.pickupLine(o) : '') +
         (o.note ? '<p class="co-note"><b>Note :</b> ' + esc(o.note) + '</p>' : '') +
@@ -392,7 +392,7 @@
     }).join('');
     return '<article class="co-card is-editing is-' + esc(o.status) + '" data-id="' + esc(o.id) + '">' +
       '<header class="co-head"><div class="co-id"><b>' + esc(o.number) + '</b><span class="co-status is-' + esc(o.status) + '">Modification</span></div>' +
-        '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') + '<span><b>' + esc(who) + '</b><small>' + esc(o.email) + '</small></span></div></header>' +
+        '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') + '<span><b>' + esc(who) + '</b><small>' + CA.pv(o.email) + '</small></span></div></header>' +
       '<div class="field"><div class="fx-combo"><input type="search" class="ce-search" placeholder="Ajouter ou remplacer un article…" autocomplete="off">' +
         '<div class="fx-combo-list ce-results" hidden></div></div></div>' +
       '<div class="co-table-wrap">' + (rows ? '<table class="co-table cof-table"><thead><tr><th class="l">Article</th><th class="n">Qté</th><th class="n cof-opt">Stock</th><th class="n" aria-label="Retirer"></th></tr></thead><tbody>' + rows + '</tbody></table>'

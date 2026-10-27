@@ -185,7 +185,7 @@
         '<header class="co-head">' +
           '<div class="co-id"><b>' + esc(r.number) + '</b><span class="co-status is-' + esc(look) + '">' + esc(STATUS[st] || st) + '</span>' + tag + '</div>' +
           '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') +
-            '<span><b>' + esc(who) + '</b><small>' + esc(r.email) + (r.phone ? ' · ' + esc(r.phone) : '') + '</small></span></div>' +
+            '<span><b>' + esc(who) + '</b><small>' + CA.pv(r.email) + (r.phone ? ' · ' + CA.pv(r.phone) : '') + '</small></span></div>' +
         '</header>' +
         (st === 'active' && CA.pickupLine ? CA.pickupLine(r) : '') +
         (r.note ? '<p class="co-note"><b>Note :</b> ' + esc(r.note) + '</p>' : '') +

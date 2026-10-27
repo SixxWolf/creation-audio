@@ -206,7 +206,7 @@
     var who = it.name || it.email;
     return '<button type="button" class="cq-item" data-go="' + (it.kind === 'resv' ? 'reservations' : 'clients') + '" data-id="' + esc(it.id) + '">' +
       (CA.avatar ? CA.avatar(who) : '') +
-      '<span class="cq-who"><b>' + esc(who) + '</b><small>' + esc(it.number) + (it.phone ? ' · ' + esc(it.phone) : '') + '</small></span>' +
+      '<span class="cq-who"><b>' + esc(who) + '</b><small>' + esc(it.number) + (it.phone ? ' · ' + CA.pv(it.phone) : '') + '</small></span>' +
       '<span class="co-status is-' + (it.kind === 'resv' ? 'ready' : esc(it.status)) + '">' +
         (it.kind === 'resv' ? 'Réservation' : esc(STATUS[it.status] || it.status)) + '</span>' +
       (it.pickup_req && it.pickup_req.state === 'pending' ? '<span class="co-status is-new">Exception</span>' : '') +

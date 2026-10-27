@@ -182,7 +182,7 @@
     var k = c.customers || {};
     sideEl.innerHTML =
       '<div class="ms-sd-who">' + CA.avatar(who(c)) + '<div><b>' + esc(who(c)) + '</b>' +
-        (k.phone ? '<small>' + esc(k.phone) + '</small>' : '') + '</div></div>' +
+        (k.phone ? '<small>' + CA.pv(k.phone) + '</small>' : '') + '</div></div>' +
       '<section class="ms-sd"><h3>Commandes en ligne</h3><div id="ms-sd-co"><p class="ms-sd-none">Chargement…</p></div></section>' +
       '<section class="ms-sd"><h3>Réservations</h3><div id="ms-sd-re"><p class="ms-sd-none">Chargement…</p></div></section>' +
       '<section class="ms-sd"><h3>Factures</h3><div id="ms-sd-in"><p class="ms-sd-none">' + (k.client_id ? 'Chargement…' : 'Fiche client pas encore reliée.') + '</p></div></section>';
@@ -273,7 +273,7 @@
         CA.avatar(custName(k)) +
         '<span class="ms-row-tx">' +
           '<span class="ms-row-top"><b>' + esc(custName(k)) + '</b>' + (oc ? '<time>Conversation ouverte</time>' : '') + '</span>' +
-          '<span class="ms-row-prev">' + esc([k.name ? k.email : '', k.phone].filter(Boolean).join(' · ')) + '</span>' +
+          '<span class="ms-row-prev">' + [k.name ? CA.pv(k.email) : '', CA.pv(k.phone)].filter(Boolean).join(' · ') + '</span>' +
           '<span class="ms-row-about">' + esc(buys) + '</span>' +
         '</span></button>';
     }).join('');
@@ -334,8 +334,8 @@
         '<button type="button" class="btn btn-ghost btn-sm ms-back" aria-label="Retour à la liste">←</button>' +
         CA.avatar(who(c)) +
         '<div class="ms-head-tx"><h2>' + esc(who(c)) + (c._draft ? '' : ' <span class="ms-seen" id="ms-seen" hidden></span>') + '</h2>' +
-          '<p class="person-meta">' + (k.email ? '<a class="pm pm-mail" href="mailto:' + esc(k.email) + '">' + esc(k.email) + '</a>' : '') +
-            (k.phone ? '<a class="pm pm-tel" href="tel:' + esc(String(k.phone).replace(/[^\d+]/g, '')) + '">' + esc(k.phone) + '</a>' : '') + '</p>' +
+          '<p class="person-meta">' + (k.email ? '<span class="pm pm-mail">' + CA.pv(k.email) + '</span>' : '') +
+            (k.phone ? '<span class="pm pm-tel">' + CA.pv(k.phone) + '</span>' : '') + '</p>' +
           '<p class="ms-about">' + (c._draft ? 'Nouvelle conversation' : esc(about(c)) + (c.page ? ' · <a href="' + esc(c.page) + '" target="_blank" rel="noopener">page</a>' : '')) + '</p></div>' +
         (c._draft ? '' : '<div class="ms-acts">' +
           '<button type="button" class="btn btn-ghost btn-sm ms-close" data-ic="check">' + (c.status === 'closed' ? 'Rouvrir' : 'Réglée') + '</button>' +

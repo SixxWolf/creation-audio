@@ -195,8 +195,8 @@ window.CA = window.CA || {};
     }
     listEl.innerHTML = list.map(function (c) {
       var loc = [c.address, c.city].filter(Boolean).join(', ');
-      var meta = (c.email ? '<span class="pm pm-mail">' + esc(c.email) + '</span>' : '') +
-        (c.phone ? '<span class="pm pm-tel">' + esc(c.phone) + '</span>' : '') +
+      var meta = (c.email ? '<span class="pm pm-mail">' + CA.pv(c.email) + '</span>' : '') +
+        (c.phone ? '<span class="pm pm-tel">' + CA.pv(c.phone) + '</span>' : '') +
         (loc ? '<span class="pm pm-loc">' + esc(loc) + '</span>' : '');
       return '<article class="mat-row person" data-id="' + esc(c.id) + '">' +
         CA.avatar(c.name) +
@@ -277,8 +277,8 @@ window.CA = window.CA || {};
       return '<article class="mat-row person cpt-row" data-cpt="' + esc(a.id) + '">' + CA.avatar(a.name || a.email) +
         '<div class="mat-main">' +
           '<div class="mat-name">' + esc(a.name || 'Sans nom') + (a.client_id ? '' : '<span class="person-tag">À relier</span>') + '</div>' +
-          '<div class="person-meta">' + resTag + '<span class="pm pm-mail">' + esc(a.email) + '</span>' +
-            (a.phone ? '<span class="pm pm-tel">' + esc(a.phone) + '</span>' : '') +
+          '<div class="person-meta">' + resTag + '<span class="pm pm-mail">' + CA.pv(a.email) + '</span>' +
+            (a.phone ? '<span class="pm pm-tel">' + CA.pv(a.phone) + '</span>' : '') +
             (c ? '<span class="pm pm-link">' + esc(c.name) + '</span>' : '') +
             '<span class="pm pm-date">' + esc(fmtD(a.created_at)) + '</span></div>' +
         '</div>' +
