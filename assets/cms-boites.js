@@ -318,7 +318,7 @@
       if ('lib:' + r.id === cur) has = true;
     });
     groups.forEach(function (g) {
-      html += '<optgroup label="Sundown · ' + esc(g) + '">' + by[g].map(function (r) {
+      html += '<optgroup label="' + esc((by[g][0].brand || 'Sundown').replace(/ Audio$/, '') + ' · ' + g) + '">' + by[g].map(function (r) {
         return '<option value="lib:' + esc(r.id) + '">' + esc(r.model + ' · ' + r.coil) + '</option>';
       }).join('') + '</optgroup>';
     });
