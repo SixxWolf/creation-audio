@@ -3,8 +3,9 @@
 @media print {
   body.doc-printing > *:not(.doc-print) { display:none !important; }
   body.doc-printing { background:#fff !important; }
-  body.doc-printing .doc-print { display:block; color:#181A1F; font-size:12pt; font-family:system-ui, -apple-system, "Segoe UI", sans-serif; }
-  @page { margin:14mm; }
+  body.doc-printing .doc-print { display:block; color:#181A1F; font-size:12pt; font-family:system-ui, -apple-system, "Segoe UI", sans-serif; padding:14mm; }
+  /* marge 0 : le navigateur n'imprime plus date, titre, adresse ni n° de page ; le recul vient du padding */
+  @page { margin:0; }
 }
 .doc-print .inv-top { display:flex; justify-content:space-between; gap:20px; align-items:flex-start;
   border-bottom:2px solid #181A1F; padding-bottom:16px; margin-bottom:16px; }

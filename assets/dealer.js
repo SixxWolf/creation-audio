@@ -506,7 +506,9 @@
         (st.hint ? '<p class="dl-order-hint">' + esc(st.hint) + '</p>' : '') +
         '<div class="dl-order-lines">' + lines.map(function (l) {
           var p = l.product_id ? byId[l.product_id] : null;
+          var iu = p && p.image_path ? publicUrl(p.image_path) : '';
           return '<div class="dl-ol">' +
+            '<span class="dl-ol-img">' + (iu ? '<img src="' + esc(iu) + '" alt="" loading="lazy">' : '') + '</span>' +
             (p ? '<a class="dl-ol-n" href="' + esc(sc.hrefOf(p)) + '">' + esc(l.name) + '</a>' : '<span class="dl-ol-n">' + esc(l.name) + '</span>') +
             '<span class="dl-ol-q">× ' + (l.qty | 0) + '</span>' +
             '<span class="dl-ol-u">' + money(l.unit_price) + '</span>' +
