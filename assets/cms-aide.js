@@ -53,7 +53,7 @@
       go: { href: '#commandes', label: 'Commandes' }, keys: 'client en ligne facturer reservation dealer',
       steps: [
         'Ouvre **Commandes** : le badge compte les nouvelles.',
-        'Choisis [Clients en ligne], [Dealers] ou [Réservations].',
+        'Choisis [Clients], [Dealers] ou [Réservations].',
         'Ouvre la commande et vérifie les articles.',
         'Au ramassage, clique [Facturer] : la facture se prépare toute seule.'
       ] },

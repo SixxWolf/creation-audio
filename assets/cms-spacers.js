@@ -139,7 +139,7 @@
       '<span class="t">À partir de</span>' +
       '<input type="number" class="tier-min" min="1" step="1" placeholder="6" value="' + (min != null ? min : '') + '">' +
       '<span class="t">paires →</span>' +
-      '<input type="number" class="tier-price money" min="0" step="0.01" placeholder="13.99" value="' + (price != null ? price : '') + '">' +
+      '<input type="number" class="tier-price money" min="0" step="0.01" placeholder="14.00" value="' + (price != null ? price : '') + '">' +
       '<span class="t">$ /paire</span>' +
       '<button type="button" class="tier-del" aria-label="Retirer ce palier">✕</button>';
     $('.tier-del', row).addEventListener('click', function () { row.remove(); });

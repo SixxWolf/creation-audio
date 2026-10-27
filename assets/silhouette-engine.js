@@ -24,7 +24,9 @@
     back: 'none', backT: 2, backM: 5, colPiece: '#000000', colBack: '#FFFFFF',
     cuts: null, edits: [], draft: false
   };
-  var BACK_R = 3;           // rayon des coins du fond rectangle (mm)
+  var BACK_TENON_L = 10;    // longueur d'un petit tenon du fond (mm)
+  var BACK_TENON_PITCH = 40; // écart entre deux tenons le long d'une coupure (mm)
+  var BACK_R = 3;          // rayon des coins du fond rectangle (mm)
 
   /* ------------------------------------------------------------------ */
   /*  Outils                                                             */
@@ -1756,12 +1758,13 @@
     // bandes d'une pièce le long d'un axe (n coutures, pièce k) : rainure (recv), corps (full), tenon
     var zones = function (n, k) {
       var z = [], last = k === n;
+      if (hasBack) return [{ lo: k ? { k: k - 1, d: 0 } : null, hi: last ? null : { k: k, d: 0 }, role: 'full' }];   // fond : coupe franche, collée au fond
       if (k) z.push({ lo: { k: k - 1, d: 0 }, hi: { k: k - 1, d: ov }, role: 'recv' });
       z.push({ lo: k ? { k: k - 1, d: ov } : null, hi: last ? null : { k: k, d: 0 }, role: 'full' });
       if (!last) z.push({ lo: { k: k, d: 0 }, hi: { k: k, d: ov - g }, role: 'tenon' });
       return z;
     };
-    var th = T / 2, out = [];
+    var th = T / 2, out = [], hasBack = !!(S.F && S.F.rings.length);
     seg.list.forEach(function (cell) {
       var i = cell.col, j = cell.row, parts = [];
       var add = function (ps, z0, z1, kind) {
@@ -1789,14 +1792,89 @@
       Tb = P.backT;
       var bRings = S.F.rings.map(flipY), bBig = 0, bA = 0;
       bRings.forEach(function (R) { var a = ringArea(R); if (Math.abs(a) > bA) { bA = Math.abs(a); bBig = a; } });
-      sets.back = bBig < 0 ? bRings.map(reverseRing) : bRings;
+      var back0 = sets.back = bBig < 0 ? bRings.map(reverseRing) : bRings;
+      var thb = Tb / 2, J = { v: [], h: [] };
+      // petits emboîtements répartis le long de chaque coupure du fond (même principe que le mi-bois, mais par
+      // endroits) : tenon = demi-épaisseur côté dos (au plateau), rainure ouverte au dos fermée devant par une peau
+      if (multi && thb >= 0.6 && S.F.box) {
+        var bbx = S.F.box, hl = BACK_TENON_L / 2 + g, mg = 1.5, near = ov + g + 3;
+        var inBack = function (x, y) { var c = 0; back0.forEach(function (R) { if (inRing(R, x, y)) c++; }); return c & 1; };
+        var patch = function (Sm, vert, c, half, dlo, dhi) {
+          var a = c - half, b = c + half, s = vert ? 1 : -1;
+          var edge = function (off) {
+            var p = [[a, seamAt(Sm, a) + off]];
+            for (var q = 0; q < Sm.u.length; q++) if (Sm.u[q] > a && Sm.u[q] < b) p.push([Sm.u[q], Sm.v[q] + off]);
+            p.push([b, seamAt(Sm, b) + off]);
+            return p;
+          };
+          var e1 = edge(s * dlo), e2 = edge(s * dhi), hiE = (s * dhi > s * dlo) ? e2 : e1, loE = hiE === e2 ? e1 : e2;
+          var first = vert ? hiE : loE, second = vert ? loE : hiE, pts = [];
+          first.forEach(function (p) { pts.push(vert ? p[1] : p[0], vert ? p[0] : p[1]); });
+          for (var q = second.length - 1; q >= 0; q--) pts.push(vert ? second[q][1] : second[q][0], vert ? second[q][0] : second[q][1]);
+          return new Float64Array(pts);
+        };
+        var along = function (seams, others, vert, u0, u1) {
+          var s = vert ? 1 : -1, res = [];
+          seams.forEach(function (Sm, k) {
+            var ok = [];
+            for (var c = u0 + hl + mg; c <= u1 - hl - mg; c += 2) {
+              var good = true;
+              for (var u = c - hl - mg; good && u <= c + hl + mg + 1e-6; u += 1.5) {
+                var pv = seamAt(Sm, u);
+                for (var di = 0; good && di < 5; di++) {
+                  var d = [-mg, 0, ov / 2, ov, ov + mg][di], pos = pv + s * d;
+                  if (!(vert ? inBack(pos, u) : inBack(u, pos))) good = false;
+                }
+                for (var m = 0; good && m < others.length; m++) {
+                  for (var dd = 0; good && dd <= ov; dd += ov) {
+                    var ux = vert ? pv + dd : u, uy = vert ? u : pv - dd;   // point de cette coupure
+                    var cross = vert ? seamAt(others[m], ux) : seamAt(others[m], uy);
+                    if (Math.abs((vert ? uy : ux) - cross) < near) good = false;
+                  }
+                }
+              }
+              ok.push(good);
+            }
+            var runs = [], st = -1;
+            for (var q = 0; q <= ok.length; q++) {
+              if (q < ok.length && ok[q]) { if (st < 0) st = q; } else if (st >= 0) { runs.push([st, q - 1]); st = -1; }
+            }
+            var G = [], T2 = [];
+            runs.forEach(function (rn) {
+              var a = u0 + hl + mg + rn[0] * 2, b = u0 + hl + mg + rn[1] * 2, n = Math.max(1, Math.floor((b - a) / BACK_TENON_PITCH) + 1);
+              for (var q = 0; q < n; q++) {
+                var c = n === 1 ? (a + b) / 2 : a + (b - a) * q / (n - 1);
+                T2.push(patch(Sm, vert, c, BACK_TENON_L / 2, 0, ov - g));
+                G.push(patch(Sm, vert, c, hl, -0.3, ov));
+              }
+            });
+            res[k] = { tenon: T2, groove: G };
+          });
+          return res;
+        };
+        // mesh : x vers la droite, y vers le haut ; coutures verticales (x en fonction de y) et horizontales
+        J.v = along(XS, YS, true, Hm - bbx[3], Hm - bbx[1]);
+        J.h = along(YS, XS, false, bbx[0], bbx[2]);
+      }
       seg.list.forEach(function (cell, n) {
-        var i = cell.col, j = cell.row;
-        var ps = polys('back', { lo: i ? { k: i - 1, d: 0 } : null, hi: i < nx ? { k: i, d: 0 } : null },
-          { lo: j ? { k: j - 1, d: 0 } : null, hi: j < ny ? { k: j, d: 0 } : null });
+        var i = cell.col, j = cell.row, recv = [], ten = [];
+        if (i && J.v[i - 1]) recv = recv.concat(J.v[i - 1].groove);
+        if (j && J.h[j - 1]) recv = recv.concat(J.h[j - 1].groove);
+        if (i < nx && J.v[i]) ten = ten.concat(J.v[i].tenon);
+        if (j < ny && J.h[j]) ten = ten.concat(J.h[j].tenon);
+        sets.back = recv.length ? back0.concat(recv.map(reverseRing)) : back0;
+        sets.bgv = recv;
+        var zx = { lo: i ? { k: i - 1, d: 0 } : null, hi: i < nx ? { k: i, d: 0 } : null };
+        var zy = { lo: j ? { k: j - 1, d: 0 } : null, hi: j < ny ? { k: j, d: 0 } : null };
+        var ps = polys('back', zx, zy);
         if (!ps.length) return;
-        var mesh = extrude(ps, -Tb, 0, { v: [], t: [] });
-        if (mesh.t.length) out[n].back.push({ kind: 'back', v: mesh.v, t: mesh.t });
+        var add2 = function (pp, z0, z1) {
+          var mesh = extrude(pp, z0, z1, { v: [], t: [] });
+          if (mesh.t.length) out[n].back.push({ kind: 'back', v: mesh.v, t: mesh.t });
+        };
+        add2(ps, -Tb, 0);
+        if (recv.length) add2(polys('bgv', zx, zy), -thb + g, 0);
+        if (ten.length) add2(nest(ten), -Tb, -thb);
       });
     }
     return { segs: out, w: D.w, h: D.h, T: T, Tb: Tb, seg: seg };
@@ -1875,11 +1953,11 @@
       x0 += mx[0] - mn[0] + 10;
     };
     // pose d'impression : « face » = retourné, languettes au plateau ; « dos » = tel quel (z = 0 au plateau)
+    // avec un fond : une case = fond au plateau (z −Tb..0 -> 0..Tb) + pièces posées dessus à leur place, comme sur le mur
     B.segs.forEach(function (s) {
-      if (s.parts.length) emit(s.parts, 'Pièce ' + s.name, s.pose === 'face', s.pose === 'face' ? T : 0);   // case vide : rien
+      if (s.back.length) emit(s.parts.concat(s.back), 'Pièce ' + s.name, false, B.Tb);
+      else if (s.parts.length) emit(s.parts, 'Pièce ' + s.name, s.pose === 'face', s.pose === 'face' ? T : 0);   // case vide : rien
     });
-    // fonds : face visible au plateau (retournés : z de −Tb..0 -> 0..Tb)
-    B.segs.forEach(function (s) { if (s.back.length) emit(s.back, 'Fond ' + s.name, true, 0); });
     out.push(' </resources>\n <build>\n', items.join(''), ' </build>\n</model>\n');
     var ct = '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
       '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +

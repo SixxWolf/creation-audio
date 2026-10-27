@@ -23,3 +23,8 @@ Desktop.ini
 .DS_Store
 liste-attente-filaments.md
 tools/news-visuals/out/
+
+# Fichiers de travail locaux (étiquettes Amazon, sortie du trancheur) — jamais en ligne
+amazon/
+thermal labels/
+result.json

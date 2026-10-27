@@ -611,9 +611,9 @@
         + (nBad ? plural(nBad, 'trop grande', 'trop grandes') + ' · ' : '') + plural(nPrint, 'à imprimer', 'à imprimer') + '</span></summary>'
         + G.list.map(function (s) { return row(['Pièce ' + s.name, empty(s) ? 'vide' : fmt(s.w) + ' × ' + fmt(s.h) + ' mm', s.frags !== 0 && !s.fits]); }).join('')
         + '</details>';
-      html += row(['Impression', 'dos au plateau · tenons cachés']);
+      html += row(['Impression', R.back ? 'fond au plateau · pièces collées dessus' : 'dos au plateau · tenons cachés']);
     } else html += row(['Impression', bad.length ? 'hors plateau' : '1 pièce · face au plateau', bad.length]);
-    if (R.back) html += row(['Fond', fmt(R.back.box[2] - R.back.box[0]) + ' × ' + fmt(R.back.box[3] - R.back.box[1]) + ' × ' + fmt(R.back.T, 1) + ' mm · face au plateau']);
+    if (R.back) html += row(['Fond', fmt(R.back.box[2] - R.back.box[0]) + ' × ' + fmt(R.back.box[3] - R.back.box[1]) + ' × ' + fmt(R.back.T, 1) + ' mm']);
     html += row(['Volume', fmt((R.volume + (R.back ? R.back.volume : 0)) / 1000) + ' cm³']);
     el.report.innerHTML = html;
   }
