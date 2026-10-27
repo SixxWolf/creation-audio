@@ -192,7 +192,8 @@
     return '';
   }
   function render() {
-    var open = orders.filter(function (o) { return OPEN[o.status]; });
+    // « En cours » : à traiter, ou facturée mais pas encore payée
+    var open = orders.filter(function (o) { return OPEN[o.status] || (o.status === 'invoiced' && !o.paid_at); });
     if (openN) openN.textContent = open.length ? open.length : '';
     renderPrint();
     var list = filter === 'open' ? open : orders;
