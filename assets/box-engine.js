@@ -310,7 +310,7 @@
     var p = g.port;
     if (p && p.shape !== 'round') {
       var mz0 = ov ? t : 0;                                 // recouvrement : le mur commence derrière la façade 1 (la 2e, encastrée, le touche)
-      var mur = { role: 'port', name: 'Mur d\'évent', x0: t + p.pw, x1: 2 * t + p.pw, y0: t, y1: H - t, z0: mz0, z1: p.wall1, cut: [p.wall1 - mz0, H - 2 * t], ex: [0.25, 0, -0.2] };
+      var mur = { role: 'port', name: 'Évent 1', x0: t + p.pw, x1: 2 * t + p.pw, y0: t, y1: H - t, z0: mz0, z1: p.wall1, cut: [p.wall1 - mz0, H - 2 * t], ex: [0.25, 0, -0.2] };
       if (p.soft && p.rad > 0.0005) {                      // sortie : arête du mur côté fente et arête intérieure du côté gauche arrondies
         var rr = p.rad, k0, side = out.filter(function (q) { return q.name === 'Côté gauche'; })[0];
         if (!ov) {
@@ -326,7 +326,7 @@
       }
       if (mur.cut[0] > 0.0005) add(mur);
       if (p.shape === 'L') {
-        var ret = { role: 'port', name: 'Retour d\'évent', x0: t + p.pw, x1: t + p.pw + p.wall2, y0: t, y1: H - t,
+        var ret = { role: 'port', name: 'Évent 2', x0: t + p.pw, x1: t + p.pw + p.wall2, y0: t, y1: H - t,
           z0: g.zb - p.pw - t, z1: g.zb - p.pw, cut: [p.wall2, H - 2 * t], ex: [0.2, 0, 0.35] };
         if (p.soft && p.rad > 0.0005) {                    // coin du retour arrondi
           var r = p.rad, rt = Math.max(0, Math.min(p.rad, t / 2, p.wall2 - r)), i, arc = function (cx, cz, rr, a0) {
