@@ -175,6 +175,7 @@
     var catalogEl = o.catalogEl, productEl = o.productEl;
     var listEl = o.listEl || catalogEl;   // où poser recherche + grille (l'en-tête de page peut rester dans le HTML)
     var items = [], byId = {}, bySlug = {}, slugById = {}, byRef = {};
+    var veh = { y: '', make: '', model: '' }, vehOpen = null;
     var q = '', size = 'all', catScrollY = 0, screen = null, shellBuilt = false, firstShow = true;
     var curP = null, curQty = 1, curImg = 0, curImgs = [], fitOpen = false;
     var rootHref = o.rootHref || '#/';
@@ -278,7 +279,75 @@
         .map(function (s) { return { size: s, n: seen[s] }; });
     }
     function filtered() {
-      return items.filter(function (p) { return (size === 'all' || sizeOf(p) === size) && matches(p, q); });
+      return items.filter(function (p) { return (size === 'all' || sizeOf(p) === size) && vehMatch(p) && matches(p, q); });
+    }
+
+    /* ---------- sélecteur de véhicule : année → marque → modèle ---------- */
+    function yearIn(r, y) { return !y || (!r.from && !r.to) || ((r.from || 0) <= y && y <= (r.to || 9999)); }
+    function vehRows() {
+      var rows = [];
+      items.forEach(function (p) { fitmentOf(p).forEach(function (r) { rows.push(r); }); });
+      return rows;
+    }
+    function vehMatch(p) {
+      if (!veh.y && !veh.make && !veh.model) return true;
+      return fitmentOf(p).some(function (r) {
+        return yearIn(r, +veh.y) && (!veh.make || r.make === veh.make) && (!veh.model || r.model === veh.model);
+      });
+    }
+    function vehOptions(level) {
+      var rows = vehRows(), seen = {}, out = [];
+      if (level === 'y') {
+        var top = new Date().getFullYear();
+        rows.forEach(function (r) {
+          if (!r.from && !r.to) return;
+          for (var y = r.from || r.to; y <= (r.to || top); y++) seen[y] = 1;
+        });
+        return Object.keys(seen).map(Number).sort(function (a, b) { return b - a; }).map(String);
+      }
+      rows.forEach(function (r) {
+        if (!yearIn(r, +veh.y) || (level === 'model' && r.make !== veh.make)) return;
+        var v = level === 'make' ? r.make : r.model;
+        if (v && !seen[v]) { seen[v] = 1; out.push(v); }
+      });
+      return out.sort(function (a, b) { return a.localeCompare(b, 'fr', { numeric: true }); });
+    }
+    function vehDd(level, label, disabled) {
+      var cur = veh[level], open = vehOpen === level && !disabled;
+      return '<div class="veh-dd' + (open ? ' is-open' : '') + (cur ? ' has-val' : '') + '">' +
+        '<button type="button" class="veh-btn" data-lv="' + level + '" aria-haspopup="listbox" aria-expanded="' + open + '"' + (disabled ? ' disabled' : '') + '>' +
+          '<span class="veh-lbl">' + esc(cur || label) + '</span>' + IC.chev + '</button>' +
+        (open ? '<ul class="veh-menu" role="listbox">' + vehOptions(level).map(function (v) {
+          return '<li role="option" tabindex="-1" data-v="' + esc(v) + '" aria-selected="' + (v === cur) + '">' + esc(v) + '</li>';
+        }).join('') + '</ul>' : '') + '</div>';
+    }
+    function renderVeh() {
+      var box = $('.spc-veh', catalogEl); if (!box) return;
+      if (!vehRows().length) { box.hidden = true; box.innerHTML = ''; return; }
+      box.hidden = false;
+      box.innerHTML = _t('<span class="veh-title">Mon véhicule</span>') +
+        vehDd('y', _t('Année')) + vehDd('make', _t('Marque')) + vehDd('model', _t('Modèle'), !veh.make) +
+        ((veh.y || veh.make) ? _t('<button type="button" class="veh-reset">Réinitialiser</button>') : '');
+      var open = $('.veh-menu', box);
+      if (open) { var sel = $('[aria-selected="true"]', open); if (sel) open.scrollTop = sel.offsetTop - 60; }
+    }
+    function vehChanged() { vehOpen = null; renderVeh(); renderGrid(); }
+    function wireVeh() {
+      var box = $('.spc-veh', catalogEl);
+      box.addEventListener('click', function (e) {
+        var b = e.target.closest('.veh-btn'), li = e.target.closest('.veh-menu li'), rs = e.target.closest('.veh-reset');
+        if (b) { vehOpen = vehOpen === b.getAttribute('data-lv') ? null : b.getAttribute('data-lv'); renderVeh(); return; }
+        if (rs) { veh = { y: '', make: '', model: '' }; vehChanged(); return; }
+        if (li) {
+          var lv = vehOpen, v = li.getAttribute('data-v');
+          veh[lv] = veh[lv] === v ? '' : v;
+          if (lv === 'y') { if (veh.make && vehOptions('make').indexOf(veh.make) === -1) veh.make = ''; }
+          if (lv !== 'model') veh.model = (lv === 'make' || !veh.make || vehOptions('model').indexOf(veh.model) === -1) ? '' : veh.model;
+          vehChanged();
+        }
+      });
+      document.addEventListener('click', function (e) { if (vehOpen && e.target.isConnected && !e.target.closest('.spc-veh')) { vehOpen = null; renderVeh(); } });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && vehOpen) { vehOpen = null; renderVeh(); } });
     }
 
     function priceRows(p) {
@@ -331,6 +400,7 @@
     // coquille du catalogue (aussi écrite telle quelle dans spacers.html par le générateur de pages)
     function shellHtml(chips, count, grid, legal) {
       return '<div class="spc-bar">' +
+          '<div class="spc-veh" hidden></div>' +
           '<div class="spc-search">' + IC.search +
             _t('<label class="sr-only" for="spc-q">Chercher un véhicule ou un code</label>') +
             _t('<input type="search" id="spc-q" placeholder="Véhicule ou code — ex. civic 2008" autocomplete="off" enterkeyhint="search">') +
@@ -347,6 +417,7 @@
       listEl.innerHTML = shellHtml();
       var input = $('#spc-q', catalogEl), clear = $('.spc-clear', catalogEl);
       input.value = q;
+      wireVeh();
       var t;
       input.addEventListener('input', function () {
         clearTimeout(t);
@@ -375,7 +446,7 @@
       });
     }
     function countText(n) {
-      return (q || size !== 'all')
+      return (q || size !== 'all' || veh.y || veh.make)
         ? plural(n, 'spacer trouvé', 'spacers trouvés') + _t(' sur ') + items.length
         : plural(items.length, 'spacer', 'spacers');
     }
@@ -390,7 +461,7 @@
         grid.innerHTML = _t('<p class="empty">Aucun spacer ne correspond') + (q ? ' à « ' + esc(q) + ' »' : '') + '.<br>' +
           _t('<button type="button" class="spc-reset">Tout afficher</button>') + (o.emptyHint ? '<br>' + o.emptyHint : '') + '</p>';
         $('.spc-reset', grid).addEventListener('click', function () {
-          q = ''; size = 'all';
+          q = ''; size = 'all'; veh = { y: '', make: '', model: '' }; renderVeh();
           var i = $('#spc-q', catalogEl); if (i) i.value = '';
           var c = $('.spc-clear', catalogEl); if (c) c.hidden = true;
           renderChips(); renderGrid();
@@ -404,7 +475,7 @@
     function showCatalog() {
       var fresh = screen !== 'catalog';
       if (!shellBuilt) buildCatalogShell();   // remplace aussi le catalogue pré-rendu (pages générées)
-      renderChips(); renderGrid();
+      renderVeh(); renderChips(); renderGrid();
       productEl.hidden = true; catalogEl.hidden = false;
       if (fresh) {
         screen = 'catalog';
