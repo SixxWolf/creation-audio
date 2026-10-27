@@ -3501,6 +3501,21 @@ insert into public.admin_settings (key, value)
   on conflict (key) do nothing;
 
 -- ------------------------------------------------------------
+-- FOND DU PORTAIL DEALER (2026-10-27)
+-- admin_settings « dealer_theme » : { bg: "#RRGGBB", at }. Réglé dans
+-- Réglages › Apparence › Portail dealer (cms-dealer-fond.js). Lu en anon par
+-- dealer.html (public_dealer_theme) dès l'écran de connexion ; ne renvoie que la couleur.
+-- ------------------------------------------------------------
+create or replace function public.public_dealer_theme()
+returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('bg', v ->> 'bg')
+    from (select coalesce((select value from public.admin_settings where key = 'dealer_theme'), '{}'::jsonb) as v) s;
+$$;
+revoke all on function public.public_dealer_theme() from public;
+grant execute on function public.public_dealer_theme() to anon, authenticated;
+
+-- ------------------------------------------------------------
 -- LANGUE ANGLAISE (2026-10-25) — site /en/, traduction automatique
 -- Colonne i18n (products, materials, news) : { h, name?, description?, long_desc?,
 -- category?, title?, body?, cta_label?, s: { "texte court FR": "EN" } } ; écrite

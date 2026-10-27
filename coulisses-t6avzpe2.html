@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=115">
+<link rel="stylesheet" href="assets/admin.css?v=116">
 <link rel="stylesheet" href="assets/cueillette.css?v=3">
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=29">
@@ -2678,6 +2678,7 @@
           <h1>Apparence</h1>
         </div>
       </div>
+      <h2 class="set-sec">Admin</h2>
       <div class="set-card">
         <div class="set-head"><b>Couleur des accents</b> <span class="set-msg" id="acc-msg" aria-live="polite"></span></div>
         <div class="acc-swatches" id="acc-swatches" role="radiogroup" aria-label="Couleur des accents"></div>
@@ -2699,9 +2700,11 @@
           <span class="acc-tab">Onglet actif</span>
         </div>
       </div>
-      <!-- Thème des fêtes du site public (cms-fetes.js → admin_settings « fetes », lu par nav.js) -->
+      <!-- Thèmes de fêtes du site public : un par fête (Noël pour l'instant).
+           cms-fetes.js → admin_settings « fetes », lu par nav.js -->
+      <h2 class="set-sec">Thèmes de fêtes · site public</h2>
       <div class="set-card fe-card">
-        <div class="set-head"><b>Thème des fêtes</b> <span class="set-msg" id="fe-msg" aria-live="polite"></span></div>
+        <div class="set-head"><b>Noël</b> <span class="set-msg" id="fe-msg" aria-live="polite"></span></div>
         <div class="fe-row">
           <label class="inline fe-on"><input type="checkbox" id="fe-on"> Activé</label>
           <div class="field">
@@ -2714,6 +2717,28 @@
           </div>
           <span class="fe-state" id="fe-state"></span>
           <a class="btn btn-ghost btn-sm" id="fe-preview" href="./?fetes=1" target="_blank" rel="noopener">Aperçu</a>
+        </div>
+      </div>
+      <!-- Fond du portail dealer (cms-dealer-fond.js → admin_settings « dealer_theme », lu par dealer.html) -->
+      <h2 class="set-sec">Portail dealer</h2>
+      <div class="set-card">
+        <div class="set-head"><b>Couleur du fond</b> <span class="set-msg" id="dt-msg" aria-live="polite"></span></div>
+        <div class="acc-swatches" id="dt-swatches" role="radiogroup" aria-label="Couleur du fond du portail dealer"></div>
+        <div class="acc-row">
+          <div class="field acc-free">
+            <label class="lbl" for="dt-hex">Couleur libre</label>
+            <div class="acc-pick">
+              <input type="color" id="dt-pick" value="#3a3e45" aria-label="Choisir une couleur">
+              <input type="text" id="dt-hex" value="#3A3E45" maxlength="7" spellcheck="false" autocomplete="off">
+            </div>
+          </div>
+          <a class="btn btn-ghost btn-sm" href="dealer.html" target="_blank" rel="noopener">Ouvrir le portail</a>
+          <button class="btn btn-ghost btn-sm" id="dt-reset" type="button" data-ic="refresh">Gris d'origine</button>
+        </div>
+        <div class="dt-preview" id="dt-preview" aria-label="Aperçu">
+          <span class="dt-eyebrow">Prix de gros — dealer</span>
+          <b class="dt-title">Spacers &amp; adaptateurs</b>
+          <span class="dt-cards"><i></i><i></i><i></i></span>
         </div>
       </div>
     </section>
@@ -2814,6 +2839,7 @@
 <script src="assets/admin-core.js?v=16"></script>
 <script src="assets/admin-accent.js?v=1"></script>
 <script src="assets/cms-fetes.js?v=1"></script>
+<script src="assets/cms-dealer-fond.js?v=1"></script>
 <script src="assets/cms-securite.js?v=2"></script>
 <script src="assets/cms-costing.js?v=4"></script>
 <script src="assets/cms-brands.js?v=7"></script>
@@ -2854,6 +2880,6 @@
 <script src="assets/cms-nouvelles.js?v=4"></script>
 <script src="assets/cms-recherche.js?v=1"></script>
 <script src="assets/aide.js?v=3"></script>
-<script src="assets/cms-aide.js?v=2"></script>
+<script src="assets/cms-aide.js?v=3"></script>
 </body>
 </html>

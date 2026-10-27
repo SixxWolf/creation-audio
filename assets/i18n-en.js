@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 2;
+window.CA_EN_V = 3;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -379,6 +379,9 @@ window.CA_EN = (function (pairs) {
   [`Commande spacers — Création Audio`, `Spacer order — Création Audio`],
 
   // ---- dealer.js
+  [`Ajouter `, `Add `],
+  [` pour `, ` for `],
+  [`Meilleur prix ✓`, `Best price ✓`],
   [`Erreur inconnue`, `Unknown error`],
   [`Catalogue dealer`, `Dealer catalogue`],
   [`Ajouter à ma commande`, `Add to my order`],

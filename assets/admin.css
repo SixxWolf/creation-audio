@@ -1496,13 +1496,13 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .set-msg.is-warn { color:var(--bad); }
 /* pastilles : relief comme les boutons, anneau de la teinte quand elle est choisie */
 .acc-swatches { display:flex; flex-wrap:wrap; gap:12px; }
-.acc-sw { width:38px; height:38px; padding:0; cursor:pointer; border:0; border-radius:50%;
+.acc-sw, .dt-sw { width:38px; height:38px; padding:0; cursor:pointer; border:0; border-radius:50%;
   background:linear-gradient(180deg, color-mix(in srgb, var(--sw) 78%, #fff), var(--sw) 55%, color-mix(in srgb, var(--sw) 88%, #000));
   box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 1px 2px rgba(0,0,0,.25);
   transition-property:transform, box-shadow; transition-duration:.15s; transition-timing-function:ease-out; }
-.acc-sw:hover { transform:scale(1.08); }
-.acc-sw[aria-checked="true"] { box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 3px var(--paper), 0 0 0 5px var(--sw); }
-.acc-sw:focus-visible { outline:2px solid var(--ink); outline-offset:4px; }
+.acc-sw:hover, .dt-sw:hover { transform:scale(1.08); }
+.acc-sw[aria-checked="true"], .dt-sw[aria-checked="true"] { box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 3px var(--paper), 0 0 0 5px var(--sw); }
+.acc-sw:focus-visible, .dt-sw:focus-visible { outline:2px solid var(--ink); outline-offset:4px; }
 .acc-row { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px 20px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
 .acc-free { margin:0; }
 .acc-pick { display:flex; align-items:center; gap:8px; }
@@ -1514,6 +1514,17 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .acc-chk { display:inline-flex; align-items:center; gap:8px; font-size:.9rem; color:var(--ink); }
 .acc-tab { position:relative; padding:4px 2px 9px; font-weight:600; font-size:.9rem; color:var(--ink); }
 .acc-tab::after { content:''; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:var(--ember); }
+/* Apparence : sous-titres Admin · Thèmes de fêtes · Portail dealer */
+.set-sec { margin:28px 0 10px; font-family:var(--font); font-size:.76rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.panel-head + .set-sec { margin-top:4px; }
+/* fond du portail dealer (cms-dealer-fond.js) : aperçu = bandeau du portail dans la couleur choisie */
+.dt-sw { box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 1px var(--line-2), 0 1px 2px rgba(0,0,0,.2); }
+.dt-preview { --dt-bg:#3A3E45; --dt-fg:#fff; display:grid; gap:4px; margin-top:18px; padding:18px 20px; background:var(--dt-bg); border:1px solid var(--line); border-radius:12px; }
+.dt-preview.is-light { --dt-fg:#181A1F; }
+.dt-eyebrow { font-size:.7rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:color-mix(in srgb, var(--ember) 70%, var(--dt-fg)); }
+.dt-title { font-family:var(--display); font-size:1.25rem; letter-spacing:-.02em; color:var(--dt-fg); }
+.dt-cards { display:flex; gap:10px; margin-top:8px; }
+.dt-cards i { flex:1; max-width:120px; height:46px; background:#fff; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,.18); }
 /* thème des fêtes du site public (cms-fetes.js) */
 .fe-card { margin-top:16px; }
 .fe-row { display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px 18px; }

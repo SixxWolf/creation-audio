@@ -3,7 +3,8 @@
    Réutilise site.css (barre/marque) + boutique.css (catalogue, fiche
    spacer, panier). Ce fichier ajoute : connexion, écran d'accès refusé,
    onglets Catalogue / Mes commandes, suivi des commandes, note +
-   bandeau « modification » du panier.
+   bandeau « modification » du panier, fond réglable, panneau
+   « Ma commande » collé à droite, barre du bas, barre de rabais par modèle.
    ========================================================= */
 
 /* Barre : bouton déconnexion + badge */
@@ -130,3 +131,121 @@ p.dl-status::before { content:none; }
 /* code de vérification (2FA) */
 #dl-mfa-code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:1.3rem;
   letter-spacing:.35em; text-align:center; font-variant-numeric:tabular-nums; }
+
+/* =========================================================
+   Fond réglable (Réglages › Apparence › Portail dealer) : --dl-bg posé par
+   caDealerBg (dealer.html). Textes posés dessus en clair ; html.dl-light
+   (fond clair) les repasse en foncé. Les cartes restent blanches.
+   ========================================================= */
+:root { --dl-bg:#3A3E45; --dl-fg:#fff; --dl-fg-2:rgba(255,255,255,.72); --dl-fg-3:rgba(255,255,255,.66);
+  --dl-veil:rgba(255,255,255,.08); --dl-veil-2:rgba(255,255,255,.14); --dl-tabon-fg:var(--ink); --dl-tabon-bg:#fff; }
+:root.dl-light { --dl-fg:var(--ink); --dl-fg-2:var(--ink-2); --dl-fg-3:var(--muted);
+  --dl-veil:rgba(0,0,0,.05); --dl-veil-2:rgba(0,0,0,.1); --dl-tabon-fg:#fff; --dl-tabon-bg:var(--ink); }
+body.dealer-page { background:var(--dl-bg); }
+.dealer-page .dl-top, .dealer-page .dl-hello, .dealer-page .shop-head, .dealer-page .spc-count, .dealer-page .spc-legal,
+.dealer-page #dl-list > p, .dealer-page #dl-orders-list > p { color:var(--dl-fg-2); }
+.dealer-page .dl-top b, .dealer-page .shop-head h1, .dealer-page .shop-head b { color:var(--dl-fg); }
+.dealer-page .shop-head .muted, .dealer-page .dl-admin-note, .dealer-page .spc-count,
+.dealer-page .spc-legal .sp-legal, .dealer-page .shop-head .ask-alt, .dealer-page .shop-head .ask-alt a { color:var(--dl-fg-3); }
+.dealer-page .shop-head .shop-eyebrow { color:color-mix(in srgb, var(--ember) 70%, var(--dl-fg)); }
+.dealer-page .shop-head a.ask { color:var(--dl-fg); background:color-mix(in srgb, var(--ember) 28%, transparent);
+  text-decoration-color:color-mix(in srgb, var(--ember) 80%, var(--dl-fg)); }
+.dealer-page .dl-tabs { background:var(--dl-veil); border-color:var(--dl-veil-2); }
+.dealer-page .dl-tab { color:var(--dl-fg-2); }
+.dealer-page .dl-tab:hover { color:var(--dl-fg); background:var(--dl-veil-2); }
+.dealer-page .dl-tab[aria-current="page"] { color:var(--dl-tabon-fg); background:var(--dl-tabon-bg); }
+/* fiche spacer : tout son contenu est posé sur le fond -> une grande carte blanche */
+.dealer-page #dl-product { margin-top:18px; padding:clamp(18px, 2.6vw, 32px); background:#fff;
+  border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:var(--shadow); }
+
+/* =========================================================
+   « Ma commande » collée à droite (≥ 1200 px) ; tiroir + barre du bas en dessous
+   ========================================================= */
+@media (min-width:1200px) {
+  .dealer-page.dl-in { --maxw:1560px; }
+  .dl-in .dl-layout { display:grid; grid-template-columns:minmax(0, 1fr) 370px; align-items:start; gap:28px;
+    max-width:var(--maxw); margin:0 auto; padding:0 var(--gutter); }
+  .dl-in .dl-layout > .shop { max-width:none; margin:0; padding-left:0; padding-right:0; min-width:0; }
+  .dl-in .cart-panel { position:sticky; top:calc(var(--top-h) + 18px); right:auto; bottom:auto; z-index:5; width:auto; max-width:none;
+    height:auto; max-height:calc(100vh - var(--top-h) - 36px); margin-top:clamp(18px, 2.4vw, 26px);
+    transform:none; visibility:visible; transition:none; overflow:hidden;
+    border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:var(--shadow); }
+  .dl-in .cart-close, .dl-in .home-top .cart-btn, .dl-in .cart-backdrop { display:none; }
+  .dl-in .cart-phead { padding:14px 18px; }
+  /* la liste grandit avec la commande ; elle ne défile que quand le panneau atteint le bas de l'écran */
+  .dl-in .cart-items { flex:0 1 auto; min-height:0; padding:14px 16px; }
+  .dl-in .cart-foot { padding:14px 18px 16px; }
+  .dl-in .cart-foot .cart-note { display:none; }   /* déjà dit dans le bandeau du haut : plus de place pour les lignes */
+}
+.cart-phead.pulse { animation:dlPing .7s ease-out; }
+
+/* Barre « Mon véhicule » + recherche : carte arrondie dans la colonne (plus de débord sous le panneau) */
+.dealer-page .spc-bar { top:calc(var(--top-h) + 10px); margin:0 0 12px; padding:14px 18px;
+  border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); }
+@keyframes dlPing { 0% { background:transparent; } 35% { background:color-mix(in srgb, var(--ember) 14%, #fff); } 100% { background:transparent; } }
+
+/* Barre du bas (téléphone / tablette) */
+.dl-mbar { position:fixed; left:50%; bottom:calc(14px + env(safe-area-inset-bottom, 0px)); translate:-50% 0; z-index:35;
+  width:min(560px, calc(100vw - 2 * var(--gutter))); display:flex; align-items:center; gap:12px; padding:8px 8px 8px 18px;
+  font:inherit; text-align:left; color:#fff; cursor:pointer; background:var(--ink); border:1px solid rgba(255,255,255,.16); border-radius:100px;
+  box-shadow:0 18px 40px -16px rgba(0,0,0,.55); }
+.dl-mbar-n { flex:none; font-weight:700; font-size:.92rem; }
+.dl-mbar-hint { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.82rem;
+  color:rgba(255,255,255,.72); font-variant-numeric:tabular-nums; }
+.dl-mbar-total { flex:none; padding:8px 14px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--ink);
+  background:var(--ember); border-radius:100px; }
+.dl-mbar:focus-visible { outline:3px solid var(--ember-dim); outline-offset:3px; }
+.dl-mbar.pulse { animation:cartPulse .45s ease; }
+@media (min-width:1200px) { .dl-mbar { display:none !important; } }
+@media (max-width:1199px) {
+  .dl-mbar-on .toast { bottom:86px; }
+  .dl-mbar-on .shop { padding-bottom:calc(clamp(64px, 8vw, 110px) + 70px); }
+}
+
+/* =========================================================
+   Barre de rabais par modèle (ligne du panier)
+   ========================================================= */
+.dealer-page .citem { flex-wrap:wrap; }
+.citem-tiers { flex-basis:100%; display:grid; grid-template-columns:minmax(0, 1fr) auto; align-items:center; gap:4px 14px;
+  padding:9px 2px 0; border-top:1px dashed var(--line); }
+.tb-track { grid-column:1; position:relative; height:6px; margin:6px 9px 0 0; background:var(--wash-2); border-radius:100px; }
+.tb-fill { position:absolute; left:0; top:0; bottom:0; width:0; border-radius:inherit;
+  background:linear-gradient(90deg, color-mix(in srgb, var(--ember) 55%, #fff), var(--ember));
+  transition:width .6s cubic-bezier(.2,.8,.2,1); }
+.tb-mark { position:absolute; top:50%; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%;
+  background:#fff; border:2px solid var(--line-2); transition:background .3s, border-color .3s, box-shadow .3s; }
+.tb-mark.is-on { background:var(--ember); border-color:var(--ember); box-shadow:0 0 0 3px color-mix(in srgb, var(--ember) 20%, transparent); }
+.tb-mark.is-pop { animation:dlSpark 1s ease-out; }
+@keyframes dlSpark {
+  0%   { transform:scale(.6); box-shadow:0 0 0 0 color-mix(in srgb, var(--ember) 60%, transparent); }
+  35%  { transform:scale(1.45); }
+  100% { transform:scale(1); box-shadow:0 0 0 14px transparent; }
+}
+.tb-lbls { grid-column:1; position:relative; height:30px; margin-right:9px; }
+.tb-lbl { position:absolute; top:0; translate:-50% 0; display:flex; flex-direction:column; align-items:center;
+  font-size:.72rem; line-height:1.25; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.tb-lbl:last-child { translate:calc(-100% + 9px) 0; align-items:flex-end; }
+.tb-lbl b { font-size:.74rem; color:var(--ink-2); }
+.tb-lbl.is-on, .tb-lbl.is-on b { font-weight:700; color:var(--ember-ink); }
+.tb-lbl.is-pop { animation:dlLblPop .8s ease-out; }
+@keyframes dlLblPop { 0% { transform:scale(1); } 35% { transform:scale(1.22); } 100% { transform:scale(1); } }
+.tb-up { grid-column:2; grid-row:1 / span 2; padding:7px 12px; font:inherit; font-weight:700; font-size:.8rem; white-space:nowrap;
+  font-variant-numeric:tabular-nums; color:var(--ember-ink); cursor:pointer; background:color-mix(in srgb, var(--ember) 10%, #fff);
+  border:1px solid color-mix(in srgb, var(--ember) 35%, #fff); border-radius:100px; transition:background .15s, color .15s, border-color .15s; }
+.tb-up:hover { color:#fff; background:var(--ember); border-color:var(--ember); }
+.tb-up:focus-visible { outline:3px solid var(--ember-dim); outline-offset:2px; }
+.tb-max { grid-column:2; grid-row:1 / span 2; font-size:.8rem; font-weight:700; white-space:nowrap; color:#16794A; }
+@media (max-width:560px) {
+  /* téléphone : la barre prend toute la largeur, le bouton passe dessous */
+  .tb-up, .tb-max { grid-column:1; grid-row:auto; justify-self:start; }
+}
+.citem-unit.is-pop { display:inline-block; border-radius:6px; animation:dlPricePop 1s ease-out; }
+@keyframes dlPricePop {
+  0%   { background:color-mix(in srgb, var(--ember) 28%, transparent); transform:scale(1.06); }
+  100% { background:transparent; transform:scale(1); }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .tb-mark.is-pop, .tb-lbl.is-pop, .citem-unit.is-pop, .cart-phead.pulse, .dl-mbar.pulse { animation:none; }
+  .tb-fill { transition:none; }
+}

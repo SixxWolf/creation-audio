@@ -67,6 +67,8 @@
     mfaSec.hidden = which !== 'mfa';
     app.hidden = which !== 'app';
     cartBtn.hidden = which !== 'app';
+    document.body.classList.toggle('dl-in', which === 'app');
+    if (which !== 'app') mbar.hidden = true;
     logoutBtn.hidden = (which === 'login');
     if (which === 'app' && email) {
       me = String(email).toLowerCase();
@@ -78,8 +80,20 @@
     }
   }
 
+  // fond choisi dans l'admin (Réglages › Apparence) ; le cache évite le saut de couleur au prochain chargement
+  function loadTheme() {
+    sb.rpc('public_dealer_theme').then(function (res) {
+      if (res.error) return;
+      var h = res.data && res.data.bg;
+      if (window.caDealerBg) window.caDealerBg(h);
+      saveJSON('ca-dealer-bg', null);
+      try { if (h) localStorage.setItem('ca-dealer-bg', h); } catch (e) {}
+    }, function () {});
+  }
+
   function boot() {
     if (!sb) { show('login'); loginStatus.textContent = 'Service indisponible.'; return; }
+    loadTheme();
     sb.auth.getSession().then(function (res) {
       var session = res && res.data && res.data.session;
       if (!session) { show('login'); return; }
@@ -192,10 +206,12 @@
 
   /* ---- animation « vol vers le panier » ---- */
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function pulseCart() { cartBtn.classList.remove('pulse'); void cartBtn.offsetWidth; cartBtn.classList.add('pulse'); }
+  // cible : le panneau collé à droite (grand écran) ou le bouton panier / la barre du bas
+  function cartTarget() { return docked() ? $('.cart-phead', cartPanel) : (!mbar.hidden ? mbar : cartBtn); }
+  function pulseCart() { var t = cartTarget(); t.classList.remove('pulse'); void t.offsetWidth; t.classList.add('pulse'); }
   function flyToCart(el) {
     if (!el || reduceMotion) { pulseCart(); return; }
-    var from = el.getBoundingClientRect(), to = cartBtn.getBoundingClientRect();
+    var from = el.getBoundingClientRect(), to = cartTarget().getBoundingClientRect();
     var size = Math.max(46, Math.min(110, from.width * 0.5));
     var sx = from.left + from.width / 2 - size / 2, sy = from.top + from.height / 2 - size / 2;
     var fly = document.createElement('div');
@@ -281,7 +297,10 @@
           '<div class="citem-right">' +
             _t('<button type="button" class="citem-del" aria-label="Retirer ') + esc(p.name) + '">&times;</button>' +
             '<div class="citem-line">' + money(lineTotal(it)) + '</div>' +
-          '</div>';
+          '</div>' + tierBarHtml(p, it.qty);
+        row.setAttribute('data-id', it.id);
+        var up = $('.tb-up', row);
+        if (up) up.addEventListener('click', function () { changeQty(it.id, +up.getAttribute('data-add')); });
         $('.citem-thumb', row).addEventListener('click', closeCart);
         $('.cq-minus', row).addEventListener('click', function () { changeQty(it.id, -1); });
         $('.cq-plus', row).addEventListener('click', function () { changeQty(it.id, 1); });
@@ -292,12 +311,86 @@
         cartItems.appendChild(row);
       });
     }
+    animateTiers();
     cartTotal.textContent = money(total());
     sendBtn.textContent = editing ? _t('Enregistrer les modifications') : _t('Envoyer ma commande');
     sendBtn.classList.toggle('is-disabled', n === 0 || sending);
+    renderMbar(n);
+    if (typeof fitPanel === 'function') fitPanel();
   }
 
-  function openCart() { cartPanel.classList.add('is-open'); cartBackdrop.hidden = false; document.body.classList.add('cart-lock'); }
+  /* ---- barre de rabais par modèle : jalons = paliers, « +N → −X % » complète le suivant ---- */
+  function tierInfo(p, qty) {
+    var base = +p.sell_price || 0;
+    var tiers = window.CASpacers.normalizeTiers(p.tiers).filter(function (t) { return t.min > 1 && t.price < base; });
+    if (!tiers.length || !base) return null;
+    var reached = -1;
+    tiers.forEach(function (t, i) { if (qty >= t.min) reached = i; });
+    var max = tiers[tiers.length - 1].min;
+    return { tiers: tiers, reached: reached, next: tiers[reached + 1] || null, max: max,
+      fill: Math.min(qty / max, 1) * 100, pct: function (t) { return Math.round((1 - t.price / base) * 100); } };
+  }
+  function tierBarHtml(p, qty) {
+    var ti = tierInfo(p, qty); if (!ti) return '';
+    var marks = '', labels = '';
+    ti.tiers.forEach(function (t, i) {
+      var at = t.min / ti.max * 100, on = i <= ti.reached ? ' is-on' : '';
+      marks += '<i class="tb-mark' + on + '" style="left:' + at + '%"></i>';
+      labels += '<span class="tb-lbl' + on + '" style="left:' + at + '%"><b>' + t.min + '</b>−' + ti.pct(t) + ' %</span>';
+    });
+    var foot = ti.next
+      ? '<button type="button" class="tb-up" data-add="' + (ti.next.min - qty) + '" aria-label="' +
+          esc(_t('Ajouter ') + plural(ti.next.min - qty, 'paire', 'paires') + _t(' pour ') + '−' + ti.pct(ti.next) + ' %') + '">+' +
+          (ti.next.min - qty) + ' → −' + ti.pct(ti.next) + ' %</button>'
+      : '<span class="tb-max">' + _t('Meilleur prix ✓') + '</span>';
+    return '<div class="citem-tiers" data-fill="' + ti.fill + '" data-reached="' + ti.reached + '">' +
+      '<div class="tb-track"><span class="tb-fill"></span>' + marks + '</div>' +
+      '<div class="tb-lbls">' + labels + '</div>' + foot + '</div>';
+  }
+  var tierPrev = {};   // id -> { fill, reached } du rendu précédent : la barre glisse, le jalon atteint s'allume
+  function animateTiers() {
+    var now = {};
+    $$('.citem', cartItems).forEach(function (row) {
+      var id = row.getAttribute('data-id'), box = $('.citem-tiers', row); if (!box) return;
+      var fill = +box.getAttribute('data-fill'), reached = +box.getAttribute('data-reached'), prev = tierPrev[id];
+      var bar = $('.tb-fill', box);
+      now[id] = { fill: fill, reached: reached };
+      if (reduceMotion) { bar.style.width = fill + '%'; return; }
+      bar.style.width = (prev ? prev.fill : 0) + '%';
+      bar.getBoundingClientRect();
+      bar.style.width = fill + '%';
+      if (prev && reached > prev.reached) {
+        var mk = $$('.tb-mark', box)[reached], lb = $$('.tb-lbl', box)[reached], un = $('.citem-unit', row);
+        [mk, lb, un].forEach(function (el) { if (el) el.classList.add('is-pop'); });
+      }
+    });
+    tierPrev = now;
+  }
+
+  /* ---- barre du bas (sous 1200 px) : nombre de paires, palier le plus proche, total ---- */
+  function renderMbar(n) {
+    if (!document.body.classList.contains('dl-in')) return;
+    mbar.hidden = !n;
+    document.body.classList.toggle('dl-mbar-on', !!n);
+    if (!n) return;
+    var best = null;
+    entries().forEach(function (it) {
+      var ti = tierInfo(byId[it.id], it.qty);
+      if (ti && ti.next && (!best || ti.next.min - it.qty < best.left)) best = { name: byId[it.id].name, left: ti.next.min - it.qty, pct: ti.pct(ti.next) };
+    });
+    $('#dl-mbar-n').textContent = plural(n, 'paire', 'paires');
+    $('#dl-mbar-hint').textContent = best ? best.name + ' : +' + best.left + ' → −' + best.pct + ' %' : '';
+    $('#dl-mbar-total').textContent = money(total());
+  }
+
+  var mbar = $('#dl-mbar');
+  var dockMQ = window.matchMedia ? window.matchMedia('(min-width:1200px)') : null;
+  function docked() { return !!(dockMQ && dockMQ.matches); }
+  function onDockChange() { if (docked()) { cartBackdrop.hidden = true; document.body.classList.remove('cart-lock'); cartPanel.classList.remove('is-open'); } }
+  if (dockMQ) { if (dockMQ.addEventListener) dockMQ.addEventListener('change', onDockChange); else if (dockMQ.addListener) dockMQ.addListener(onDockChange); }
+  mbar.addEventListener('click', function () { openCart(); });
+
+  function openCart() { if (docked()) { pulseCart(); return; } cartPanel.classList.add('is-open'); cartBackdrop.hidden = false; document.body.classList.add('cart-lock'); }
   function closeCart() { cartPanel.classList.remove('is-open'); cartBackdrop.hidden = true; document.body.classList.remove('cart-lock'); }
   cartBtn.addEventListener('click', openCart);
   cartBackdrop.addEventListener('click', closeCart);
@@ -514,6 +607,28 @@
   });
   window.addEventListener('focus', function () { if (Date.now() - lastRefresh > 5000) refresh(); });
   setInterval(function () { if (document.visibilityState === 'visible') refresh(); }, 60000);
+
+  // panneau collé : sa hauteur suit la commande mais s'arrête au bas de l'écran, où qu'il soit (bandeau visible ou non)
+  function fitPanel() {
+    if (!docked() || app.hidden) { cartPanel.style.maxHeight = ''; return; }
+    cartPanel.style.maxHeight = Math.max(320, window.innerHeight - cartPanel.getBoundingClientRect().top - 18) + 'px';
+  }
+  var ticking = false;
+  window.addEventListener('scroll', function () {
+    if (ticking) return; ticking = true;
+    requestAnimationFrame(function () {
+      fitPanel(); ticking = false;
+    });
+  }, { passive: true });
+  window.addEventListener('resize', fitPanel);
+
+  // panneau collé (grand écran) : simple région, pas une fenêtre modale
+  function syncDockA11y() {
+    if (docked()) { cartPanel.setAttribute('role', 'region'); cartPanel.removeAttribute('aria-modal'); }
+    else { cartPanel.setAttribute('role', 'dialog'); cartPanel.setAttribute('aria-modal', 'true'); }
+  }
+  syncDockA11y();
+  if (dockMQ) { if (dockMQ.addEventListener) dockMQ.addEventListener('change', syncDockA11y); else if (dockMQ.addListener) dockMQ.addListener(syncDockA11y); }
 
   boot();
 })();
