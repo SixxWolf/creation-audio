@@ -44,7 +44,7 @@
   var STATUS = { 'new': 'Nouvelle', preparing: 'En préparation', ready: 'Prête' };
   var cfg = null, cfgLoading = null, listLoading = null;
 
-  function blank() { return { week: {}, closed: [], extra: [], cap: 0, notice: 24, days: 14, address: '' }; }
+  function blank() { return { week: {}, closed: [], extra: [], off: [], cap: 0, notice: 24, days: 14, address: '' }; }
 
   /* ---- horaire : lecture ---- */
   function loadCfg() {
@@ -56,6 +56,7 @@
       Object.keys(cfg).forEach(function (k) { if (v[k] != null) cfg[k] = v[k]; });
       cfg.week = JSON.parse(JSON.stringify(cfg.week || {}));
       cfg.closed = (cfg.closed || []).slice(); cfg.extra = (cfg.extra || []).slice();
+      cfg.off = JSON.parse(JSON.stringify(cfg.off || []));
       paint();
     }).then(function () { cfgLoading = null; }, function (err) {
       cfgLoading = null;
@@ -97,7 +98,111 @@
     $('#cq-notice').value = cfg.notice != null ? cfg.notice : 24;
     $('#cq-days').value = cfg.days || 14;
     $('#cq-address').value = cfg.address || '';
+    paintCal();
   }
+  /* ---- dates précises : jours + heures fermés (cfg.off = [{ d, all:true } | { d, h:['16:00', …] }]) ---- */
+  function toDate(iso) { var p = iso.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function inClosed(d) {
+    return cfg.closed.some(function (c) { return c.from && d >= c.from && d <= (c.to || c.from); });
+  }
+  function quarters(s, e) {
+    var a = hm(s).split(':'), b = hm(e).split(':'), out = [];
+    for (var m = (+a[0]) * 60 + (+a[1]); m <= (+b[0]) * 60 + (+b[1]) - 15; m += 15) {
+      out.push(String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'));
+    }
+    return out;
+  }
+  // plages ouvertes ce jour-là selon l'horaire (hors fermetures par date) : [{ times: ['12:00', …] }]
+  function rangesFor(d) {
+    var iso = toDate(d).getDay() || 7, out = [];
+    if (!inClosed(d)) (cfg.week[iso] || []).forEach(function (p) { if (p.s && p.e) out.push(quarters(p.s, p.e)); });
+    cfg.extra.forEach(function (p) { if (p.d === d && p.s && p.e) out.push(quarters(p.s, p.e)); });
+    return out.filter(function (t) { return t.length; });
+  }
+  function offOf(d) { for (var i = 0; i < cfg.off.length; i++) if (cfg.off[i].d === d) return cfg.off[i]; return null; }
+  function isOff(d, t) { var o = offOf(d); return !!o && (o.all || (o.h || []).indexOf(t) >= 0); }
+  function setOff(d, times, off) {   // ferme / rouvre une liste d'heures
+    var all = [].concat.apply([], rangesFor(d)), o = offOf(d), cur = all.filter(function (t) { return isOff(d, t); });
+    cfg.off = cfg.off.filter(function (x) { return x.d !== d; });
+    times.forEach(function (t) {
+      var i = cur.indexOf(t);
+      if (off && i < 0) cur.push(t); else if (!off && i >= 0) cur.splice(i, 1);
+    });
+    if (cur.length && cur.length >= all.length) cfg.off.push({ d: d, all: true });
+    else if (cur.length) cfg.off.push({ d: d, h: cur.sort() });
+  }
+  var selD = null, monthMode = false, calMonth = null;
+  function dayBtn(d, mode) {
+    var r = rangesFor(d), all = [].concat.apply([], r), nOff = all.filter(function (t) { return isOff(d, t); }).length;
+    var st = !all.length ? 'is-none' : nOff >= all.length ? 'is-closed' : nOff ? 'is-part' : '';
+    var dt = toDate(d), past = d < today();
+    return '<button type="button" class="cq-cd ' + st + (d === selD ? ' is-on' : '') + '" data-day="' + d + '"' + (past ? ' disabled' : '') + '>' +
+      (mode === 'month' ? '' : '<small>' + dt.toLocaleDateString('fr-CA', { weekday: 'short' }).replace('.', '') + '</small>') + '<b>' + dt.getDate() + '</b>' +
+      (mode === 'month' ? '' : '<i>' + dt.toLocaleDateString('fr-CA', { month: 'short' }).replace('.', '') + '</i>') + '</button>';
+  }
+  function monthLabel(ym) {
+    var t = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1).toLocaleDateString('fr-CA', { month: 'long', year: 'numeric' });
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function shiftMonth(ym, k) {
+    var d = new Date(+ym.slice(0, 4), +ym.slice(5, 7) - 1 + k, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function paintCal() {
+    var el = $('#cq-cal'); if (!el) return;
+    var n = Math.min(60, Math.max(1, cfg.days || 14)), days = [], t0 = new Date(), i, html;
+    for (i = 0; i <= n; i++) { var dd = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() + i); days.push(ymd(dd)); }
+    if (!selD) selD = days[0];
+    var cur = today().slice(0, 7);
+    if (monthMode) {
+      if (!calMonth) calMonth = selD.slice(0, 7);
+      var first = new Date(+calMonth.slice(0, 4), +calMonth.slice(5, 7) - 1, 1), lead = (first.getDay() + 6) % 7,
+          last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate(), cells = '';
+      for (i = 0; i < lead; i++) cells += '<span></span>';
+      for (i = 1; i <= last; i++) cells += dayBtn(calMonth + '-' + String(i).padStart(2, '0'), 'month');
+      html = '<div class="cq-calhead"><button type="button" class="cq-nav" data-mv="-1" aria-label="Mois précédent"' + (calMonth <= cur ? ' disabled' : '') + '>‹</button>' +
+        '<b>' + esc(monthLabel(calMonth)) + '</b>' +
+        '<button type="button" class="cq-nav" data-mv="1" aria-label="Mois suivant"' + (calMonth >= shiftMonth(cur, 12) ? ' disabled' : '') + '>›</button>' +
+        '<button type="button" class="cq-link" data-mode="strip">Réduire</button></div>' +
+        '<div class="cq-month">' + ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'].map(function (w) { return '<small>' + w + '</small>'; }).join('') + cells + '</div>';
+    } else {
+      html = '<div class="cq-strip">' + days.map(function (d) { return dayBtn(d); }).join('') + '</div>' +
+        '<button type="button" class="cq-more" data-mode="month">Voir tout le mois <span aria-hidden="true">▾</span></button>';
+    }
+    var ranges = rangesFor(selD), all = [].concat.apply([], ranges);
+    html += '<p class="cq-dayname">' + esc(dayLabel(selD)) + '</p>';
+    if (!all.length) html += '<p class="cq-none">Aucune plage ce jour-là</p>';
+    else {
+      var closedAll = all.every(function (t) { return isOff(selD, t); });
+      html += '<div class="cq-calbar"><button type="button" class="btn btn-ghost btn-sm" data-dayall="' + (closedAll ? 'open' : 'close') + '">' +
+        (closedAll ? 'Rouvrir la journée' : 'Fermer la journée') + '</button></div>';
+      ranges.forEach(function (times, k) {
+        var rc = times.every(function (t) { return isOff(selD, t); });
+        html += '<div class="cq-rng"><div class="cq-rngh"><b>' + esc(hTxt(times[0])) + ' – ' + esc(hTxt(addHours(times[times.length - 1], 0.25))) + '</b>' +
+          '<button type="button" class="cq-link" data-rng="' + k + '">' + (rc ? 'Rouvrir' : 'Fermer') + ' la plage</button></div><div class="cq-hrs">' +
+          times.map(function (t) {
+            return '<button type="button" class="cq-h' + (isOff(selD, t) ? ' is-off' : '') + '" data-t="' + t + '">' + esc(hTxt(t)) + '</button>';
+          }).join('') + '</div></div>';
+      });
+    }
+    el.innerHTML = html;
+  }
+  $('#cq-cal').addEventListener('click', function (e) {
+    if (!cfg) return;
+    var day = e.target.closest('[data-day]'), tb = e.target.closest('[data-t]'),
+        rng = e.target.closest('[data-rng]'), dall = e.target.closest('[data-dayall]'),
+        mode = e.target.closest('[data-mode]'), mv = e.target.closest('[data-mv]');
+    if (mode) { monthMode = mode.getAttribute('data-mode') === 'month'; calMonth = selD ? selD.slice(0, 7) : null; }
+    else if (mv) calMonth = shiftMonth(calMonth, +mv.getAttribute('data-mv'));
+    else if (day) selD = day.getAttribute('data-day');
+    else if (tb) { var t = tb.getAttribute('data-t'); setOff(selD, [t], !isOff(selD, t)); touched(); }
+    else if (rng) {
+      var times = rangesFor(selD)[+rng.getAttribute('data-rng')] || [];
+      setOff(selD, times, !times.every(function (x) { return isOff(selD, x); })); touched();
+    } else if (dall) { setOff(selD, [].concat.apply([], rangesFor(selD)), dall.getAttribute('data-dayall') === 'close'); touched(); }
+    else return;
+    paintCal();
+  });
   function arr(list, d) {
     if (list === 'week') return (cfg.week[d] = cfg.week[d] || []);
     return cfg[list];
@@ -113,7 +218,7 @@
     if (!cfg || !list) { if (cfg) touched(); return; }
     var row = arr(list, t.getAttribute('data-d'))[+t.getAttribute('data-i')];
     if (row) row[t.getAttribute('data-k')] = t.value;
-    touched();
+    touched(); paintCal();
   });
   form.addEventListener('click', function (e) {
     if (!cfg) return;
@@ -166,7 +271,10 @@
     extra.sort(function (a, b) { return (a.d + a.s) < (b.d + b.s) ? -1 : 1; });
     if (bad) { caDialog.error(bad + ' — la fin doit suivre le début.', 'Plage invalide'); return; }
     var at = new Date().toISOString();
-    var value = { week: week, closed: closed, extra: extra, cap: intOf('#cq-cap', 0, 0, 99),
+    var off = cfg.off.filter(function (o) { return o.d >= t && (o.all || (o.h && o.h.length)); })
+      .map(function (o) { return o.all ? { d: o.d, all: true } : { d: o.d, h: o.h.slice().sort() }; })
+      .sort(function (a, b) { return a.d < b.d ? -1 : 1; });
+    var value = { week: week, closed: closed, extra: extra, off: off, cap: intOf('#cq-cap', 0, 0, 99),
                   notice: intOf('#cq-notice', 24, 0, 336), days: intOf('#cq-days', 14, 1, 60),
                   address: $('#cq-address').value.trim().slice(0, 200), at: at };
     saveBtn.disabled = true; if (statusEl) statusEl.textContent = 'Enregistrement…';
@@ -176,6 +284,7 @@
       cfg = Object.assign(blank(), JSON.parse(JSON.stringify(value)));
       paint();
       if (statusEl) statusEl.textContent = 'Enregistré';
+      warnBooked();
       loadList();
     }).then(null, function (err) {
       saveBtn.disabled = false; if (statusEl) statusEl.textContent = '';
@@ -199,11 +308,25 @@
       var items = [], todo = [];
       (rs[0].data || []).forEach(function (o) { (o.pickup_date ? items : todo).push(Object.assign({ kind: 'order' }, o)); });
       (rs[1].data || []).forEach(function (r) { if (Date.parse(r.expires_at) > now) items.push(Object.assign({ kind: 'resv' }, r)); });
+      lastItems = items.slice();
       render(items, todo);
     }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; })
       .then(function () { listLoading = null; }, function () { listLoading = null; });
     return listLoading;
   }
+  // cueillettes déjà prises dans une heure maintenant fermée : on les signale (rien n'est annulé)
+  function warnBooked() {
+    var hit = lastItems.filter(function (it) { return it.pickup_date && isOff(it.pickup_date, hm(it.pickup_start)); });
+    if (!hit.length) return;
+    hit.sort(function (a, b) { return (a.pickup_date + hm(a.pickup_start)) < (b.pickup_date + hm(b.pickup_start)) ? -1 : 1; });
+    var box = document.createElement('div');
+    box.innerHTML = hit.map(function (it) {
+      return '<p style="margin:4px 0"><b>' + esc(it.name || it.email) + '</b> — ' + esc(dayLabel(it.pickup_date)) + ', ' + esc(hTxt(it.pickup_start)) + '</p>';
+    }).join('');
+    caDialog.alert({ title: plural(hit.length, 'cueillette déjà prise', 'cueillettes déjà prises'),
+      message: 'Dans une heure fermée. Rien n\'est annulé; écris aux clients.', ok: 'Compris', danger: true, body: box });
+  }
+  var lastItems = [];
   function itemHtml(it) {
     var who = it.name || it.email;
     return '<button type="button" class="cq-item" data-go="' + (it.kind === 'resv' ? 'reservations' : 'clients') + '" data-id="' + esc(it.id) + '">' +

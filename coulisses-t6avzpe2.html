@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
-<link rel="stylesheet" href="assets/admin.css?v=117">
+<link rel="stylesheet" href="assets/admin.css?v=121">
 <link rel="stylesheet" href="assets/cueillette.css?v=4">
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=29">
@@ -121,7 +121,7 @@
       <p class="side-group" aria-hidden="true">Contacts</p>
       <button class="tab" type="button" data-tab="messages" data-group="Contacts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10.5H9.5L4 19.5z"/><path d="M8 9.5h8M8 12.5h5"/></svg><span>Messages</span><b class="nav-count" id="nav-msgs-n" hidden>0</b></button>
       <button class="tab" type="button" data-tab="clients" data-group="Contacts"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.5 3.5 0 0 1 0 6.6M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></svg><span>Clients</span><b class="nav-count" id="nav-clients-n" hidden>0</b></button>
-      <button class="tab" type="button" data-tab="dealers" data-group="Contacts"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M8.5 7.5V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2M3 13h18"/></svg><span>Dealers</span></button>
+      <button class="tab" type="button" data-tab="dealers" data-group="Contacts"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M8.5 7.5V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v2M3 13h18"/></svg><span>Dealers</span><b class="nav-count" id="nav-dealers-n" hidden>0</b></button>
 
       <p class="side-group" aria-hidden="true">Atelier</p>
       <button class="tab" type="button" data-tab="autoloop" data-group="Atelier"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3.5l3 3-3 3"/><path d="M20 6.5H8.5a5 5 0 0 0-5 5"/><path d="M7 20.5l-3-3 3-3"/><path d="M4 17.5h11.5a5 5 0 0 0 5-5"/></svg><span>AutoLoop</span></button>
@@ -1257,7 +1257,7 @@
         <h2 id="dl-editor-title">Nouveau dealer</h2>
         <div class="grid">
           <div class="field">
-            <label class="lbl" for="dl-email">Courriel du compte Supabase</label>
+            <label class="lbl" for="dl-email">Courriel</label>
             <input type="text" id="dl-email" placeholder="dealer@example.com" autocomplete="off" inputmode="email">
           </div>
           <div class="field">
@@ -1283,6 +1283,13 @@
           <span class="status" id="dl-status"></span>
         </div>
       </form>
+
+      <!-- demandes d'accès venues de revendeur.html (table dealer_requests) : Approuver / Refuser -->
+      <section class="dl-reqs" id="dl-reqs" hidden>
+        <h2 class="cl-sec">Demandes d'accès <b class="cl-sec-n" id="dl-reqs-n">0</b></h2>
+        <div id="dl-req-list" class="mat-rows"></div>
+      </section>
+      <h2 class="cl-sec" id="dl-list-title" hidden>Revendeurs</h2>
 
       <div id="dl-list" class="mat-rows"><p class="muted">Chargement…</p></div>
      </div><!-- /.dock-main -->
@@ -1461,6 +1468,10 @@
           <div class="cq-sec">
             <div class="cq-sec-head"><h3>Fermetures</h3><button type="button" class="btn btn-ghost btn-sm" id="cq-add-closed" data-ic="plus">Ajouter</button></div>
             <div class="cq-rows" id="cq-closed"></div>
+          </div>
+          <div class="cq-sec">
+            <div class="cq-sec-head"><h3>Jours et heures fermés</h3></div>
+            <div class="cq-cal" id="cq-cal"></div>
           </div>
           <div class="cq-sec">
             <div class="cq-sec-head"><h3>Plages en plus</h3><button type="button" class="btn btn-ghost btn-sm" id="cq-add-extra" data-ic="plus">Ajouter</button></div>
@@ -2855,7 +2866,7 @@
 <script src="assets/cms-attente.js?v=6"></script>
 <script src="assets/cms-reserves.js?v=2"></script>
 <script src="assets/cms-en-route.js?v=8"></script>
-<script src="assets/cms-dealers.js?v=7"></script>
+<script src="assets/cms-dealers.js?v=8"></script>
 <script src="assets/cms-clients.js?v=10"></script>
 <script src="assets/cms-messages.js?v=7"></script>
 <script src="assets/cms-facturation.js?v=51"></script>
@@ -2863,7 +2874,7 @@
 <script src="assets/commande-client.js?v=1"></script>
 <script src="assets/cms-commandes-clients.js?v=23"></script>
 <script src="assets/cms-reservations.js?v=9"></script>
-<script src="assets/cms-cueillettes.js?v=4"></script>
+<script src="assets/cms-cueillettes.js?v=6"></script>
 <script src="assets/doc-print.js?v=1"></script>
 <script src="assets/cms-commandes.js?v=12"></script>
 <script src="assets/cms-statistiques.js?v=10"></script>

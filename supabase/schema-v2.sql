@@ -2338,6 +2338,7 @@ grant execute on function public.admin_reservation_action(uuid, text)       to a
 --   { week: { "1": [{s:"13:00", e:"17:00"}], … "7": [] }   (1 = lundi, ISO)
 --     closed: [{from:"AAAA-MM-JJ", to:"AAAA-MM-JJ"}]          (fermé, bornes incluses)
 --     extra:  [{d:"AAAA-MM-JJ", s:"10:00", e:"12:00"}]        (plage ponctuelle, même un jour fermé)
+--     off:    [{d:"AAAA-MM-JJ", all:true} | {d:"AAAA-MM-JJ", h:["16:00","16:15"]}]  (jour ou heures fermés)
 --     cap: 3 (commandes max par plage, 0 = illimité) · notice: 24 (h de préavis) · days: 14 (jours offerts) }
 -- Chaque plage est découpée en heures d'arrivée aux 15 min (12:00, 12:15… jusqu'à la fin − 15 min) ;
 -- le client choisit une heure (pickup_end reste vide). Comptent dans une heure : commandes
@@ -2382,6 +2383,10 @@ language sql stable security definer set search_path = '' as $$
          p.cap
     from q b, p
    where b.d + b.s >= p.lnow + make_interval(hours => p.notice)
+     and not exists (select 1 from jsonb_array_elements(coalesce(p.v -> 'off', '[]'::jsonb)) o
+                      where (o ->> 'd')::date = b.d
+                        and (coalesce((o ->> 'all')::boolean, false)
+                             or (o -> 'h') ? to_char(b.s, 'HH24:MI')))
      and (p_until is null or (b.d + b.s) at time zone 'America/Toronto' < p_until)
    order by b.d, b.s;
 $$;
@@ -3841,6 +3846,113 @@ begin
 end $$;
 revoke all on function public.dealer_order_docs(uuid) from public, anon;
 grant execute on function public.dealer_order_docs(uuid) to authenticated;
+
+-- ------------------------------------------------------------
+-- DEMANDES D'ACCÈS REVENDEUR (2026-10-28) — page publique revendeur.html
+-- Le prospect remplit le formulaire -> Edge Function « dealer-request »
+-- (action submit, anonyme) -> dealer_request_submit (service_role) : champ
+-- piège côté fonction, 1 demande en attente par courriel, 5 / heure par IP.
+-- L'admin approuve dans l'onglet Dealers (pastille #nav-dealers-n) ->
+-- admin_dealer_request_decide ajoute le courriel à « dealers » ; la fonction
+-- envoie alors le courriel de bienvenue. Refus = silencieux (aucun courriel).
+-- Le dealer se connecte ensuite au portail par code courriel (compte-code,
+-- purpose 'dealer' : code envoyé seulement aux courriels de « dealers »).
+-- Loi 25 : demande refusée effacée après 90 jours.
+-- ------------------------------------------------------------
+create table if not exists public.dealer_requests (
+  id          uuid primary key default gen_random_uuid(),
+  business    text not null check (length(business) between 1 and 120),
+  contact     text not null check (length(contact) between 1 and 120),
+  email       text not null check (length(email) between 3 and 254),
+  phone       text not null check (length(phone) between 1 and 40),
+  city        text not null check (length(city) between 1 and 120),
+  website     text check (length(website) <= 300),
+  facebook    text check (length(facebook) <= 300),
+  lang        text not null default 'fr' check (lang in ('fr', 'en')),
+  status      text not null default 'pending' check (status in ('pending', 'approved', 'refused')),
+  ip          text,
+  created_at  timestamptz not null default now(),
+  decided_at  timestamptz
+);
+create index if not exists dealer_requests_status_idx on public.dealer_requests (status, created_at desc);
+create unique index if not exists dealer_requests_pending_email on public.dealer_requests (lower(email)) where status = 'pending';
+alter table public.dealer_requests enable row level security;
+drop policy if exists dealer_requests_admin_all on public.dealer_requests;
+create policy dealer_requests_admin_all on public.dealer_requests for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+
+-- Nouvelle demande (Edge Function seulement). -> { status: 'new'|'pending'|'dealer'|'wait', id? }
+--   pending = une demande attend déjà pour ce courriel ; dealer = déjà revendeur ;
+--   wait = trop de demandes depuis cette adresse IP. Refus récent (30 j) : 'new' sans rien créer.
+create or replace function public.dealer_request_submit(p jsonb, p_ip text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_email text := lower(btrim(coalesce(p ->> 'email', '')));
+  v_id uuid;
+  f text;
+begin
+  if random() < 0.05 then
+    delete from public.dealer_requests where status = 'refused' and decided_at < now() - interval '90 days';
+  end if;
+  foreach f in array array['business', 'contact', 'phone', 'city'] loop
+    if btrim(coalesce(p ->> f, '')) = '' then raise exception 'Champ manquant : %', f using errcode = '22023'; end if;
+  end loop;
+  if v_email !~ '^[^\s@]+@[^\s@]+\.[a-z]{2,}$' then raise exception 'Courriel invalide.' using errcode = '22023'; end if;
+  if exists (select 1 from public.dealers where lower(email) = v_email) then
+    return jsonb_build_object('status', 'dealer');
+  end if;
+  if exists (select 1 from public.dealer_requests where lower(email) = v_email and status = 'pending') then
+    return jsonb_build_object('status', 'pending');
+  end if;
+  if coalesce(p_ip, '') <> '' and (select count(*) from public.dealer_requests
+       where ip = p_ip and created_at > now() - interval '1 hour') >= 5 then
+    return jsonb_build_object('status', 'wait');
+  end if;
+  if exists (select 1 from public.dealer_requests where lower(email) = v_email and status = 'refused'
+              and decided_at > now() - interval '30 days') then
+    return jsonb_build_object('status', 'new');
+  end if;
+  insert into public.dealer_requests (business, contact, email, phone, city, website, facebook, lang, ip)
+  values (left(btrim(p ->> 'business'), 120), left(btrim(p ->> 'contact'), 120), v_email,
+          left(btrim(p ->> 'phone'), 40), left(btrim(p ->> 'city'), 120),
+          nullif(left(btrim(coalesce(p ->> 'website', '')), 300), ''),
+          nullif(left(btrim(coalesce(p ->> 'facebook', '')), 300), ''),
+          case when p ->> 'lang' = 'en' then 'en' else 'fr' end, nullif(left(p_ip, 64), ''))
+  returning id into v_id;
+  return jsonb_build_object('status', 'new', 'id', v_id);
+end $$;
+revoke all on function public.dealer_request_submit(jsonb, text) from public, anon, authenticated;
+grant execute on function public.dealer_request_submit(jsonb, text) to service_role;
+
+-- Décision de l'admin. Approuver = ajout à « dealers » (nom = commerce). -> la demande (courriel de bienvenue)
+create or replace function public.admin_dealer_request_decide(p_id uuid, p_approve boolean)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.dealer_requests;
+begin
+  if not (select public.is_admin()) then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  update public.dealer_requests
+     set status = case when p_approve then 'approved' else 'refused' end, decided_at = now()
+   where id = p_id and status = 'pending' returning * into r;
+  if not found then raise exception 'Demande introuvable ou déjà traitée.'; end if;
+  if p_approve then
+    insert into public.dealers (email, name, phone, city)
+    values (lower(r.email), r.business, r.phone, r.city)
+    on conflict (email) do update set name  = coalesce(public.dealers.name, excluded.name),
+                                      phone = coalesce(public.dealers.phone, excluded.phone),
+                                      city  = coalesce(public.dealers.city, excluded.city);
+  end if;
+  return to_jsonb(r) - 'ip';
+end $$;
+revoke all on function public.admin_dealer_request_decide(uuid, boolean) from public, anon;
+grant execute on function public.admin_dealer_request_decide(uuid, boolean) to authenticated;
+
+-- Portail : un code de connexion n'est envoyé qu'aux courriels revendeurs (Edge Function compte-code).
+create or replace function public.dealer_email_ok(p_email text)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.dealers where lower(email) = lower(btrim(coalesce(p_email, ''))));
+$$;
+revoke all on function public.dealer_email_ok(text) from public, anon, authenticated;
+grant execute on function public.dealer_email_ok(text) to service_role;
 
 -- ------------------------------------------------------------
 -- Vérification
