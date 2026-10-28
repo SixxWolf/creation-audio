@@ -29,7 +29,7 @@
   font:inherit; font-size:.88rem; font-weight:600; color:var(--ink); white-space:nowrap; cursor:pointer;
   background:var(--paper); border:1.5px solid var(--line); border-radius:10px; transition:border-color .15s, background .15s; }
 .pk-slot:hover { border-color:var(--ember); }
-.pk-slot.is-on { color:var(--ember-ink, #9A3A0E); background:color-mix(in srgb, var(--ember) 12%, var(--paper)); border-color:var(--ember); }
+.pk-slot.is-on { color:var(--ember-ink, var(--warn-ink)); background:color-mix(in srgb, var(--ember) 12%, var(--paper)); border-color:var(--ember); }
 .pk-slot.is-full, .pk-slot:disabled { color:var(--muted); cursor:default; background:var(--wash); text-decoration:line-through; }
 .pk-slot.is-full:hover { border-color:var(--line); }
 .pk-slot small { font-size:.72rem; font-weight:600; text-decoration:none; }
@@ -57,10 +57,10 @@
 .pk-change { margin-left:auto; padding:5px 12px; font:inherit; font-size:.82rem; font-weight:700; color:var(--ink); cursor:pointer;
   background:var(--paper); border:1px solid var(--line); border-radius:8px; }
 .pk-change:hover { border-color:var(--ember); }
-.ord-pk.is-todo .pk-change { color:#fff; background:var(--ember); border-color:var(--ember); }
+.ord-pk.is-todo .pk-change { color:var(--on-ember); background:var(--ember); border-color:var(--ember); }
 
 /* Statut de la cueillette (Mon compte) : à confirmer / confirmée + adresse */
 .pk-st { margin-left:8px; padding:2px 9px; font-size:.78rem; font-weight:700; color:var(--muted); background:var(--paper); border:1px solid var(--line); border-radius:100px; }
-.pk-st.is-ok { color:#16794A; background:#E7F6EE; border-color:transparent; }
+.pk-st.is-ok { color:var(--good-ink); background:var(--good-wash); border-color:transparent; }
 .pkv-addr { margin:10px 0 0; font-weight:600; color:var(--ink); }
 .pkv-addr span { display:block; font-size:.78rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }

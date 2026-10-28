@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 6;
+window.CA_EN_V = 7;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -830,5 +830,17 @@ window.CA_EN = (function (pairs) {
   // ---- fetes.js
   [`Couper la neige`, `Stop the snow`],
   [`Faire neiger`, `Let it snow`],
-  [`Neige`, `Snow`]
+  [`Neige`, `Snow`],
+  // ---- look.js : onglet Apparence (Mon compte, portail dealer)
+  [`Apparence — Portail dealer · Création Audio`, `Appearance — Dealer portal · Création Audio`],
+  [`Clair`, `Light`],
+  [`Sombre`, `Dark`],
+  [`Auto`, `Auto`],
+  [`Apparence`, `Appearance`],
+  [`S'applique à tout le site quand tu es connecté, sur tous tes appareils.`, `Applies to the whole site while you're signed in, on all your devices.`],
+  [`Le thème des fêtes est affiché en ce moment ; ton choix reprend après.`, `The holiday theme is showing right now; your choice comes back after.`],
+  [`Mode`, `Mode`],
+  [`Accent`, `Accent`],
+  [`Revenir à l'origine`, `Back to default`],
+  [`Non enregistré — réessaie.`, `Not saved — try again.`]
 ]);

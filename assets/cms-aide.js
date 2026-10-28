@@ -221,13 +221,6 @@
         'Choisis une couleur : tout l\'admin suit.',
         'Pour revenir : [Orange d\'origine].'
       ] },
-    { id: 'fond-dealer', group: 'Réglages', tab: 'apparence', title: 'Changer le fond du portail dealer',
-      go: { href: '#apparence', label: 'Apparence' }, keys: 'couleur gris dealer portail olivier',
-      steps: [
-        'Ouvre **Apparence**, section **Portail dealer**.',
-        'Choisis une pastille ou une **Couleur libre** : le portail suit au prochain chargement.',
-        'Pour revenir : [Gris d\'origine].'
-      ] },
     { id: 'appareil', group: 'Réglages', tab: 'securite', title: 'Ajouter un appareil (double authentification)',
       go: { href: '#securite', label: 'Sécurité' }, keys: '2fa code telephone connexion',
       steps: [

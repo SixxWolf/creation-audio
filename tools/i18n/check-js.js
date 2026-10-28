@@ -14,7 +14,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '../..');
 const FILES = ['nav.js', 'accueil.js', 'boutique.js', 'commande-client.js', 'spacer-catalog.js', 'spacers.js',
-  'dealer.js', 'doc-print.js', 'auth-gate.js', 'compte.js', 'messagerie.js', 'dialog.js', 'aide.js', 'aide-public.js', 'fetes.js']
+  'dealer.js', 'doc-print.js', 'auth-gate.js', 'compte.js', 'messagerie.js', 'dialog.js', 'aide.js', 'aide-public.js', 'fetes.js', 'look.js']
   .map((f) => 'assets/' + f);
 
 const STR = `'(?:[^'\\\\\\n]|\\\\.)*'`;

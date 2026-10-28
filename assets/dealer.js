@@ -37,7 +37,7 @@
       loginBtn = $('#dl-login-btn'), loginStatus = $('#dl-login-status'),
       cartBtn = $('#cart-btn'), logoutBtn = $('#logout-btn'), hello = $('#dl-hello'),
       catalogEl = $('#dl-catalog'), productEl = $('#dl-product'), ordersEl = $('#dl-orders'),
-      ordersList = $('#dl-orders-list'), ordersFlash = $('#dl-orders-flash'), ordersN = $('#dl-orders-n');
+      ordersList = $('#dl-orders-list'), lookEl = $('#dl-look'), ordersFlash = $('#dl-orders-flash'), ordersN = $('#dl-orders-n');
 
   var ICON = {
     bolt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l8-10.5h-6z"/></svg>',
@@ -80,20 +80,8 @@
     }
   }
 
-  // fond choisi dans l'admin (Réglages › Apparence) ; le cache évite le saut de couleur au prochain chargement
-  function loadTheme() {
-    sb.rpc('public_dealer_theme').then(function (res) {
-      if (res.error) return;
-      var h = res.data && res.data.bg;
-      if (window.caDealerBg) window.caDealerBg(h);
-      saveJSON('ca-dealer-bg', null);
-      try { if (h) localStorage.setItem('ca-dealer-bg', h); } catch (e) {}
-    }, function () {});
-  }
-
   function boot() {
     if (!sb) { show('login'); loginStatus.textContent = 'Service indisponible.'; return; }
-    loadTheme();
     sb.auth.getSession().then(function (res) {
       var session = res && res.data && res.data.session;
       if (!session) { show('login'); return; }
@@ -112,7 +100,7 @@
   function checkDealer(email) {
     sb.rpc('is_dealer').then(function (res) {
       if (res.error) { show('gate'); return; }
-      if (res.data === true) { show('app', email); load(); loadOrders(); }
+      if (res.data === true) { show('app', email); syncLook(); load(); loadOrders(); }
       else show('gate');
     }, function () { show('gate'); });
   }
@@ -150,7 +138,27 @@
     }, function (err) { mfaBtn.disabled = false; mfaStatus.textContent = _t('Erreur : ') + errMsg(err); });
   });
 
-  function doLogout() { sb.auth.signOut().then(function () { passI.value = ''; closeCart(); show('login'); }); }
+  function doLogout() { sb.auth.signOut().then(function () { passI.value = ''; closeCart(); if (window.caLook) window.caLook.clear('d'); show('login'); }); }
+
+  /* ---------- apparence (onglet #/apparence, assets/look.js) ---------- */
+  // le choix est gardé dans le compte (user_metadata.look) : on le relit à chaque connexion
+  var myLook = null, lookMounted = false;
+  function syncLook() {
+    if (!window.caLook) return;
+    sb.auth.getUser().then(function (res) {
+      var u = res && res.data && res.data.user;
+      myLook = (u && u.user_metadata && u.user_metadata.look) || null;
+      window.caLook.set(myLook, 'd');
+      if (lookMounted) mountLook();
+    }, function () {});
+  }
+  function mountLook() {
+    lookMounted = true;
+    window.caLook.mount($('#dl-look'), { k: 'd', initial: myLook, save: function (l) {
+      myLook = l;
+      return sb.auth.updateUser({ data: { look: l } });
+    } });
+  }
   logoutBtn.addEventListener('click', doLogout);
   $('#gate-logout').addEventListener('click', doLogout);
   $('#mfa-logout').addEventListener('click', doLogout);
@@ -182,11 +190,18 @@
     if (!loaded) return;
     var h = location.hash || '';
     if (/^#\/commandes/.test(h)) {
-      sc.hide(); ordersEl.hidden = false; setTab('orders');
+      sc.hide(); lookEl.hidden = true; ordersEl.hidden = false; setTab('orders');
       if (view !== 'orders') { window.scrollTo(0, 0); loadOrders(); }
       view = 'orders'; document.title = _t('Mes commandes — Portail dealer · Création Audio');
       return;
     }
+    if (/^#\/apparence/.test(h)) {
+      sc.hide(); ordersEl.hidden = true; lookEl.hidden = false; setTab('look');
+      if (view !== 'look') { window.scrollTo(0, 0); if (window.caLook) mountLook(); }
+      view = 'look'; document.title = _t('Apparence — Portail dealer · Création Audio');
+      return;
+    }
+    lookEl.hidden = true;
     if (view === 'orders') flash = null;   // le message « envoyée ✓ » ne sert qu'une fois
     ordersEl.hidden = true; setTab('catalog');
     var m = /^#\/s\/([^/?#]+)/.exec(h);

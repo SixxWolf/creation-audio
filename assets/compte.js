@@ -77,6 +77,7 @@
   }
   function signedIn(on) {
     $$('.home-account').forEach(function (a) { a.classList.toggle('is-in', !!on); });
+    if (!on && window.caLook) window.caLook.clear('c');   // déconnecté = site normal
   }
   function say(el, text, cls) {
     if (!el) return;
@@ -217,6 +218,7 @@
           return;
         }
         acct = res.data || {};
+        syncLook();
         if (CA.custLang) CA.custLang();          // langue des courriels = celle de cette page
         if (!String(acct.name || '').trim()) { openWelcome(); return; }
         openHome();
@@ -262,9 +264,29 @@
     loadMsgs();
     loadAlerts();
   }
+
+  /* ---- Apparence (onglet #/apparence, assets/look.js) ---- */
+  // le choix est gardé dans le compte (user_metadata.look) : il suit la personne d'un appareil à l'autre
+  var myLook = null, lookMounted = false;
+  function syncLook() {
+    if (!window.caLook) return;
+    sb.auth.getUser().then(function (r) {
+      var u = r && r.data && r.data.user;
+      myLook = (u && u.user_metadata && u.user_metadata.look) || null;
+      window.caLook.set(myLook, 'c');
+      if (lookMounted) mountLook();
+    }, function () {});
+  }
+  function mountLook() {
+    lookMounted = true;
+    window.caLook.mount($('#acct-look'), { k: 'c', initial: myLook, save: function (l) {
+      myLook = l;
+      return sb.auth.updateUser({ data: { look: l } });
+    } });
+  }
   // #/messages/<id> (lien du courriel « On t'a répondu ») : onglet Messages + fil ouvert dans le panneau
   // #/cueillette/c|r/<id> : écran « Ma cueillette » (après l'envoi du panier, courriel « Prête »)
-  var ROUTE = /^#\/(commandes|alertes|messages|infos|cueillette)(?:\/(?:([cr])\/)?([0-9a-f-]{36}))?$/;
+  var ROUTE = /^#\/(commandes|alertes|messages|infos|apparence|cueillette)(?:\/(?:([cr])\/)?([0-9a-f-]{36}))?$/;
   function route() {
     if ($('#acct-home').hidden) return;
     var m = ROUTE.exec(location.hash), tab = m ? m[1] : 'commandes';
@@ -281,6 +303,7 @@
       if (cur) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     $$('.acct-panel').forEach(function (p) { p.hidden = p.getAttribute('data-panel') !== tab; });
+    if (tab === 'apparence' && !lookMounted && window.caLook) mountLook();
   }
   window.addEventListener('hashchange', route);
 

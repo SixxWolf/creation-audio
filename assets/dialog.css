@@ -40,8 +40,8 @@ html:has(.ca-dlg[open]) { overflow:hidden; }
 .dlg-b:focus-visible { outline:3px solid var(--ember-dim, var(--ember)); outline-offset:2px; }
 .dlg-back { color:var(--ink); background:var(--paper); border-color:var(--line-2, var(--line)); }
 .dlg-back:hover { border-color:var(--ink); }
-.dlg-go { color:var(--paper); background:var(--ink); border-color:var(--ink); }
-.dlg-go:hover { background:color-mix(in srgb, var(--ink) 88%, #000); }
+.dlg-go { color:#fff; background:var(--fill-strong); border-color:var(--fill-strong); }
+.dlg-go:hover { background:var(--fill-strong-hover); }
 .dlg-go.is-danger { color:#fff; background:var(--bad); border-color:var(--bad);
   box-shadow:0 10px 22px -12px color-mix(in srgb, var(--bad) 80%, transparent); }
 .dlg-go.is-danger:hover { background:color-mix(in srgb, var(--bad) 86%, #000); }

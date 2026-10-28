@@ -15,6 +15,12 @@
   --fill-strong:#181A1F;        /* remplissage « fort » : bouton plein, chip/segment actif */
   --fill-strong-hover:#14161A;
   --thumb-bg:#FFFFFF;           /* fond des vignettes d'image produit (reste clair) */
+  --on-ember:#181A1F;           /* texte posé sur l'accent (look.js / admin-accent.js le dérivent) */
+  --tint:color-mix(in srgb, var(--ember) 9%, var(--paper));        /* fond teinté de l'accent (ex. #FFF3EC) */
+  --tint-2:color-mix(in srgb, var(--ember) 4%, var(--paper));
+  --tint-line:color-mix(in srgb, var(--ember) 24%, var(--paper));  /* bordure teintée */
+  --good-ink:#16794A; --bad-ink:#B42A19; --warn-ink:#9A4A0E;        /* textes d'état AA */
+  --info-wash:#E8F1FB; --info-ink:#1D5FA8;
 
   /* Typographie — une seule famille : Inter */
   --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
@@ -47,6 +53,8 @@
 
   --fill-strong:#3A414D; --fill-strong-hover:#48505E;
   --thumb-bg:#ECEDEA;          /* vignettes : reste clair pour les photos produit */
+  --good-ink:#4FCB85; --bad-ink:#FF7A66; --warn-ink:#F0A25E;
+  --info-wash:#172A40; --info-ink:#7DB3F0;
 
   --shadow-sm:0 1px 2px rgba(0,0,0,.40), 0 1px 3px rgba(0,0,0,.30);
   --shadow:0 10px 30px rgba(0,0,0,.50);
