@@ -499,10 +499,6 @@
  "Des marges qui font sourire.": "Margins that make you smile.",
  "Plus tu en commandes, moins tu paies. Tes prix et tes paliers s'affichent dès l'ouverture de ton compte.": "The more you order, the less you pay. Your prices and tiers show up as soon as your account opens.",
  "Voir mes prix de gros": "See my wholesale prices",
- "Rabais quantité à 6, 12 et 18 paires": "Volume discounts at 6, 12 and 18 pairs",
- "6 paires": "6 pairs",
- "12 paires": "12 pairs",
- "18 paires": "18 pairs",
  "Rabais dévoilés à l'ouverture de ton compte": "Discounts revealed when your account opens",
  "Ouvrir un compte": "Open an account",
  "Demande ton accès revendeur.": "Request your dealer access.",
@@ -521,5 +517,7 @@
  "Envoyer ma demande": "Send my request",
  "Demande reçue": "Request received",
  "Ouvrir le portail revendeur": "Open the dealer portal",
- "Liens": "Links"
+ "Liens": "Links",
+ "Le rabais grandit avec la quantité, dévoilé à l'ouverture de ton compte": "Your discount grows with quantity, revealed when your account opens",
+ "Quantité": "Quantity"
 }

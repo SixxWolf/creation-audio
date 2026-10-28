@@ -85,7 +85,7 @@
         '<h3>' + esc(p.name) + '</h3>' +
         '<p class="rv-makes">' + esc(makes) + '</p>' +
         '<p class="rv-teaser">' + esc(TEASERS[i % TEASERS.length]) + '</p>' +
-        '<p class="rv-perk">' + LOCK + esc(_t('Rabais dès 6, 12 et 18 paires')) + '</p>' +
+        '<p class="rv-perk">' + LOCK + esc(_t('Rabais sur la quantité')) + '</p>' +
       '</div></article>';
   }
   function endCardHtml() {

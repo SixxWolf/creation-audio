@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 8;
+window.CA_EN_V = 9;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -854,7 +854,7 @@ window.CA_EN = (function (pairs) {
   [`Des marges qui font sourire.`, `Margins that make you smile.`],
   [`Ton prix baisse à chaque palier.`, `Your price drops at every tier.`],
   [`Adaptateur de haut-parleur`, `Speaker adapter`],
-  [`Rabais dès 6, 12 et 18 paires`, `Discounts at 6, 12 and 18 pairs`],
+  [`Rabais sur la quantité`, `Volume discounts`],
   [`Pas dans la liste ? On le conçoit.`, `Not on the list? We'll design it.`],
   [`Donne-nous le véhicule, on dessine la pièce.`, `Give us the vehicle, we'll design the part.`],
   [`Demander l'accès`, `Request access`],

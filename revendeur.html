@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/revendeur.css?v=1">
+<link rel="stylesheet" href="assets/revendeur.css?v=2">
 <!-- Page « Atelier » sombre : pas de thème des fêtes (nav.js lit data-fetes-off) ; .rv-js = animations d'apparition -->
 <script>document.documentElement.setAttribute('data-fetes-off','');document.documentElement.classList.add('rv-js');</script>
 <script src="assets/i18n.js?v=1"></script>
@@ -138,10 +138,12 @@
         <p class="rv-lead">Plus tu en commandes, moins tu paies. Tes prix et tes paliers s'affichent dès l'ouverture de ton compte.</p>
         <a class="rv-btn rv-btn-accent rv-btn-lg" href="#demande">Voir mes prix de gros</a>
       </div>
-      <div class="rv-tiers rv-reveal" role="img" aria-label="Rabais quantité à 6, 12 et 18 paires">
-        <div class="rv-tier" style="--h:38%"><span class="rv-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><b>6 paires</b></div>
-        <div class="rv-tier" style="--h:64%"><span class="rv-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><b>12 paires</b></div>
-        <div class="rv-tier" style="--h:90%"><span class="rv-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><b>18 paires</b></div>
+      <!-- les seuils des paliers restent secrets : barres sans chiffres, axe « Quantité » seulement -->
+      <div class="rv-tiers rv-reveal" role="img" aria-label="Le rabais grandit avec la quantité, dévoilé à l'ouverture de ton compte">
+        <div class="rv-tier" style="--h:38%"><span class="rv-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span></div>
+        <div class="rv-tier" style="--h:64%"><span class="rv-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span></div>
+        <div class="rv-tier" style="--h:90%"><span class="rv-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span></div>
+        <p class="rv-tiers-axis" aria-hidden="true"><span>Quantité</span><i></i></p>
         <p class="rv-tiers-note">Rabais dévoilés à l'ouverture de ton compte</p>
       </div>
     </div>
@@ -216,6 +218,6 @@
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=12"></script>
 <script src="assets/spacer-catalog.js?v=16"></script>
-<script src="assets/revendeur.js?v=1"></script>
+<script src="assets/revendeur.js?v=2"></script>
 </body>
 </html>
