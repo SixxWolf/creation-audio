@@ -58,11 +58,28 @@
         (q.note ? '<p class="co-pk-note">' + esc(q.note) + '</p>' : '') +
         '<div class="co-pk-act"><button type="button" class="btn btn-accent btn-sm" data-pkreq="yes" data-ic="check">Approuver</button>' +
         '<button type="button" class="btn btn-ghost btn-sm" data-pkreq="no">Refuser</button></div></div>' : '';
-    return (t ? '<p class="co-pk"><b>Cueillette :</b> ' + esc(t) + '</p>' : '') + req;
+    var ok = x && x.pickup_confirmed_at;
+    return (t ? '<p class="co-pk"><b>Cueillette :</b> ' + esc(t) +
+      (ok ? ' <span class="co-status is-ready">Confirmée</span>'
+          : ' <button type="button" class="btn btn-accent btn-sm" data-pkok data-ic="check">Confirmer</button>') + '</p>' : '') + req;
+  };
+  // bouton « Confirmer » : marque la cueillette confirmée et envoie le courriel (avec l'adresse) au client
+  CA.confirmPickup = function (kind, x, btn, reload) {
+    btn.disabled = true;
+    sb.rpc('admin_confirm_pickup', { p_kind: kind, p_id: x.id }).then(function (res) {
+      if (res.error) throw res.error;
+      sb.functions.invoke('pickup-request-notify', { body: { kind: kind, id: x.id, event: 'confirmed' } }).then(function (r) {
+        if (r && r.error) caDialog.toast('Confirmée, mais courriel non envoyé.', 'bad');
+        else caDialog.toast('Cueillette confirmée — client prévenu.');
+      }, function () { caDialog.toast('Confirmée, mais courriel non envoyé.', 'bad'); });
+      reload();
+    }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
   };
   // boutons Approuver / Refuser d'une demande (cartes Clients en ligne et Réservations) ; kind : 'order' | 'reservation'
   CA.bindPickupReq = function (card, x, kind, reload) {
     var q = x && x.pickup_req;
+    var okBtn = card.querySelector('[data-pkok]');
+    if (okBtn) okBtn.addEventListener('click', function () { CA.confirmPickup(kind, x, okBtn, reload); });
     Array.prototype.slice.call(card.querySelectorAll('[data-pkreq]')).forEach(function (btn) {
       btn.addEventListener('click', function () {
         var yes = btn.getAttribute('data-pkreq') === 'yes';

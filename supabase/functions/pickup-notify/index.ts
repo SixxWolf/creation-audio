@@ -60,8 +60,8 @@ function wrap(kicker: string, title: string, body: string) {
     '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">' + esc(kicker) + '</p>' +
     '<h1 style="font-size:22px;margin:0 0 10px">' + esc(title) + '</h1>' + body + "</div>";
 }
-const box = (t: string) =>
-  '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#E7F6EE;color:#16794A;font-weight:700">' + esc(t) + '</p>';
+const box = (t: string, ok = true) =>
+  '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:' + (ok ? "#E7F6EE;color:#16794A" : "#F3F3F0;color:#3A3D45") + ';font-weight:700">' + esc(t) + '</p>';
 const btn = (href: string, t: string) =>
   '<p style="margin:22px 0"><a href="' + href + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' + esc(t) + '</a></p>';
 
@@ -123,26 +123,26 @@ Deno.serve(async (req) => {
     const pkE = fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end, true);
     const whatE = (kind === "reservation" ? "reservation " : "order ") + x.number;
     const accE = SITE + "/en/compte.html#/cueillette/" + (kind === "reservation" ? "r/" : "c/") + id;
-    cSubject = "Pickup " + pkE + " — Création Audio";
+    cSubject = "Pickup request " + pkE + " — Création Audio";
     cText = "Hello " + first + ",\n\n" +
-      "Got it: your pickup for " + whatE + " is " + pkE + ".\n\n" +
+      "Got it: you picked " + pkE + " for " + whatE + ". We'll confirm by email shortly.\n\n" +
       "You can change it in your account: " + accE + "\n\n" +
       "Création Audio\n" + SITE + "/en/";
-    cHtml = wrap("Création Audio", "Pickup confirmed",
-      '<p style="margin:0 0 14px">Hello ' + esc(first) + ', got it for ' + esc(whatE) + '.</p>' +
-      box("See you " + pkE + ".") + btn(accE, "See my order") +
+    cHtml = wrap("Création Audio", "Pickup request received",
+      '<p style="margin:0 0 14px">Hello ' + esc(first) + ', got it for ' + esc(whatE) + '. We\'ll confirm by email shortly.</p>' +
+      box("Requested: " + pkE, false) + btn(accE, "See my order") +
       '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
       '<p style="font-size:12px;color:#6C727C">You can change your time slot in your account. A question? Just reply to this email.</p>');
   } else {
-    cSubject = "Cueillette " + pk + " — Création Audio";
+    cSubject = "Demande de cueillette " + pk + " — Création Audio";
     cText =
     "Bonjour " + first + ",\n\n" +
-    "C'est noté : ta cueillette pour " + what.toLowerCase() + " est " + pk + ".\n\n" +
+    "C'est noté : tu as choisi " + pk + " pour " + what.toLowerCase() + ". On te confirme par courriel sous peu.\n\n" +
     "Tu peux la changer dans ton compte : " + accountUrl + "\n\n" +
     "Création Audio\n" + SITE;
-    cHtml = wrap("Création Audio", "Cueillette confirmée",
-    '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', c\'est noté pour ' + esc(what.toLowerCase()) + '.</p>' +
-    box("On t'attend " + pk + ".") + btn(accountUrl, "Voir ma commande") +
+    cHtml = wrap("Création Audio", "Demande de cueillette reçue",
+    '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', c\'est noté pour ' + esc(what.toLowerCase()) + '. On te confirme par courriel sous peu.</p>' +
+    box("Demande : " + pk, false) + btn(accountUrl, "Voir ma commande") +
     '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
     '<p style="font-size:12px;color:#6C727C">Tu peux changer ta plage dans ton compte. Une question&nbsp;? Réponds simplement à ce courriel.</p>');
   }
@@ -155,9 +155,9 @@ Deno.serve(async (req) => {
   const who = x.name || x.email;
   const aText = "Plage de cueillette choisie — " + what + "\n" + who + " · " + x.email + (x.phone ? " · " + x.phone : "") +
     "\n\nCueillette : " + pk + "\n\nOuvrir dans l'admin : " + adminUrl + "\n";
-  const aHtml = wrap("Cueillette", "Plage choisie — " + what,
+  const aHtml = wrap("Cueillette", "À confirmer — " + what,
     '<p style="margin:0 0 16px;color:#3A3D45">' + esc(who) + ' · ' + esc(x.email) + (x.phone ? ' · ' + esc(x.phone) : '') + '</p>' +
-    box("Cueillette : " + pk) + btn(adminUrl, "Ouvrir dans l'admin"));
+    box("Cueillette : " + pk) + btn(adminUrl, "Confirmer dans l'admin"));
   try {
     await send(resendKey, from, { to: [adminTo], reply_to: x.email, subject: "Cueillette " + what + " — " + who + " · " + pk, html: aHtml, text: aText });
     results.admin = "sent";

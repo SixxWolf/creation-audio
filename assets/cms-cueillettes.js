@@ -44,7 +44,7 @@
   var STATUS = { 'new': 'Nouvelle', preparing: 'En préparation', ready: 'Prête' };
   var cfg = null, cfgLoading = null, listLoading = null;
 
-  function blank() { return { week: {}, closed: [], extra: [], cap: 0, notice: 24, days: 14 }; }
+  function blank() { return { week: {}, closed: [], extra: [], cap: 0, notice: 24, days: 14, address: '' }; }
 
   /* ---- horaire : lecture ---- */
   function loadCfg() {
@@ -96,6 +96,7 @@
     $('#cq-cap').value = cfg.cap > 0 ? cfg.cap : '';
     $('#cq-notice').value = cfg.notice != null ? cfg.notice : 24;
     $('#cq-days').value = cfg.days || 14;
+    $('#cq-address').value = cfg.address || '';
   }
   function arr(list, d) {
     if (list === 'week') return (cfg.week[d] = cfg.week[d] || []);
@@ -166,7 +167,8 @@
     if (bad) { caDialog.error(bad + ' — la fin doit suivre le début.', 'Plage invalide'); return; }
     var at = new Date().toISOString();
     var value = { week: week, closed: closed, extra: extra, cap: intOf('#cq-cap', 0, 0, 99),
-                  notice: intOf('#cq-notice', 24, 0, 336), days: intOf('#cq-days', 14, 1, 60), at: at };
+                  notice: intOf('#cq-notice', 24, 0, 336), days: intOf('#cq-days', 14, 1, 60),
+                  address: $('#cq-address').value.trim().slice(0, 200), at: at };
     saveBtn.disabled = true; if (statusEl) statusEl.textContent = 'Enregistrement…';
     sb.from('admin_settings').upsert({ key: KEY, value: value, updated_at: at }).then(function (res) {
       saveBtn.disabled = false;
@@ -186,10 +188,10 @@
     if (listLoading) return listLoading;
     var t = today(), now = Date.now();
     listLoading = Promise.all([
-      sb.from('customer_orders').select('id,number,name,email,phone,status,pickup_date,pickup_start,pickup_end,pickup_req')
+      sb.from('customer_orders').select('id,number,name,email,phone,status,pickup_date,pickup_start,pickup_end,pickup_req,pickup_confirmed_at')
         .in('status', ['new', 'preparing', 'ready']).or('pickup_date.gte.' + t + ',and(status.eq.ready,pickup_date.is.null)')
         .order('pickup_date', { ascending: true }).limit(300),
-      sb.from('customer_reservations').select('id,number,name,email,status,expires_at,pickup_date,pickup_start,pickup_end,pickup_req')
+      sb.from('customer_reservations').select('id,number,name,email,status,expires_at,pickup_date,pickup_start,pickup_end,pickup_req,pickup_confirmed_at')
         .eq('status', 'active').gte('pickup_date', t).limit(300)
     ]).then(function (rs) {
       var err = rs[0].error || rs[1].error;
@@ -209,6 +211,7 @@
       '<span class="cq-who"><b>' + esc(who) + '</b><small>' + esc(it.number) + (it.phone ? ' · ' + CA.pv(it.phone) : '') + '</small></span>' +
       '<span class="co-status is-' + (it.kind === 'resv' ? 'ready' : esc(it.status)) + '">' +
         (it.kind === 'resv' ? 'Réservation' : esc(STATUS[it.status] || it.status)) + '</span>' +
+      (it.pickup_date && !it.pickup_confirmed_at ? '<span class="co-status is-new">À confirmer</span>' : '') +
       (it.pickup_req && it.pickup_req.state === 'pending' ? '<span class="co-status is-new">Exception</span>' : '') +
     '</button>';
   }

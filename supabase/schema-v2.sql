@@ -1714,6 +1714,7 @@ alter table public.customer_orders add column if not exists pickup_start       t
 alter table public.customer_orders add column if not exists pickup_end         time;
 alter table public.customer_orders add column if not exists pickup_notified_at timestamptz;
 alter table public.customer_orders add column if not exists pickup_req         jsonb;   -- demande d'exception (voir CUEILLETTE)
+alter table public.customer_orders add column if not exists pickup_confirmed_at timestamptz;   -- cueillette confirmée par l'admin (remise à null si la plage change)
 alter table public.customer_orders add column if not exists ready_notified_at  timestamptz;   -- courriel « commande prête » (EF customer-order-notify, event ready)
 alter table public.customer_orders add column if not exists stock_hold boolean not null default false;   -- stock retiré du site en attendant le paiement (voir _held_stock)
 create index if not exists customer_orders_customer_idx on public.customer_orders (customer_id, created_at desc);
@@ -1897,6 +1898,8 @@ returns jsonb language sql stable security definer set search_path = '' as $$
       'note', o.note, 'total', o.total, 'has_backorder', o.has_backorder, 'cancelled_by', o.cancelled_by,
       'pickup_date', o.pickup_date, 'pickup_start', to_char(o.pickup_start, 'HH24:MI'), 'pickup_end', to_char(o.pickup_end, 'HH24:MI'),
       'pickup_req', o.pickup_req,
+      'pickup_confirmed', o.pickup_confirmed_at is not null,
+      'pickup_address', case when o.pickup_confirmed_at is not null then (select s.value ->> 'address' from public.admin_settings s where s.key = 'cueillette') end,
       'invoice_number', (select i.number from public.invoices i where i.id = o.invoice_id),
       'lines', coalesce((
         select jsonb_agg(jsonb_build_object(
@@ -2022,6 +2025,7 @@ alter table public.customer_reservations add column if not exists pickup_start  
 alter table public.customer_reservations add column if not exists pickup_end         time;
 alter table public.customer_reservations add column if not exists pickup_notified_at timestamptz;
 alter table public.customer_reservations add column if not exists pickup_req         jsonb;
+alter table public.customer_reservations add column if not exists pickup_confirmed_at timestamptz;
 create index if not exists customer_reservations_customer_idx on public.customer_reservations (customer_id, created_at desc);
 create index if not exists customer_reservations_status_idx on public.customer_reservations (status, expires_at);
 create table if not exists public.customer_reservation_lines (
@@ -2142,6 +2146,8 @@ returns jsonb language sql stable security definer set search_path = '' as $$
           'created_at', r.created_at, 'expires_at', r.expires_at, 'note', r.note, 'total', r.total,
           'pickup_date', r.pickup_date, 'pickup_start', to_char(r.pickup_start, 'HH24:MI'), 'pickup_end', to_char(r.pickup_end, 'HH24:MI'),
           'pickup_req', r.pickup_req,
+          'pickup_confirmed', r.pickup_confirmed_at is not null,
+          'pickup_address', case when r.pickup_confirmed_at is not null then (select s.value ->> 'address' from public.admin_settings s where s.key = 'cueillette') end,
           'penalized', r.penalized or (r.status = 'active' and r.expires_at <= now()), 'cancelled_by', r.cancelled_by,
           'invoice_number', (select i.number from public.invoices i where i.id = r.invoice_id),
           'lines', coalesce((
@@ -2403,7 +2409,7 @@ begin
     v_pk := public._pickup_check(p_pickup, r.expires_at, p_id, true);
     update public.customer_reservations
        set pickup_date = (v_pk ->> 'd')::date, pickup_start = (v_pk ->> 's')::time, pickup_end = (v_pk ->> 'e')::time,
-           updated_at = now()
+           pickup_confirmed_at = null, updated_at = now()
      where id = p_id;
   else
     select * into o from public.customer_orders where id = p_id and customer_id = v_uid for update;
@@ -2415,7 +2421,7 @@ begin
     v_pk := public._pickup_check(p_pickup, null, p_id, true);
     update public.customer_orders
        set pickup_date = (v_pk ->> 'd')::date, pickup_start = (v_pk ->> 's')::time, pickup_end = (v_pk ->> 'e')::time,
-           updated_at = now()
+           pickup_confirmed_at = null, updated_at = now()
      where id = p_id;
   end if;
   return v_pk;
@@ -2478,6 +2484,7 @@ begin
            pickup_start = case when p_ok then (v_req ->> 's')::time else pickup_start end,
            pickup_end = case when p_ok then null else pickup_end end,
            pickup_req = case when p_ok then null else v_req || jsonb_build_object('state', 'refused', 'reply', v_reply) end,
+           pickup_confirmed_at = case when p_ok then now() else pickup_confirmed_at end,
            updated_at = now()
      where id = p_id;
   else
@@ -2486,6 +2493,7 @@ begin
            pickup_start = case when p_ok then (v_req ->> 's')::time else pickup_start end,
            pickup_end = case when p_ok then null else pickup_end end,
            pickup_req = case when p_ok then null else v_req || jsonb_build_object('state', 'refused', 'reply', v_reply) end,
+           pickup_confirmed_at = case when p_ok then now() else pickup_confirmed_at end,
            updated_at = now()
      where id = p_id;
   end if;
@@ -2500,16 +2508,34 @@ begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   if p_d is null or p_s is null then raise exception 'Choisis un jour et une heure.'; end if;
   if p_kind = 'reservation' then
-    update public.customer_reservations set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_req = null, updated_at = now()
+    update public.customer_reservations set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_req = null, pickup_confirmed_at = null, updated_at = now()
      where id = p_id and status = 'active';
   else
-    update public.customer_orders set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_req = null, updated_at = now()
+    update public.customer_orders set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_req = null, pickup_confirmed_at = null, updated_at = now()
      where id = p_id and status in ('new', 'preparing', 'ready');
   end if;
   get diagnostics n = row_count;
   if n = 0 then raise exception 'Commande introuvable ou fermée.'; end if;
   return jsonb_build_object('d', p_d, 's', to_char(p_s, 'HH24:MI'));
 end $$;
+-- Confirmation de la cueillette par l'admin (bouton « Confirmer » des cartes) -> courriel au client (EF pickup-request-notify, event 'confirmed').
+create or replace function public.admin_confirm_pickup(p_kind text, p_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare n int;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  if p_kind = 'reservation' then
+    update public.customer_reservations set pickup_confirmed_at = now(), updated_at = now()
+     where id = p_id and status = 'active' and pickup_date is not null;
+  else
+    update public.customer_orders set pickup_confirmed_at = now(), updated_at = now()
+     where id = p_id and status in ('new', 'preparing', 'ready') and pickup_date is not null;
+  end if;
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'Aucune cueillette à confirmer.'; end if;
+end $$;
+revoke all on function public.admin_confirm_pickup(text, uuid) from public, anon;
+grant execute on function public.admin_confirm_pickup(text, uuid) to authenticated;
 revoke all on function public.admin_set_pickup(text, uuid, date, time) from public, anon;
 grant execute on function public.admin_set_pickup(text, uuid, date, time) to authenticated;
 revoke all on function public.customer_request_pickup(text, uuid, jsonb) from public, anon;

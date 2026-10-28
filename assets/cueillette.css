@@ -58,3 +58,9 @@
   background:var(--paper); border:1px solid var(--line); border-radius:8px; }
 .pk-change:hover { border-color:var(--ember); }
 .ord-pk.is-todo .pk-change { color:#fff; background:var(--ember); border-color:var(--ember); }
+
+/* Statut de la cueillette (Mon compte) : à confirmer / confirmée + adresse */
+.pk-st { margin-left:8px; padding:2px 9px; font-size:.78rem; font-weight:700; color:var(--muted); background:var(--paper); border:1px solid var(--line); border-radius:100px; }
+.pk-st.is-ok { color:#16794A; background:#E7F6EE; border-color:transparent; }
+.pkv-addr { margin:10px 0 0; font-weight:600; color:var(--ink); }
+.pkv-addr span { display:block; font-size:.78rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }

@@ -394,6 +394,7 @@
     if (!CO || (!x && !hasSlots)) return '';
     var txt = x ? CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end) : later ? _t('à choisir quand tout sera arrivé') : _t('à choisir');
     return '<p class="ord-note ord-pk' + (x ? '' : ' is-todo') + _t('"><span>Cueillette</span><b>') + esc(txt) + '</b>' +
+      (x ? '<span class="pk-st' + (x.pickup_confirmed ? ' is-ok' : '') + '">' + (x.pickup_confirmed ? _t('Confirmée') : _t('À confirmer')) + '</span>' : '') +
       (can && hasSlots ? '<button class="pk-change" type="button">' + (x ? _t('Changer') : _t('Choisir')) + '</button>' : '') + '</p>';
   }
   /* ---- écran « Ma cueillette » (#/cueillette/c|r/<id>) : la commande à gauche, le calendrier à droite ---- */
@@ -508,6 +509,7 @@
         ok.disabled = true; msg.textContent = _t('Enregistrement…');
         CO.setPickup(isC ? 'order' : 'reservation', x.id, v).then(function (r) {
           x.pickup_date = r.d || v.d; x.pickup_start = r.s || v.s; x.pickup_end = r.e || v.e;
+          x.pickup_confirmed = false; x.pickup_address = null;
           doneView();
           if (isC) loadOrders(); else loadResv();   // listes de Mes commandes à jour (l'écran reste tel quel)
         }, function (err) {
@@ -518,8 +520,10 @@
     }
     function doneView() {
       side.innerHTML = '<div class="pkv-done"><span class="pkv-check" aria-hidden="true"></span>' +
-        _t('<h2 class="pkv-h">Cueillette confirmée</h2>') +
+        (x.pickup_confirmed ? _t('<h2 class="pkv-h">Cueillette confirmée</h2>') : _t('<h2 class="pkv-h">Demande reçue</h2>')) +
         '<p class="pkv-when">' + esc(CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end)) + '</p>' +
+        (x.pickup_confirmed ? (x.pickup_address ? '<p class="pkv-addr"><span>' + _t('Adresse') + '</span>' + esc(x.pickup_address) + '</p>' : '')
+          : _t('<p class="pkv-addr">On te confirme par courriel.</p>')) +
         _t('<div class="pkv-foot"><a class="acct-submit" href="#/commandes">Mes commandes</a>') +
         _t('<button class="acct-btn pkv-change" type="button">Changer</button></div></div>');
       $('.pkv-change', side).addEventListener('click', function () {

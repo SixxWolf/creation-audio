@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     kind = body?.kind === "reservation" ? "reservation" : "order";
     id = typeof body?.id === "string" ? body.id : "";
-    event = ["request", "approved", "refused"].includes(body?.event) ? body.event : "request";
+    event = ["request", "approved", "refused", "confirmed"].includes(body?.event) ? body.event : "request";
   } catch { /* corps invalide */ }
   if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Identifiant invalide." }, 400);
   if (event !== "request") {
@@ -148,15 +148,20 @@ Deno.serve(async (req) => {
 
   // réponse de l'admin -> client
   let cSubject: string, cText: string, cHtml: string;
-  if (event === "approved") {
+  if (event === "approved" || event === "confirmed") {
     if (!x.pickup_date) return json({ result: "skipped", reason: "aucune cueillette" });
     const pk = fmtPickup(x.pickup_date, x.pickup_start), pkE = fmtPickup(x.pickup_date, x.pickup_start, true);
+    const { data: cfg } = await db.from("admin_settings").select("value").eq("key", "cueillette").maybeSingle();
+    const addr = String(cfg?.value?.address || "").trim();
+    const addrBox = addr ? '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#F3F3F0;color:#181A1F"><b>' + (en ? "Address" : "Adresse") + '</b><br>' + esc(addr) + '</p>' : "";
+    const addrTxt = addr ? (en ? "\nAddress: " : "\nAdresse : ") + addr + "\n" : "";
+    const ok = event === "confirmed";
     cSubject = en ? "Pickup confirmed " + pkE + " — Création Audio" : "Cueillette confirmée " + pk + " — Création Audio";
-    cText = en ? "Hello " + first + ",\n\nGood news: your request is approved. See you " + pkE + ".\n\n" + accountUrl + "\n\nCréation Audio\n" + SITE + "/en/"
-      : "Bonjour " + first + ",\n\nBonne nouvelle : ta demande est approuvée. On t'attend " + pk + ".\n\n" + accountUrl + "\n\nCréation Audio\n" + SITE;
+    cText = en ? "Hello " + first + ",\n\n" + (ok ? "Your pickup is confirmed" : "Good news: your request is approved") + ". See you " + pkE + "." + addrTxt + "\n" + accountUrl + "\n\nCréation Audio\n" + SITE + "/en/"
+      : "Bonjour " + first + ",\n\n" + (ok ? "Ta cueillette est confirmée" : "Bonne nouvelle : ta demande est approuvée") + ". On t'attend " + pk + "." + addrTxt + "\n" + accountUrl + "\n\nCréation Audio\n" + SITE;
     cHtml = en
-      ? wrap("Création Audio", "Request approved", '<p style="margin:0 0 14px">Hello ' + esc(first) + ', for ' + esc(what.toLowerCase().replace("commande", "order").replace("réservation", "reservation")) + '.</p>' + box("See you " + pkE + ".") + btn(accountUrl, "See my order"))
-      : wrap("Création Audio", "Demande approuvée", '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', pour ' + esc(what.toLowerCase()) + '.</p>' + box("On t'attend " + pk + ".") + btn(accountUrl, "Voir ma commande"));
+      ? wrap("Création Audio", ok ? "Pickup confirmed" : "Request approved", '<p style="margin:0 0 14px">Hello ' + esc(first) + ', for ' + esc(what.toLowerCase().replace("commande", "order").replace("réservation", "reservation")) + '.</p>' + box("See you " + pkE + ".") + addrBox + btn(accountUrl, "See my order"))
+      : wrap("Création Audio", ok ? "Cueillette confirmée" : "Demande approuvée", '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', pour ' + esc(what.toLowerCase()) + '.</p>' + box("On t'attend " + pk + ".") + addrBox + btn(accountUrl, "Voir ma commande"));
   } else {
     if (!rq || rq.state !== "refused") return json({ result: "skipped", reason: "aucun refus" });
     const pk = fmtPickup(rq.d, rq.s), pkE = fmtPickup(rq.d, rq.s, true), cur = fmtPickup(x.pickup_date, x.pickup_start), curE = fmtPickup(x.pickup_date, x.pickup_start, true);

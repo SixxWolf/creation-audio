@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=4">
 <link rel="stylesheet" href="assets/admin.css?v=117">
-<link rel="stylesheet" href="assets/cueillette.css?v=3">
+<link rel="stylesheet" href="assets/cueillette.css?v=4">
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=29">
 <link rel="stylesheet" href="assets/autoloop.css?v=28">
@@ -1471,6 +1471,7 @@
             <div class="field"><label class="lbl" for="cq-notice">Préavis (h)</label><input type="number" id="cq-notice" min="0" max="336" step="1" inputmode="numeric"></div>
             <div class="field"><label class="lbl" for="cq-days">Jours offerts</label><input type="number" id="cq-days" min="1" max="60" step="1" inputmode="numeric"></div>
           </div>
+          <div class="field"><label class="lbl" for="cq-address">Adresse de ramassage</label><input type="text" id="cq-address" maxlength="200" autocomplete="off" placeholder="123 rue Exemple, Québec"></div>
           <div class="editor-actions">
             <button class="btn btn-accent" type="submit" id="cq-save" data-ic="save">Enregistrer</button>
             <span class="status" id="cq-status"></span>
@@ -2860,9 +2861,9 @@
 <script src="assets/cms-facturation.js?v=51"></script>
 <script src="assets/cms-historique.js?v=16"></script>
 <script src="assets/commande-client.js?v=1"></script>
-<script src="assets/cms-commandes-clients.js?v=21"></script>
+<script src="assets/cms-commandes-clients.js?v=22"></script>
 <script src="assets/cms-reservations.js?v=9"></script>
-<script src="assets/cms-cueillettes.js?v=3"></script>
+<script src="assets/cms-cueillettes.js?v=4"></script>
 <script src="assets/doc-print.js?v=1"></script>
 <script src="assets/cms-commandes.js?v=12"></script>
 <script src="assets/cms-statistiques.js?v=10"></script>
