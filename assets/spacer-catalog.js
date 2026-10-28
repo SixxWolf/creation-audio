@@ -351,12 +351,37 @@
     }
 
     function priceRows(p) {
-      var rows = [{ min: 1, price: +p.sell_price || 0 }].concat(tiersFor(p));
-      return rows.map(function (t, i) {
-        var label = t.min === 1 ? _t('1 paire') : (t.min + _t('+ paires'));
-        return '<div class="sp-pr' + (i === 0 ? _t(' base') : '') + '">' + (i === 0 && !isDealer ? '' : label + ' : ') + money(t.price) +
-          (i === 0 && !isDealer ? _t(' <small>/ paire</small>') : '') + '</div>';
-      }).join('');
+      var base = +p.sell_price || 0, tiers = tiersFor(p);
+      var pctOf = function (t) { return base > 0 && t.price < base ? Math.round((1 - t.price / base) * 100) : 0; };
+      var max = tiers.reduce(function (m, t) { return Math.max(m, pctOf(t)); }, 0);
+      var html = '<div class="sp-pr base">' + (isDealer ? _t('1 paire') + ' : ' : '') + money(base) +
+        (isDealer ? '' : _t(' <small>/ paire</small>')) + '</div>';
+      if (!max) return html;
+      // badge « jusqu'à −X % » : les paliers s'ouvrent en bulle (survol sur ordi, toucher sur mobile)
+      return html + '<div class="sp-save">' +
+        '<button type="button" class="sp-save-btn" aria-expanded="false">' + _t('Jusqu’à −{n} % en quantité', { n: max }) + '</button>' +
+        _t('<div class="sp-save-pop" role="table" aria-label="Prix selon la quantité">') + tiers.map(function (t) {
+          var pct = pctOf(t);
+          return '<div class="sp-save-row" role="row"><span role="cell">' + t.min + _t('+ paires') + '</span>' +
+            '<span role="cell">' + money(t.price) + '</span><em role="cell">' + (pct ? '−' + pct + ' %' : '') + '</em></div>';
+        }).join('') + '</div></div>';
+    }
+    function closeSave(except) {
+      $$('.sp-save.is-open').forEach(function (x) {
+        if (x === except) return;
+        x.classList.remove('is-open'); $('.sp-save-btn', x).setAttribute('aria-expanded', 'false');
+      });
+    }
+    document.addEventListener('click', function (e) { if (!(e.target.closest && e.target.closest('.sp-save'))) closeSave(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSave(); });
+    function wireSave(root) {
+      $$('.sp-save-btn', root).forEach(function (b) {
+        b.addEventListener('click', function () {
+          var box = b.parentNode, open = !box.classList.contains('is-open');
+          closeSave(box);
+          box.classList.toggle('is-open', open); b.setAttribute('aria-expanded', String(open));
+        });
+      });
     }
     function cardHtml(p) {
       var url = publicUrl(p.image_path), sz = sizeOf(p), fit = fitmentOf(p), b = stockBadge(p);
@@ -387,6 +412,7 @@
       '</article>';
     }
     function wireAdds(root) {
+      wireSave(root);
       $$('.sp-add', root).forEach(function (b) {
         b.addEventListener('click', function () {
           var p = byId[b.getAttribute('data-id')]; if (!p) return;

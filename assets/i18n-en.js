@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 3;
+window.CA_EN_V = 5;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -289,7 +289,8 @@ window.CA_EN = (function (pairs) {
   [`Sur commande`, `Made to order`],
   [`1 paire`, `1 pair`],
   [`+ paires`, `+ pairs`],
-  [` base`, ` base`],
+  [`Jusqu’à −{n} % en quantité`, `Up to −{n}% off in bulk`],
+  [`<div class="sp-save-pop" role="table" aria-label="Prix selon la quantité">`, `<div class="sp-save-pop" role="table" aria-label="Price by quantity">`],
   [` <small>/ paire</small>`, ` <small>/ pair</small>`],
   [`<p class="sp-repl">Remplace `, `<p class="sp-repl">Replaces `],
   [`<label class="sr-only" for="spc-q">Chercher un véhicule ou un code</label>`, `<label class="sr-only" for="spc-q">Search a vehicle or a code</label>`],
