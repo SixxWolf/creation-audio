@@ -387,6 +387,7 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
   color:#fff; background:var(--k); border-radius:100px; }
 .news-top { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; }
 .news-meta { font-size:.85rem; font-weight:600; color:var(--muted); }
+.news-date { margin-left:auto; font-size:.82rem; font-weight:500; color:var(--muted); white-space:nowrap; }
 
 .news-feat { overflow:hidden; background:var(--paper); border:1px solid var(--line); border-radius:22px; }
 .news-media { display:grid; place-items:center; aspect-ratio:16 / 9; padding:14px; background:var(--wash); border-bottom:1px solid var(--line); }

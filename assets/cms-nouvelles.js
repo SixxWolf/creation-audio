@@ -235,7 +235,8 @@
     if (s === 'soon') return 'Dès le ' + a + (b ? ' · jusqu\'au ' + b : '');
     if (s === 'done') return 'Terminée le ' + b;
     if (s === 'off') return 'Hors ligne' + (b ? ' · fin ' + b : '');
-    return b ? 'Jusqu\'au ' + b : 'Sans fin';
+    var p = r.published_at && (!r.starts_at || r.published_at > r.starts_at) ? r.published_at : r.starts_at;
+    return (p ? 'Publiée le ' + fmtDay(p) : 'En ligne') + (b ? ' · jusqu\'au ' + b : '');
   }
 
   function rowHtml(r) {

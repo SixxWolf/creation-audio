@@ -115,7 +115,7 @@
   var _t = CA.t || function (s) { return s; };
   var KINDS = { promo: _t('Promo'), event: _t('Événement'), 'new': _t('Nouveauté'), update: _t('Mise à jour') };
   // en:i18n = textes anglais (fonction translate) — CA.tr(n, 'title')
-  var COLS = 'id,kind,title,body,image_path,cta_label,cta_url,promo_code,event_at,starts_at,ends_at,featured,in_bar,sort_order,updated_at,en:i18n';
+  var COLS = 'id,kind,title,body,image_path,cta_label,cta_url,promo_code,event_at,starts_at,ends_at,featured,in_bar,sort_order,updated_at,published_at,en:i18n';
   var KEY = 'ca-news-closed';
 
   function cfg() { return window.CA_SUPABASE || null; }

@@ -3562,6 +3562,19 @@ drop policy if exists news_admin_all on public.news;
 create policy news_admin_all on public.news for all to authenticated
   using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
 grant select on public.news to anon, authenticated;
+-- published_at (2026-10-28) : date affichée sur la nouvelle = jour de sa 1re mise en ligne
+-- (active et pas proposée), posée par le déclencheur — publier une proposition, enregistrer
+-- « En ligne » ou dupliquer. Le site affiche la plus tardive de published_at et starts_at.
+alter table public.news add column if not exists published_at timestamptz;
+create or replace function public._news_published()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if NEW.active and not NEW.proposed and NEW.published_at is null then NEW.published_at := now(); end if;
+  return NEW;
+end $$;
+drop trigger if exists news_published on public.news;
+create trigger news_published before insert or update on public.news for each row execute function public._news_published();
+update public.news set published_at = created_at where published_at is null and active and not proposed;
 
 -- ------------------------------------------------------------
 -- THÈME DES FÊTES (2026-10-25) — skin de Noël du site public

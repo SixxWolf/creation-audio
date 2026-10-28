@@ -426,6 +426,16 @@
     if (CA0.lang === 'en') return d.toLocaleDateString('en-CA', { month: 'long', day: 'numeric' });
     return d.getDate() + (d.getDate() === 1 ? 'er' : '') + ' ' + MONTHS[d.getMonth()];
   }
+  // date de la nouvelle = jour de sa mise en ligne (published_at, ou starts_at si elle a été programmée plus tard)
+  function newsDate(n) {
+    var a = n.published_at ? new Date(n.published_at) : null, b = n.starts_at ? new Date(n.starts_at) : null;
+    var d = a && b ? (b > a ? b : a) : a || b;
+    if (!d || isNaN(d)) return '';
+    var iso = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    var txt = CA0.lang === 'en' ? d.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
+      : d.getDate() + (d.getDate() === 1 ? 'er' : '') + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+    return '<time class="news-date" datetime="' + iso + '">' + txt + '</time>';
+  }
   function newsMeta(n) {
     if (n.kind === 'event' && n.event_at) return _t('Le {d}', { d: dayText(n.event_at, true) });
     if (n.ends_at) return _t('Jusqu\'au {d}', { d: dayText(n.ends_at) });
@@ -460,7 +470,7 @@
         return '<article class="news-feat k-' + esc(n.kind) + (img ? '' : ' no-img') + '">' +
           (img ? '<div class="news-media"><img src="' + esc(img) + '" alt="" loading="lazy"></div>' : '') +
           '<div class="news-body">' +
-            '<div class="news-top">' + tag(n) + (meta ? '<span class="news-meta">' + esc(meta) + '</span>' : '') + '</div>' +
+            '<div class="news-top">' + tag(n) + (meta ? '<span class="news-meta">' + esc(meta) + '</span>' : '') + newsDate(n) + '</div>' +
             '<h3>' + esc(CA.tr(n, 'title')) + '</h3>' +
             (n.body ? '<p>' + esc(CA.tr(n, 'body')).replace(/\n/g, '<br>') + '</p>' : '') +
             ((href && n.cta_label) || n.promo_code ? '<div class="news-acts">' +
@@ -477,7 +487,7 @@
         return '<button type="button" class="news-mini' + (i === cur ? ' is-on' : '') + '" data-i="' + i + '" aria-pressed="' + (i === cur) + '">' +
           (img ? '<span class="news-thumb"><img src="' + esc(img) + '" alt="" loading="lazy"></span>' : '') +
           '<span class="news-mini-txt">' +
-            '<span class="news-top">' + tag(n) + (meta ? '<span class="news-meta">' + esc(meta) + '</span>' : '') + '</span>' +
+            '<span class="news-top">' + tag(n) + (meta ? '<span class="news-meta">' + esc(meta) + '</span>' : '') + newsDate(n) + '</span>' +
             '<span class="news-mini-t">' + esc(CA.tr(n, 'title')) + '</span>' +
           '</span>' +
           (i === cur && auto ? progHtml() : '') +
