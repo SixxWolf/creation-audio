@@ -567,7 +567,7 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
   font-family:var(--display); font-weight:700; font-size:.92rem; letter-spacing:.02em;
   color:hsl(var(--h, 20) 45% 30%); background:hsl(var(--h, 20) 70% 91%); }
 :root[data-theme="dark"] .person-av { color:hsl(var(--h, 20) 75% 80%); background:hsl(var(--h, 20) 30% 22%); }
-.person-tag { margin-left:6px; padding:2px 8px; font-family:var(--font); font-size:.66rem; font-weight:700; letter-spacing:.06em;
+.person-tag { display:inline-block; white-space:nowrap; margin-left:6px; padding:2px 8px; font-family:var(--font); font-size:.66rem; font-weight:700; letter-spacing:.06em;
   text-transform:uppercase; vertical-align:2px; color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 13%, transparent); border-radius:100px; }
 .person-meta { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:.84rem; color:var(--muted); }
 .pm { display:inline-flex; align-items:center; gap:6px; min-width:0; overflow-wrap:anywhere; }

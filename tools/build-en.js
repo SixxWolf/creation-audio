@@ -28,7 +28,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const SITE = 'https://creationaudio.ca/';
 const PAGES = ['index.html', 'boutique.html', 'compte.html', 'dealer.html', 'aide.html',
-  'conditions.html', 'confidentialite.html', 'retours.html', '404.html'];
+  'conditions.html', 'confidentialite.html', 'retours.html', '404.html', 'revendeur.html'];
 const DICT_FILE = path.join(ROOT, 'tools/i18n/pages.en.json');
 const MISSING_FILE = path.join(ROOT, 'tools/i18n/missing.json');
 

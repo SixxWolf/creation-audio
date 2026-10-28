@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Become a dealer — Création Audio</title>
+<meta name="description" content="3D-printed speaker spacers and adapters made in Québec. Open your dealer account: wholesale pricing, volume discounts and online ordering.">
+<meta name="theme-color" content="#0D0F12">
+<link rel="canonical" href="https://creationaudio.ca/en/revendeur.html">
+<link rel="alternate" hreflang="fr-CA" href="https://creationaudio.ca/revendeur.html">
+<link rel="alternate" hreflang="en-CA" href="https://creationaudio.ca/en/revendeur.html">
+<link rel="alternate" hreflang="x-default" href="https://creationaudio.ca/revendeur.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Création Audio">
+<meta property="og:locale" content="en_CA">
+<meta property="og:url" content="https://creationaudio.ca/en/revendeur.html">
+<meta property="og:title" content="Become a dealer — Création Audio">
+<meta property="og:description" content="3D-printed speaker spacers and adapters made in Québec. Open your dealer account: wholesale pricing, volume discounts and online ordering.">
+<meta property="og:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="../assets/img/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="../assets/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/tokens.css?v=5">
+<link rel="stylesheet" href="../assets/revendeur.css?v=1">
+<!-- Page « Atelier » sombre : pas de thème des fêtes (nav.js lit data-fetes-off) ; .rv-js = animations d'apparition -->
+<script>document.documentElement.setAttribute('data-fetes-off','');document.documentElement.classList.add('rv-js');</script>
+<script src="../assets/i18n.js?v=1"></script>
+<script src="../assets/i18n-en.js?v=8"></script>
+</head>
+<body class="rv">
+<a class="rv-skip" href="#main">Skip to content</a>
+
+<header class="rv-top">
+  <a class="rv-brand" href="./" aria-label="Création Audio — home">
+    <img src="../assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="40" height="40">
+    <span><b>Création Audio</b><small>Dealer program</small></span>
+  </a>
+  <nav class="rv-nav" aria-label="Sections">
+    <a href="#gamme">The lineup</a>
+    <a href="#pourquoi">Why us</a>
+    <a href="#prix">Wholesale pricing</a>
+  </nav>
+  <span class="rv-grow"></span>
+  <a href="../revendeur.html" class="rv-lang" hreflang="fr" lang="fr" title="Version française" data-lang-switch="fr">FR</a>
+  <a class="rv-portal" href="dealer.html" aria-label="Dealer portal">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    <span>Dealer portal</span>
+  </a>
+  <a class="rv-btn rv-btn-accent rv-top-cta" href="#demande">Request access</a>
+</header>
+
+<main id="main">
+  <!-- Héros -->
+  <section class="rv-hero">
+    <div class="rv-wrap rv-hero-in">
+      <div class="rv-hero-tx rv-reveal">
+        <p class="rv-eyebrow">Dealer program</p>
+        <h1>The spacers your customers are looking for. <em>At wholesale prices.</em></h1>
+        <p class="rv-lead">Speaker adapters 3D-printed in Québec, ready to install. Open your account and order online.</p>
+        <div class="rv-ctas">
+          <a class="rv-btn rv-btn-accent rv-btn-lg" href="#demande">Request access
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          <a class="rv-btn rv-btn-ghost rv-btn-lg" href="#gamme">See the lineup</a>
+        </div>
+        <dl class="rv-stats" id="rv-stats" hidden>
+          <div><dt id="rv-n-models">0</dt><dd>models</dd></div>
+          <div><dt id="rv-n-veh">0</dt><dd>vehicles</dd></div>
+          <div><dt>QC</dt><dd>made here</dd></div>
+        </dl>
+      </div>
+      <figure class="rv-stage rv-reveal" aria-hidden="true">
+        <div class="rv-stage-card">
+          <span class="rv-tick tl"></span><span class="rv-tick tr"></span><span class="rv-tick bl"></span><span class="rv-tick br"></span>
+          <img id="rv-hero-img" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" draggable="false">
+        </div>
+        <figcaption class="rv-stage-cap">
+          <span class="rv-dim"><i></i><b id="rv-hero-size"></b><i></i></span>
+          <span class="rv-stage-name" id="rv-hero-name"></span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- Gamme : rangée qui défile seule vers la droite, saisissable (revendeur.js) -->
+  <section class="rv-range" id="gamme" aria-labelledby="rv-range-t">
+    <div class="rv-wrap rv-head rv-reveal">
+      <p class="rv-eyebrow">The lineup</p>
+      <h2 id="rv-range-t">A part for every door.</h2>
+    </div>
+    <div class="rv-marquee" id="rv-marquee" tabindex="0" aria-label="Spacer lineup, swipe to browse">
+      <div class="rv-track" id="rv-track"><p class="rv-loading">Loading the lineup…</p></div>
+    </div>
+  </section>
+
+  <!-- Pourquoi nous -->
+  <section class="rv-why" id="pourquoi" aria-labelledby="rv-why-t">
+    <div class="rv-wrap">
+      <div class="rv-head rv-reveal">
+        <p class="rv-eyebrow">Why us</p>
+        <h2 id="rv-why-t">What makes the difference.</h2>
+      </div>
+      <div class="rv-why-grid">
+        <article class="rv-why-card rv-reveal">
+          <span class="rv-why-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+          <h3>Made in Québec</h3>
+          <p>Designed and printed right here in Québec City.</p>
+        </article>
+        <article class="rv-why-card rv-reveal">
+          <span class="rv-why-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></svg></span>
+          <h3>Precise fit</h3>
+          <p>Modeled to the millimetre: it installs without trimming.</p>
+        </article>
+        <article class="rv-why-card rv-reveal">
+          <span class="rv-why-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></span>
+          <h3>Not on the list? We'll design it.</h3>
+          <p>Give us the vehicle, we'll design the part.</p>
+        </article>
+        <article class="rv-why-card rv-reveal">
+          <span class="rv-why-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6 5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg></span>
+          <h3>Simple online ordering</h3>
+          <p>Your prices, your cart, your tracking: all in your portal.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Prix de gros : teaser, aucun chiffre -->
+  <section class="rv-deal" id="prix" aria-labelledby="rv-deal-t">
+    <div class="rv-wrap rv-deal-in">
+      <div class="rv-deal-tx rv-reveal">
+        <p class="rv-eyebrow">Wholesale pricing</p>
+        <h2 id="rv-deal-t">Margins that make you smile.</h2>
+        <p class="rv-lead">The more you order, the less you pay. Your prices and tiers show up as soon as your account opens.</p>
+        <a class="rv-btn rv-btn-accent rv-btn-lg" href="#demande">See my wholesale prices</a>
+      </div>
+      <div class="rv-tiers rv-reveal" role="img" aria-label="Volume discounts at 6, 12 and 18 pairs">
+        <div class="rv-tier" style="--h:38%"><span class="rv-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><b>6 pairs</b></div>
+        <div class="rv-tier" style="--h:64%"><span class="rv-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><b>12 pairs</b></div>
+        <div class="rv-tier" style="--h:90%"><span class="rv-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span><b>18 pairs</b></div>
+        <p class="rv-tiers-note">Discounts revealed when your account opens</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demande d'accès (Edge Function dealer-request) -->
+  <section class="rv-join" id="demande" aria-labelledby="rv-join-t">
+    <div class="rv-wrap rv-join-in">
+      <div class="rv-join-tx rv-reveal">
+        <p class="rv-eyebrow">Open an account</p>
+        <h2 id="rv-join-t">Request your dealer access.</h2>
+        <ol class="rv-steps">
+          <li><b>Fill in the request</b><span>One minute, tops.</span></li>
+          <li><b>We reply within 1 business day</b><span>By email.</span></li>
+          <li><b>Sign in with a code</b><span>No password to remember.</span></li>
+        </ol>
+        <p class="rv-q">A question? <a class="ask" href="/en/compte.html#/messages" data-msg="Dealer program">Write to us</a></p>
+      </div>
+      <div class="rv-form-card rv-reveal">
+        <form id="rv-form" novalidate>
+          <div class="rv-grid">
+            <label class="rv-field"><span>Business</span>
+              <input name="business" required maxlength="120" autocomplete="organization"></label>
+            <label class="rv-field"><span>Your name</span>
+              <input name="contact" required maxlength="120" autocomplete="name"></label>
+            <label class="rv-field"><span>Email</span>
+              <input name="email" type="email" required maxlength="254" autocomplete="email" inputmode="email"></label>
+            <label class="rv-field"><span>Phone</span>
+              <input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
+            <label class="rv-field rv-wide"><span>City, province</span>
+              <input name="city" required maxlength="120" autocomplete="address-level2" placeholder="e.g. Toronto, ON"></label>
+            <label class="rv-field"><span>Website <small>optional</small></span>
+              <input name="website" maxlength="300" autocomplete="url" inputmode="url"></label>
+            <label class="rv-field"><span>Facebook page <small>optional</small></span>
+              <input name="facebook" maxlength="300" inputmode="url"></label>
+          </div>
+          <!-- champ piège : invisible pour les gens, rempli par les robots -->
+          <div class="rv-hp" aria-hidden="true"><label>Leave empty <input name="hp" tabindex="-1" autocomplete="off"></label></div>
+          <button class="rv-btn rv-btn-accent rv-btn-lg rv-submit" type="submit" id="rv-submit">Send my request</button>
+          <p class="rv-status" id="rv-status" role="status" aria-live="polite"></p>
+        </form>
+        <div class="rv-done" id="rv-done" tabindex="-1" hidden>
+          <span class="rv-done-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
+          <h3 id="rv-done-t">Request received</h3>
+          <p id="rv-done-p"></p>
+          <a class="rv-btn rv-btn-ghost" id="rv-done-portal" href="dealer.html" hidden>Open the dealer portal</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="rv-foot">
+  <div class="rv-wrap rv-foot-in">
+    <a class="rv-brand" href="./" aria-label="Création Audio — home">
+      <img src="../assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="34" height="34">
+      <span><b>Création Audio</b><small>3D printing · Car audio</small></span>
+    </a>
+    <nav class="rv-foot-nav" aria-label="Links">
+      <a href="./">Home</a>
+      <a href="spacers.html">Spacers</a>
+      <a href="dealer.html">Dealer portal</a>
+      <a href="conditions.html">Terms of use</a>
+      <a href="confidentialite.html">Privacy</a>
+    </nav>
+    <p class="rv-foot-legal">© <span id="year">2026</span> Création Audio · NEQ 2282510769 · Québec (QC), Canada</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
+<script src="../assets/supabase-config.js?v=1"></script>
+<script src="../assets/supabase-client.js?v=1"></script>
+<script src="../assets/nav.js?v=12"></script>
+<script src="../assets/spacer-catalog.js?v=16"></script>
+<script src="../assets/revendeur.js?v=1"></script>
+</body>
+</html>

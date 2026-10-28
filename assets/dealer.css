@@ -32,6 +32,15 @@
 .dl-submit:disabled { opacity:.55; cursor:not-allowed; }
 .dl-status { color:var(--muted); font-size:.85rem; margin-top:12px; min-height:1.2em; }
 .dl-gate-actions { margin-top:18px; }
+/* connexion par code : lien vers revendeur.html, Renvoyer / Changer de courriel */
+.dl-card a:not(.dl-submit) { color:var(--ember-dim); font-weight:600; }
+.dl-card p b { color:var(--ink); word-break:break-all; }
+.dl-join { margin:14px 0 0 !important; font-size:.88rem !important; }
+.dl-code-links { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 16px; margin-top:6px; }
+.dl-linkbtn { font:inherit; font-size:.86rem; font-weight:600; color:var(--ember-dim); background:none; border:0; padding:4px 0; cursor:pointer; }
+.dl-linkbtn:hover:not(:disabled) { text-decoration:underline; text-underline-offset:3px; }
+.dl-linkbtn:disabled { color:var(--muted); cursor:default; }
+#dl-code-in { font-size:1.4rem; letter-spacing:.3em; text-align:center; font-variant-numeric:tabular-nums; }
 
 /* Bandeau connecté + onglets Catalogue / Mes commandes */
 .dl-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px 20px;
@@ -138,6 +147,10 @@ details[open] .dl-chev { transform:translateY(2px) rotate(-135deg); }
 .dl-status { flex:none; display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:100px;
   font-size:.78rem; font-weight:700; white-space:nowrap; color:var(--ink-2); background:var(--wash-2); }
 .dl-status::before { content:''; width:7px; height:7px; border-radius:50%; background:currentColor; }
+/* les messages des cartes de connexion gardent leur style de texte simple (pas de pastille de statut) */
+.dl-card .dl-status { display:block; padding:0; border-radius:0; background:none; white-space:normal; font-size:.85rem; font-weight:400; color:var(--muted); }
+.dl-card .dl-status::before { content:none; }
+.dl-card .dl-status.is-bad { color:var(--bad-ink); }
 .dl-status.is-new { color:var(--warn-ink); background:var(--tint); }
 .dl-status.is-preparing { color:var(--info-ink); background:var(--info-wash); }
 .dl-status.is-ready { color:var(--good-ink); background:var(--good-wash); }

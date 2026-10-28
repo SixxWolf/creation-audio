@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 7;
+window.CA_EN_V = 8;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -842,5 +842,32 @@ window.CA_EN = (function (pairs) {
   [`Mode`, `Mode`],
   [`Accent`, `Accent`],
   [`Revenir à l'origine`, `Back to default`],
-  [`Non enregistré — réessaie.`, `Not saved — try again.`]
+  [`Non enregistré — réessaie.`, `Not saved — try again.`],
+  // ---- dealer.js : connexion par code
+  [`Se connecter`, `Sign in`],
+  [`Recevoir mon code`, `Get my code`],
+  [`Ce courriel n'a pas encore d'accès revendeur.`, `This email doesn't have dealer access yet.`],
+  [`Demande ton accès`, `Request access`],
+  // ---- revendeur.js (page Devenir revendeur)
+  [`Des prix de gros qui t'attendent.`, `Wholesale prices waiting for you.`],
+  [`Plus tu en commandes, moins tu paies.`, `The more you order, the less you pay.`],
+  [`Des marges qui font sourire.`, `Margins that make you smile.`],
+  [`Ton prix baisse à chaque palier.`, `Your price drops at every tier.`],
+  [`Adaptateur de haut-parleur`, `Speaker adapter`],
+  [`Rabais dès 6, 12 et 18 paires`, `Discounts at 6, 12 and 18 pairs`],
+  [`Pas dans la liste ? On le conçoit.`, `Not on the list? We'll design it.`],
+  [`Donne-nous le véhicule, on dessine la pièce.`, `Give us the vehicle, we'll design the part.`],
+  [`Demander l'accès`, `Request access`],
+  [`Gamme momentanément indisponible.`, `Lineup temporarily unavailable.`],
+  [`Tu as déjà accès`, `You already have access`],
+  [`Ce courriel a déjà un accès revendeur. Connecte-toi au portail avec un code par courriel.`, `This email already has dealer access. Sign in to the portal with a code sent by email.`],
+  [`Demande déjà en attente`, `Request already pending`],
+  [`On a déjà ta demande. On te répond sous 24 h ouvrables.`, `We already have your request. We'll reply within 1 business day.`],
+  [`Demande reçue`, `Request received`],
+  [`On te répond sous 24 h ouvrables. Un courriel de confirmation est en route vers`, `We'll reply within 1 business day. A confirmation email is on its way to`],
+  [`Remplis les champs requis.`, `Fill in the required fields.`],
+  [`Envoi impossible pour l'instant. Écris-nous à contact@creationaudio.ca.`, `Can't send right now. Email us at contact@creationaudio.ca.`],
+  [`Trop de demandes d'un coup. Réessaie dans une heure.`, `Too many requests at once. Try again in an hour.`],
+  [`Vérifie ton courriel et les champs requis.`, `Check your email and the required fields.`],
+  [`Erreur réseau. Vérifie ta connexion et réessaie.`, `Network error. Check your connection and try again.`]
 ]);

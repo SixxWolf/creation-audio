@@ -5,12 +5,15 @@
 //
 //  POST { action: 'send', email, hp, purpose?, lang? }  purpose 'message' = code demandé par le panneau
 //                                                 « Écris-nous » (assets/messagerie.js) : texte adapté ;
-//                                                 lang 'en' = courriel en anglais (page /en/)
+//                                                 lang 'en' = courriel en anglais (page /en/) ;
+//                                                 purpose 'dealer' = portail revendeur (dealer.html) :
+//                                                 code envoyé SEULEMENT aux courriels de « dealers »
 //     -> 200 { ok }                         code envoyé (hp rempli = robot : rien n'est fait)
 //        429 { error: 'wait', retry_after } 1 envoi / 60 s, 5 / h par courriel, 20 / h par IP
 //        403 { error: 'reserved' }          courriel de l'admin (il passe par sa propre page)
+//        403 { error: 'not_dealer' }        purpose 'dealer' : courriel sans accès revendeur
 //        502 { error: 'mail' }              Resend a refusé l'envoi
-//  POST { action: 'verify', email, code }
+//  POST { action: 'verify', email, code, purpose? }   purpose 'dealer' : pas de ligne « customers »
 //     -> 200 { session: { access_token, refresh_token }, needs_name }
 //        401 { error: 'invalid', left }     mauvais code
 //        410 { error: 'expired' }           aucun code valable (expiré, déjà utilisé, 5 essais ratés)
@@ -48,12 +51,15 @@ function newCode() {
 }
 
 // Langue = celle de la page qui demande le code (body.lang, 'fr' par défaut)
-function mailContent(code: string, forMessage: boolean, en: boolean) {
+function mailContent(code: string, forMessage: boolean, en: boolean, forDealer = false) {
   const L = (fr: string, eng: string) => (en ? eng : fr);
   const subject = (forMessage ? L("Ton code pour envoyer ton message : ", "Your code to send your message: ")
+                              : forDealer ? L("Ton code pour le portail revendeur : ", "Your dealer portal code: ")
                               : L("Ton code de connexion : ", "Your sign-in code: ")) + code;
   const intro = forMessage
     ? L("Voici ton code pour confirmer ton courriel et envoyer ton message à Création Audio", "Here is your code to confirm your email and send your message to Création Audio")
+    : forDealer
+    ? L("Voici ton code pour te connecter au portail revendeur Création Audio", "Here is your code to sign in to the Création Audio dealer portal")
     : L("Voici ton code pour te connecter à ton compte Création Audio", "Here is your code to sign in to your Création Audio account");
   const ignore = L("Si tu n'as pas demandé ce code, ignore simplement ce courriel : personne ne peut se connecter sans lui.",
                    "If you didn't ask for this code, just ignore this email: no one can sign in without it.");
@@ -70,6 +76,7 @@ function mailContent(code: string, forMessage: boolean, en: boolean) {
     '<h1 style="font-size:22px;margin:0 0 14px">' + (forMessage ? L("Confirme ton courriel", "Confirm your email") : L("Ton code de connexion", "Your sign-in code")) + "</h1>" +
     "<p>" + L("Bonjour,", "Hello,") + "</p>" +
     "<p>" + (forMessage ? L("Voici ton code pour envoyer ton message", "Here is your code to send your message")
+                        : forDealer ? L("Voici ton code pour te connecter au portail revendeur", "Here is your code to sign in to the dealer portal")
                         : L("Voici ton code pour te connecter à ton compte", "Here is your code to sign in to your account")) + L("&nbsp;:", ":") + "</p>" +
     '<p style="margin:20px 0;font-size:34px;font-weight:700;letter-spacing:.18em;font-family:Consolas,Menlo,monospace;' +
     'background:#F4F3EF;border-radius:12px;padding:14px 20px;display:inline-block">' + code + "</p>" +
@@ -101,18 +108,24 @@ Deno.serve(async (req) => {
   const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const opts = { auth: { persistSession: false, autoRefreshToken: false } };
   const db = createClient(url, service, opts);
+  const forDealer = body.purpose === "dealer";
 
   /* ---------- envoi du code ---------- */
   if (action === "send") {
     if (String(body.hp ?? "") !== "") return json({ ok: true });   // robot : on fait semblant
     const resendKey = Deno.env.get("RESEND_API_KEY");
     if (!resendKey) return json({ error: "unavailable" }, 503);
+    if (forDealer) {
+      const { data: okDealer, error: dErr } = await db.rpc("dealer_email_ok", { p_email: email });
+      if (dErr) return json({ error: "unavailable" }, 503);
+      if (!okDealer) return json({ error: "not_dealer" }, 403);
+    }
     const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim().slice(0, 64);
     const code = newCode();
     const { data: gate, error } = await db.rpc("compte_code_issue", { p_email: email, p_ip: ip, p_code: code });
     if (error || !gate) return json({ error: "unavailable" }, 503);
     if (!gate.allowed) return json({ error: "wait", retry_after: gate.retry_after }, 429);
-    const mail = mailContent(code, body.purpose === "message", body.lang === "en");
+    const mail = mailContent(code, body.purpose === "message", body.lang === "en", forDealer);
     try {
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -167,6 +180,12 @@ Deno.serve(async (req) => {
     if (v.error || !v.data.session || !v.data.user) {
       console.error("compte-code: session impossible", v.error?.message);
       return json({ error: "unavailable" }, 503);
+    }
+    if (forDealer) {   // revendeur : pas de compte client (customers) créé au passage
+      return json({
+        session: { access_token: v.data.session.access_token, refresh_token: v.data.session.refresh_token },
+        needs_name: false,
+      });
     }
     const { data: touch } = await db.rpc("compte_touch", { p_id: v.data.user.id, p_email: email });
     return json({

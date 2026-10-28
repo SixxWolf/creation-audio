@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=9">
 <link rel="stylesheet" href="assets/boutique.css?v=46">
-<link rel="stylesheet" href="assets/dealer.css?v=17">
+<link rel="stylesheet" href="assets/dealer.css?v=18">
 <link rel="stylesheet" href="assets/doc-print.css?v=2">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
 <script src="assets/look.js?v=1"></script>
@@ -42,22 +42,42 @@
   <button class="dl-logout" id="logout-btn" type="button" hidden>Déconnexion</button>
 </header>
 
-<!-- Connexion -->
+<!-- Connexion : code à 6 chiffres par courriel (Edge Function compte-code, purpose 'dealer') ;
+     le mot de passe n'apparaît que pour le courriel de l'admin (aperçu, double authentification) -->
 <section class="dl-center" id="dl-login" hidden>
-  <form class="dl-card" id="dl-login-form">
+  <form class="dl-card" id="dl-login-form" novalidate>
     <h1>Portail dealer</h1>
-    <p>Accès réservé aux comptes dealer. Connecte-toi avec le compte fourni par Création Audio.</p>
+    <p>Entre ton courriel : on t'envoie un code à 6 chiffres. Aucun mot de passe.</p>
     <div class="field">
       <label for="dl-login-email">Courriel</label>
-      <input type="text" id="dl-login-email" inputmode="email" autocomplete="username" placeholder="ton@courriel.com">
+      <input type="email" id="dl-login-email" inputmode="email" autocomplete="username" placeholder="ton@courriel.com">
     </div>
-    <div class="field">
+    <div class="field" id="dl-pass-field" hidden>
       <label for="dl-login-pass">Mot de passe</label>
       <input type="password" id="dl-login-pass" autocomplete="current-password">
     </div>
-    <button class="dl-submit" type="submit" id="dl-login-btn">Se connecter</button>
-    <p class="dl-status" id="dl-login-status"></p>
+    <button class="dl-submit" type="submit" id="dl-login-btn">Recevoir mon code</button>
+    <p class="dl-status" id="dl-login-status" aria-live="polite"></p>
+    <p class="dl-join">Pas encore revendeur ? <a href="revendeur.html">Demande ton accès</a></p>
     <p class="dl-status"><a href="./" style="color:var(--ember-dim);text-decoration:none">← Retour au site</a></p>
+  </form>
+</section>
+
+<!-- Code reçu par courriel -->
+<section class="dl-center" id="dl-code" hidden>
+  <form class="dl-card" id="dl-code-form" novalidate>
+    <h1>Vérifie tes courriels</h1>
+    <p>Code envoyé à <b id="dl-code-email"></b>. Il expire dans 10 minutes.</p>
+    <div class="field">
+      <label for="dl-code-in">Code</label>
+      <input type="text" id="dl-code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false">
+    </div>
+    <button class="dl-submit" type="submit" id="dl-code-btn">Se connecter</button>
+    <p class="dl-status" id="dl-code-status" aria-live="polite"></p>
+    <div class="dl-code-links">
+      <button class="dl-linkbtn" type="button" id="dl-code-resend">Renvoyer le code</button>
+      <button class="dl-linkbtn" type="button" id="dl-code-back">Changer de courriel</button>
+    </div>
   </form>
 </section>
 
@@ -80,7 +100,7 @@
 <section class="dl-center" id="dl-gate" hidden>
   <div class="dl-card">
     <h1>Accès réservé</h1>
-    <p>Ce compte n'est pas autorisé au portail dealer. Contacte Création Audio pour obtenir un accès de gros.</p>
+    <p>Ce compte n'est pas autorisé au portail dealer. <a href="revendeur.html">Demande ton accès revendeur</a></p>
     <div class="dl-gate-actions"><button class="dl-logout" id="gate-logout" type="button">Se déconnecter</button></div>
   </div>
 </section>
@@ -172,6 +192,6 @@
 <script src="assets/spacer-catalog.js?v=16"></script>
 <script src="assets/auth-gate.js?v=3"></script>
 <script src="assets/doc-print.js?v=1"></script>
-<script src="assets/dealer.js?v=16"></script>
+<script src="assets/dealer.js?v=17"></script>
 </body>
 </html>

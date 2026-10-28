@@ -1,7 +1,12 @@
 /* =========================================================
    Création Audio V2 — Portail dealer (privé)
-   - Login Supabase. Le compte doit être listé dans « dealers »
-     (vérifié via l'RPC is_dealer()).
+   - Connexion par code à 6 chiffres envoyé par courriel (Edge Function
+     compte-code, purpose 'dealer' : code envoyé SEULEMENT aux courriels de
+     « dealers », session rendue puis posée par sb.auth.setSession). Le compte
+     doit être listé dans « dealers » (vérifié via l'RPC is_dealer()).
+     L'admin (aperçu) garde mot de passe + double authentification : le champ
+     mot de passe n'apparaît que pour son courriel (CA.adminEmail).
+     Pas encore dealer -> revendeur.html (demande d'accès).
    - Catalogue des spacers au PRIX DEALER + rabais quantité PAR MODÈLE,
      lu depuis la vue products_dealer (invisible aux non-dealers).
      Catalogue + fiche détaillée : spacer-catalog.js.
@@ -34,7 +39,9 @@
   var loginSec = $('#dl-login'), gateSec = $('#dl-gate'), mfaSec = $('#dl-mfa'), app = $('#dl-app'),
       mfaForm = $('#dl-mfa-form'), mfaCode = $('#dl-mfa-code'), mfaBtn = $('#dl-mfa-btn'), mfaStatus = $('#dl-mfa-status'),
       loginForm = $('#dl-login-form'), emailI = $('#dl-login-email'), passI = $('#dl-login-pass'),
-      loginBtn = $('#dl-login-btn'), loginStatus = $('#dl-login-status'),
+      loginBtn = $('#dl-login-btn'), loginStatus = $('#dl-login-status'), passField = $('#dl-pass-field'),
+      codeSec = $('#dl-code'), codeForm = $('#dl-code-form'), codeI = $('#dl-code-in'), codeBtn = $('#dl-code-btn'),
+      codeStatus = $('#dl-code-status'), resendBtn = $('#dl-code-resend'),
       cartBtn = $('#cart-btn'), logoutBtn = $('#logout-btn'), hello = $('#dl-hello'),
       catalogEl = $('#dl-catalog'), productEl = $('#dl-product'), ordersEl = $('#dl-orders'),
       ordersList = $('#dl-orders-list'), lookEl = $('#dl-look'), ordersFlash = $('#dl-orders-flash'), ordersN = $('#dl-orders-n');
@@ -65,11 +72,12 @@
     loginSec.hidden = which !== 'login';
     gateSec.hidden = which !== 'gate';
     mfaSec.hidden = which !== 'mfa';
+    codeSec.hidden = which !== 'code';
     app.hidden = which !== 'app';
     cartBtn.hidden = which !== 'app';
     document.body.classList.toggle('dl-in', which === 'app');
     if (which !== 'app') mbar.hidden = true;
-    logoutBtn.hidden = (which === 'login');
+    logoutBtn.hidden = (which === 'login' || which === 'code');
     if (which === 'app' && email) {
       me = String(email).toLowerCase();
       var isAdmin = me === String((window.CA && window.CA.adminEmail) || '').toLowerCase();
@@ -105,19 +113,114 @@
     }, function () { show('gate'); });
   }
 
-  /* ---------- connexion / déconnexion ---------- */
+  /* ---------- connexion : code par courriel (dealers) · mot de passe (admin seulement) ---------- */
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i, RESEND_S = 60;
+  var codeEmail = '', resendAt = 0, resendTimer = null;
+  function say(el, msg, bad) { el.textContent = msg || ''; el.classList.toggle('is-bad', !!bad); }
+  function isAdminEmail(v) { return String(v || '').trim().toLowerCase() === String(window.CA.adminEmail || '').toLowerCase(); }
+  function syncAdmin() {
+    var adm = isAdminEmail(emailI.value);
+    if (passField.hidden !== !adm) { passField.hidden = !adm; loginBtn.textContent = adm ? _t('Se connecter') : _t('Recevoir mon code'); }
+  }
+  emailI.addEventListener('input', syncAdmin);
+  emailI.addEventListener('change', syncAdmin);   // remplissage automatique du navigateur
+
+  function codeFn(body) {
+    var cfg = window.CA_SUPABASE || {};
+    return fetch(cfg.url + '/functions/v1/compte-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey },
+      body: JSON.stringify(Object.assign({ purpose: 'dealer', lang: EN ? 'en' : 'fr' }, body))
+    }).then(function (r) {
+      return r.json().then(function (b) { b = b || {}; b._status = r.status; return b; }, function () { return { _status: r.status }; });
+    });
+  }
+  function sendErr(b) {
+    if (b.error === 'wait') {
+      var s = Math.max(1, +b.retry_after || 60);
+      return s > 90 ? _t('Trop de demandes. Réessaie dans ') + plural(Math.ceil(s / 60), 'minute', 'minutes') + '.'
+                    : _t('Patiente ') + s + _t(' s avant de redemander un code.');
+    }
+    if (b.error === 'bad_request') return _t('Entre un courriel valide.');
+    if (b.error === 'mail') return _t('Envoi impossible pour le moment. Réessaie dans un instant.');
+    return _t('Service indisponible. Réessaie plus tard.');
+  }
+  function tickResend() {
+    clearTimeout(resendTimer);
+    var left = Math.ceil((resendAt - Date.now()) / 1000);
+    resendBtn.disabled = left > 0;
+    resendBtn.textContent = left > 0 ? _t('Renvoyer dans ') + left + ' s' : _t('Renvoyer le code');
+    if (left > 0) resendTimer = setTimeout(tickResend, 1000);
+  }
+  // fromCode : « Renvoyer le code » depuis l'écran du code (le message s'affiche là)
+  function sendCode(email, fromCode) {
+    var st = fromCode ? codeStatus : loginStatus, btn = fromCode ? resendBtn : loginBtn;
+    btn.disabled = true; say(st, _t('Envoi…'));
+    codeFn({ action: 'send', email: email }).then(function (b) {
+      btn.disabled = false;
+      if (b.ok) {
+        codeEmail = email; resendAt = Date.now() + RESEND_S * 1000;
+        if (fromCode) say(st, _t('Nouveau code envoyé.'));
+        else { say(st, ''); $('#dl-code-email').textContent = email; codeI.value = ''; say(codeStatus, ''); show('code'); codeI.focus(); }
+        tickResend();
+        return;
+      }
+      if (b.error === 'not_dealer') {
+        st.classList.add('is-bad');
+        st.innerHTML = esc(_t('Ce courriel n\'a pas encore d\'accès revendeur.')) +
+          ' <a href="revendeur.html">' + esc(_t('Demande ton accès')) + '</a>';
+        return;
+      }
+      if (b.error === 'reserved') { passField.hidden = false; loginBtn.textContent = _t('Se connecter'); say(st, ''); passI.focus(); return; }
+      say(st, sendErr(b), true);
+      if (fromCode) tickResend();
+    }, function () { btn.disabled = false; say(st, _t('Erreur réseau — réessaie.'), true); if (fromCode) tickResend(); });
+  }
+
   loginForm.addEventListener('submit', function (e) {
     e.preventDefault();
-    var email = (emailI.value || '').trim(), pass = passI.value || '';
-    if (!email || !pass || loginBtn.disabled) return;
-    loginBtn.disabled = true; loginStatus.textContent = _t('Connexion…');
-    // via le portier : 5 essais puis 15 min de blocage ; compte retiré -> refusé
+    if (loginBtn.disabled) return;
+    var email = (emailI.value || '').trim().toLowerCase();
+    if (!EMAIL_RE.test(email)) { say(loginStatus, _t('Entre un courriel valide.'), true); emailI.focus(); return; }
+    if (!isAdminEmail(email)) { sendCode(email, false); return; }
+    // admin (aperçu) : via le portier, 5 essais puis 15 min de blocage, puis double authentification
+    var pass = passI.value || '';
+    if (!pass) { passField.hidden = false; passI.focus(); return; }
+    loginBtn.disabled = true; say(loginStatus, _t('Connexion…'));
     window.CA.signIn(email, pass).then(function (r) {
       loginBtn.disabled = false;
-      if (!r.ok) { loginStatus.textContent = r.message; return; }
-      loginStatus.textContent = ''; passI.value = '';
+      if (!r.ok) { say(loginStatus, r.message, true); return; }
+      say(loginStatus, ''); passI.value = '';
       afterLogin(email);
-    }, function (err) { loginBtn.disabled = false; loginStatus.textContent = _t('Erreur : ') + errMsg(err); });
+    }, function (err) { loginBtn.disabled = false; say(loginStatus, _t('Erreur : ') + errMsg(err), true); });
+  });
+
+  window.CA.codeInput(codeI, codeForm);
+  codeForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = codeI.value.replace(/\D/g, '');
+    if (codeBtn.disabled) return;
+    if (code.length !== 6) { say(codeStatus, _t('Le code a 6 chiffres.'), true); return; }
+    codeBtn.disabled = true; say(codeStatus, _t('Vérification…'));
+    codeFn({ action: 'verify', email: codeEmail, code: code }).then(function (b) {
+      if (b.session) {
+        return sb.auth.setSession(b.session).then(function (res) {
+          codeBtn.disabled = false;
+          if (res.error) { say(codeStatus, _t('Service indisponible. Réessaie plus tard.'), true); return; }
+          say(codeStatus, ''); clearTimeout(resendTimer);
+          afterLogin(codeEmail);
+        });
+      }
+      codeBtn.disabled = false;
+      if (b.error === 'invalid') { say(codeStatus, _t('Code incorrect · ') + plural(b.left, 'essai restant', 'essais restants') + '.', true); codeI.select(); return; }
+      if (b.error === 'expired') { say(codeStatus, _t('Ce code n\'est plus valable. Demande un nouveau code.'), true); return; }
+      if (b.error === 'revoked') { say(codeStatus, _t('Accès retiré. Écris-nous à ') + 'contact@creationaudio.ca.', true); return; }
+      say(codeStatus, _t('Service indisponible. Réessaie plus tard.'), true);
+    }, function () { codeBtn.disabled = false; say(codeStatus, _t('Erreur réseau — réessaie.'), true); });
+  });
+  resendBtn.addEventListener('click', function () { if (codeEmail && !resendBtn.disabled) sendCode(codeEmail, true); });
+  $('#dl-code-back').addEventListener('click', function () {
+    clearTimeout(resendTimer); say(loginStatus, ''); show('login'); emailI.focus(); emailI.select();
   });
 
   window.CA.codeInput(mfaCode, mfaForm);
@@ -138,7 +241,7 @@
     }, function (err) { mfaBtn.disabled = false; mfaStatus.textContent = _t('Erreur : ') + errMsg(err); });
   });
 
-  function doLogout() { sb.auth.signOut().then(function () { passI.value = ''; closeCart(); if (window.caLook) window.caLook.clear('d'); show('login'); }); }
+  function doLogout() { sb.auth.signOut().then(function () { passI.value = ''; syncAdmin(); closeCart(); if (window.caLook) window.caLook.clear('d'); show('login'); }); }
 
   /* ---------- apparence (onglet #/apparence, assets/look.js) ---------- */
   // le choix est gardé dans le compte (user_metadata.look) : on le relit à chaque connexion

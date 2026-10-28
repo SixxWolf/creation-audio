@@ -234,6 +234,7 @@
   'use strict';
   var CA = window.CA = window.CA || {};
   var FETES_V = 2, KEY = 'ca-fetes', PREV = 'ca-fetes-voir', root = document.documentElement;
+  if (root.hasAttribute('data-fetes-off')) return;   // page à ambiance propre (revendeur.html) : jamais de thème des fêtes
   var q = /[?&]fetes=([01])/.exec(location.search), preview = q ? q[1] : null;
   try {
     if (q) sessionStorage.setItem(PREV, q[1]);
