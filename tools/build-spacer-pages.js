@@ -63,7 +63,8 @@ async function fetchSpacers(c) {
 /* ---------- rendu : on exécute spacer-catalog.js tel quel ---------- */
 function loadCatalog(lang) {
   // CA.loadMsg présent comme sur le site (nav.js) : les « Écris-nous » pré-rendus ouvrent la Messagerie
-  const ctx = { window: { CA: { loadMsg: function () {} }, CA_LANG: lang }, console };
+  const ctx = { window: { CA: { loadMsg: function () {} }, CA_LANG: lang }, console,
+    document: { addEventListener() {}, removeEventListener() {} } };  // le catalogue branche des écouteurs globaux à la création
   vm.createContext(ctx);
   // anglais : CA.t / CA.money / CA.tr comme sur les pages /en/ (le français garde les replis du catalogue)
   if (lang === 'en') ['assets/i18n.js', 'assets/i18n-en.js'].forEach((f) => vm.runInContext(read(f), ctx, { filename: f }));
