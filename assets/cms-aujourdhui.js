@@ -74,7 +74,7 @@
         .eq('status', 'open').order('updated_at', { ascending: false }).limit(5); }),
       q(function () { return sb.from('dealer_orders').select('id,number,dealer_name,dealer_email,status,total,created_at')
         .in('status', ['new', 'preparing', 'ready']).order('created_at', { ascending: false }); }),
-      q(function () { return sb.from('customer_orders').select('id,number,name,email,status,total,created_at')
+      q(function () { return sb.from('customer_orders').select('id,number,name,email,status,total,created_at,pickup_date')
         .in('status', ['new', 'preparing', 'ready']).order('created_at', { ascending: false }); }),
       q(function () { return sb.from('customer_reservations').select('id,number,name,email,status,total,expires_at,created_at')
         .eq('status', 'active').order('expires_at', { ascending: true }); }),
@@ -107,11 +107,14 @@
     var dNew = newOf(d.dealer), cNew = newOf(d.client);
     var soon = d.resv.filter(function (x) { return Date.parse(x.expires_at) - Date.now() < 86400000; }).length;
     var st = d.stock, miss = st && st.miss;
+    // cueillette passée depuis plus de 2 jours et commande jamais ramassée : le stock reste bloqué
+    var lim = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
+    var late = d.client.filter(function (o) { return o.status !== 'new' && o.pickup_date && o.pickup_date < lim; }).length;
 
     tilesEl.innerHTML =
       tile('#messages', d.err[0] ? '—' : d.unread, 'Messages non lus', '', d.unread > 0) +
       tile('#commandes', d.err[2] ? '—' : dNew, 'Commandes dealers', d.dealer.length - dNew ? '+ ' + (d.dealer.length - dNew) + ' en cours' : '', dNew > 0) +
-      tile('#commandes/clients', d.err[3] ? '—' : cNew, 'Commandes clients', d.client.length - cNew ? '+ ' + (d.client.length - cNew) + ' en cours' : '', cNew > 0) +
+      tile('#commandes/clients', d.err[3] ? '—' : cNew, 'Commandes clients', late ? plural(late, 'cueillette dépassée', 'cueillettes dépassées') : d.client.length - cNew ? '+ ' + (d.client.length - cNew) + ' en cours' : '', cNew > 0 || late > 0) +
       tile('#commandes/reservations', d.err[4] ? '—' : d.resv.length, 'Réservations', soon ? plural(soon, 'expire', 'expirent') + ' < 24 h' : '', soon > 0) +
       tile('#inventaire/commander', miss ? miss.units : '—', 'À commander', miss && miss.lines ? plural(miss.lines, 'ligne', 'lignes') : '', !!(miss && miss.units)) +
       tile('#inventaire/reception', st ? st.routeOrders : '—', 'En route', st && st.routeLeft ? plural(st.routeLeft, 'article attendu', 'articles attendus') : '', false) +

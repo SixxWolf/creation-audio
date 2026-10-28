@@ -117,6 +117,18 @@ Deno.serve(async (req) => {
   const from = Deno.env.get("MAIL_FROM") || "Création Audio <avis@creationaudio.ca>";
   let adminTo = Deno.env.get("ORDER_NOTIFY_TO") || "contact@creationaudio.ca";
 
+  // 0) tick pg_cron (reservations_tick, aux 10 min) : rappel « choisis ta cueillette » et avis d'annulation automatique
+  if (req.headers.get("x-cron-key")) {
+    const body = await req.clone().json().catch(() => ({}));
+    if (body?.cron === true) {
+      const db0 = createClient(url, service);
+      const { data: ok } = await db0.rpc("reservation_cron_ok", { p_key: req.headers.get("x-cron-key") || "" });
+      if (ok !== true) return json({ error: "Clé invalide." }, 401);
+      if (!resendKey) return json({ error: "Envoi non configuré : secret RESEND_API_KEY manquant." }, 503);
+      return json({ result: "done", ...(await runCron(db0, resendKey, from)) });
+    }
+  }
+
   // 1) qui appelle ?
   const authHeader = req.headers.get("Authorization") || "";
   const userClient = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
@@ -178,7 +190,7 @@ Deno.serve(async (req) => {
     const printBo = toOrder.some((l) => l.ptype === "spacer");
     const status = !toOrder.length
       ? (pkC ? T("Tout est en stock : on t'attend " + pkC + ".", "Everything is in stock: see you " + pkC + ".")
-             : T("Tout est en stock : choisis ta plage de cueillette dans ton compte.", "Everything is in stock: choose your pickup time slot in your account."))
+             : T("Tout est en stock et gardé pour toi : choisis ton jour et ton heure de cueillette dans ton compte dans les 24 h, sinon la commande sera annulée.", "Everything is in stock and held for you: choose your pickup day and time in your account within 24 hours, or the order will be cancelled."))
       : [supplierBo
         ? T("Certains articles ne sont pas en stock : on les commande chez notre fournisseur. Prévois un délai de " + BO_DELAY +
             " avant la cueillette ; on t'écrit dès leur arrivée pour que tu choisisses ta plage de cueillette.",
@@ -201,8 +213,8 @@ Deno.serve(async (req) => {
       "\n\n" + T("Total estimé : ", "Estimated total: ") + m(order.total) + "\n" +
       pickupLine + "\n" +
       (order.note ? "\n" + T("Ta note : ", "Your note: ") + order.note + "\n" : "") +
-      "\n" + T("Tu peux suivre, modifier ou annuler ta commande (tant qu'on ne l'a pas commencée) dans ton compte : ",
-               "You can track, edit or cancel your order (until we start on it) in your account: ") + link + "\n\n" +
+      "\n" + T("Tu peux suivre, modifier ou annuler ta commande (tant qu'elle n'est pas confirmée) dans ton compte : ",
+               "You can track, edit or cancel your order (until it is confirmed) in your account: ") + link + "\n\n" +
       "Création Audio\n" + site + "/";
     const rowsHtml = L.map((l) => {
       const bo = Number(l.qty_to_order) || 0;
@@ -231,8 +243,8 @@ Deno.serve(async (req) => {
       '<p style="margin:22px 0"><a href="' + link + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
         (toOrder.length || pkC ? T("Suivre ma commande", "Track my order") : T("Choisir ma plage de cueillette", "Choose my pickup time slot")) + '</a></p>' +
       '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-      '<p style="font-size:12px;color:#6C727C">' + T("Tu peux modifier ou annuler ta commande dans ton compte tant qu'on ne l'a pas commencée. Une question&nbsp;? Réponds simplement à ce courriel.",
-        "You can edit or cancel your order in your account until we start on it. A question? Just reply to this email.") + '</p>' +
+      '<p style="font-size:12px;color:#6C727C">' + T("Tu peux modifier ou annuler ta commande dans ton compte tant qu'elle n'est pas confirmée. Une question&nbsp;? Réponds simplement à ce courriel.",
+        "You can edit or cancel your order in your account until it is confirmed. A question? Just reply to this email.") + '</p>' +
       "</div>";
     try {
       await send(resendKey, from, { to: [order.email], reply_to: REPLY_TO, subject, html, text });
@@ -360,4 +372,45 @@ async function notifyReady(db: any, order: any, resendKey: string | undefined, f
   } catch (e) { return json({ error: String((e as Error).message || e) }, 502); }
   await db.from("customer_orders").update({ ready_notified_at: new Date().toISOString() }).eq("id", order.id);
   return json({ result: "done", sent: true });
+}
+
+// ---- tick : commandes sans cueillette choisie (24 h) ----
+// rappel ~6 h avant l'échéance (pickup_reminded_at) ; avis d'annulation automatique (auto_mailed_at)
+// deno-lint-ignore no-explicit-any
+async function runCron(db: any, resendKey: string, from: string) {
+  const iso = new Date().toISOString();
+  const out = { reminded: 0, cancelled: 0 };
+  const mail = async (o: { email: string; number: string; name: string; id: string; customer_id: string | null; pickup_due: string | null }, cancelled: boolean) => {
+    const en = await clientEn(db, o.customer_id);
+    const T = (fr: string, e: string) => (en ? e : fr);
+    const first = String(o.name || "").trim().split(/\s+/)[0] || "";
+    const url = SITE + (en ? "/en" : "") + "/compte.html#/cueillette/c/" + o.id;
+    const head = cancelled
+      ? T("Commande " + o.number + " annulée", "Order " + o.number + " cancelled")
+      : T("Choisis ta cueillette — commande " + o.number, "Choose your pickup — order " + o.number);
+    const msg = cancelled
+      ? T("Sans jour ni heure de cueillette choisis dans les 24 h, ta commande a été annulée et le stock est remis en vente. Tu peux recommander quand tu veux.",
+          "Since no pickup day and time was chosen within 24 hours, your order was cancelled and the stock is back on sale. You can reorder any time.")
+      : T("Ton stock est gardé, mais il nous faut un jour et une heure de cueillette. Sans ça, ta commande sera annulée bientôt.",
+          "Your stock is on hold, but we need a pickup day and time. Without it, your order will be cancelled soon.");
+    const label = cancelled ? T("Voir mes commandes", "See my orders") : T("Choisir ma cueillette", "Choose my pickup");
+    const link = cancelled ? SITE + (en ? "/en" : "") + "/compte.html#/commandes" : url;
+    const html =
+      '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
+      '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
+      '<h1 style="font-size:22px;margin:0 0 10px">' + esc(head) + '</h1>' +
+      '<p style="margin:0 0 14px">' + T("Bonjour ", "Hello ") + esc(first) + ',</p><p style="margin:0 0 16px">' + esc(msg) + '</p>' +
+      '<p style="margin:22px 0"><a href="' + link + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' + esc(label) + '</a></p></div>';
+    const text = T("Bonjour ", "Hello ") + first + ",\n\n" + msg + "\n\n" + link + "\n\nCréation Audio\n" + SITE + (en ? "/en/" : "/");
+    await send(resendKey, from, { to: [o.email], reply_to: REPLY_TO, subject: head + " — Création Audio", html, text });
+  };
+  const soon = new Date(Date.now() + 6 * 3600 * 1000).toISOString();
+  const { data: rem } = await db.from("customer_orders").update({ pickup_reminded_at: iso })
+    .eq("status", "new").is("pickup_date", null).is("pickup_reminded_at", null).not("pickup_due", "is", null).lte("pickup_due", soon).gt("pickup_due", iso).select("*");
+  for (const o of rem || []) { try { await mail(o, false); out.reminded++; } catch { /* réessayé jamais : marqué */ } }
+  const twoDays = new Date(Date.now() - 2 * 86400 * 1000).toISOString();
+  const { data: can } = await db.from("customer_orders").update({ auto_mailed_at: iso })
+    .eq("status", "cancelled").eq("cancelled_by", "auto").is("auto_mailed_at", null).gt("updated_at", twoDays).select("*");
+  for (const o of can || []) { try { await mail(o, true); out.cancelled++; } catch { /* idem */ } }
+  return out;
 }

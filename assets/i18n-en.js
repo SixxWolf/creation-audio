@@ -533,6 +533,7 @@ window.CA_EN = (function (pairs) {
   [`délai à confirmer`, `lead time to be confirmed`],
   [`Remplacer ton panier ?`, `Replace your cart?`],
   [`Ton panier actuel sera remplacé par la commande `, `Your current cart will be replaced by order `],
+  [`à choisir avant `, `to choose before `],
   [`à choisir quand tout sera arrivé`, `to choose once everything has arrived`],
   [`à choisir`, `to choose`],
   [`"><span>Cueillette</span><b>`, `"><span>Pickup</span><b>`],

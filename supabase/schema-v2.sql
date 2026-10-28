@@ -201,7 +201,7 @@ begin
           join public.customer_reservations r on r.id = l.reservation_id
          where r.status = 'active' and r.expires_at > now() and l.product_id is not null
         union all
-        select l.product_id, l.kind, l.qty
+        select l.product_id, l.kind, greatest(l.qty - l.qty_to_order, 0)   -- la partie « à commander » n'est pas en stock : rien à garder
           from public.customer_order_lines l
           join public.customer_orders o on o.id = l.order_id
          where o.stock_hold and o.status in ('new', 'preparing', 'ready') and l.product_id is not null
@@ -1716,7 +1716,11 @@ alter table public.customer_orders add column if not exists pickup_notified_at t
 alter table public.customer_orders add column if not exists pickup_req         jsonb;   -- demande d'exception (voir CUEILLETTE)
 alter table public.customer_orders add column if not exists pickup_confirmed_at timestamptz;   -- cueillette confirmée par l'admin (remise à null si la plage change)
 alter table public.customer_orders add column if not exists ready_notified_at  timestamptz;   -- courriel « commande prête » (EF customer-order-notify, event ready)
-alter table public.customer_orders add column if not exists stock_hold boolean not null default false;   -- stock retiré du site en attendant le paiement (voir _held_stock)
+alter table public.customer_orders add column if not exists stock_hold boolean not null default false;   -- stock retiré du site en attendant le paiement (voir _held_stock) ; mis à vrai à l'envoi
+alter table public.customer_orders add column if not exists pickup_due timestamptz;          -- cueillette à choisir avant : sinon annulée par reservations_tick (null = pas d'échéance : articles à commander)
+alter table public.customer_orders add column if not exists pickup_reminded_at timestamptz;  -- rappel « choisis ta cueillette » envoyé
+alter table public.customer_orders add column if not exists auto_mailed_at timestamptz;      -- courriel d'annulation automatique envoyé
+update public.customer_orders set status = 'new' where status = 'preparing';   -- « En préparation » n'existe plus côté clients en ligne
 create index if not exists customer_orders_customer_idx on public.customer_orders (customer_id, created_at desc);
 create index if not exists customer_orders_status_idx on public.customer_orders (status);
 create table if not exists public.customer_order_lines (
@@ -1836,10 +1840,12 @@ begin
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
   if not v_bo then v_pk := public._pickup_check(p_pickup, null, null, false); end if;
   v_num := 'C-' || lpad(nextval('public.customer_order_seq')::text, 4, '0');
+  -- stock en attente dès l'envoi ; cueillette à choisir dans les 24 h (sauf articles à commander)
   insert into public.customer_orders (number, customer_id, email, name, phone, note, total, has_backorder,
-                                      pickup_date, pickup_start, pickup_end)
+                                      pickup_date, pickup_start, pickup_end, stock_hold, pickup_due)
   values (v_num, v_uid, c.email, c.name, c.phone, nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_bo,
-          (v_pk ->> 'd')::date, (v_pk ->> 's')::time, (v_pk ->> 'e')::time)
+          (v_pk ->> 'd')::date, (v_pk ->> 's')::time, (v_pk ->> 'e')::time, true,
+          case when not v_bo and v_pk is null then now() + interval '24 hours' end)
   returning id into v_id;
   insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
   select v_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
@@ -1857,7 +1863,8 @@ begin
   if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
   select * into o from public.customer_orders where id = p_id and customer_id = v_uid for update;
   if not found then raise exception 'Commande introuvable.'; end if;
-  if o.status <> 'new' then raise exception 'Cette commande est déjà en préparation : écris-nous pour la changer.'; end if;
+  if o.status <> 'new' then raise exception 'Cette commande est déjà confirmée : écris-nous pour la changer.'; end if;
+  update public.customer_orders set stock_hold = false where id = p_id;   -- sa propre réserve ne doit pas compter contre elle
   v_lines := public._customer_fill_lines(p_lines);
   select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
@@ -1872,6 +1879,9 @@ begin
          pickup_date  = case when v_pk is not null then (v_pk ->> 'd')::date else pickup_date end,
          pickup_start = case when v_pk is not null then (v_pk ->> 's')::time else pickup_start end,
          pickup_end   = case when v_pk is not null then (v_pk ->> 'e')::time else pickup_end end,
+         stock_hold = true,
+         pickup_due = case when v_bo then null
+                           else coalesce(pickup_due, case when pickup_date is null and v_pk is null then now() + interval '24 hours' end) end,
          edited_at = now(), updated_at = now()
    where id = p_id;
   return jsonb_build_object('id', p_id, 'number', o.number, 'total', v_total, 'has_backorder', v_bo);
@@ -1885,7 +1895,7 @@ begin
   if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
   select * into o from public.customer_orders where id = p_id and customer_id = v_uid for update;
   if not found then raise exception 'Commande introuvable.'; end if;
-  if o.status <> 'new' then raise exception 'Cette commande est déjà en préparation : écris-nous pour l''annuler.'; end if;
+  if o.status <> 'new' then raise exception 'Cette commande est déjà confirmée : écris-nous pour l''annuler.'; end if;
   update public.customer_orders set status = 'cancelled', cancelled_by = 'client', updated_at = now() where id = p_id;
   return jsonb_build_object('id', p_id, 'number', o.number);
 end $$;
@@ -1897,7 +1907,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
       'id', o.id, 'number', o.number, 'status', o.status, 'created_at', o.created_at, 'edited_at', o.edited_at,
       'note', o.note, 'total', o.total, 'has_backorder', o.has_backorder, 'cancelled_by', o.cancelled_by,
       'pickup_date', o.pickup_date, 'pickup_start', to_char(o.pickup_start, 'HH24:MI'), 'pickup_end', to_char(o.pickup_end, 'HH24:MI'),
-      'pickup_req', o.pickup_req,
+      'pickup_req', o.pickup_req, 'pickup_due', o.pickup_due,
       'pickup_confirmed', o.pickup_confirmed_at is not null,
       'pickup_address', case when o.pickup_confirmed_at is not null then (select s.value ->> 'address' from public.admin_settings s where s.key = 'cueillette') end,
       'invoice_number', (select i.number from public.invoices i where i.id = o.invoice_id),
@@ -1953,6 +1963,7 @@ begin
   select * into o from public.customer_orders where id = p_id for update;
   if not found then raise exception 'Commande introuvable.'; end if;
   if o.status not in ('new', 'preparing', 'ready') then raise exception 'Commande facturée ou annulée : plus modifiable.'; end if;
+  update public.customer_orders set stock_hold = false where id = p_id;   -- sa propre réserve ne doit pas compter contre elle
   v_lines := public._customer_fill_lines(p_lines);
   select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
@@ -1961,7 +1972,7 @@ begin
   select p_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
          (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int
     from jsonb_array_elements(v_lines) x;
-  update public.customer_orders set total = v_total, has_backorder = v_bo, updated_at = now() where id = p_id;
+  update public.customer_orders set total = v_total, has_backorder = v_bo, stock_hold = (o.stock_hold or o.status = 'new'), updated_at = now() where id = p_id;
   return jsonb_build_object('id', p_id, 'number', o.number, 'total', v_total, 'has_backorder', v_bo);
 end $$;
 revoke all on function public.admin_update_customer_order(uuid, jsonb) from public, anon;
@@ -2276,6 +2287,21 @@ begin
     if r.customer_id is not null then perform public._reservation_penalize(r.customer_id); end if;
     n := n + 1;
   end loop;
+  -- commandes en ligne sans cueillette choisie dans les 24 h : annulées (stock libéré), client prévenu par courriel
+  update public.customer_orders
+     set status = 'cancelled', cancelled_by = 'auto', updated_at = now()
+   where status = 'new' and not has_backorder and pickup_date is null and pickup_due is not null and pickup_due <= now();
+  if exists (select 1 from public.customer_orders
+              where (status = 'new' and pickup_date is null and pickup_due is not null and pickup_reminded_at is null
+                     and pickup_due <= now() + interval '6 hours')
+                 or (status = 'cancelled' and cancelled_by = 'auto' and auto_mailed_at is null and updated_at > now() - interval '2 days')) then
+    perform net.http_post(
+      url := 'https://cqfmvdknppscazfynoiy.supabase.co/functions/v1/customer-order-notify',
+      body := '{"cron":true}'::jsonb,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                   'x-cron-key', (select value from private.secrets where key = 'cron_key')),
+      timeout_milliseconds := 20000);
+  end if;
   if exists (select 1 from public.customer_reservations
               where (status = 'active' and reminded_at is null and expires_at <= now() + interval '12 hours'
                      and created_at <= now() - interval '1 hour')
@@ -2534,6 +2560,29 @@ begin
   get diagnostics n = row_count;
   if n = 0 then raise exception 'Aucune cueillette à confirmer.'; end if;
 end $$;
+-- Bouton unique « Confirmer la cueillette » (carte d'une commande en ligne) : Nouvelle -> Prête, cueillette confirmée,
+-- stock gardé. Article à commander : « Articles reçus, prête » (le tout passe en stock, le client choisit sa cueillette ensuite).
+-- -> { event: 'confirmed' | 'ready' } : l'admin envoie alors le courriel correspondant (un seul par commande).
+create or replace function public.admin_confirm_order(p_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare o public.customer_orders;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into o from public.customer_orders where id = p_id for update;
+  if not found or o.status <> 'new' then raise exception 'Commande introuvable ou déjà confirmée.'; end if;
+  if o.has_backorder then
+    update public.customer_order_lines set qty_to_order = 0 where order_id = p_id;
+    update public.customer_orders set status = 'ready', has_backorder = false, stock_hold = true, pickup_due = null, updated_at = now() where id = p_id;
+    return jsonb_build_object('event', 'ready');
+  end if;
+  if o.pickup_date is null then raise exception 'Le client n''a pas encore choisi sa cueillette.'; end if;
+  update public.customer_orders
+     set status = 'ready', stock_hold = true, pickup_due = null, pickup_confirmed_at = now(), ready_notified_at = now(), updated_at = now()
+   where id = p_id;
+  return jsonb_build_object('event', 'confirmed');
+end $$;
+revoke all on function public.admin_confirm_order(uuid) from public, anon;
+grant execute on function public.admin_confirm_order(uuid) to authenticated;
 revoke all on function public.admin_confirm_pickup(text, uuid) from public, anon;
 grant execute on function public.admin_confirm_pickup(text, uuid) to authenticated;
 revoke all on function public.admin_set_pickup(text, uuid, date, time) from public, anon;

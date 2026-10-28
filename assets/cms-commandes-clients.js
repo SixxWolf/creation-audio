@@ -7,8 +7,9 @@
    - Pastille de la barre latérale = nouvelles commandes dealer + client
      (CA.paintOrdersBadge, CA.ordersCount — cms-commandes.js y écrit les dealers).
    - Par commande : lignes, stock actuel, « à commander » (qté − stock), note, statut.
-   - Statuts new → preparing → ready → invoiced (+ cancelled) ; dès « En préparation »
-     le client ne peut plus modifier ni annuler dans Mon compte.
+   - Statuts new → ready → invoiced (+ cancelled) ; « Prête » = confirmée : le client ne peut plus
+     modifier ni annuler dans Mon compte. Stock en attente dès l'envoi ; sans cueillette en 24 h :
+     annulée par le tick. Bouton unique « Confirmer la cueillette » (RPC admin_confirm_order).
    - « Facturer » : CA.invoiceFromOrder({…, kind:'client'}) ; à l'enregistrement,
      RPC admin_invoice_customer_order (Facturée + compte relié à sa fiche).
    ========================================================= */
@@ -61,6 +62,7 @@
     var ok = x && x.pickup_confirmed_at;
     return (t ? '<p class="co-pk"><b>Cueillette :</b> ' + esc(t) +
       (ok ? ' <span class="co-status is-ready">Confirmée</span>'
+          : x.status === 'new' ? ''   // commande en ligne Nouvelle : le bouton principal de la carte confirme tout
           : ' <button type="button" class="btn btn-accent btn-sm" data-pkok data-ic="check">Confirmer</button>') + '</p>' : '') + req;
   };
   // bouton « Confirmer » : marque la cueillette confirmée et envoie le courriel (avec l'adresse) au client
@@ -287,13 +289,17 @@
   function actionsFor(o) {
     var b = function (act, label, cls) {
       return '<button type="button" class="btn ' + (cls || 'btn-ghost') + ' btn-sm" data-act="' + act + '"' +
-        (act === 'invoice' ? ' data-ic="receipt"' : act === 'edit' ? ' data-ic="edit"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
+        (act === 'invoice' ? ' data-ic="receipt"' : act === 'confirm' ? ' data-ic="check"' : act === 'edit' ? ' data-ic="edit"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
     };
     var hold = OPEN[o.status] ? b(o.stock_hold ? 'unhold' : 'hold', o.stock_hold ? 'Libérer le stock' : 'Mettre en attente') + b('edit', 'Modifier') + b('pickup', 'Cueillette') : '';
     switch (o.status) {
-      case 'new': return b('preparing', 'Commencer la préparation', 'btn-accent') + hold + b('invoice', 'Facturer') + b('cancel', 'Annuler', 'btn-ghost co-danger');
-      case 'preparing': return b('ready', 'Marquer prête', 'btn-accent') + hold + b('invoice', 'Facturer') + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
-      case 'ready': return b('invoice', 'Facturer', 'btn-accent') + hold + b('preparing', '↩ En préparation') + b('cancel', 'Annuler', 'btn-ghost co-danger');
+      case 'new': case 'preparing': {
+        var go = o.has_backorder ? b('confirm', 'Articles reçus, prête', 'btn-accent')
+          : o.pickup_date ? b('confirm', 'Confirmer la cueillette', 'btn-accent')
+          : '<button type="button" class="btn btn-accent btn-sm" data-act="confirm" data-ic="check" disabled>Confirmer la cueillette</button>';
+        return go + hold + b('invoice', 'Facturer') + b('cancel', 'Annuler', 'btn-ghost co-danger');
+      }
+      case 'ready': return b('invoice', 'Facturer', 'btn-accent') + hold + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'invoiced': return o.invoice_id ? b('see-invoice', 'Voir la facture') : '';
       case 'cancelled': return b('new', 'Rouvrir') + b('delete', 'Supprimer', 'btn-ghost co-danger');
     }
@@ -333,7 +339,8 @@
           '<div class="co-id"><b>' + esc(o.number) + '</b><span class="co-status is-' + esc(o.status) + '">' + esc(STATUS[o.status] || o.status) + '</span>' +
             (o.edited_at && OPEN[o.status] ? '<span class="co-edited">modifiée par le client ' + esc(ago(o.edited_at)) + '</span>' : '') +
             (o.stock_hold && OPEN[o.status] ? '<span class="co-status is-preparing">Stock en attente</span>' : '') +
-            (o.status === 'cancelled' ? '<span class="co-edited">' + (o.cancelled_by === 'client' ? 'par le client' : 'par toi') + '</span>' : '') +
+            (o.status === 'cancelled' ? '<span class="co-edited">' + (o.cancelled_by === 'client' ? 'par le client' : o.cancelled_by === 'auto' ? 'automatique : pas de cueillette' : 'par toi') + '</span>' : '') +
+            (o.status === 'new' && !o.pickup_date && !o.has_backorder && o.pickup_due ? '<span class="co-edited">annulée ' + esc(dueIn(o.pickup_due)) + ' sans cueillette</span>' : '') +
           '</div>' +
           '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') +
             '<span><b>' + esc(who) + '</b><small>' + CA.pv(o.email) + (o.phone ? ' · ' + CA.pv(o.phone) : '') + ' · ' + esc(ago(o.created_at)) + '</small></span></div>' +
@@ -480,8 +487,16 @@
     });
   }
 
+  // « dans 5 h » / « dans 40 min » avant l'annulation automatique
+  function dueIn(t) {
+    var m = Math.round((new Date(t).getTime() - Date.now()) / 60000);
+    if (m <= 0) return 'bientôt';
+    return 'dans ' + (m < 90 ? m + ' min' : Math.round(m / 60) + ' h');
+  }
+
   /* ---- actions ---- */
   function act(o, what, btn) {
+    if (what === 'confirm') { confirmOrder(o, btn); return; }
     if (what === 'pickup') { CA.editPickup(o, 'order', load, btn.closest('.co-card')); return; }
     if (what === 'invoice') {
       if (!CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
@@ -515,6 +530,22 @@
     }
     if (what === 'hold' || what === 'unhold') { setHold(o, what === 'hold', btn); return; }
     setStatus(o, what, btn);
+  }
+  // bouton unique : Prête + cueillette confirmée + courriel (confirmation avec adresse, ou « articles arrivés »)
+  function confirmOrder(o, btn) {
+    btn.disabled = true;
+    sb.rpc('admin_confirm_order', { p_id: o.id }).then(function (res) {
+      if (res.error) throw res.error;
+      var ev = res.data && res.data.event === 'ready' ? 'ready' : 'confirmed';
+      var fail = function () { caDialog.toast('Confirmée, mais courriel non envoyé.', 'bad'); };
+      var call = ev === 'ready'
+        ? sb.functions.invoke('customer-order-notify', { body: { order_id: o.id, event: 'ready' } })
+        : sb.functions.invoke('pickup-request-notify', { body: { kind: 'order', id: o.id, event: 'confirmed' } });
+      call.then(function (r) {
+        if (r && r.error) fail(); else caDialog.toast(ev === 'ready' ? 'Prête — client prévenu.' : 'Cueillette confirmée — client prévenu.');
+      }, fail);
+      load();
+    }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
   }
   // stock retiré du site (ou remis) en attendant le paiement : customer_orders.stock_hold -> _held_stock
   function setHold(o, on, btn) {

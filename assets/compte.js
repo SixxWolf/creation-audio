@@ -337,7 +337,7 @@
         '<div class="ord-body">' +
           '<ul class="ord-lines">' + lines + '</ul>' +
           _t('<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>') + money(o.total) + '</span></div></div>' +
-          (open ? pkRow(o.pickup_date ? o : null, !o.has_backorder || o.status === 'ready', o.has_backorder && o.status !== 'ready') : '') +
+          (open ? pkRow(o.pickup_date ? o : null, !o.has_backorder || o.status === 'ready', o.has_backorder && o.status !== 'ready', o.status === 'new' && !o.pickup_date ? o.pickup_due : null) : '') +
           (o.note ? _t('<p class="ord-note"><span>Note</span>') + esc(o.note) + '</p>' : '') +
           (o.status === 'new' ? _t('<div class="ord-acts"><button class="acct-btn ord-edit" type="button">Modifier</button>') +
             _t('<button class="acct-btn acct-btn-danger ord-cancel" type="button">Annuler la commande</button></div>') : '') +
@@ -389,10 +389,10 @@
   /* ---- cueillette : date + plage (commande ouverte, réservation gardée) — CA.custOrder (commande-client.js) ---- */
   var hasSlots = false;
   // x : commande/réservation avec sa plage (sinon null) ; can : modifiable ; later : articles encore à commander
-  function pkRow(x, can, later) {
+  function pkRow(x, can, later, due) {
     var CO = window.CA.custOrder;
     if (!CO || (!x && !hasSlots)) return '';
-    var txt = x ? CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end) : later ? _t('à choisir quand tout sera arrivé') : _t('à choisir');
+    var txt = x ? CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end) : later ? _t('à choisir quand tout sera arrivé') : due ? _t('à choisir avant ') + new Date(due).toLocaleString(CA.locale, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : _t('à choisir');
     return '<p class="ord-note ord-pk' + (x ? '' : ' is-todo') + _t('"><span>Cueillette</span><b>') + esc(txt) + '</b>' +
       (x ? '<span class="pk-st' + (x.pickup_confirmed ? ' is-ok' : '') + '">' + (x.pickup_confirmed ? _t('Confirmée') : _t('À confirmer')) + '</span>' : '') +
       (can && hasSlots ? '<button class="pk-change" type="button">' + (x ? _t('Changer') : _t('Choisir')) + '</button>' : '') + '</p>';
