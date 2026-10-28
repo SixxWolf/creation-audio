@@ -489,21 +489,58 @@
     ordersN.textContent = active; ordersN.hidden = !active;
     ordersFlash.innerHTML = flash ? '<div class="dl-flash">' + esc(flash.text) + '</div>' : '';
     if (!orders.length) {
-      ordersList.innerHTML = _t('<p class="empty">Aucune commande pour l\'instant.<br><a href="#/">Parcourir le catalogue</a></p>');
+      ordersList.innerHTML = '<div class="dl-empty">' +
+        '<span class="dl-empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg></span>' +
+        '<h2>' + _t('Aucune commande') + '</h2>' +
+        '<p>' + _t('Tes commandes s\'afficheront ici.') + '</p>' +
+        '<a class="dl-btn is-primary" href="#/">' + _t('Voir le catalogue') + ' →</a></div>';
       return;
     }
-    ordersList.innerHTML = orders.map(function (o) {
-      var st = o.status === 'invoiced' && o.paid_at ? { label: _t('Payée'), hint: '' } : (STATUS[o.status] || { label: o.status, hint: '' });
+    var live = orders.filter(function (o) { return STEPS.indexOf(o.status) > -1 && o.status !== 'invoiced'; }),
+        past = orders.filter(function (o) { return live.indexOf(o) < 0; });
+    ordersList.innerHTML =
+      (live.length ? '<h2 class="dl-sec">' + _t('En cours') + ' <span>' + live.length + '</span></h2>' +
+        '<div class="dl-orders-grp">' + live.map(function (o) { return orderHtml(o, false); }).join('') + '</div>' : '') +
+      (past.length ? '<h2 class="dl-sec">' + _t('Historique') + '</h2>' +
+        '<div class="dl-orders-grp is-past">' + past.map(function (o) { return orderHtml(o, true); }).join('') + '</div>' : '');
+    $$('.dl-order', ordersList).forEach(function (el) {
+      var o = orders.filter(function (x) { return x.id === el.getAttribute('data-id'); })[0];
+      var ed = $('.js-edit', el), ca = $('.js-cancel', el);
+      if (ed) ed.addEventListener('click', function () { editOrder(o); });
+      if (ca) ca.addEventListener('click', function () { cancelOrder(o, ca); });
+      $$('.js-doc', el).forEach(function (b) {
+        b.addEventListener('click', function () { printDoc(o, b); });
+      });
+    });
+  }
+  // suivi Envoyée → Préparation → Prête → Facturée (étape actuelle allumée)
+  var STEPS = ['new', 'preparing', 'ready', 'invoiced'];
+  function stepsHtml(status) {
+    var at = STEPS.indexOf(status),
+        names = [_t('Envoyée'), _t('Préparation'), _t('Prête'), _t('Facturée')];
+    return '<ol class="dl-steps">' + names.map(function (n, i) {
+      return '<li class="' + (i < at ? 'is-done' : i === at ? 'is-on' : '') + '"' + (i === at ? ' aria-current="step"' : '') + '>' + n + '</li>';
+    }).join('') + '</ol>';
+  }
+  // carte d'une commande ; past = ligne compacte dépliable (Historique)
+  function orderHtml(o, past) {
+      var st = o.status === 'invoiced' && o.paid_at ? { label: _t('Payée') } : (STATUS[o.status] || { label: o.status });
       var lines = (o.dealer_order_lines || []).slice().sort(function (a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
       var pairs = lines.reduce(function (s, l) { return s + (l.qty | 0); }, 0);
       var isNew = o.status === 'new';
-      return '<article class="dl-order is-' + esc(o.status) + (flash && flash.id === o.id ? ' is-flash' : '') + '" data-id="' + esc(o.id) + '">' +
-        '<header class="dl-order-head">' +
-          '<div class="dl-order-id"><b>' + esc(o.number) + '</b><span>' + esc(fmtDate(o.created_at)) +
-            (o.created_by === 'admin' ? _t(' · ajoutée par Création Audio') : '') + (o.edited_at ? _t(' · modifiée') : '') + '</span></div>' +
-          '<span class="dl-status is-' + (st.label === _t('Payée') ? 'paid' : esc(o.status)) + '">' + esc(st.label) + '</span>' +
-        '</header>' +
-        (st.hint ? '<p class="dl-order-hint">' + esc(st.hint) + '</p>' : '') +
+      var cls = 'dl-order is-' + esc(o.status) + (flash && flash.id === o.id ? ' is-flash' : '');
+      var meta = (o.created_by === 'admin' ? _t(' · ajoutée par Création Audio') : '') + (o.edited_at ? _t(' · modifiée') : '');
+      var total = '<span class="dl-order-total"><b>' + money(o.total) + '</b><small>' + plural(pairs, 'paire', 'paires') + _t(' · hors taxes') + '</small></span>';
+      var pill = '<span class="dl-status is-' + (o.paid_at && o.status === 'invoiced' ? 'paid' : esc(o.status)) + '">' + esc(st.label) + '</span>';
+      var head = past
+        ? '<summary class="dl-order-head">' +
+            '<span class="dl-order-id"><b>' + esc(o.number) + '</b><span>' + esc(fmtDay(o.created_at)) + '</span></span>' +
+            pill + '<span class="dl-order-sum">' + money(o.total) + '</span><span class="dl-chev" aria-hidden="true"></span>' +
+          '</summary><div class="dl-order-body">'
+        : '<header class="dl-order-head">' +
+            '<div class="dl-order-id"><b>' + esc(o.number) + '</b><span>' + esc(fmtDate(o.created_at)) + meta + '</span></div>' + total +
+          '</header>' + stepsHtml(o.status);
+      return (past ? '<details class="' + cls + '" data-id="' + esc(o.id) + '">' : '<article class="' + cls + '" data-id="' + esc(o.id) + '">') + head +
         '<div class="dl-order-lines">' + lines.map(function (l) {
           var p = l.product_id ? byId[l.product_id] : null;
           var iu = p && p.image_path ? publicUrl(p.image_path) : '';
@@ -515,8 +552,9 @@
             '<span class="dl-ol-t">' + money(l.line_total) + '</span></div>';
         }).join('') + '</div>' +
         (o.note ? '<p class="dl-order-note"><b>' + (o.created_by === 'admin' ? _t('Note') : _t('Ta note')) + ' :</b> ' + esc(o.note) + '</p>' : '') +
-        '<footer class="dl-order-foot">' +
-          '<span class="dl-order-total">' + plural(pairs, 'paire', 'paires') + ' · <b>' + money(o.total) + _t('</b> <small>hors taxes</small></span>') +
+        (past && meta ? '<p class="dl-order-meta">' + esc(fmtDate(o.created_at)) + meta + '</p>' : '') +
+        (!past && !isNew ? '' : '<footer class="dl-order-foot">' +
+          (past ? total : '<span></span>') +
           (isNew ? '<span class="dl-order-actions">' +
             _t('<button type="button" class="dl-btn js-edit">Modifier</button>') +
             _t('<button type="button" class="dl-btn is-danger js-cancel">Annuler</button></span>') : '') +
@@ -524,18 +562,12 @@
             _t('<button type="button" class="dl-btn js-doc" data-kind="invoice">Facture</button>') +
             (o.paid_at ? _t('<button type="button" class="dl-btn js-doc" data-kind="receipt">Reçu</button>') : _t('<span class="dl-order-unpaid">Paiement à venir</span>')) +
             '</span>' : '') +
-        '</footer>' +
-      '</article>';
-    }).join('');
-    $$('.dl-order', ordersList).forEach(function (el) {
-      var o = orders.filter(function (x) { return x.id === el.getAttribute('data-id'); })[0];
-      var ed = $('.js-edit', el), ca = $('.js-cancel', el);
-      if (ed) ed.addEventListener('click', function () { editOrder(o); });
-      if (ca) ca.addEventListener('click', function () { cancelOrder(o, ca); });
-      $$('.js-doc', el).forEach(function (b) {
-        b.addEventListener('click', function () { printDoc(o, b); });
-      });
-    });
+        '</footer>') +
+      (past ? '</div></details>' : '</article>');
+  }
+  function fmtDay(iso) {
+    try { return new Date(iso).toLocaleDateString(window.CA.locale, { day: 'numeric', month: 'short', year: 'numeric' }); }
+    catch (e) { return String(iso || '').slice(0, 10); }
   }
   // facture / reçu : relu à chaque clic (le reçu n'existe qu'une fois le virement confirmé)
   function printDoc(o, btn) {

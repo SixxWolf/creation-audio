@@ -15,11 +15,11 @@
 <link rel="stylesheet" href="../assets/tokens.css?v=4">
 <link rel="stylesheet" href="../assets/site.css?v=8">
 <link rel="stylesheet" href="../assets/boutique.css?v=45">
-<link rel="stylesheet" href="../assets/dealer.css?v=15">
+<link rel="stylesheet" href="../assets/dealer.css?v=16">
 <link rel="stylesheet" href="../assets/doc-print.css?v=2">
 <link rel="stylesheet" href="../assets/dialog.css?v=1">
 <script src="../assets/i18n.js?v=1"></script>
-<script src="../assets/i18n-en.js?v=5"></script>
+<script src="../assets/i18n-en.js?v=6"></script>
 <script>
 /* Fond du portail (admin : Réglages › Apparence › Portail dealer) : posé avant le rendu depuis
    le cache « ca-dealer-bg », puis rafraîchi par dealer.js (RPC public_dealer_theme).
@@ -41,7 +41,7 @@ try { window.caDealerBg(localStorage.getItem('ca-dealer-bg')); } catch (e) {}
   Dealer portal · Orders recorded directly · Shipping across Canada on request · No online payment
 </div>
 <header class="home-top">
-  <a class="brand" href="dealer.html#/" aria-label="Création Audio — dealer portal">
+  <a class="brand" href="./" aria-label="Création Audio — home">
     <img class="brand-mark" src="../assets/img/loup_ondes_rouges_512_transparent.png" alt="" width="42" height="42">
     <span class="brand-tx"><b>Création Audio</b><small>Dealer portal</small></span>
   </a>
@@ -127,7 +127,14 @@ try { window.caDealerBg(localStorage.getItem('ca-dealer-bg')); } catch (e) {}
     <div class="shop-head">
       <div class="shop-eyebrow">Tracking</div>
       <h1 id="dl-orders-title">My orders</h1>
-      <p class="muted">While an order is “Sent”, you can edit or cancel it. Once we start preparing it, <a class="ask" href="https://m.me/61591945465745" target="_blank" rel="noopener">write to us for any change</a><span class="ask-alt"> or <a href="mailto:contact@creationaudio.ca?subject=Changement%20de%20commande%20dealer&amp;body=Bonjour%2C%0A%0ANum%C3%A9ro%20de%20commande%20%3A%20%0AChangement%20souhait%C3%A9%20%3A%20%0A%0AMerci%20!">by email</a></span>.</p>
+      <p class="muted">You can edit or cancel it while it's “Sent”.</p>
+    </div>
+    <div class="dl-help">
+      <b>Need a change after sending?</b>
+      <div class="dl-help-btns">
+        <a class="dl-btn" href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
+        <a class="dl-btn" href="mailto:contact@creationaudio.ca?subject=Changement%20de%20commande%20dealer&amp;body=Bonjour%2C%0A%0ANum%C3%A9ro%20de%20commande%20%3A%20%0AChangement%20souhait%C3%A9%20%3A%20%0A%0AMerci%20!">Email</a>
+      </div>
     </div>
     <div id="dl-orders-flash" role="status"></div>
     <div id="dl-orders-list"><p class="muted">Loading…</p></div>
@@ -174,6 +181,6 @@ try { window.caDealerBg(localStorage.getItem('ca-dealer-bg')); } catch (e) {}
 <script src="../assets/spacer-catalog.js?v=16"></script>
 <script src="../assets/auth-gate.js?v=3"></script>
 <script src="../assets/doc-print.js?v=1"></script>
-<script src="../assets/dealer.js?v=14"></script>
+<script src="../assets/dealer.js?v=15"></script>
 </body>
 </html>

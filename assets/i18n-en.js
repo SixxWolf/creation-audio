@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 5;
+window.CA_EN_V = 6;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -446,6 +446,13 @@ window.CA_EN = (function (pairs) {
   [`Document introuvable.`, `Document not found.`],
   [`Le reçu sera disponible une fois ton virement confirmé.`, `Your receipt will be available once your transfer is confirmed.`],
   [`Impression impossible`, `Couldn't print`],
+  [`Aucune commande`, `No orders`],
+  [`Tes commandes s'afficheront ici.`, `Your orders will show up here.`],
+  [`Voir le catalogue`, `Browse the catalogue`],
+  [`En cours`, `In progress`],
+  [`Historique`, `History`],
+  [`Préparation`, `Preparation`],
+  [` · hors taxes`, ` · before tax`],
   // ---- doc-print.js
   [`Reçu de`, `Received from`],
   [`Facturé à`, `Billed to`],
