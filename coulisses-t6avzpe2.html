@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="assets/admin.css?v=127">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=1">
-<link rel="stylesheet" href="assets/facture.css?v=31">
+<link rel="stylesheet" href="assets/facture.css?v=33">
 <link rel="stylesheet" href="assets/autoloop.css?v=30">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
 <link rel="stylesheet" href="assets/boites.css?v=8">
@@ -1536,11 +1536,6 @@
           <button type="button" class="fx-seg-btn" data-cat="accessory">Accessoire</button>
         </div>
         <label class="fx-check" data-wide="fx-right" data-wide-order="3"><input type="checkbox" id="fx-tax"> Taxes (TPS/TVQ)</label>
-        <div class="fx-seg fx-pay-seg" id="fx-pay" role="group" aria-label="Mode de paiement" data-wide="fx-right" data-wide-order="4">
-          <span class="fx-pay-lbl">Paiement</span>
-          <button type="button" class="fx-pay-btn" data-pay="cash">Comptant</button>
-          <button type="button" class="fx-pay-btn" data-pay="interac">Interac</button>
-        </div>
         <span class="fx-scan-feedback no-print" id="fx-scan-feedback" aria-live="polite" data-wide="fx-left" data-wide-order="2"
               title="Dans cet onglet, le scanner est toujours à l'écoute : scanne un article, il s'ajoute à la facture."></span>
         <div class="fx-seg fx-cli-seg" role="group" aria-label="Type de client" data-wide="fx-right" data-wide-order="1">
@@ -1654,6 +1649,12 @@
 
           <!-- Résumé marge (privé, non imprimé) — masqué par défaut, bouton pour afficher -->
           <div class="fx-margin no-print" id="fx-margin" hidden data-wide="fx-right" data-wide-order="4"></div>
+
+          <div class="fx-seg fx-pay-seg no-print" id="fx-pay" role="group" aria-label="Mode de paiement" data-wide="fx-right" data-wide-order="4">
+            <span class="fx-pay-lbl">Paiement</span>
+            <button type="button" class="fx-pay-btn" data-pay="cash">Comptant</button>
+            <button type="button" class="fx-pay-btn" data-pay="interac">Interac</button>
+          </div>
 
           <div class="fx-actions no-print" data-wide="fx-right" data-wide-order="5">
             <button class="btn btn-accent" id="fx-save" type="button" data-ic="save">Enregistrer la facture</button>

@@ -30,6 +30,8 @@
 /* mode de paiement : obligatoire à l'enregistrement -> cerclé en rouge tant qu'il manque */
 .fx-pay-seg { align-items:center; }
 .fx-pay-seg[hidden] { display:none; }
+.fx-main > .fx-pay-seg:not([hidden]) { display:flex; margin-top:12px; max-width:420px; }
+.fx-main > .fx-pay-seg .fx-pay-btn { flex:1; padding:0 10px; }
 .fx-pay-lbl { padding:0 8px 0 10px; font-size:.84rem; font-weight:700; color:var(--muted); white-space:nowrap; }
 .fx-pay-seg.is-missing { border-color:var(--bad); box-shadow:0 0 0 3px color-mix(in srgb, var(--bad) 18%, transparent); }
 .fx-seg-sm .fx-cli-btn { min-height:30px; padding:0 12px; font-size:.85rem; }
