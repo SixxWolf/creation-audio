@@ -47,7 +47,7 @@
   }
   function normalizeTiers(raw) {
     if (!Array.isArray(raw)) return [];
-    return raw.map(function (t) { return { min: parseInt(t.min, 10), price: parseFloat(t.price) }; })
+    return raw.map(function (t) { return { min: parseInt(t.min, 10), price: parseFloat(t.price), pct: t.pct != null ? parseFloat(t.pct) : null }; })
       .filter(function (t) { return isFinite(t.min) && t.min >= 1 && isFinite(t.price) && t.price >= 0; })
       .sort(function (a, b) { return a.min - b.min; });
   }
@@ -115,6 +115,7 @@
   if (cancelBtn) cancelBtn.addEventListener('click', closeEditor);
   if (editor) editor.addEventListener('submit', onSave);
   [priceI, dealerPriceI, costI].forEach(function (el) { if (el) el.addEventListener('input', updateMargin); });
+  [priceI, dealerPriceI].forEach(function (el) { if (el) el.addEventListener('input', function () { refreshTierRows(); }); });
   if (nameI) nameI.addEventListener('input', renderLinks);
   if (activeI) activeI.addEventListener('change', renderLinks);
 
@@ -132,26 +133,65 @@
 
   /* ---- paliers ---- */
   if (tierAdd) tierAdd.addEventListener('click', function () { addTierRow(); });
-  function addTierRow(min, price) {
+  // Un palier = { min, price } ; en mode « % » on garde aussi pct, et price = prix dealer × (1 − pct/100)
+  // (les pages publiques / la facturation ne lisent que price).
+  function dealerBaseNow() {
+    var d = num(dealerPriceI.value), c = num(priceI.value);
+    return d != null ? d : (c || 0);
+  }
+  function tierRowPrice(row) {
+    var v = parseFloat($('.tier-price', row).value);
+    if (!isFinite(v)) return NaN;
+    return row.getAttribute('data-mode') === 'pct' ? dealerBaseNow() * (1 - v / 100) : v;
+  }
+  function refreshTierRow(row) {
+    var pct = row.getAttribute('data-mode') === 'pct', p = tierRowPrice(row);
+    var inp = $('.tier-price', row);
+    inp.step = pct ? '0.1' : '0.01'; inp.max = pct ? '100' : ''; inp.placeholder = pct ? '10' : '14.00';
+    $('.tier-mode', row).textContent = pct ? '% de rabais' : '$ /paire';
+    $('.tier-calc', row).textContent = pct && isFinite(p) ? '= ' + money(p) : '';
+  }
+  function refreshTierRows() { $$('.tier-row', tiersEl).forEach(refreshTierRow); }
+  function addTierRow(min, price, pct) {
     var row = document.createElement('div');
     row.className = 'tier-row';
+    var isPct = pct != null && isFinite(pct);
+    row.setAttribute('data-mode', isPct ? 'pct' : 'price');
     row.innerHTML =
       '<span class="t">À partir de</span>' +
       '<input type="number" class="tier-min" min="1" step="1" placeholder="6" value="' + (min != null ? min : '') + '">' +
       '<span class="t">paires →</span>' +
-      '<input type="number" class="tier-price money" min="0" step="0.01" placeholder="14.00" value="' + (price != null ? price : '') + '">' +
-      '<span class="t">$ /paire</span>' +
+      '<input type="number" class="tier-price money" min="0" value="' + (isPct ? pct : (price != null ? price : '')) + '">' +
+      '<button type="button" class="btn btn-ghost btn-sm tier-mode" aria-label="Changer le type de rabais"></button>' +
+      '<span class="t tier-calc"></span>' +
       '<button type="button" class="tier-del" aria-label="Retirer ce palier">✕</button>';
     $('.tier-del', row).addEventListener('click', function () { row.remove(); });
+    $('.tier-price', row).addEventListener('input', function () { refreshTierRow(row); });
+    $('.tier-mode', row).addEventListener('click', function () {
+      var inp = $('.tier-price', row), toPct = row.getAttribute('data-mode') !== 'pct', base = dealerBaseNow(), v = parseFloat(inp.value);
+      if (isFinite(v) && base > 0) {   // convertit la valeur saisie pour garder le même prix
+        inp.value = toPct ? Math.round((1 - v / base) * 1000) / 10 : Math.round(base * (1 - v / 100) * 100) / 100;
+      }
+      row.setAttribute('data-mode', toPct ? 'pct' : 'price');
+      refreshTierRow(row);
+    });
     tiersEl.appendChild(row);
+    refreshTierRow(row);
     return row;
   }
   function collectTiers() {
     return $$('.tier-row', tiersEl).map(function (row) {
-      return { min: parseInt($('.tier-min', row).value, 10), price: parseFloat($('.tier-price', row).value) };
-    }).filter(function (t) { return isFinite(t.min) && t.min >= 1 && isFinite(t.price) && t.price >= 0; })
+      var pct = row.getAttribute('data-mode') === 'pct', v = parseFloat($('.tier-price', row).value);
+      var t = { min: parseInt($('.tier-min', row).value, 10), price: tierRowPrice(row) };
+      if (pct && isFinite(v)) t.pct = v;
+      return t;
+    }).filter(function (t) { return isFinite(t.min) && t.min >= 1 && isFinite(t.price) && t.price >= 0 && (t.pct == null || t.pct <= 100); })
       .sort(function (a, b) { return a.min - b.min; })
-      .map(function (t) { return { min: t.min, price: Math.round(t.price * 100) / 100 }; });
+      .map(function (t) {
+        var o = { min: t.min, price: Math.round(t.price * 100) / 100 };
+        if (t.pct != null) o.pct = Math.round(t.pct * 100) / 100;
+        return o;
+      });
   }
 
   /* ---- photos (la 1re = photo principale) : ajout multiple, glisser pour réordonner ---- */
@@ -365,7 +405,7 @@
     qtyI.value = row && row.qty != null ? row.qty : 0;
     activeI.checked = row ? !!row.active : true;
     tiersEl.innerHTML = '';
-    normalizeTiers(row ? row.tiers : []).forEach(function (t) { addTierRow(t.min, t.price); });
+    normalizeTiers(row ? row.tiers : []).forEach(function (t) { addTierRow(t.min, t.price, t.pct); });
     photos = photosOf(row).map(function (p) { return { path: p }; });
     renderPhotos();
     sizeI.value = a.speaker_size || '';
