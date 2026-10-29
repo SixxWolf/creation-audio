@@ -783,7 +783,7 @@
      chercher le .gcode.3mf. Les réglages du batch (loops…) restent ceux de la page. */
   var libPlates = [], libCur = null, lastFile = null, libPending = null;
   var STUDIO_MAX = 50 * 1024 * 1024 - 65536;   // limite de fichier du stockage Supabase (marge pour l'envoi)
-  var PRESETS = [6, 12, 18, 24];   // lignes « Batchs prêts » (loops)
+  var PRESETS = [6, 12, 18];   // lignes « Batchs prêts » (loops)
   function libSb() { return window.CA && window.CA.sb; }
   function libToast(msg, kind) { if (window.caDialog && caDialog.toast) caDialog.toast(msg, kind); }
   function libRow(id) { return libPlates.filter(function (p) { return p.id === id; })[0] || null; }
