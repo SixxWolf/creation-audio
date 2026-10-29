@@ -1057,7 +1057,8 @@
         '<span class="mcard-foot">' +
           '<span class="mcard-price"><b>' + money(a.price) + '</b>' +
             (best ? '<small>' + money(best.price) + _t(' dès ') + best.min + '</small>' : '') + '</span>' +
-          (out ? _t('<span class="pill out">Rupture</span>') : '') +
+          (out ? _t('<span class="pill out">Rupture</span>')
+            : a.qty != null ? '<span class="pill ok">' + a.qty + _t(' en stock') + '</span>' : '') +
         '</span>' +
       '</span>' +
     '</a>';
