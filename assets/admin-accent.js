@@ -24,7 +24,7 @@
   var DEFAULT = '#FF6A2B', KEY = 'apparence', LS_HEX = 'ca-accent', LS_CSS = 'ca-accent-css', STYLE_ID = 'ca-accent';
   // « rainbow » (pastille Arc-en-ciel, directe dans l'admin) : jetons d'une couleur d'ancrage fixe + rainbow.css
   // (dégradé qui glisse sur les surfaces pleines) quand html[data-rainbow] est posé. Même ancre que look.js (site public).
-  var RAINBOW = 'rainbow', ARC_HEX = '#4C9AFF', RB_ID = 'ca-rainbow-css', RB_HREF = 'assets/rainbow.css?v=2';
+  var RAINBOW = 'rainbow', ARC_HEX = '#4C9AFF', RB_ID = 'ca-rainbow-css', RB_HREF = 'assets/rainbow.css?v=3';
   var PRESETS = [
     ['#FF6A2B', 'Orange (d\'origine)'], ['#E5484D', 'Rouge'], ['#EF3E82', 'Rose'], ['#8B5CF6', 'Violet'],
     ['#3B82F6', 'Bleu'], ['#14B8A6', 'Turquoise'], ['#22C55E', 'Vert'], ['#F59E0B', 'Ambre'],
