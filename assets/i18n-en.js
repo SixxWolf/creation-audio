@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 9;
+window.CA_EN_V = 10;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -843,6 +843,12 @@ window.CA_EN = (function (pairs) {
   [`Accent`, `Accent`],
   [`Revenir à l'origine`, `Back to default`],
   [`Non enregistré — réessaie.`, `Not saved — try again.`],
+  [`J'aime les arcs-en-ciel`, `I love rainbows`],
+  [`Êtes-vous sûr ?`, `Are you sure?`],
+  [`Il n'y aura pas de retour en arrière.`, `There's no going back.`],
+  [`Non`, `No`],
+  [`Oui`, `Yes`],
+  [`Arc-en-ciel`, `Rainbow`],
   // ---- dealer.js : connexion par code
   [`Se connecter`, `Sign in`],
   [`Recevoir mon code`, `Get my code`],

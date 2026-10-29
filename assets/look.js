@@ -13,6 +13,11 @@
    - Accent : mêmes dérivations que l'admin (admin-accent.js) : --ember,
      --ember-dim, --on-ember (encre ou blanc), --ember-ink (texte AA 4,5:1).
    À charger juste après le script des fêtes, avant le <body>.
+   - Arc-en-ciel (accent « arc », 2026-10-29) : se débloque par le bouton « J'aime les
+     arcs-en-ciel » (pop-up « Êtes-vous sûr ? ») ; look.rainbow = true le garde dans le
+     compte, définitivement (« Revenir à l'origine » ne le reverrouille pas). Ancre de
+     couleur fixe pour les jetons + rainbow.css (dégradé qui glisse sur les surfaces
+     pleines), chargé seulement quand html[data-rainbow] est posé.
    API : caLook.get() · caLook.set(look, k) · caLook.clear(k) · caLook.mount(el, { save }).
    ========================================================= */
 (function () {
@@ -24,6 +29,8 @@
     ['orange', '#FF6A2B', 'Orange'], ['bleu', '#3B82F6', 'Bleu'], ['vert', '#22C55E', 'Vert'],
     ['violet', '#8B5CF6', 'Violet'], ['rose', '#EF3E82', 'Rose'], ['rouge', '#E5484D', 'Rouge']
   ];
+  var ARC = 'arc', ARC_HEX = '#4C9AFF', RB_ID = 'ca-rainbow-css';
+  var RB_SRC = document.currentScript && document.currentScript.src;   // rainbow.css est à côté (même ?v=)
   var DEF = { mode: 'light', accent: 'orange' };
   var LIGHT_BGS = ['#FFFFFF', '#F6F6F4', '#EFEDE8'], DARK_BGS = ['#1C1F26', '#141619', '#20242B'], INK = '#181A1F';
   var root = document.documentElement;
@@ -59,12 +66,27 @@
            ';--ember-ink:' + inkVariant(c, LIGHT_BGS, '#000000') + ';}' +
            ':root:root[data-theme="dark"]{--ember-ink:' + inkVariant(c, DARK_BGS, '#FFFFFF') + ';}';
   }
-  function hexOf(a) { for (var i = 0; i < ACCENTS.length; i++) if (ACCENTS[i][0] === a) return ACCENTS[i][1]; return null; }
+  function hexOf(a) {
+    if (a === ARC) return ARC_HEX;
+    for (var i = 0; i < ACCENTS.length; i++) if (ACCENTS[i][0] === a) return ACCENTS[i][1];
+    return null;
+  }
+  // feuille du dégradé : bloquante pendant l'analyse du <head> (aucun éclair), ajoutée à la volée ensuite
+  function rainbowCss() {
+    if (document.getElementById(RB_ID) || !RB_SRC) return;
+    var href = RB_SRC.replace(/look\.js/, 'rainbow.css');
+    if (document.readyState === 'loading') { document.write('<link rel="stylesheet" id="' + RB_ID + '" href="' + href + '">'); return; }
+    var l = document.createElement('link');
+    l.rel = 'stylesheet'; l.id = RB_ID; l.href = href;
+    document.head.appendChild(l);
+  }
 
   /* ---- état ---- */
   function clean(v) {
     v = v || {};
-    return { mode: MODES.indexOf(v.mode) >= 0 ? v.mode : DEF.mode, accent: hexOf(v.accent) ? v.accent : DEF.accent };
+    var rb = v.rainbow === true;   // débloqué : « arc » n'est valable que dans ce cas
+    return { mode: MODES.indexOf(v.mode) >= 0 ? v.mode : DEF.mode,
+             accent: hexOf(v.accent) && (rb || v.accent !== ARC) ? v.accent : DEF.accent, rainbow: rb };
   }
   function has(k) { try { return !!(KEYS[k] && localStorage.getItem(KEYS[k])); } catch (e) { return false; } }
   function read() {
@@ -80,6 +102,7 @@
     var l = cur && !fetes() ? cur : DEF;
     var dark = l.mode === 'dark' || (l.mode === 'auto' && mq && mq.matches);
     if (dark) root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
+    if (l.accent === ARC) { root.setAttribute('data-rainbow', ''); rainbowCss(); } else root.removeAttribute('data-rainbow');
     var el = document.getElementById(STYLE_ID), h = hexOf(l.accent);
     if (l.accent === DEF.accent) { if (el) el.parentNode.removeChild(el); }
     else {
@@ -111,11 +134,44 @@
     dark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>',
     auto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>'
   };
+  // confettis arc-en-ciel au déblocage : deux canons au bas de l'écran, ~2,5 s (rien si « réduire les animations »)
+  function confetti() {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var cv = document.createElement('canvas'), ctx = cv.getContext && cv.getContext('2d');
+    if (!ctx) return;
+    var dpr = window.devicePixelRatio || 1, w = window.innerWidth, h = window.innerHeight;
+    cv.width = w * dpr; cv.height = h * dpr;
+    cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2147483000';
+    cv.setAttribute('aria-hidden', 'true');
+    ctx.scale(dpr, dpr);
+    document.body.appendChild(cv);
+    var cols = ['#FF5C5C', '#FF9F43', '#FFD93D', '#4ADE80', '#38BDF8', '#7C8CFF', '#C084FC'], ps = [], i;
+    for (i = 0; i < 150; i++) {
+      var left = i % 2 === 0, a = (left ? -1 : 1) * (0.25 + Math.random() * 0.55), sp = (0.9 + Math.random() * 0.7) * Math.min(18, Math.max(11, h / 45));
+      ps.push({ x: left ? w * 0.08 : w * 0.92, y: h + 6, vx: -Math.sin(a) * sp * 0.9, vy: -Math.cos(a) * sp * 1.15,
+        s: 6 + Math.random() * 6, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.4, c: cols[i % cols.length] });
+    }
+    var t0 = Date.now();
+    (function frame() {
+      var age = Date.now() - t0;
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalAlpha = age > 1800 ? Math.max(0, 1 - (age - 1800) / 700) : 1;
+      ps.forEach(function (p) {
+        p.vy += 0.34; p.vx *= 0.992; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 3, p.s, p.s * 0.6); ctx.restore();
+      });
+      if (age < 2500) requestAnimationFrame(frame); else if (cv.parentNode) cv.parentNode.removeChild(cv);
+    })();
+  }
   function mount(el, opts) {
     opts = opts || {};
     var k = opts.k || 'c', timer = null;
     var l = clean(opts.initial);   // le choix enregistré dans le compte
     var names = { light: _t('Clair'), dark: _t('Sombre'), auto: _t('Auto') };
+    function arcDot() {
+      return '<button type="button" role="radio" class="look-dot look-dot-arc" data-accent="' + ARC + '" title="' + _t('Arc-en-ciel') + '" aria-label="' + _t('Arc-en-ciel') + '"></button>';
+    }
     el.innerHTML =
       '<div class="look-card">' +
         '<h2>' + _t('Apparence') + '</h2>' +
@@ -132,12 +188,15 @@
           '<div class="look-sw" role="radiogroup" aria-labelledby="look-acc-lbl">' +
           ACCENTS.map(function (a) {
             return '<button type="button" role="radio" class="look-dot" data-accent="' + a[0] + '" style="--c:' + a[1] + '" title="' + _t(a[2]) + '" aria-label="' + _t(a[2]) + '"></button>';
-          }).join('') + '</div></div>' +
+          }).join('') + (l.rainbow ? arcDot() : '') + '</div></div>' +
         '<div class="look-foot"><button type="button" class="look-reset">' + _t('Revenir à l\'origine') + '</button>' +
+          '<button type="button" class="look-reset look-love">' + _t('J\'aime les arcs-en-ciel') + '</button>' +
           '<span class="look-msg" role="status" aria-live="polite"></span></div>' +
       '</div>';
-    var msg = el.querySelector('.look-msg'), reset = el.querySelector('.look-reset');
+    var msg = el.querySelector('.look-msg'), reset = el.querySelector('.look-reset'), love = el.querySelector('.look-love');
     function sync() {
+      if (l.rainbow && !el.querySelector('.look-dot-arc')) el.querySelector('.look-sw').insertAdjacentHTML('beforeend', arcDot());
+      love.hidden = l.rainbow;
       el.querySelectorAll('.look-mode').forEach(function (b) { b.setAttribute('aria-checked', String(b.getAttribute('data-mode') === l.mode)); });
       el.querySelectorAll('.look-dot').forEach(function (b) { b.setAttribute('aria-checked', String(b.getAttribute('data-accent') === l.accent)); });
       reset.disabled = l.mode === DEF.mode && l.accent === DEF.accent;
@@ -153,7 +212,9 @@
       if (!opts.save) return;
       timer = setTimeout(function () {
         say(_t('Enregistrement…'));
-        Promise.resolve(opts.save({ mode: l.mode, accent: l.accent })).then(function (r) {
+        var out = { mode: l.mode, accent: l.accent };
+        if (l.rainbow) out.rainbow = true;
+        Promise.resolve(opts.save(out)).then(function (r) {
           if (r && r.error) say(_t('Non enregistré — réessaie.'), 'bad'); else say(_t('Enregistré ✓'), 'ok');
         }, function () { say(_t('Non enregistré — réessaie.'), 'bad'); });
       }, 500);
@@ -164,7 +225,20 @@
       if (b.hasAttribute('data-mode')) choose({ mode: b.getAttribute('data-mode') });
       else if (b.hasAttribute('data-accent')) choose({ accent: b.getAttribute('data-accent') });
       else if (b === reset) choose(DEF);
+      else if (b === love) unlock();
     });
+    // « J'aime les arcs-en-ciel » → pop-up → Oui : débloqué pour de bon, appliqué tout de suite
+    function unlock() {
+      if (!window.caDialog) return;
+      window.caDialog.confirm({ title: _t('Êtes-vous sûr ?'), message: _t('Il n\'y aura pas de retour en arrière.'),
+        cancel: _t('Non'), ok: _t('Oui'), icon: 'warn' }).then(function (yes) {
+        if (yes !== true) return;
+        choose({ rainbow: true, accent: ARC });
+        var d = el.querySelector('.look-dot-arc');
+        if (d) d.focus();
+        confetti();
+      });
+    }
     // flèches au clavier dans chaque groupe (radiogroup)
     el.addEventListener('keydown', function (e) {
       var b = e.target.closest('[role="radio"]');

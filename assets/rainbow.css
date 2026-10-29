@@ -1,0 +1,75 @@
+/* =========================================================
+   Création Audio — thème arc-en-ciel (Apparence › Accent › Arc-en-ciel)
+   Chargé seulement quand html[data-rainbow] est posé : look.js (site public,
+   comptes clients / dealers) et admin-accent.js (admin, Réglages › Apparence).
+   Les jetons (--ember, --ember-ink, --on-ember…) viennent d'une couleur d'ancrage
+   fixe calculée par ces deux scripts : bordures, liens, cases, halos restent unis.
+   Ici : les surfaces PLEINES d'accent (boutons, soulignés, pastilles, barres)
+   reçoivent un dégradé des 7 couleurs qui glisse lentement en boucle.
+   Les 7 couleurs sont assez claires pour que le texte « encre » (--on-ember)
+   garde un contraste AA sur chacune.
+   Nouvelle surface pleine var(--ember) → l'ajouter à la bonne liste ci-dessous.
+   « Réduire les animations » : dégradé figé (--rb-anim: none).
+   ========================================================= */
+html[data-rainbow] {
+  --rb-grad: linear-gradient(90deg, #FF5C5C, #FF9F43, #FFD93D, #4ADE80, #38BDF8, #7C8CFF, #C084FC, #FF5C5C);
+  --rb-grad-v: linear-gradient(180deg, #FF5C5C, #FF9F43, #FFD93D, #4ADE80, #38BDF8, #7C8CFF, #C084FC, #FF5C5C);
+  --rb-anim: rb-slide 18s linear infinite;
+  --rb-anim-v: rb-slide-v 18s linear infinite;
+  --rb-anim-2: rb-slide-2 18s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-rainbow] { --rb-anim: none; --rb-anim-v: none; --rb-anim-2: none; }
+}
+@keyframes rb-slide { to { background-position: 200% 0; } }
+@keyframes rb-slide-v { to { background-position: 0 200%; } }
+@keyframes rb-slide-2 { to { background-position: 0 0, 200% 0; } }   /* relief + dégradé (.btn-accent) */
+
+/* ---- surfaces pleines : site public ---- */
+html[data-rainbow] :is(
+  .home-page .btn-ember, .drawer-cta .primary, .foot-made .dot, .look-mock i:last-child,
+  .cart-btn.has-items .cart-count, .cart-login-btn, .step-n, .news-prog, .cp-ic,
+  .acct-n, .dl-badge, .dl-tab-n, .dl-sec span, .dl-mbar-total, .tb-mark.is-on,
+  .msg-dot, .msg-row-n, .msg-send-ic, .ord-pk.is-todo .pk-change,
+  .btn-add:not(:disabled), .add-btn:not(:disabled), .buybar-btn:not(:disabled),
+  .cart-order:not(.cart-email, .is-disabled, :disabled),
+  .acct-submit:not(:disabled), .dl-submit:not(:disabled), .msg-send:not(:disabled),
+  .dlg-go:not(.is-danger)
+),
+/* ---- surfaces pleines : admin ---- */
+html[data-rainbow] :is(
+  .td-st.is-new, .gthumb .gtag, .cl-sec-n, .wl-tab-count, .rv-bar span, .reorder-total, .rv-cur,
+  .nav-count, .co-status.is-new, .cq-tag, .pr-q-bar i, .pr-bar > span, .co-pkedit .pk-day.is-on, .al-sum-head
+) {
+  background-image: var(--rb-grad);
+  background-size: 200% 100%;
+  animation: var(--rb-anim);
+}
+
+/* ---- soulignés d'onglet / de lien actif (barre horizontale) ---- */
+html[data-rainbow] :is(
+  .home-nav a.is-active, .home-account.is-in, .tab[aria-selected="true"], .fil-group-title.flash,
+  .inv-subtab.is-active, .acc-tab, .al-seg[aria-selected="true"]
+)::after,
+html[data-rainbow] .dl-steps li.is-on::before {
+  background-image: var(--rb-grad);
+  background-size: 200% 100%;
+  animation: var(--rb-anim);
+}
+/* ---- barres verticales (onglet actif de l'admin, tuile en vedette) ---- */
+html[data-rainbow] :is(.tab[aria-current="page"], .td-tile.is-hot)::before {
+  background-image: var(--rb-grad-v);
+  background-size: 100% 200%;
+  animation: var(--rb-anim-v);
+}
+
+/* ---- bouton principal de l'admin : reflet + relief par-dessus le dégradé ---- */
+html[data-rainbow] .btn-accent {
+  background-image: linear-gradient(180deg, rgba(255,255,255,.34) 0%, rgba(255,255,255,0) 52%, rgba(0,0,0,.1) 100%), var(--rb-grad);
+  background-size: 100% 100%, 200% 100%;
+  background-position: 0 0, 0 0;
+  animation: var(--rb-anim-2);
+}
+html[data-rainbow] .btn-accent:active {
+  background-image: linear-gradient(180deg, rgba(0,0,0,.16), rgba(0,0,0,0)), var(--rb-grad);
+}

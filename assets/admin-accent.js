@@ -15,14 +15,20 @@
    appareils — + localStorage (ca-accent, ca-accent-css), appliqué dès le
    <head> de la page admin pour éviter un éclair orange au chargement.
    Orange d'origine = aucune surcharge : les jetons des feuilles s'appliquent.
+   Arc-en-ciel (2026-10-29) : la valeur « rainbow » remplace l'hex (admin_settings.apparence.accent,
+   ca-accent) — pose html[data-rainbow] + assets/rainbow.css ; le <head> de la page admin le rejoue avant le rendu.
    ========================================================= */
 (function () {
   'use strict';
 
   var DEFAULT = '#FF6A2B', KEY = 'apparence', LS_HEX = 'ca-accent', LS_CSS = 'ca-accent-css', STYLE_ID = 'ca-accent';
+  // « rainbow » (pastille Arc-en-ciel, directe dans l'admin) : jetons d'une couleur d'ancrage fixe + rainbow.css
+  // (dégradé qui glisse sur les surfaces pleines) quand html[data-rainbow] est posé. Même ancre que look.js (site public).
+  var RAINBOW = 'rainbow', ARC_HEX = '#4C9AFF', RB_ID = 'ca-rainbow-css', RB_HREF = 'assets/rainbow.css?v=1';
   var PRESETS = [
     ['#FF6A2B', 'Orange (d\'origine)'], ['#E5484D', 'Rouge'], ['#EF3E82', 'Rose'], ['#8B5CF6', 'Violet'],
-    ['#3B82F6', 'Bleu'], ['#14B8A6', 'Turquoise'], ['#22C55E', 'Vert'], ['#F59E0B', 'Ambre']
+    ['#3B82F6', 'Bleu'], ['#14B8A6', 'Turquoise'], ['#22C55E', 'Vert'], ['#F59E0B', 'Ambre'],
+    [RAINBOW, 'Arc-en-ciel']
   ];
   var LIGHT_BGS = ['#FFFFFF', '#F6F6F4', '#EFEDE8'];   // --paper, --wash, --wash-2 en clair
   var DARK_BGS = ['#1C1F26', '#141619', '#20242B'];    // --paper, --wash, --wash-2 en sombre
@@ -33,6 +39,7 @@
 
   /* ---- couleurs ---- */
   function norm(h) {
+    if (String(h == null ? '' : h).trim().toLowerCase() === RAINBOW) return RAINBOW;
     var m = /^#?([0-9a-f]{6})$/i.exec(String(h == null ? '' : h).trim());
     return m ? '#' + m[1].toUpperCase() : null;
   }
@@ -69,16 +76,24 @@
   /* ---- application + cache local ---- */
   var state = DEFAULT;
   function apply(h) {
-    var el = document.getElementById(STYLE_ID);
-    if (h === DEFAULT) {
+    var el = document.getElementById(STYLE_ID), css = h === DEFAULT ? '' : cssFor(h === RAINBOW ? ARC_HEX : h);
+    if (!css) {
       if (el) el.parentNode.removeChild(el);
     } else {
       if (!el) { el = document.createElement('style'); el.id = STYLE_ID; document.head.appendChild(el); }
-      el.textContent = cssFor(h);
+      el.textContent = css;
     }
+    if (h === RAINBOW) {
+      document.documentElement.setAttribute('data-rainbow', '');
+      if (!document.getElementById(RB_ID)) {
+        var lk = document.createElement('link');
+        lk.rel = 'stylesheet'; lk.id = RB_ID; lk.href = RB_HREF;
+        document.head.appendChild(lk);
+      }
+    } else document.documentElement.removeAttribute('data-rainbow');
     try {
       if (h === DEFAULT) { localStorage.removeItem(LS_HEX); localStorage.removeItem(LS_CSS); }
-      else { localStorage.setItem(LS_HEX, h); localStorage.setItem(LS_CSS, cssFor(h)); }
+      else { localStorage.setItem(LS_HEX, h); localStorage.setItem(LS_CSS, css); }
     } catch (e) {}
   }
   function cached() { try { return norm(localStorage.getItem(LS_HEX)) || DEFAULT; } catch (e) { return DEFAULT; } }
@@ -93,8 +108,10 @@
   }
   function syncUi() {
     $$('.acc-sw').forEach(function (b) { b.setAttribute('aria-checked', String(b.dataset.hex === state)); });
-    if (pick && pick.value.toUpperCase() !== state) pick.value = state.toLowerCase();
-    if (hexIn && document.activeElement !== hexIn) hexIn.value = state;
+    if (state !== RAINBOW) {   // le sélecteur libre garde la dernière couleur unie
+      if (pick && pick.value.toUpperCase() !== state) pick.value = state.toLowerCase();
+      if (hexIn && document.activeElement !== hexIn) hexIn.value = state;
+    }
     if (resetBtn) resetBtn.disabled = state === DEFAULT;
   }
   // Aperçu immédiat sur tout l'admin ; enregistrement différé (le sélecteur libre
@@ -141,7 +158,7 @@
     pick = $('#acc-pick'); hexIn = $('#acc-hex'); resetBtn = $('#acc-reset'); msgEl = $('#acc-msg');
     box.innerHTML = PRESETS.map(function (p) {
       return '<button type="button" class="acc-sw" role="radio" data-hex="' + p[0] + '" aria-label="' + p[1] +
-             '" title="' + p[1] + '" style="--sw:' + p[0] + '"></button>';
+             '" title="' + p[1] + '" style="--sw:' + (p[0] === RAINBOW ? '#7C8CFF' : p[0]) + '"></button>';
     }).join('');
     box.addEventListener('click', function (e) {
       var b = e.target.closest('.acc-sw');
@@ -150,7 +167,7 @@
     if (pick) pick.addEventListener('input', function () { choose(pick.value); });
     if (hexIn) {
       hexIn.addEventListener('input', function () { var h = norm(hexIn.value); if (h) choose(h); });
-      hexIn.addEventListener('blur', function () { hexIn.value = state; });
+      hexIn.addEventListener('blur', function () { if (state !== RAINBOW) hexIn.value = state; });
     }
     if (resetBtn) resetBtn.addEventListener('click', function () { choose(DEFAULT); });
     syncUi();
