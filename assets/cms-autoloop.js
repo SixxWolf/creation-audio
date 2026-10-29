@@ -925,7 +925,8 @@
     }).then(function (r) {
       if (r.error) throw r.error;
       libToast('Ouverture dans Bambu Studio…');
-      window.location.href = 'bambustudio://open?file=' + encodeURIComponent(r.data.signedUrl);
+      // Studio lit le nom du fichier au bout du lien : on le répète après le jeton (paramètre ignoré par Supabase)
+      window.location.href = 'bambustudio://open?file=' + encodeURIComponent(r.data.signedUrl + '&x=/' + safe);
     });
   }
   function cleanTmp(bucket) {
