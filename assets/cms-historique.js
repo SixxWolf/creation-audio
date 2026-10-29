@@ -8,6 +8,8 @@
    - ANNULER une facture à tout moment : le stock déduit est REMIS
      (receive_stock positif), la facture passe en statut « annulée ».
    - Supprimer définitivement (remet aussi le stock si nécessaire).
+   - Courriel de la facture : pastille (envoyé le… / non envoyé / pas de courriel) lue dans invoice_emails
+     + bouton Envoyer / Renvoyer (CA.invoiceMail.resend, cms-facturation.js → EF invoice-notify).
    ========================================================= */
 (function () {
   'use strict';
@@ -53,6 +55,7 @@
 
   /* ---------- état ---------- */
   var loaded = false, invoices = [], linesByInv = {}, filter = 'active', catFilter = 'all', query = '';
+  var emailsByInv = {}, mailOn = true, mailSince = null;   // journal des courriels de facture (invoice_emails, récents d'abord) + réglage « invoice_email »
   var loadSeq = 0;       // seul le DERNIER chargement lancé s'affiche (évite qu'un vieux résultat écrase un plus récent)
   var focusId = null;    // facture à rouvrir au prochain affichage (retour après une modification)
 
@@ -94,22 +97,36 @@
   });
 
   /* ---------- chargement ---------- */
+  // journal des envois + réglage ; jamais bloquant (table absente ou lecture refusée = pas de pastille courriel)
+  function loadMail() {
+    return Promise.all([
+      sb.from('invoice_emails').select('invoice_id,to_email,kind,ok,error,sent_at').order('sent_at', { ascending: false }).limit(2000),
+      sb.from('admin_settings').select('value').eq('key', 'invoice_email').maybeSingle()
+    ]).then(function (r) {
+      var by = {};
+      ((r[0] && r[0].data) || []).forEach(function (e) { (by[e.invoice_id] = by[e.invoice_id] || []).push(e); });
+      var v = (r[1] && r[1].data && r[1].data.value) || {};
+      emailsByInv = by; mailOn = v.enabled !== false; mailSince = v.since || null;
+    }, function () {});
+  }
   function load() {
     var my = ++loadSeq;
     listEl.innerHTML = '<p class="muted">Chargement…</p>';
+    var mailP = loadMail();
+    var show = function () { mailP.then(function () { if (my === loadSeq) render(); }); };
     sb.from('invoices').select('*').order('created_at', { ascending: false }).then(function (res) {
       if (my !== loadSeq) return;
       if (res.error) { listEl.innerHTML = '<p class="empty">Impossible de charger.<br>As-tu relancé <strong>schema-v2.sql</strong> ?</p>'; return; }
       var invs = res.data || [];
-      if (!invs.length) { invoices = invs; linesByInv = {}; render(); return; }
+      if (!invs.length) { invoices = invs; linesByInv = {}; show(); return; }
       var ids = invs.map(function (r) { return r.id; });
       sb.from('invoice_lines').select('*').in('invoice_id', ids).order('sort_order', { ascending: true }).then(function (r2) {
         if (my !== loadSeq) return;
         var byInv = {};
         (r2.data || []).forEach(function (l) { (byInv[l.invoice_id] = byInv[l.invoice_id] || []).push(l); });
         invoices = invs; linesByInv = byInv;
-        render();
-      }, function () { if (my !== loadSeq) return; invoices = invs; linesByInv = {}; render(); });
+        show();
+      }, function () { if (my !== loadSeq) return; invoices = invs; linesByInv = {}; show(); });
     }, function () { if (my === loadSeq) listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
 
@@ -229,6 +246,8 @@
     }).join('');
     var stockNote = inv.stock_deducted ? '<span class="hd-stock">stock déduit</span>' : (cancelled ? '<span class="hd-stock ok">stock remis</span>' : '');
     if (inv.updated_at) stockNote += '<span class="hd-stock">modifiée le ' + esc(fmtStampFR(inv.updated_at)) + '</span>';
+    var mailable = !cancelled && inv.client_type !== 'internal';
+    if (mailable) stockNote += mailChip(inv);
     box.innerHTML =
       '<table class="hist-lines"><thead><tr><th>Article</th><th class="num">Qté</th><th class="num">Prix</th><th class="num">Montant</th></tr></thead>' +
         '<tbody>' + (linesHtml || '<tr><td colspan="4" class="muted">(aucune ligne)</td></tr>') + '</tbody></table>' +
@@ -239,11 +258,13 @@
         '<span class="grow"></span>' +
         (pend ? '<button class="btn btn-accent btn-sm hd-give-all" type="button" data-ic="check">Tout remis</button>' : '') +
         (cancelled ? '' : '<button class="btn btn-ghost btn-sm hd-edit" type="button">Modifier</button>') +
+        (mailable ? '<button class="btn btn-ghost btn-sm hd-mail" type="button" data-ic="mail">' + ((emailsByInv[inv.id] || []).length ? 'Renvoyer' : 'Envoyer') + '</button>' : '') +
         '<button class="btn btn-ghost btn-sm hd-print" type="button">Réimprimer</button>' +
         (cancelled ? '' : '<button class="btn btn-ghost btn-sm hd-cancel" type="button">Annuler</button>') +
         '<button class="btn btn-ghost btn-sm hd-del" type="button">Suppr.</button>' +
       '</div>';
     var eb = $('.hd-edit', box); if (eb) eb.addEventListener('click', function (e) { e.stopPropagation(); editInvoice(inv, lines); });
+    var mb = $('.hd-mail', box); if (mb) mb.addEventListener('click', function (e) { e.stopPropagation(); mailInvoice(inv, mb); });
     $('.hd-print', box).addEventListener('click', function (e) { e.stopPropagation(); reprint(inv, lines); });
     var cb = $('.hd-cancel', box); if (cb) cb.addEventListener('click', function (e) { e.stopPropagation(); cancelInvoice(inv, lines); });
     $('.hd-del', box).addEventListener('click', function (e) { e.stopPropagation(); delInvoice(inv, lines); });
@@ -257,6 +278,24 @@
       head.className = 'hist-head hist-pv-head';
       previewEl.innerHTML = ''; previewEl.appendChild(head); previewEl.appendChild(box); previewEl.scrollTop = 0;
     }
+  }
+
+  /* ---------- courriel de la facture (EF invoice-notify, via CA.invoiceMail de cms-facturation.js) ---------- */
+  var EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.-]+/;
+  // dernière tentative en pastille ; « pas de courriel » seulement pour une facture créée depuis la mise en service
+  function mailChip(inv) {
+    var last = (emailsByInv[inv.id] || [])[0];
+    if (last) return last.ok
+      ? '<span class="hd-stock ok">courriel envoyé le ' + esc(fmtStampFR(last.sent_at)) + ' à ' + esc(last.to_email) + '</span>'
+      : '<span class="hd-stock bad" title="' + esc(last.error || '') + '">courriel non envoyé</span>';
+    if (mailOn && mailSince && String(inv.created_at || '') >= mailSince && !EMAIL_RE.test(inv.client_contact || '')) return '<span class="hd-stock">pas de courriel</span>';
+    return '';
+  }
+  function mailInvoice(inv, btn) {
+    if (!window.CA.invoiceMail) { caDialog.error('Le module Facturation n\'est pas chargé. Recharge la page.'); return; }
+    btn.disabled = true;
+    focusId = inv.id;   // la facture reste ouverte après le rechargement
+    window.CA.invoiceMail.resend(inv).then(function (r) { if (!r) focusId = null; btn.disabled = false; });
   }
 
   /* ---------- remettre les articles « à venir » (stock déduit à ce moment-là si la facture déduit) ---------- */

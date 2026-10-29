@@ -4084,5 +4084,32 @@ revoke all on public.autoloop_plates from anon;
 -- Vérification
 -- ------------------------------------------------------------
 select count(*) as produits_v2 from public.products;
+-- ------------------------------------------------------------
+-- FACTURE PAR COURRIEL (Edge Function « invoice-notify »)
+-- Journal des envois (un par envoi, auto ou « Renvoyer ») ; l'écriture se fait par l'EF (service role),
+-- la lecture est réservée à l'admin. Réglage « Envoyer la facture par courriel » : admin_settings
+-- « invoice_email » = { "enabled": true|false, "since": date de mise en service } (enabled absent = activé ;
+-- « since » : l'Historique ne signale « pas de courriel » que pour les factures créées après).
+-- ------------------------------------------------------------
+create table if not exists public.invoice_emails (
+  id         uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  to_email   text not null,
+  kind       text not null default 'auto' check (kind in ('auto', 'resend')),
+  lang       text not null default 'fr',
+  ok         boolean not null default true,
+  error      text,
+  sent_at    timestamptz not null default now()
+);
+create index if not exists invoice_emails_invoice_idx on public.invoice_emails (invoice_id, sent_at desc);
+alter table public.invoice_emails enable row level security;
+drop policy if exists invoice_emails_admin_all on public.invoice_emails;
+create policy invoice_emails_admin_all on public.invoice_emails for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.invoice_emails from anon;
+insert into public.admin_settings (key, value)
+  values ('invoice_email', jsonb_build_object('enabled', true, 'since', now()))
+  on conflict (key) do nothing;
+
 select count(*) as factures_v2 from public.invoices;
 select count(*) as dealers_v2  from public.dealers;

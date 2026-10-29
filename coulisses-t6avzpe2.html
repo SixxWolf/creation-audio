@@ -15,10 +15,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=126">
+<link rel="stylesheet" href="assets/admin.css?v=127">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=1">
-<link rel="stylesheet" href="assets/facture.css?v=29">
+<link rel="stylesheet" href="assets/facture.css?v=30">
 <link rel="stylesheet" href="assets/autoloop.css?v=30">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
 <link rel="stylesheet" href="assets/boites.css?v=8">
@@ -2826,6 +2826,11 @@
         </div>
         <div class="ent-actions"><button type="button" class="btn btn-accent btn-sm" id="co-save" data-ic="save">Enregistrer</button></div>
       </div>
+      <!-- Facture PDF envoyée au client à l'enregistrement : EF invoice-notify, admin_settings « invoice_email » (cms-facturation.js) -->
+      <div class="set-card ent-mail">
+        <div class="set-head"><b>Facture par courriel</b> <span class="set-msg" id="im-msg" aria-live="polite"></span></div>
+        <label class="inline"><input type="checkbox" id="im-on" checked> Envoyée au client à l'enregistrement</label>
+      </div>
     </section>
   </main>
   </div><!-- /.adm-main -->
@@ -2858,8 +2863,8 @@
 <script src="assets/cms-dealers.js?v=9"></script>
 <script src="assets/cms-clients.js?v=10"></script>
 <script src="assets/cms-messages.js?v=7"></script>
-<script src="assets/cms-facturation.js?v=51"></script>
-<script src="assets/cms-historique.js?v=16"></script>
+<script src="assets/cms-facturation.js?v=52"></script>
+<script src="assets/cms-historique.js?v=17"></script>
 <script src="assets/commande-client.js?v=1"></script>
 <script src="assets/cms-commandes-clients.js?v=23"></script>
 <script src="assets/cms-reservations.js?v=9"></script>
@@ -2882,6 +2887,6 @@
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-recherche.js?v=2"></script>
 <script src="assets/aide.js?v=3"></script>
-<script src="assets/cms-aide.js?v=5"></script>
+<script src="assets/cms-aide.js?v=6"></script>
 </body>
 </html>

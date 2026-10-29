@@ -440,6 +440,7 @@
 .hd-sum b { color:var(--ink); }
 .hd-stock { padding:3px 9px; font-size:.72rem; font-weight:600; color:var(--muted); background:var(--wash); border:1px solid var(--line); border-radius:100px; }
 .hd-stock.ok { color:var(--good); background:var(--good-wash); border-color:transparent; }
+.hd-stock.bad { color:var(--bad); background:color-mix(in srgb, var(--bad) 10%, var(--paper)); border-color:transparent; }
 
 /* =========================================================
    Statistiques (admin v3)

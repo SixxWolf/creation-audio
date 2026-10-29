@@ -184,6 +184,71 @@
     reader.readAsDataURL(file);
   }
 
+  /* ---------- facture par courriel (EF invoice-notify : PDF joint, copie cachée, journal invoice_emails) ----------
+     Départ automatique à l'enregistrement ; « Renvoyer » (ici après une modification, et dans l'Historique) à la main.
+     Réglage : admin_settings « invoice_email » { enabled, since } — relu aussi par l'EF. */
+  var IM_KEY = 'invoice_email';
+  // appelle l'EF ; renvoie toujours { result: 'sent' | 'skipped' | 'error', reason, to, message }
+  function mailInvoice(inv, event) {
+    return sb.functions.invoke('invoice-notify', { body: { invoice_id: inv.id, event: event } }).then(function (res) {
+      if (!res.error) return res.data || { result: 'error', message: 'Réponse vide.' };
+      var ctx = res.error.context, fallback = { result: 'error', message: res.error.message };
+      if (ctx && ctx.json) return ctx.json().then(function (j) { return { result: 'error', message: (j && j.error) || res.error.message }; }, function () { return fallback; });
+      return fallback;
+    }, function (err) { return { result: 'error', message: err && err.message ? err.message : String(err) }; });
+  }
+  // « Renvoyer » : confirmation (le client reçoit un courriel), puis message en bas d'écran
+  function resendInvoice(inv) {
+    return caDialog.confirm({ title: 'Renvoyer ' + (inv.number || 'la facture') + ' par courriel ?', message: 'Le PDF à jour est envoyé au client.', ok: 'Renvoyer' }).then(function (ok) {
+      if (!ok) return null;
+      return mailInvoice(inv, 'resend').then(function (r) {
+        if (r.result === 'sent') caDialog.toast('Facture envoyée à ' + r.to);
+        else if (r.result === 'skipped') caDialog.toast(r.reason === 'no_email' ? 'Aucun courriel pour ce client.' : r.reason === 'recent' ? 'Déjà envoyée à l\'instant.' : 'Rien envoyé.', 'bad');
+        else caDialog.toast('Courriel non envoyé : ' + r.message, 'bad');
+        if (window.CA.reloadHistorique) window.CA.reloadHistorique();
+        return r;
+      });
+    });
+  }
+  window.CA.invoiceMail = { send: mailInvoice, resend: resendInvoice };
+  // à l'enregistrement : le résultat s'ajoute, discret, à la ligne d'état (rien si désactivé / déjà envoyé)
+  function autoMail(inv) {
+    var note = document.createElement('span');
+    elStatus.appendChild(note);
+    mailInvoice(inv, 'auto').then(function (r) {
+      if (r.result === 'sent') { note.textContent = ' ✓ Envoyée à ' + r.to + '. '; caDialog.toast('Facture envoyée à ' + r.to); }
+      else if (r.result === 'skipped' && r.reason === 'no_email') note.textContent = ' Pas de courriel : non envoyée. ';
+      else if (r.result === 'error') {
+        note.textContent = ' Courriel non envoyé : ' + r.message + ' ';
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn btn-ghost btn-sm'; b.textContent = 'Renvoyer';
+        b.addEventListener('click', function () { resendInvoice(inv); });
+        note.appendChild(b);
+        caDialog.toast('Courriel non envoyé.', 'bad');
+      }
+      if (window.CA.reloadHistorique) window.CA.reloadHistorique();
+    });
+  }
+  // case Réglages › Entreprise : enregistrée dès le changement, « since » conservé
+  var imOn = $('#im-on'), imMsg = $('#im-msg'), imValue = {}, imTimer = null;
+  function imSay(text, tone) { if (imMsg) { imMsg.textContent = text; imMsg.className = 'set-msg' + (tone ? ' is-' + tone : ''); } }
+  if (imOn) imOn.addEventListener('change', function () {
+    var v = Object.assign({}, imValue, { enabled: imOn.checked });
+    imSay('enregistrement…');
+    sb.from('admin_settings').upsert({ key: IM_KEY, value: v, updated_at: new Date().toISOString() }).then(function (res) {
+      if (res.error) { imSay('non enregistré', 'warn'); imOn.checked = !imOn.checked; return; }
+      imValue = v; imSay('enregistré ✓', 'ok');
+      clearTimeout(imTimer); imTimer = setTimeout(function () { imSay(''); }, 2000);
+    }, function () { imSay('non enregistré', 'warn'); imOn.checked = !imOn.checked; });
+  });
+  if (imOn && window.CA.onAdminReady) window.CA.onAdminReady(function () {
+    sb.from('admin_settings').select('value').eq('key', IM_KEY).maybeSingle().then(function (res) {
+      if (res.error || !res.data) return;
+      imValue = res.data.value || {};
+      imOn.checked = imValue.enabled !== false;
+    }, function () {});
+  });
+
   /* ---------- prix / coût / paliers par type de produit ---------- */
   function matOf(p) { return (window.CA.materialOf ? window.CA.materialOf(p.brand, p.material) : null) || null; }
   function filOffers(p, kind) {
@@ -946,6 +1011,7 @@
         (pend ? ' · ' + pend + ' à remettre' : '') + '. Nouvelle facture prête. ';
       if (window.CA.printInvoice) statusButton('Imprimer ' + inv.number, function () { window.CA.printInvoice(inv, savedRows); });
       if (order) linkOrder(order, inv);
+      if (!internal) autoMail(inv);
       refreshAfterSave();
     }, function (err) {
       unlock();
@@ -967,7 +1033,7 @@
     var fields = invoiceFields(totals());
     fields.number = norm(elNumber.value) || ed.number;
     var lineRows = valid.map(lineRow);
-    var deduct = !!elDeduct.checked, pend = pendingCount();
+    var deduct = !!elDeduct.checked, pend = pendingCount(), internalEdit = isInternal();
     sb.rpc('update_invoice', { p_id: ed.id, p_invoice: fields, p_lines: lineRows, p_deduct: deduct }).then(function (res) {
       if (res.error) throw res.error;
       var inv = Array.isArray(res.data) ? res.data[0] : res.data;
@@ -981,6 +1047,7 @@
       elStatus.textContent = '✓ Facture ' + inv.number + ' mise à jour' + (deduct ? ', stock ajusté' : '') +
         (pend ? ' · ' + pend + ' à remettre' : '') + '. ';
       if (window.CA.printInvoice) statusButton('Imprimer ' + inv.number, function () { window.CA.printInvoice(inv, lineRows); });
+      if (!internalEdit) statusButton('Renvoyer par courriel', function () { resendInvoice(inv); });
       statusButton('Voir dans l\'historique', function () {
         if (window.CA.focusInvoice) window.CA.focusInvoice(inv.id);
         location.hash = '#historique';

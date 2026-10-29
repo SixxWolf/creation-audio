@@ -1593,6 +1593,8 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .sec-actions { margin-top:14px; }
 /* Réglages › Entreprise (coordonnées imprimées sur les factures, ex. repliable de la Facturation) */
 .ent-actions { display:flex; align-items:center; gap:10px; margin-top:20px; }   /* ⚠ pas .co-actions : déjà pris par les cartes de Commandes */
+.ent-mail { margin-top:16px; }
+.ent-mail .inline { height:40px; font-weight:600; }
 
 /* ==================================================
    ONGLET MESSAGES (messagerie du site — cms-messages.js)

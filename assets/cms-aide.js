@@ -21,8 +21,8 @@
         'Scanne chaque article — ou ajoute-le avec [Filament], [Spacer], [Accessoire] ou [Ligne libre].',
         'Code inconnu ? Choisis l\'article, puis [Associer + ajouter] : il sera reconnu la prochaine fois.',
         'Choisis le client (ou [Dealer]).',
-        'Clique [Enregistrer la facture] : le stock est déduit.',
-        'Remets-la : [Imprimer / PDF] ou [Envoyer par courriel].'
+        'Clique [Enregistrer la facture] : le stock est déduit et le PDF part par courriel au client.',
+        'Pas de courriel au dossier ? Remets-la avec [Imprimer / PDF].'
       ] },
     { id: 'modifier-facture', group: 'Ventes', tab: 'historique', title: 'Modifier ou annuler une facture',
       go: { href: '#historique', label: 'Historique' }, keys: 'corriger erreur annulation',
@@ -33,6 +33,14 @@
         'Pour l\'annuler plutôt : [Annuler], puis [Annuler la facture]. Le stock est remis.'
       ],
       tip: 'Le prix et le coût d\'origine sont gardés : la marge ne change pas.' },
+    { id: 'renvoyer-facture', group: 'Ventes', tab: 'historique', title: 'Renvoyer une facture par courriel',
+      go: { href: '#historique', label: 'Historique' }, keys: 'courriel pdf envoyer client copie envoi automatique',
+      steps: [
+        'Ouvre **Historique**, puis la facture.',
+        'Clique [Renvoyer] ([Envoyer] si rien n\'est encore parti), puis confirme.',
+        'La pastille dit où ça en est : courriel envoyé, non envoyé ou pas de courriel.'
+      ],
+      tip: 'Pour couper l\'envoi automatique : **Réglages › Entreprise › Facture par courriel**.' },
     { id: 'a-venir', group: 'Ventes', tab: 'historique', title: 'Remettre une commande en deux fois',
       go: { href: '#historique', label: 'Historique' }, keys: 'a venir remis partiel plus tard',
       steps: [
