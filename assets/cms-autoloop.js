@@ -760,9 +760,10 @@
 
   // Accepte un .gcode brut OU le projet tranché exporté par Bambu Studio (.gcode.3mf,
   // une archive ZIP : on y lit Metadata/plate_N.gcode). Détection par signature « PK ».
-  function loadFile(file) {
+  function loadFile(file, libId) {
     if (!file) return;
     rawName = file.name;
+    lastFile = file; libCur = libId || null; syncLib();
     project = null; plateName = ''; showPlatePicker();   // repart de zéro (projet précédent oublié)
     resetOutput();
     $('#al-file-name').textContent = 'Lecture de ' + rawName + '…';
@@ -775,6 +776,101 @@
     reader.onerror = function () { fileError('Impossible de lire ce fichier.'); };
     reader.readAsArrayBuffer(file);
   }
+  /* ---- Bibliothèque de plateaux (bucket privé « autoloop » + table autoloop_plates) ----
+     Un plateau tranché par spacer, gardé une fois : on le choisit dans le menu au lieu de
+     chercher le .gcode.3mf. Les réglages du batch (loops…) restent ceux de la page. */
+  var libPlates = [], libCur = null, lastFile = null;
+  function libSb() { return window.CA && window.CA.sb; }
+  function libToast(msg, kind) { if (window.caDialog && caDialog.toast) caDialog.toast(msg, kind); }
+  function libRow(id) { return libPlates.filter(function (p) { return p.id === id; })[0] || null; }
+  function renderLib() {
+    var sel = $('#al-lib-sel'); if (!sel) return;
+    sel.innerHTML = '<option value="">' + (libPlates.length ? 'Bibliothèque : choisir un spacer' : 'Bibliothèque vide') + '</option>' +
+      libPlates.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'; }).join('');
+    sel.value = libCur || '';
+    if (window.CA && CA.pick) CA.pick(sel);
+  }
+  function syncLib() {
+    var save = $('#al-lib-save'), del = $('#al-lib-del'), sel = $('#al-lib-sel');
+    if (!save) return;
+    save.hidden = !(lastFile && !libCur);
+    del.hidden = !libCur;
+    if (sel && sel.value !== (libCur || '')) { sel.value = libCur || ''; if (window.CA && CA.pick) CA.pick(sel); }
+  }
+  function loadLib() {
+    var sb = libSb(); if (!sb) return;
+    sb.from('autoloop_plates').select('*').order('name').then(function (res) {
+      if (res.error) { libToast('Bibliothèque : ' + res.error.message, 'bad'); return; }
+      libPlates = res.data || []; renderLib(); syncLib();
+    });
+  }
+  function libPick(id) {
+    var sb = libSb(), row = libRow(id);
+    if (!row) { libCur = null; syncLib(); return; }
+    $('#al-file-name').textContent = 'Chargement de ' + row.name + '…';
+    sb.storage.from('autoloop').download(row.file_path).then(function (res) {
+      if (res.error || !res.data) {
+        libToast('Fichier introuvable : ' + (res.error ? res.error.message : row.name), 'bad');
+        libCur = null; syncLib(); return;
+      }
+      loadFile(new File([res.data], row.file_name || (row.name + '.gcode.3mf')), row.id);
+    });
+  }
+  function libSave() {
+    var sb = libSb(); if (!sb || !lastFile) return;
+    var file = lastFile;
+    caDialog.prompt({ title: 'Nom du plateau', value: file.name.replace(/(.gcode)?.3mf$|.gcode$/i, ''), ok: 'Enregistrer', icon: 'save' }).then(function (name) {
+      name = (name || '').trim(); if (!name) return;
+      var old = libPlates.filter(function (p) { return p.name.toLowerCase() === name.toLowerCase(); })[0] || null;
+      var go = old ? caDialog.confirm({ title: 'Remplacer « ' + old.name + ' » ?', message: 'Le fichier enregistré sera remplacé.', ok: 'Remplacer', icon: 'save' }) : Promise.resolve(true);
+      go.then(function (ok) {
+        if (!ok) return;
+        var path = old ? old.file_path : ((window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + '.gcode.3mf');
+        var btn = $('#al-lib-save'); btn.disabled = true;
+        sb.storage.from('autoloop').upload(path, file, { upsert: true, contentType: 'application/octet-stream' }).then(function (up) {
+          if (up.error) throw up.error;
+          var row = { name: name, file_path: path, file_name: file.name, size_bytes: file.size, updated_at: new Date().toISOString() };
+          return old ? sb.from('autoloop_plates').update(row).eq('id', old.id).select().single()
+                     : sb.from('autoloop_plates').insert(row).select().single();
+        }).then(function (res) {
+          if (res.error) throw res.error;
+          libCur = res.data.id; loadLibThen();
+          libToast('« ' + name + ' » enregistré.');
+        }).catch(function (err) {
+          libToast('Enregistrement : ' + (err && err.message ? err.message : err), 'bad');
+        }).then(function () { btn.disabled = false; });
+      });
+    });
+  }
+  function loadLibThen() {
+    var sb = libSb();
+    sb.from('autoloop_plates').select('*').order('name').then(function (res) {
+      if (!res.error) libPlates = res.data || [];
+      renderLib(); syncLib();
+    });
+  }
+  function libDelete() {
+    var sb = libSb(), row = libRow(libCur); if (!sb || !row) return;
+    caDialog.confirm({ title: 'Retirer « ' + row.name + ' » de la bibliothèque ?', message: 'Action définitive.', ok: 'Retirer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      sb.storage.from('autoloop').remove([row.file_path]).then(function (r1) {
+        if (r1.error) throw r1.error;
+        return sb.from('autoloop_plates').delete().eq('id', row.id);
+      }).then(function (r2) {
+        if (r2.error) throw r2.error;
+        libCur = null; loadLibThen(); libToast('Plateau retiré.');
+      }).catch(function (err) { libToast('Suppression : ' + (err && err.message ? err.message : err), 'bad'); });
+    });
+  }
+  function initLib() {
+    var sel = $('#al-lib-sel'); if (!sel) return;
+    renderLib();
+    sel.addEventListener('change', function () { if (sel.value) libPick(sel.value); });
+    $('#al-lib-save').addEventListener('click', libSave);
+    $('#al-lib-del').addEventListener('click', libDelete);
+    if (window.CA && window.CA.onAdminReady) window.CA.onAdminReady(loadLib);
+  }
+
   function loadProject(u8) {
     try { project = window.ALProject.read(u8); }
     catch (err) { project = null; syncDownloadLabel(); fileError('Archive illisible : ' + (err && err.message ? err.message : err)); return; }
@@ -960,6 +1056,7 @@
     function syncBend() { $('#al-bend-fields').style.opacity = bendEnable.checked ? '1' : '.4'; }
     bendEnable.addEventListener('change', syncBend); syncBend();
     initCalGrid();
+    initLib();
     // Résumé de l'en-tête des réglages machine, tenu à jour (saisie ou défauts appliqués).
     var machine = $('#al-machine');
     if (machine) { machine.addEventListener('input', syncMachineSum); machine.addEventListener('change', syncMachineSum); }

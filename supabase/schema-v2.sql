@@ -3968,6 +3968,47 @@ revoke all on function public.dealer_email_ok(text) from public, anon, authentic
 grant execute on function public.dealer_email_ok(text) to service_role;
 
 -- ------------------------------------------------------------
+-- AUTOLOOP — BIBLIOTHÈQUE DE PLATEAUX (2026-10-29)
+-- Un plateau tranché (.gcode.3mf de Bambu Studio) par spacer, gardé une fois :
+-- AutoLoop le relit, boucle N fois et rend le projet prêt à envoyer.
+-- Bucket PRIVÉ « autoloop » (admin seulement) ; chemin = <uuid>.gcode.3mf.
+-- ------------------------------------------------------------
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('autoloop', 'autoloop', false, 52428800)
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit;
+
+drop policy if exists autoloop_files_admin_read on storage.objects;
+create policy autoloop_files_admin_read on storage.objects for select to authenticated
+  using (bucket_id = 'autoloop' and (select public.is_admin()));
+drop policy if exists autoloop_files_admin_insert on storage.objects;
+create policy autoloop_files_admin_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'autoloop' and (select public.is_admin()));
+drop policy if exists autoloop_files_admin_update on storage.objects;
+create policy autoloop_files_admin_update on storage.objects for update to authenticated
+  using (bucket_id = 'autoloop' and (select public.is_admin()))
+  with check (bucket_id = 'autoloop' and (select public.is_admin()));
+drop policy if exists autoloop_files_admin_delete on storage.objects;
+create policy autoloop_files_admin_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'autoloop' and (select public.is_admin()));
+
+create table if not exists public.autoloop_plates (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,                                     -- libellé dans le menu (ex. « HKSB110 »)
+  spacer_id  uuid references public.products(id) on delete set null,
+  file_path  text not null,                                     -- chemin dans le bucket « autoloop »
+  file_name  text not null default '',                          -- nom d'origine du fichier
+  size_bytes bigint not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists autoloop_plates_spacer_idx on public.autoloop_plates (spacer_id);
+alter table public.autoloop_plates enable row level security;
+drop policy if exists autoloop_plates_admin_all on public.autoloop_plates;
+create policy autoloop_plates_admin_all on public.autoloop_plates for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.autoloop_plates from anon;
+
+-- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
 select count(*) as produits_v2 from public.products;

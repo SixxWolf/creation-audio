@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=29">
-<link rel="stylesheet" href="assets/autoloop.css?v=28">
+<link rel="stylesheet" href="assets/autoloop.css?v=29">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
 <link rel="stylesheet" href="assets/boites.css?v=8">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
@@ -1757,6 +1757,11 @@
           <div class="al-main">
             <div class="al-card">
               <div class="al-card-head"><span class="al-ic al-step">1</span> Plateau tranché</div>
+              <div class="al-lib" id="al-lib">
+                <select id="al-lib-sel" aria-label="Bibliothèque de plateaux"></select>
+                <button class="btn btn-ghost btn-sm" id="al-lib-save" type="button" hidden data-ic="save">Enregistrer</button>
+                <button class="btn btn-ghost btn-sm" id="al-lib-del" type="button" hidden data-ic="trash">Retirer</button>
+              </div>
               <div class="al-drop" id="al-drop">
                 <div class="al-drop-ic">＋</div>
                 <p class="al-drop-t">Glisse l'export de Bambu Studio (<b>.gcode.3mf</b>) ou un <b>.gcode</b> ici, ou clique pour choisir</p>
@@ -2857,7 +2862,7 @@
 <script src="assets/cms-statistiques.js?v=10"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
-<script src="assets/cms-autoloop.js?v=45"></script>
+<script src="assets/cms-autoloop.js?v=46"></script>
 <!-- Silhouettes : le ?v= du moteur sert aussi au worker (cms-silhouettes.js le lit ici) -->
 <script src="assets/silhouette-engine.js?v=17"></script>
 <script src="assets/cms-silhouettes.js?v=16"></script>

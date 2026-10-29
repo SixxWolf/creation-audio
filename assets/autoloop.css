@@ -44,6 +44,10 @@
 .al-drop.has-file .al-drop-ic::before { content:'↻'; font-size:1rem; }
 .al-drop.has-file .al-drop-t { display:none; }
 .al-drop.has-file .al-drop-s { font-size:.9rem; font-weight:600; color:var(--ink); }
+/* Bibliothèque de plateaux : menu + Enregistrer / Retirer sur une ligne (mobile : le menu passe seul sur la sienne) */
+.al-lib { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.al-lib .cpk, .al-lib > select { flex:1 1 220px; min-width:0; }
+.al-lib .btn[hidden] { display:none; }
 .al-plate { margin-top:12px; max-width:260px; }
 .al-plate[hidden] { display:none; }
 /* Avertissement (pas une erreur) : fond orangé, comme la note « Projet Bambu » */
