@@ -3020,6 +3020,24 @@ create table if not exists public.production_uses (
 );
 -- terminée toute seule (vidée par une production) : rouverte si cette production est supprimée
 alter table public.production_spools add column if not exists closed_auto boolean not null default false;
+-- Retraits de grammes (2026-10-29) : filament pris sur une bobine de production pour autre chose
+-- que des spacers (aucun coût, aucun stock). `batch` = un retrait réparti sur plusieurs bobines.
+create table if not exists public.production_removals (
+  id         uuid primary key default gen_random_uuid(),
+  batch      uuid not null default gen_random_uuid(),
+  spool_id   uuid not null references public.production_spools(id) on delete restrict,
+  grams      numeric(10,2) not null check (grams > 0),
+  note       text,
+  removed_at date not null default current_date,
+  created_at timestamptz not null default now()
+);
+create index if not exists production_removals_spool_idx on public.production_removals (spool_id);
+create index if not exists production_removals_batch_idx on public.production_removals (batch);
+alter table public.production_removals enable row level security;
+drop policy if exists production_removals_admin_all on public.production_removals;
+create policy production_removals_admin_all on public.production_removals for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.production_removals from anon;
 create index if not exists production_spools_status_idx  on public.production_spools (status, taken_at desc);
 create index if not exists production_spools_product_idx on public.production_spools (product_id);
 create index if not exists productions_spacer_idx        on public.productions (spacer_id, created_at desc);
@@ -3118,6 +3136,9 @@ begin
   if exists (select 1 from public.production_uses where spool_id = p_id) then
     raise exception 'Cette bobine a servi à une production : termine-la plutôt.';
   end if;
+  if exists (select 1 from public.production_removals where spool_id = p_id) then
+    raise exception 'Des grammes ont été retirés de cette bobine : termine-la plutôt.';
+  end if;
   if v_s.product_id is not null and v_s.stock_taken > 0 then
     update public.products
        set qty   = case when v_s.kind = 'spool'  then coalesce(qty, 0)   + v_s.stock_taken else qty   end,
@@ -3199,7 +3220,8 @@ begin
      set status = 'done', closed_at = now(), closed_auto = true
    where s.status = 'active'
      and s.id in (select (e ->> 'spool_id')::uuid from jsonb_array_elements(v_uses) e)
-     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id) <= 5;
+     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id)
+                    - (select coalesce(sum(r.grams), 0) from public.production_removals r where r.spool_id = s.id) <= 5;
 
   v_attrs := jsonb_set(v_sp.attrs, '{prod_seed}', v_seed);
   v_attrs := case when v_lout = 1 then jsonb_set(v_attrs, '{loose}', jsonb_build_object('n', 1, 'cost', round(v_loutc, 4)))
@@ -3243,11 +3265,59 @@ begin
   update public.production_spools s
      set status = 'active', closed_at = null, closed_auto = false
    where s.id = any(coalesce(v_spools, '{}')) and s.status = 'done' and s.closed_auto
-     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id) > 5;
+     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id)
+                    - (select coalesce(sum(r.grams), 0) from public.production_removals r where r.spool_id = s.id) > 5;
   if v_pr.spacer_id is not null then perform public._spacer_recost(v_pr.spacer_id); end if;
 end $$;
 revoke all on function public.admin_delete_production(uuid) from public, anon;
 grant execute on function public.admin_delete_production(uuid) to authenticated;
+
+-- Retirer des grammes de bobines de production (2026-10-29), sans raison ni coût :
+-- p = { parts: [{ spool_id, grams }], note, date }. Une bobine vidée (≤ 5 g) est terminée toute seule.
+-- -> { batch }
+create or replace function public.admin_take_grams(p jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_batch uuid := gen_random_uuid(); v_e jsonb; v_g numeric; v_ids uuid[] := '{}'; v_n integer := 0;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  if jsonb_typeof(p -> 'parts') is distinct from 'array' then raise exception 'Indique les grammes à retirer.'; end if;
+  for v_e in select value from jsonb_array_elements(p -> 'parts') loop
+    v_g := round(coalesce((v_e ->> 'grams')::numeric, 0), 2);
+    if v_g <= 0 then continue; end if;
+    perform 1 from public.production_spools where id = (v_e ->> 'spool_id')::uuid and status = 'active' for update;
+    if not found then raise exception 'Bobine de production introuvable.'; end if;
+    insert into public.production_removals (batch, spool_id, grams, note, removed_at)
+    values (v_batch, (v_e ->> 'spool_id')::uuid, v_g, nullif(btrim(coalesce(p ->> 'note', '')), ''),
+            coalesce((p ->> 'date')::date, current_date));
+    v_ids := v_ids || (v_e ->> 'spool_id')::uuid; v_n := v_n + 1;
+  end loop;
+  if v_n = 0 then raise exception 'Indique les grammes à retirer.'; end if;
+  update public.production_spools s
+     set status = 'done', closed_at = now(), closed_auto = true
+   where s.status = 'active' and s.id = any(v_ids)
+     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id)
+                    - (select coalesce(sum(r.grams), 0) from public.production_removals r where r.spool_id = s.id) <= 5;
+  return jsonb_build_object('batch', v_batch);
+end $$;
+revoke all on function public.admin_take_grams(jsonb) from public, anon;
+grant execute on function public.admin_take_grams(jsonb) to authenticated;
+
+-- Annuler un retrait de grammes : ses grammes reviennent aux bobines (rouvertes si elles étaient fermées toutes seules).
+create or replace function public.admin_removal_undo(p_batch uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_spools uuid[];
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select array_agg(distinct spool_id) into v_spools from public.production_removals where batch = p_batch;
+  delete from public.production_removals where batch = p_batch;
+  update public.production_spools s
+     set status = 'active', closed_at = null, closed_auto = false
+   where s.id = any(coalesce(v_spools, '{}')) and s.status = 'done' and s.closed_auto
+     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id)
+                    - (select coalesce(sum(r.grams), 0) from public.production_removals r where r.spool_id = s.id) > 5;
+end $$;
+revoke all on function public.admin_removal_undo(uuid) from public, anon;
+grant execute on function public.admin_removal_undo(uuid) to authenticated;
 
 -- ============================================================
 -- BOBINES VIDES ← PRODUCTION / USAGE INTERNE (2026-10-12)

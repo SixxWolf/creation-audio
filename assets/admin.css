@@ -1776,7 +1776,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .pr-q-bar { height:6px; margin:9px 0 7px; border-radius:99px; background:var(--line); overflow:hidden; }
 .pr-q-bar i { display:block; height:100%; border-radius:inherit; background:var(--ember); transition:width .4s; }
 .pr-q.is-end .pr-q-bar i { background:var(--good); }
-.pr-q-foot { display:flex; align-items:center; gap:8px; font-size:.86rem; }
+.pr-q-foot { display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; font-size:.86rem; }
 .pr-q-t { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .pr-q.is-end .pr-q-t { color:var(--good); font-weight:600; }
 .pr-q-on { color:var(--ember-ink, var(--ember)); font-weight:600; white-space:nowrap; }
@@ -1787,7 +1787,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 
 /* bobines en production */
 .pr-spool-list { display:flex; flex-direction:column; margin-top:6px; }
-.pr-spool { display:grid; grid-template-columns:auto minmax(0, 1fr) minmax(150px, 230px) 206px; align-items:center; gap:6px 14px; padding:11px 0; border-top:1px solid var(--line); }
+.pr-spool { display:grid; grid-template-columns:auto minmax(0, 1fr) minmax(150px, 230px) 300px; align-items:center; gap:6px 14px; padding:11px 0; border-top:1px solid var(--line); }
 /* colonne fixe (Terminer · Retirer · chevron) : jauges alignées quels que soient les boutons */
 .pr-sp-act { display:flex; align-items:center; justify-content:flex-end; gap:6px; }
 .pr-n { margin-left:4px; font-weight:700; color:var(--ember-ink); font-variant-numeric:tabular-nums; }
@@ -1815,7 +1815,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .pr-sp-left { font-size:.84rem; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink); }
 .pr-sp-left em { font-style:normal; font-weight:500; color:var(--muted); }
 .pr-sp-left.is-neg { color:var(--bad); }
-.pr-spool.is-done { grid-template-columns:auto minmax(0, 1fr) auto 206px; }
+.pr-spool.is-done { grid-template-columns:auto minmax(0, 1fr) auto 300px; }
 .pr-spool.is-done .pr-sp-left { font-weight:500; color:var(--ink-2); }
 .pr-done { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
 .pr-done > summary { display:inline-flex; align-items:center; gap:6px; font-size:.86rem; font-weight:600; color:var(--ember-ink); cursor:pointer; }
@@ -2050,3 +2050,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .co-pkedit-free { display:flex; gap:10px; }
 .co-pkedit-free input { flex:1; min-width:0; }
 .co-pkedit-foot { display:flex; flex-wrap:wrap; gap:8px; }
+
+/* production : bloc presque vide (< 150 g) et retraits de grammes */
+.pr-spool.is-low .pr-bar > span { background:var(--bad); }
+.pr-spool.is-low .pr-sp-left { color:var(--bad); }
