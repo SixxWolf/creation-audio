@@ -32,6 +32,7 @@
 .doc-print .inv-tot .taxno { color:#6C727C; font-size:.75rem; font-weight:400; }
 .doc-print .inv-tot .grand { border-top:2px solid #181A1F; margin-top:6px; padding-top:10px; font-weight:700; font-size:1.1rem; }
 .doc-print .inv-pay { margin-top:16px; background:#F6F6F4; border-radius:10px; padding:10px 13px; font-size:.88rem; }
+.doc-print .inv-pay + .inv-pay { margin-top:6px; }
 .doc-print .inv-pay .lbl { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#6C727C; margin-right:8px; }
 .doc-print .inv-paid { margin-top:18px; display:flex; align-items:center; gap:14px; padding:10px 14px;
   border:2px solid #1F7A3D; border-radius:10px; color:#1F7A3D; }

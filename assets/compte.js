@@ -676,6 +676,8 @@
             (inv.tax_enabled ? _t('<div><span>Sous-total</span><span>') + money(inv.subtotal) + '</span></div>' + tax : '') +
             _t('<div class="grand"><span>Total</span><span>') + money(inv.total) + '</span></div>' +
           '</div>' +
+          (inv.pay_method === 'cash' || inv.pay_method === 'interac'
+            ? '<p class="ord-note"><span>' + _t('Paiement') + '</span>' + (inv.pay_method === 'cash' ? _t('Comptant') : _t('Virement Interac')) + '</p>' : '') +
           (inv.note ? _t('<p class="ord-note"><span>Note</span>') + esc(inv.note) + '</p>' : '') +
           _t('<button class="acct-btn ord-print" type="button">Imprimer / PDF</button>') +
         '</div>' +
@@ -728,6 +730,8 @@
         _t('<div class="line"><span>Sous-total</span><span>') + money(inv.subtotal) + '</span></div>' + taxLines +
         _t('<div class="line grand"><span>Total</span><span>') + money(inv.total) + '</span></div>' +
       '</div>' +
+      (inv.pay_method === 'cash' || inv.pay_method === 'interac'
+        ? '<div class="inv-pay"><span class="lbl">' + _t('Paiement') + '</span>' + (inv.pay_method === 'cash' ? _t('Comptant') : _t('Virement Interac')) + '</div>' : '') +
       (inv.note ? _t('<div class="inv-pay"><span class="lbl">Note</span>') + esc(inv.note) + '</div>' : '') +
       _t('<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
   }

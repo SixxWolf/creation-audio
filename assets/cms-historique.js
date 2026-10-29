@@ -42,6 +42,8 @@
     try { return d.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) { return fmtDateFR(ts); }
   }
   var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', mixte: 'Mixte' };
+  var PAY_LABEL = { cash: 'Comptant', interac: 'Virement Interac' };   // factures d'avant : pay_method vide, rien d'affiché
+  var PAY_CHIP = { cash: 'payé comptant', interac: 'payé par Interac' };
 
   var DEFAULT_CO = {
     name: 'Création Audio', tagline: 'Audio automobile & impression 3D — Québec',
@@ -244,7 +246,8 @@
         '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num">' + money(l.line_total) + '</td>' +
       '</tr>';
     }).join('');
-    var stockNote = inv.stock_deducted ? '<span class="hd-stock">stock déduit</span>' : (cancelled ? '<span class="hd-stock ok">stock remis</span>' : '');
+    var stockNote = PAY_CHIP[inv.pay_method] ? '<span class="hd-stock">' + PAY_CHIP[inv.pay_method] + '</span>' : '';
+    stockNote += inv.stock_deducted ? '<span class="hd-stock">stock déduit</span>' : (cancelled ? '<span class="hd-stock ok">stock remis</span>' : '');
     if (inv.updated_at) stockNote += '<span class="hd-stock">modifiée le ' + esc(fmtStampFR(inv.updated_at)) + '</span>';
     var mailable = !cancelled && inv.client_type !== 'internal';
     if (mailable) stockNote += mailChip(inv);
@@ -444,6 +447,7 @@
         '<div class="line"><span>Sous-total</span><span>' + money(inv.subtotal) + '</span></div>' + taxLines +
         '<div class="line grand"><span>Total</span><span>' + money(inv.total) + '</span></div>' +
       '</div>' +
+      (!internal && PAY_LABEL[inv.pay_method] ? '<div class="inv-pay"><span class="lbl">Paiement</span>' + PAY_LABEL[inv.pay_method] + '</div>' : '') +
       (inv.note ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(inv.note) + '</div>' : '') +
       (internal ? '' : '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
   }

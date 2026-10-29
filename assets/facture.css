@@ -20,13 +20,18 @@
   background:var(--paper); border:1px solid var(--line); border-radius:14px; }
 /* contrôles segmentés : l'option active « ressort » (fond papier + ombre) */
 .fx-seg, .fx-type { display:inline-flex; gap:2px; padding:3px; background:var(--wash); border:1px solid var(--line); border-radius:11px; }
-.fx-seg-btn, .fx-cli-btn { min-height:36px; padding:0 16px; font:inherit; font-weight:600; font-size:.92rem; color:var(--muted);
+.fx-seg-btn, .fx-cli-btn, .fx-pay-btn { min-height:36px; padding:0 16px; font:inherit; font-weight:600; font-size:.92rem; color:var(--muted);
   white-space:nowrap; cursor:pointer; background:none; border:none; border-radius:8px; transition:background .15s, color .15s, box-shadow .15s; }
-.fx-seg-btn:hover, .fx-cli-btn:hover { color:var(--ink); }
+.fx-seg-btn:hover, .fx-cli-btn:hover, .fx-pay-btn:hover { color:var(--ink); }
 .fx-seg-btn.is-active, .fx-cli-btn.is-active { color:var(--ink); background:var(--paper);
   box-shadow:0 1px 3px rgba(20,22,26,.14), inset 0 0 0 1px var(--line); }
-.fx-cli-btn[data-cli="dealer"].is-active { color:var(--on-ember); background:var(--ember); box-shadow:none; }
-.fx-seg-btn:focus-visible, .fx-cli-btn:focus-visible, .fx-type-btn:focus-visible, .pk-cell:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
+.fx-cli-btn[data-cli="dealer"].is-active, .fx-pay-btn.is-active { color:var(--on-ember); background:var(--ember); box-shadow:none; }
+.fx-seg-btn:focus-visible, .fx-cli-btn:focus-visible, .fx-pay-btn:focus-visible, .fx-type-btn:focus-visible, .pk-cell:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
+/* mode de paiement : obligatoire à l'enregistrement -> cerclé en rouge tant qu'il manque */
+.fx-pay-seg { align-items:center; }
+.fx-pay-seg[hidden] { display:none; }
+.fx-pay-lbl { padding:0 8px 0 10px; font-size:.84rem; font-weight:700; color:var(--muted); white-space:nowrap; }
+.fx-pay-seg.is-missing { border-color:var(--bad); box-shadow:0 0 0 3px color-mix(in srgb, var(--bad) 18%, transparent); }
 .fx-seg-sm .fx-cli-btn { min-height:30px; padding:0 12px; font-size:.85rem; }
 .fx-cli-seg { margin-left:auto; }   /* type de client calé à droite de la barre */
 .fx-check { display:inline-flex; align-items:center; gap:8px; min-height:36px; padding:0 12px; font-size:.9rem; font-weight:600;
@@ -222,6 +227,7 @@
 .inv-tot .taxno { color:var(--muted); font-size:.75rem; font-weight:400; }
 .inv-tot .grand { border-top:2px solid var(--ink); margin-top:6px; padding-top:10px; font-weight:700; font-size:1.1rem; }
 .inv-pay { margin-top:16px; background:var(--wash); border-radius:var(--radius-sm); padding:10px 13px; font-size:.88rem; }
+.inv-pay + .inv-pay { margin-top:6px; }
 .inv-pay .lbl { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-right:8px; }
 .inv-foot { margin-top:18px; color:var(--muted); font-size:.78rem; text-align:center; border-top:1px solid var(--line); padding-top:12px; }
 
@@ -272,7 +278,8 @@
   .fx-rail { display:flex; flex-direction:column; gap:12px; overflow-y:auto; scrollbar-width:thin; }
   .fx-rail > * { flex:none; }
   .fx-rail .fx-cli-seg { display:flex; margin-left:0; }
-  .fx-rail .fx-cli-btn { flex:1; padding:0 10px; }
+  .fx-rail .fx-cli-btn, .fx-rail .fx-pay-btn { flex:1; padding:0 10px; }
+  .fx-rail .fx-pay-seg:not([hidden]) { display:flex; }
   .fx-rail .fx-meta { margin:0; padding:18px; box-shadow:none; }
   .fx-rail .fx-meta .grid { grid-template-columns:minmax(0, 1fr); gap:14px; }
   .fx-rail .fx-details { margin-top:16px; padding-top:14px; }

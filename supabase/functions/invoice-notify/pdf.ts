@@ -24,22 +24,25 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 
 const STR = {
   fr: { invoice: "FACTURE", no: "N°", from: "De", to: "Facturé à", desc: "Description", qty: "Qté", unit: "Prix unitaire", total: "Total",
-        sub: "Sous-total", gst: "TPS", qst: "TVQ", note: "Note", thanks: "Merci pour ta commande !", page: "Page", of: "sur", cont: "suite" },
+        sub: "Sous-total", gst: "TPS", qst: "TVQ", note: "Note", pay: "Paiement", cash: "Comptant", interac: "Virement Interac",
+        thanks: "Merci pour ta commande !", page: "Page", of: "sur", cont: "suite" },
   en: { invoice: "INVOICE", no: "No.", from: "From", to: "Billed to", desc: "Description", qty: "Qty", unit: "Unit price", total: "Total",
-        sub: "Subtotal", gst: "GST", qst: "QST", note: "Note", thanks: "Thank you for your order!", page: "Page", of: "of", cont: "continued" },
+        sub: "Subtotal", gst: "GST", qst: "QST", note: "Note", pay: "Payment", cash: "Cash", interac: "Interac e-Transfer",
+        thanks: "Thank you for your order!", page: "Page", of: "of", cont: "continued" },
 };
 
 export type Company = Record<string, unknown>;
 export type InvoiceHead = {
   number: string; invoice_date: string; client_name?: string | null; client_address?: string | null; client_city?: string | null;
   client_contact?: string | null; tax_enabled: boolean; subtotal: number; tax_gst: number; tax_qst: number; total: number; note?: string | null;
+  pay_method?: "cash" | "interac" | null;
 };
 export type InvoiceLine = { label?: string | null; meta?: string | null; qty: number; unit_price: number; line_total: number };
 
 // espaces fines / insécables et caractères invisibles : absents des polices
-const clean = (s: unknown) => String(s ?? "").replace(/[   ]/g, " ").replace(/[​-‍﻿]/g, "").replace(/\r/g, "");
+const clean = (s: unknown) => String(s ?? "").replace(/[\u202f\u00a0\u2009]/g, " ").replace(/[\u200b-\u200d\ufeff]/g, "").replace(/\r/g, "");
 // Helvetica (WinAnsi) refuse tout ce qui n'est pas du Latin-1 + quelques signes : on les remplace
-const winSafe = (s: string) => s.replace(/[^ -~ -ÿŒœ–—‘’“”•…€]/g, "?");
+const winSafe = (s: string) => s.replace(/[^ -~\u00a0-\u00ff\u0152\u0153\u2013\u2014\u2018\u2019\u201c\u201d\u2022\u2026\u20ac]/g, "?");
 
 export function money(n: unknown, en: boolean) {
   const v = Math.round((Number(n) || 0) * 100) / 100;
@@ -214,7 +217,13 @@ export async function buildInvoicePdf(o: { company: Company; invoice: InvoiceHea
   // ---- totaux (bloc réservé : jamais coupé de la dernière ligne) ----
   const rows: [string, number][] = inv.tax_enabled ? [[T.sub, inv.subtotal], [T.gst, inv.tax_gst], [T.qst, inv.tax_qst]] : [];
   const noteLines = inv.note ? wrap(inv.note, reg, 9, 250) : [];
-  const need = rows.length * 17 + 70 + Math.max(0, noteLines.length - 2) * 13 + 40;
+  // bloc de gauche, à côté du total : mode de paiement puis note
+  const payTxt = inv.pay_method === "cash" ? T.cash : inv.pay_method === "interac" ? T.interac : "";
+  const blocks: { label: string; lines: string[] }[] = [];
+  if (payTxt) blocks.push({ label: T.pay, lines: [payTxt] });
+  if (noteLines.length) blocks.push({ label: T.note, lines: noteLines });
+  const leftH = blocks.reduce((h, b) => h + 22 + b.lines.length * 13, 0);
+  const need = rows.length * 17 + 70 + Math.max(0, leftH - 48) + 40;
   if (y - need < BOTTOM) newPage(false);
   y -= 10;
   const tx = W - M - 190;
@@ -229,12 +238,15 @@ export async function buildInvoicePdf(o: { company: Company; invoice: InvoiceHea
   text(money(inv.total, en), W - M - 8, y - 1, { font: disp, size: 15, color: WHITE, align: "right" });
   page.drawRectangle({ x: tx - 10, y: y - 10, width: 3, height: 32, color: C.ember });
   let after = y - 40;
-  if (noteLines.length) {
+  if (blocks.length) {
     let ny = y + 6 + rows.length * 17;
-    text(T.note.toUpperCase(), M, ny, { font: semi, size: 7, color: C.soft });
-    ny -= 14;
-    noteLines.forEach((s) => { text(s, M, ny, { size: 9 }); ny -= 13; });
-    after = Math.min(after, ny - 18);
+    blocks.forEach((b) => {
+      text(b.label.toUpperCase(), M, ny, { font: semi, size: 7, color: C.soft });
+      ny -= 14;
+      b.lines.forEach((s) => { text(s, M, ny, { size: 9 }); ny -= 13; });
+      ny -= 8;
+    });
+    after = Math.min(after, ny - 10);
   }
   y = after;
   text(T.thanks, M, y, { font: semi, size: 10 });

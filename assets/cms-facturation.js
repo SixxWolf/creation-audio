@@ -67,6 +67,8 @@
   var clientType = 'client';     // 'client' | 'dealer' | 'internal' (usage interne : prix 0 $, n° INT-)
   var INTERNAL_NAME = 'Usage interne';
   var taxEnabled = false;
+  var payMethod = null;          // 'cash' (comptant) | 'interac' (virement) | null ; obligatoire à l'enregistrement, sauf usage interne
+  var PAY_LABEL = { cash: 'Comptant', interac: 'Virement Interac' };
   var pickerKind = 'spool';      // filament : bobine | recharge
   var brandFilter = 'all';       // filtre marque (catalogue filament)
   var matFilter = 'all';         // filtre matériau (catalogue filament)
@@ -83,7 +85,7 @@
 
   /* ---------- éléments ---------- */
   var elReset = $('#fx-reset'), elNextHint = $('#fx-nexthint'),
-      elTax = $('#fx-tax'),
+      elTax = $('#fx-tax'), elPay = $('#fx-pay'),
       elCliName = $('#fx-cli-name'), elCliEmail = $('#fx-cli-email'), elCliPhone = $('#fx-cli-phone'),
       elCliAddress = $('#fx-cli-address'), elCliCity = $('#fx-cli-city'),
       elDealerField = $('#fx-dealer-field'), elDealerSelect = $('#fx-dealer-select'),
@@ -351,6 +353,23 @@
   $$('.fx-cli-btn').forEach(function (b) {
     b.addEventListener('click', function () { setClientType(b.getAttribute('data-cli')); });
   });
+  // mode de paiement (Comptant | Interac)
+  function setPay(v) {
+    payMethod = v === 'cash' || v === 'interac' ? v : null;
+    $$('.fx-pay-btn').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-pay') === payMethod); });
+    if (elPay) elPay.classList.remove('is-missing');
+    render();
+  }
+  $$('.fx-pay-btn').forEach(function (b) {
+    b.addEventListener('click', function () { setPay(b.getAttribute('data-pay')); });
+  });
+  // refuse l'enregistrement tant que le mode manque (usage interne : aucun paiement)
+  function payMissing() {
+    if (isInternal() || payMethod) return false;
+    if (elPay) { elPay.classList.add('is-missing'); elPay.scrollIntoView({ block: 'nearest' }); }
+    elStatus.textContent = 'Choisis le mode de paiement.';
+    return true;
+  }
 
   /* ---------- carnet clients / dealers ---------- */
   function clientFields() {
@@ -461,6 +480,7 @@
     });
     var isDlr = clientType === 'dealer', isInt = clientType === 'internal';
     if (elDealerField) elDealerField.hidden = !isDlr;
+    if (elPay) elPay.hidden = isInt;        // usage interne : aucun paiement
     if (elClientField) elClientField.hidden = isDlr || isInt;
     if (elClientSearch) elClientSearch.value = '';
     hideClientResults();
@@ -799,6 +819,7 @@
     }
 
     var noteVal = elNote.value.trim();
+    var payVal = !internal && payMethod ? PAY_LABEL[payMethod] : '';
     elInvoice.innerHTML =
       '<div class="inv-top">' +
         '<div class="inv-co">' + (co.logo ? '<img class="inv-logo" src="' + co.logo + '" alt="' + esc(co.name) + '">' : '') +
@@ -817,6 +838,7 @@
         taxLines +
         '<div class="line grand"><span>Total</span><span>' + money(t.total) + '</span></div>' +
       '</div>' +
+      (payVal ? '<div class="inv-pay"><span class="lbl">Paiement</span>' + esc(payVal) + '</div>' : '') +
       (noteVal ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(noteVal) + '</div>' : '') +
       (internal ? '' : '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
 
@@ -929,6 +951,7 @@
       category: currentCategory(),
       invoice_date: /^\d{4}-\d{2}-\d{2}$/.test(elDate.value) ? elDate.value : todayISO(),
       note: elNote.value.trim() || null,
+      pay_method: isInternal() ? null : payMethod,
       tax_enabled: taxEnabled,
       subtotal: round2(t.sub), tax_gst: round2(t.gst), tax_qst: round2(t.qst),
       total: round2(t.total), cost_total: round2(t.cost)
@@ -961,6 +984,7 @@
     if (editing) { onSaveEdit(); return; }
     var valid = lines.filter(function (l) { return l.qty > 0; });
     if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
+    if (payMissing()) return;
     var order = fromOrder;   // commande dealer à marquer « Facturée » une fois la facture enregistrée
 
     saved = true;   // verrou pendant l'envoi (anti double-clic)
@@ -1027,6 +1051,7 @@
   function onSaveEdit() {
     var valid = lines.filter(function (l) { return l.qty > 0; });
     if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
+    if (payMissing()) return;
     var ed = editing;
     saved = true;   // verrou pendant l'envoi (anti double-clic)
     elSave.disabled = true; elStatus.textContent = 'Enregistrement des modifications…';
@@ -1104,6 +1129,7 @@
     lines = []; saved = false; unlock();
     elNote.value = '';
     elDate.value = todayISO(); elStatus.textContent = '';
+    payMethod = null; $$('.fx-pay-btn').forEach(function (b) { b.classList.remove('is-active'); }); if (elPay) elPay.classList.remove('is-missing');
     setClientType('client');   // vide les champs client (le profil dealer reste mémorisé)
     loadNextNumberHint();
     render();
@@ -1209,6 +1235,7 @@
       address: inv.client_address || '', city: inv.client_city || '' });
     if (elDealerSelect) { var d = dealer ? dealerByEmail(ct.email) : null; elDealerSelect.value = d ? d.email : ''; }
     elNote.value = inv.note || '';
+    setPay(inv.pay_method);
     elNumber.value = inv.number || '';
     elDate.value = inv.invoice_date || todayISO();
     taxEnabled = !!inv.tax_enabled; if (elTax) elTax.checked = taxEnabled;
@@ -1391,6 +1418,7 @@
     L.push('Sous-total : ' + money(t.sub));
     if (taxEnabled) { L.push('TPS : ' + money(t.gst)); L.push('TVQ : ' + money(t.qst)); }
     L.push('TOTAL : ' + money(t.total));
+    if (payMethod && !isInternal()) { L.push(''); L.push('Paiement : ' + PAY_LABEL[payMethod]); }
     var note = elNote.value.trim(); if (note) { L.push(''); L.push('Note : ' + note); }
     return L.join('\n');
   }

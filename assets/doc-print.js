@@ -65,8 +65,10 @@
         '<div class="line grand"><span>' + _t('Total') + '</span><span>' + money(inv.total) + '</span></div>' +
       '</div>' +
       (isReceipt
-        ? '<div class="inv-paid"><b>' + _t('PAYÉ') + '</b><span>' + money(inv.total) + _t(' reçu par virement le ') + esc(fmtDay(docs.paid_at)) + '</span></div>'
-        : (inv.note ? '<div class="inv-pay"><span class="lbl">' + _t('Note') + '</span>' + esc(inv.note) + '</div>' : '')) +
+        ? '<div class="inv-paid"><b>' + _t('PAYÉ') + '</b><span>' + money(inv.total) + (inv.pay_method === 'cash' ? _t(' reçu comptant le ') : _t(' reçu par virement le ')) + esc(fmtDay(docs.paid_at)) + '</span></div>'
+        : (inv.pay_method === 'cash' || inv.pay_method === 'interac'
+            ? '<div class="inv-pay"><span class="lbl">' + _t('Paiement') + '</span>' + (inv.pay_method === 'cash' ? _t('Comptant') : _t('Virement Interac')) + '</div>' : '') +
+          (inv.note ? '<div class="inv-pay"><span class="lbl">' + _t('Note') + '</span>' + esc(inv.note) + '</div>' : '')) +
       '<div class="inv-foot">' + _t('Merci de votre confiance !') + '</div>';
   }
 

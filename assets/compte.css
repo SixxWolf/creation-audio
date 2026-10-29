@@ -130,6 +130,7 @@
 .ord-tot div { display:flex; justify-content:space-between; gap:12px; padding:3px 0; color:var(--ink-2); }
 .ord-tot .grand { margin-top:4px; padding-top:8px; border-top:2px solid var(--ink); color:var(--ink); font-weight:700; font-size:1.05rem; }
 .ord-note { margin:14px 0 0; padding:10px 13px; background:var(--wash); border-radius:var(--radius-sm); font-size:.88rem; overflow-wrap:anywhere; }
+.ord-note + .ord-note { margin-top:6px; }
 .ord-note span { margin-right:8px; font-size:.68rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
 .acct-btn { display:inline-flex; align-items:center; height:40px; margin-top:16px; padding:0 16px; font:inherit; font-weight:600; font-size:.9rem;
   color:var(--ink); cursor:pointer; background:var(--paper); border:1px solid var(--line-2); border-radius:12px; }
@@ -258,6 +259,7 @@
 .acct-print .inv-tot .taxno { color:var(--muted); font-size:.75rem; font-weight:400; }
 .acct-print .inv-tot .grand { border-top:2px solid #181A1F; margin-top:6px; padding-top:10px; font-weight:700; font-size:1.1rem; }
 .acct-print .inv-pay { margin-top:16px; background:var(--wash); border-radius:10px; padding:10px 13px; font-size:.88rem; }
+.acct-print .inv-pay + .inv-pay { margin-top:6px; }
 .acct-print .inv-pay .lbl { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-right:8px; }
 .acct-print .inv-foot { margin-top:18px; color:var(--muted); font-size:.78rem; text-align:center; border-top:1px solid var(--line); padding-top:12px; }
 

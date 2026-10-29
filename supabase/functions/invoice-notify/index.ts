@@ -156,6 +156,7 @@ Deno.serve(async (req) => {
     const first = String(inv.client_name || "").trim().split(/\s+/)[0] || "";
     const m = (n: unknown) => money(n, en);
     const dateStr = dateTxt(inv.invoice_date, en);
+    const payTxt = inv.pay_method === "cash" ? T("Comptant", "Cash") : inv.pay_method === "interac" ? T("Virement Interac", "Interac e-Transfer") : "";
     const accUrl = SITE + (en ? "/en" : "") + "/compte.html#/commandes";
     const subject = T("Ta facture ", "Your invoice ") + inv.number + " — Création Audio";
     const text =
@@ -163,7 +164,8 @@ Deno.serve(async (req) => {
       T("Ta facture " + inv.number + " (" + dateStr + ") est jointe à ce courriel, en PDF.", "Your invoice " + inv.number + " (" + dateStr + ") is attached to this email as a PDF.") + "\n\n" +
       L.map((l) => "- " + (l.label || "") + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + m(l.line_total)).join("\n") + "\n\n" +
       (inv.tax_enabled ? T("Sous-total : ", "Subtotal: ") + m(inv.subtotal) + "\n" + T("TPS : ", "GST: ") + m(inv.tax_gst) + "\n" + T("TVQ : ", "QST: ") + m(inv.tax_qst) + "\n" : "") +
-      "Total" + T(" : ", ": ") + m(inv.total) + "\n\n" +
+      "Total" + T(" : ", ": ") + m(inv.total) + "\n" +
+      (payTxt ? T("Paiement : ", "Payment: ") + payTxt + "\n" : "") + "\n" +
       T("Tu retrouves aussi tes factures dans ton compte : ", "You can also find your invoices in your account: ") + accUrl + "\n\n" +
       "Création Audio\n" + SITE + (en ? "/en/" : "/");
     const rowsHtml = L.map((l) => '<tr>' +
@@ -186,6 +188,7 @@ Deno.serve(async (req) => {
         '<th style="padding:8px 10px;text-align:right">Total</th></tr>' + rowsHtml +
       '</table>' + taxHtml +
       '<p style="margin:10px 0 0;text-align:right;font-size:16px"><strong>Total' + T(" : ", ": ") + m(inv.total) + '</strong></p>' +
+      (payTxt ? '<p style="margin:2px 0 0;text-align:right;color:#6C727C;font-size:13px">' + T("Paiement : ", "Payment: ") + esc(payTxt) + '</p>' : '') +
       '<p style="margin:22px 0"><a href="' + accUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
         T("Voir mon compte", "Open my account") + '</a></p>' +
       '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +

@@ -18,12 +18,12 @@
 <link rel="stylesheet" href="assets/admin.css?v=127">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=1">
-<link rel="stylesheet" href="assets/facture.css?v=30">
+<link rel="stylesheet" href="assets/facture.css?v=31">
 <link rel="stylesheet" href="assets/autoloop.css?v=30">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
 <link rel="stylesheet" href="assets/boites.css?v=8">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
-<link rel="stylesheet" href="assets/doc-print.css?v=2">
+<link rel="stylesheet" href="assets/doc-print.css?v=3">
 <!-- Couleur d'accent choisie dans Réglages › Apparence (admin-accent.js) : posée APRÈS les feuilles et avant le rendu -->
 <script>try{var c=localStorage.getItem('ca-accent-css');if(c){var s=document.createElement('style');s.id='ca-accent';s.textContent=c;document.head.appendChild(s);}if(localStorage.getItem('ca-accent')==='rainbow'){document.documentElement.setAttribute('data-rainbow','');document.write('<link rel="stylesheet" id="ca-rainbow-css" href="assets/rainbow.css?v=3">');}}catch(e){}</script>
 <script src="assets/dialog.js?v=5"></script>
@@ -1536,6 +1536,11 @@
           <button type="button" class="fx-seg-btn" data-cat="accessory">Accessoire</button>
         </div>
         <label class="fx-check" data-wide="fx-right" data-wide-order="3"><input type="checkbox" id="fx-tax"> Taxes (TPS/TVQ)</label>
+        <div class="fx-seg fx-pay-seg" id="fx-pay" role="group" aria-label="Mode de paiement" data-wide="fx-right" data-wide-order="4">
+          <span class="fx-pay-lbl">Paiement</span>
+          <button type="button" class="fx-pay-btn" data-pay="cash">Comptant</button>
+          <button type="button" class="fx-pay-btn" data-pay="interac">Interac</button>
+        </div>
         <span class="fx-scan-feedback no-print" id="fx-scan-feedback" aria-live="polite" data-wide="fx-left" data-wide-order="2"
               title="Dans cet onglet, le scanner est toujours à l'écoute : scanne un article, il s'ajoute à la facture."></span>
         <div class="fx-seg fx-cli-seg" role="group" aria-label="Type de client" data-wide="fx-right" data-wide-order="1">
@@ -1594,8 +1599,8 @@
               <input type="text" id="fx-date" placeholder="AAAA-MM-JJ" autocomplete="off">
             </div>
             <div class="field col-2">
-              <label class="lbl" for="fx-note">Note / paiement</label>
-              <input type="text" id="fx-note" placeholder="Ex. Interac · ramassage Québec" autocomplete="off">
+              <label class="lbl" for="fx-note">Note</label>
+              <input type="text" id="fx-note" placeholder="Ex. ramassage Québec" autocomplete="off">
             </div>
           </div>
         </details>
@@ -2863,13 +2868,13 @@
 <script src="assets/cms-dealers.js?v=9"></script>
 <script src="assets/cms-clients.js?v=10"></script>
 <script src="assets/cms-messages.js?v=7"></script>
-<script src="assets/cms-facturation.js?v=52"></script>
-<script src="assets/cms-historique.js?v=17"></script>
+<script src="assets/cms-facturation.js?v=53"></script>
+<script src="assets/cms-historique.js?v=18"></script>
 <script src="assets/commande-client.js?v=1"></script>
 <script src="assets/cms-commandes-clients.js?v=23"></script>
 <script src="assets/cms-reservations.js?v=9"></script>
 <script src="assets/cms-cueillettes.js?v=6"></script>
-<script src="assets/doc-print.js?v=1"></script>
+<script src="assets/doc-print.js?v=2"></script>
 <script src="assets/cms-commandes.js?v=12"></script>
 <script src="assets/cms-statistiques.js?v=10"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
@@ -2887,6 +2892,6 @@
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-recherche.js?v=2"></script>
 <script src="assets/aide.js?v=3"></script>
-<script src="assets/cms-aide.js?v=6"></script>
+<script src="assets/cms-aide.js?v=7"></script>
 </body>
 </html>

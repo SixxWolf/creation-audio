@@ -21,6 +21,7 @@
         'Scanne chaque article — ou ajoute-le avec [Filament], [Spacer], [Accessoire] ou [Ligne libre].',
         'Code inconnu ? Choisis l\'article, puis [Associer + ajouter] : il sera reconnu la prochaine fois.',
         'Choisis le client (ou [Dealer]).',
+        'Choisis le paiement : [Comptant] ou [Interac]. Obligatoire pour enregistrer.',
         'Clique [Enregistrer la facture] : le stock est déduit et le PDF part par courriel au client.',
         'Pas de courriel au dossier ? Remets-la avec [Imprimer / PDF].'
       ] },
