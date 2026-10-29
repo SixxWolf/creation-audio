@@ -48,6 +48,14 @@
 .al-lib { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
 .al-lib .cpk, .al-lib > select { flex:1 1 220px; min-width:0; }
 .al-lib .btn[hidden] { display:none; }
+/* Batchs prêts : une ligne par nombre de loops */
+.al-pre-row { display:flex; align-items:center; flex-wrap:wrap; gap:6px 18px; padding:11px 0; border-top:1px solid var(--line); }
+.al-pre-row:first-child { border-top:0; padding-top:0; }
+.al-pre-n { flex:0 0 76px; font-family:var(--display); }
+.al-pre-v { flex:0 0 86px; font-weight:600; font-variant-numeric:tabular-nums; }
+.al-pre-b { display:flex; flex-wrap:wrap; gap:8px; margin-left:auto; }
+.al-pre-card[hidden] { display:none; }
+@media (max-width:640px) { .al-pre-b { flex:1 0 100%; margin-left:0; } .al-pre-b .btn { flex:1 1 auto; } }
 .al-plate { margin-top:12px; max-width:260px; }
 .al-plate[hidden] { display:none; }
 /* Avertissement (pas une erreur) : fond orangé, comme la note « Projet Bambu » */

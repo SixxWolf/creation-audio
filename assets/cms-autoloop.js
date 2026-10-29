@@ -763,7 +763,9 @@
   function loadFile(file, libId) {
     if (!file) return;
     rawName = file.name;
-    lastFile = file; libCur = libId || null; syncLib();
+    lastFile = file; libCur = libId || null;
+    libPending = libId && libRow(libId) ? libRow(libId).settings : null;   // appliqués une fois le fichier lu (useGcode)
+    syncLib();
     project = null; plateName = ''; showPlatePicker();   // repart de zéro (projet précédent oublié)
     resetOutput();
     $('#al-file-name').textContent = 'Lecture de ' + rawName + '…';
@@ -779,7 +781,8 @@
   /* ---- Bibliothèque de plateaux (bucket privé « autoloop » + table autoloop_plates) ----
      Un plateau tranché par spacer, gardé une fois : on le choisit dans le menu au lieu de
      chercher le .gcode.3mf. Les réglages du batch (loops…) restent ceux de la page. */
-  var libPlates = [], libCur = null, lastFile = null;
+  var libPlates = [], libCur = null, lastFile = null, libPending = null;
+  var PRESETS = [6, 12, 18, 24];   // lignes « Batchs prêts » (loops)
   function libSb() { return window.CA && window.CA.sb; }
   function libToast(msg, kind) { if (window.caDialog && caDialog.toast) caDialog.toast(msg, kind); }
   function libRow(id) { return libPlates.filter(function (p) { return p.id === id; })[0] || null; }
@@ -791,10 +794,10 @@
     if (window.CA && CA.pick) CA.pick(sel);
   }
   function syncLib() {
-    var save = $('#al-lib-save'), del = $('#al-lib-del'), sel = $('#al-lib-sel');
+    var save = $('#al-lib-save'), del = $('#al-lib-del'), set = $('#al-lib-set'), sel = $('#al-lib-sel');
     if (!save) return;
     save.hidden = !(lastFile && !libCur);
-    del.hidden = !libCur;
+    set.hidden = del.hidden = !libCur;
     if (sel && sel.value !== (libCur || '')) { sel.value = libCur || ''; if (window.CA && CA.pick) CA.pick(sel); }
   }
   function loadLib() {
@@ -829,7 +832,7 @@
         var btn = $('#al-lib-save'); btn.disabled = true;
         sb.storage.from('autoloop').upload(path, file, { upsert: true, contentType: 'application/octet-stream' }).then(function (up) {
           if (up.error) throw up.error;
-          var row = { name: name, file_path: path, file_name: file.name, size_bytes: file.size, updated_at: new Date().toISOString() };
+          var row = { name: name, file_path: path, file_name: file.name, size_bytes: file.size, settings: libSettings(), updated_at: new Date().toISOString() };
           return old ? sb.from('autoloop_plates').update(row).eq('id', old.id).select().single()
                      : sb.from('autoloop_plates').insert(row).select().single();
         }).then(function (res) {
@@ -842,6 +845,114 @@
       });
     });
   }
+  // Tout ce que la page règle (batch, calculateur de prix, cases de calibration) suit le plateau.
+  function libSettings() {
+    var N = loopCount(); fitCal(N);
+    return { gcode: snapshot('gcode'), prix: snapshot('prix'), cal: { flow: cal.flow.slice(0, N), bed: cal.bed.slice(0, N) } };
+  }
+  function libApply(s) {
+    if (!s || !s.gcode) return;   // plateau sans réglages enregistrés : la page reste comme elle est
+    applyValues(s.gcode, true); applyValues(s.prix, true);
+    if (s.cal && s.cal.flow) { cal.flow = s.cal.flow.slice(); cal.bed = (s.cal.bed || []).slice(); renderCalGrid(); }
+  }
+  function libSet() {
+    var sb = libSb(), row = libRow(libCur); if (!sb || !row) return;
+    var btn = $('#al-lib-set'); btn.disabled = true;
+    sb.from('autoloop_plates').update({ settings: libSettings(), updated_at: new Date().toISOString() }).eq('id', row.id).select().single().then(function (res) {
+      if (res.error) throw res.error;
+      libToast('Réglages de « ' + row.name + ' » enregistrés.'); loadLibThen();
+    }).catch(function (err) { libToast('Réglages : ' + (err && err.message ? err.message : err), 'bad'); })
+      .then(function () { btn.disabled = false; });
+  }
+
+  /* ---- Batchs prêts : 6 / 12 / 18 / 24 loops, durée et filament calculés d'après UN loop
+     (temps = loops × (loop + cooldown/éjection), filament = loops × poids du loop : même
+     calcul que generateBatch) ; le projet n'est généré qu'au clic. ---- */
+  function presetOpts(n) {
+    var o = readOpts(), fk = calInterval('flow'), bk = calInterval('bed');
+    o.loops = n; o.cal = { flow: [], bed: [] };
+    for (var i = 1; i <= n; i++) { o.cal.flow.push(calibrateLoop(i, fk)); o.cal.bed.push(calibrateLoop(i, bk)); }
+    return o;
+  }
+  function renderPresets() {
+    var card = $('#al-pre-card'), box = $('#al-pre'); if (!card) return;
+    card.hidden = !rawText;
+    if (!rawText) return;
+    var rep = null;
+    try { rep = generateBatch(rawText, presetOpts(1)).report; } catch (e) { rep = null; }
+    if (!rep || !rep.ok) { box.innerHTML = '<p class="al-warn">' + esc(rep && rep.error ? rep.error : 'Fichier illisible.') + '</p>'; return; }
+    var perMin = rep.progress ? rep.loopMin + rep.transMin : 0;
+    box.innerHTML = PRESETS.map(function (n) {
+      return '<div class="al-pre-row"><b class="al-pre-n">' + n + ' loops</b>' +
+        '<span class="al-pre-v">' + (perMin ? fmtDur(Math.round(n * perMin)) : '—') + '</span>' +
+        '<span class="al-pre-v">' + (rep.weightPer > 0 ? grams(n * rep.weightPer) + ' g' : '—') + '</span>' +
+        '<span class="al-pre-b"><button class="btn btn-accent btn-sm" type="button" data-pre="' + n + '" data-act="open" data-ic="print"' + (project ? '' : ' disabled') + '>Ouvrir dans Bambu Studio</button>' +
+        '<button class="btn btn-ghost btn-sm" type="button" data-pre="' + n + '" data-act="dl" data-ic="download">Télécharger</button></span></div>';
+    }).join('');
+  }
+  var preTimer = null;
+  function schedulePresets() { clearTimeout(preTimer); preTimer = setTimeout(renderPresets, 250); }
+  function presetBuild(n) {
+    var res = generateBatch(rawText, presetOpts(n));
+    if (!res.report.ok) return Promise.reject(new Error(res.report.error || 'Génération impossible.'));
+    var bytes = new TextEncoder().encode(res.text);
+    if (!project) return Promise.resolve({ bytes: bytes, name: rawName.replace(/\.gcode$/i, '') + ' AutoLoop x' + n + '.gcode' });
+    return window.ALProject.build(project, plateName, bytes, { loops: n, predictionSec: res.report.progress ? res.report.totalMin * 60 : 0 })
+      .then(function (zip) { return { bytes: zip, name: projectOutName(n) }; });
+  }
+  function busy(btn, text, work) {
+    var old = btn.textContent; btn.disabled = true; btn.textContent = text;
+    return new Promise(function (r) { setTimeout(r, 30); }).then(work)   // laisse peindre l'état avant le gros travail
+      .catch(function (err) { libToast((err && err.message ? err.message : err), 'bad'); })
+      .then(function () { btn.disabled = false; btn.textContent = old; });
+  }
+  // Le fichier part dans le bucket privé (dossier tmp/, vidé après 24 h), puis Bambu Studio l'ouvre
+  // par lien signé (15 min) : bambustudio://open?file=…
+  function openInStudio(bytes, name) {
+    var sb = libSb(); if (!sb) return Promise.reject(new Error('Non connecté.'));
+    var bucket = sb.storage.from('autoloop');
+    var safe = name.replace(/[^A-Za-z0-9._-]+/g, '_');
+    var path = 'tmp/' + Date.now() + '/' + safe;
+    cleanTmp(bucket);
+    return bucket.upload(path, new Blob([bytes], { type: 'application/octet-stream' }), { contentType: 'application/octet-stream' }).then(function (up) {
+      if (up.error) throw up.error;
+      return bucket.createSignedUrl(path, 900);
+    }).then(function (r) {
+      if (r.error) throw r.error;
+      libToast('Ouverture dans Bambu Studio…');
+      window.location.href = 'bambustudio://open?file=' + encodeURIComponent(r.data.signedUrl);
+    });
+  }
+  function cleanTmp(bucket) {
+    bucket.list('tmp', { limit: 100 }).then(function (r) {
+      if (r.error || !r.data) return;
+      r.data.filter(function (f) { return +f.name < Date.now() - 864e5; }).forEach(function (f) {
+        bucket.list('tmp/' + f.name).then(function (x) {
+          if (x.data && x.data.length) bucket.remove(x.data.map(function (y) { return 'tmp/' + f.name + '/' + y.name; }));
+        });
+      });
+    });
+  }
+  function onPresetClick(e) {
+    var b = e.target.closest ? e.target.closest('button[data-pre]') : null;
+    if (!b || !rawText) return;
+    var n = +b.dataset.pre, open = b.dataset.act === 'open';
+    busy(b, 'Préparation…', function () {
+      return presetBuild(n).then(function (p) {
+        if (open) return openInStudio(p.bytes, p.name);
+        saveBlob(new Blob([p.bytes], { type: 'application/octet-stream' }), p.name);
+      });
+    });
+  }
+  function openCustom() {
+    if (!outText || !project) return;
+    busy($('#al-open-studio'), 'Préparation…', function () {
+      return window.ALProject.build(project, plateName, new TextEncoder().encode(outText), outBatch).then(function (zip) {
+        return openInStudio(zip, outName);
+      });
+    });
+  }
+
   function loadLibThen() {
     var sb = libSb();
     sb.from('autoloop_plates').select('*').order('name').then(function (res) {
@@ -868,6 +979,12 @@
     sel.addEventListener('change', function () { if (sel.value) libPick(sel.value); });
     $('#al-lib-save').addEventListener('click', libSave);
     $('#al-lib-del').addEventListener('click', libDelete);
+    $('#al-lib-set').addEventListener('click', libSet);
+    $('#al-pre').addEventListener('click', onPresetClick);
+    $('#al-open-studio').addEventListener('click', openCustom);
+    // durée / filament des lignes suivent les réglages (cooldown, purge…)
+    var main = $('.al-main');
+    if (main) { main.addEventListener('input', schedulePresets); main.addEventListener('change', schedulePresets); }
     if (window.CA && window.CA.onAdminReady) window.CA.onAdminReady(loadLib);
   }
 
@@ -904,6 +1021,8 @@
     $('#al-process').disabled = false;
     syncPushWarn();
     applyGcodeToPricing(rawText, rawName);
+    libApply(libPending); libPending = null;
+    renderPresets();
   }
   // Avertissement sous le fichier dès qu'il est chargé : pièce ≤ 10 mm ou push calculé < 2 mm
   // → push à mi-hauteur (cf. pushHeight). Suit aussi le champ Retrait.
@@ -922,6 +1041,7 @@
   function resetOutput() {
     outText = ''; outBatch = null; lastRep = null;
     $('#al-download').disabled = true;
+    if ($('#al-open-studio')) $('#al-open-studio').disabled = true;
     syncSend(false);
     renderReport(null);
     syncDownloadLabel();
@@ -932,6 +1052,7 @@
     $('#al-drop').classList.remove('has-file');
     syncPushWarn();
     $('#al-process').disabled = true;
+    renderPresets();
     $('#al-report').innerHTML = '<p class="al-warn">' + esc(msg) + '</p>';
   }
   function syncDownloadLabel() {
@@ -964,6 +1085,7 @@
           outName = project ? projectOutName(opts.loops) : 'plate_1.gcode';
           outBatch = { loops: opts.loops, predictionSec: res.report.progress ? res.report.totalMin * 60 : 0 };
           $('#al-download').disabled = false;
+          $('#al-open-studio').disabled = !project;
           syncSend(true);
         } else {
           lastRep = null;

@@ -4002,6 +4002,8 @@ create table if not exists public.autoloop_plates (
   updated_at timestamptz not null default now()
 );
 create index if not exists autoloop_plates_spacer_idx on public.autoloop_plates (spacer_id);
+-- tous les réglages d'AutoLoop mémorisés avec le plateau : { gcode:{id:valeur}, prix:{…}, cal:{flow:[…],bed:[…]} }
+alter table public.autoloop_plates add column if not exists settings jsonb not null default '{}'::jsonb;
 alter table public.autoloop_plates enable row level security;
 drop policy if exists autoloop_plates_admin_all on public.autoloop_plates;
 create policy autoloop_plates_admin_all on public.autoloop_plates for all to authenticated
