@@ -379,7 +379,7 @@ async function notifyReady(db: any, order: any, resendKey: string | undefined, f
 // deno-lint-ignore no-explicit-any
 async function runCron(db: any, resendKey: string, from: string) {
   const iso = new Date().toISOString();
-  const out = { reminded: 0, cancelled: 0 };
+  const out = { reminded: 0, cancelled: 0, hourly: 0 };
   const mail = async (o: { email: string; number: string; name: string; id: string; customer_id: string | null; pickup_due: string | null }, cancelled: boolean) => {
     const en = await clientEn(db, o.customer_id);
     const T = (fr: string, e: string) => (en ? e : fr);
@@ -412,5 +412,54 @@ async function runCron(db: any, resendKey: string, from: string) {
   const { data: can } = await db.from("customer_orders").update({ auto_mailed_at: iso })
     .eq("status", "cancelled").eq("cancelled_by", "auto").is("auto_mailed_at", null).gt("updated_at", twoDays).select("*");
   for (const o of can || []) { try { await mail(o, true); out.cancelled++; } catch { /* idem */ } }
+  // rappel « ta cueillette est dans 1 h » (par plage : si le client change d'heure, un nouveau rappel part)
+  const nowMs = Date.now();
+  const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  const { data: soonPk } = await db.from("customer_orders").select("*")
+    .in("status", ["new", "preparing", "ready"]).not("pickup_date", "is", null).not("pickup_start", "is", null)
+    .gte("pickup_date", day(nowMs - 86400000)).lte("pickup_date", day(nowMs + 86400000));
+  for (const o of soonPk || []) {
+    const startMs = torontoMs(o.pickup_date, o.pickup_start);
+    if (startMs < nowMs || startMs - nowMs > 3600000) continue;
+    const startIso = new Date(startMs).toISOString();
+    const { data: claim } = await db.from("customer_orders").update({ pickup_hour_reminded_for: startIso })
+      .eq("id", o.id).or("pickup_hour_reminded_for.is.null,pickup_hour_reminded_for.neq." + startIso).select("id");
+    if (!claim?.length) continue;
+    try { await mailHour(db, resendKey, from, o); out.hourly++; } catch { /* marqué : pas de réessai */ }
+  }
   return out;
+}
+
+// début de plage (date + heure locales du Québec) -> millisecondes UTC
+function torontoMs(d: string, t: string) {
+  const [y, mo, da] = String(d).split("-").map(Number), [h, mi] = String(t).split(":").map(Number);
+  const guess = Date.UTC(y, mo - 1, da, h, mi || 0);
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+    .formatToParts(new Date(guess));
+  const g = (k: string) => Number(parts.find((p) => p.type === k)?.value);
+  return guess - (Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute")) - guess);
+}
+
+// deno-lint-ignore no-explicit-any
+async function mailHour(db: any, resendKey: string, from: string, o: any) {
+  const en = await clientEn(db, o.customer_id);
+  const T = (fr: string, e: string) => (en ? e : fr);
+  const first = String(o.name || "").trim().split(/\s+/)[0] || "";
+  const when = fmtPickup(o.pickup_date, o.pickup_start, o.pickup_end, en);
+  const link = SITE + (en ? "/en" : "") + "/compte.html#/cueillette/c/" + o.id;
+  const head = T("Ta cueillette est dans environ 1 h — commande " + o.number, "Your pickup is in about 1 hour — order " + o.number);
+  const msg = T("Petit rappel : ta commande " + o.number + " t'attend, cueillette prévue " + when + ".",
+    "Friendly reminder: your order " + o.number + " is waiting for you, pickup scheduled " + when + ".");
+  const alt = T("Un empêchement ? Réponds à ce courriel ou change ta cueillette dans ton compte.",
+    "Can't make it? Reply to this email or change your pickup in your account.");
+  const label = T("Voir ma commande", "See my order");
+  const html =
+    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
+    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
+    '<h1 style="font-size:22px;margin:0 0 10px">' + esc(head) + '</h1>' +
+    '<p style="margin:0 0 14px">' + T("Bonjour ", "Hello ") + esc(first) + ',</p><p style="margin:0 0 16px">' + esc(msg) + '</p>' +
+    '<p style="margin:0 0 16px;color:#6C727C;font-size:13px">' + esc(alt) + '</p>' +
+    '<p style="margin:22px 0"><a href="' + link + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' + esc(label) + '</a></p></div>';
+  const text = T("Bonjour ", "Hello ") + first + ",\n\n" + msg + "\n" + alt + "\n\n" + link + "\n\nCréation Audio\n" + SITE + (en ? "/en/" : "/");
+  await send(resendKey, from, { to: [o.email], reply_to: REPLY_TO, subject: head + " — Création Audio", html, text });
 }

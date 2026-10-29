@@ -482,6 +482,8 @@ create table if not exists public.invoice_lines (
 alter table public.invoices add column if not exists client_address text;
 alter table public.invoices add column if not exists client_city    text;
 alter table public.invoices add column if not exists cancelled_at   timestamptz;   -- Phase 5 : annulation
+-- mode de paiement (obligatoire à l'enregistrement dans Facturation, sauf usage interne) ; null = anciennes factures
+alter table public.invoices add column if not exists pay_method text check (pay_method in ('cash', 'interac'));   -- 'cash' = comptant, 'interac' = virement Interac
 
 create index if not exists invoices_date_idx        on public.invoices (invoice_date desc);
 create index if not exists invoices_category_idx     on public.invoices (category);
@@ -866,6 +868,7 @@ begin
     category       = coalesce(nullif(p_invoice ->> 'category', ''), category),
     invoice_date   = coalesce((p_invoice ->> 'invoice_date')::date, invoice_date),
     note           = p_invoice ->> 'note',
+    pay_method     = case when p_invoice ? 'pay_method' then nullif(p_invoice ->> 'pay_method', '') else pay_method end,
     tax_enabled    = coalesce((p_invoice ->> 'tax_enabled')::boolean, false),
     subtotal       = coalesce((p_invoice ->> 'subtotal')::numeric, 0),
     tax_gst        = coalesce((p_invoice ->> 'tax_gst')::numeric, 0),
@@ -1556,7 +1559,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
     select jsonb_build_object(
       'id', i.id, 'number', i.number, 'invoice_date', i.invoice_date, 'status', i.status, 'category', i.category,
       'client_name', i.client_name, 'client_contact', i.client_contact,
-      'client_address', i.client_address, 'client_city', i.client_city, 'note', i.note,
+      'client_address', i.client_address, 'client_city', i.client_city, 'note', i.note, 'pay_method', i.pay_method,
       'tax_enabled', i.tax_enabled, 'subtotal', i.subtotal, 'tax_gst', i.tax_gst, 'tax_qst', i.tax_qst, 'total', i.total,
       'lines', coalesce((
         select jsonb_agg(jsonb_build_object(
@@ -1719,6 +1722,7 @@ alter table public.customer_orders add column if not exists ready_notified_at  t
 alter table public.customer_orders add column if not exists stock_hold boolean not null default false;   -- stock retiré du site en attendant le paiement (voir _held_stock) ; mis à vrai à l'envoi
 alter table public.customer_orders add column if not exists pickup_due timestamptz;          -- cueillette à choisir avant : sinon annulée par reservations_tick (null = pas d'échéance : articles à commander)
 alter table public.customer_orders add column if not exists pickup_reminded_at timestamptz;  -- rappel « choisis ta cueillette » envoyé
+alter table public.customer_orders add column if not exists pickup_hour_reminded_for timestamptz;  -- rappel « cueillette dans 1 h » : début de plage pour lequel il est parti
 alter table public.customer_orders add column if not exists auto_mailed_at timestamptz;      -- courriel d'annulation automatique envoyé
 update public.customer_orders set status = 'new' where status = 'preparing';   -- « En préparation » n'existe plus côté clients en ligne
 create index if not exists customer_orders_customer_idx on public.customer_orders (customer_id, created_at desc);
@@ -2294,7 +2298,10 @@ begin
   if exists (select 1 from public.customer_orders
               where (status = 'new' and pickup_date is null and pickup_due is not null and pickup_reminded_at is null
                      and pickup_due <= now() + interval '6 hours')
-                 or (status = 'cancelled' and cancelled_by = 'auto' and auto_mailed_at is null and updated_at > now() - interval '2 days')) then
+                 or (status = 'cancelled' and cancelled_by = 'auto' and auto_mailed_at is null and updated_at > now() - interval '2 days')
+                 or (status in ('new', 'preparing', 'ready') and pickup_date is not null and pickup_start is not null
+                     and ((pickup_date + pickup_start) at time zone 'America/Toronto') between now() and now() + interval '1 hour'
+                     and pickup_hour_reminded_for is distinct from ((pickup_date + pickup_start) at time zone 'America/Toronto'))) then
     perform net.http_post(
       url := 'https://cqfmvdknppscazfynoiy.supabase.co/functions/v1/customer-order-notify',
       body := '{"cron":true}'::jsonb,
@@ -3920,7 +3927,7 @@ begin
     'invoice', jsonb_build_object(
       'id', i.id, 'number', i.number, 'invoice_date', i.invoice_date, 'status', i.status,
       'client_name', i.client_name, 'client_contact', i.client_contact,
-      'client_address', i.client_address, 'client_city', i.client_city, 'note', i.note,
+      'client_address', i.client_address, 'client_city', i.client_city, 'note', i.note, 'pay_method', i.pay_method,
       'tax_enabled', i.tax_enabled, 'subtotal', i.subtotal, 'tax_gst', i.tax_gst, 'tax_qst', i.tax_qst, 'total', i.total,
       'lines', coalesce((select jsonb_agg(jsonb_build_object(
           'label', l.label, 'meta', l.meta, 'qty', l.qty, 'unit_price', l.unit_price, 'line_total', l.line_total)
@@ -4081,10 +4088,6 @@ create policy autoloop_plates_admin_all on public.autoloop_plates for all to aut
 revoke all on public.autoloop_plates from anon;
 
 -- ------------------------------------------------------------
--- Vérification
--- ------------------------------------------------------------
-select count(*) as produits_v2 from public.products;
--- ------------------------------------------------------------
 -- FACTURE PAR COURRIEL (Edge Function « invoice-notify »)
 -- Journal des envois (un par envoi, auto ou « Renvoyer ») ; l'écriture se fait par l'EF (service role),
 -- la lecture est réservée à l'admin. Réglage « Envoyer la facture par courriel » : admin_settings
@@ -4111,5 +4114,9 @@ insert into public.admin_settings (key, value)
   values ('invoice_email', jsonb_build_object('enabled', true, 'since', now()))
   on conflict (key) do nothing;
 
+-- ------------------------------------------------------------
+-- Vérification
+-- ------------------------------------------------------------
+select count(*) as produits_v2 from public.products;
 select count(*) as factures_v2 from public.invoices;
 select count(*) as dealers_v2  from public.dealers;
