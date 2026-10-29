@@ -782,6 +782,7 @@
      Un plateau tranché par spacer, gardé une fois : on le choisit dans le menu au lieu de
      chercher le .gcode.3mf. Les réglages du batch (loops…) restent ceux de la page. */
   var libPlates = [], libCur = null, lastFile = null, libPending = null;
+  var STUDIO_MAX = 50 * 1024 * 1024 - 65536;   // limite de fichier du stockage Supabase (marge pour l'envoi)
   var PRESETS = [6, 12, 18, 24];   // lignes « Batchs prêts » (loops)
   function libSb() { return window.CA && window.CA.sb; }
   function libToast(msg, kind) { if (window.caDialog && caDialog.toast) caDialog.toast(msg, kind); }
@@ -910,6 +911,10 @@
   // par lien signé (15 min) : bambustudio://open?file=…
   function openInStudio(bytes, name) {
     var sb = libSb(); if (!sb) return Promise.reject(new Error('Non connecté.'));
+    // Supabase (forfait gratuit) refuse tout fichier de plus de 50 Mo : on le dit avant d'envoyer
+    if (bytes.length > STUDIO_MAX) {
+      return Promise.reject(new Error('Fichier de ' + Math.round(bytes.length / 1048576) + ' Mo : trop gros pour l\'ouverture directe (max 50 Mo). Utilise « Télécharger ».'));
+    }
     var bucket = sb.storage.from('autoloop');
     var safe = name.replace(/[^A-Za-z0-9._-]+/g, '_');
     var path = 'tmp/' + Date.now() + '/' + safe;
