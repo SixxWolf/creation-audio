@@ -67,6 +67,7 @@
   var clientType = 'client';     // 'client' | 'dealer' | 'internal' (usage interne : prix 0 $, n° INT-)
   var INTERNAL_NAME = 'Usage interne';
   var taxEnabled = false;
+  var internalUse = null;        // usage interne : 'production' (filament pour imprimer des spacers) | 'other' (perso, projets) ; obligatoire en « Interne »
   var payMethod = null;          // 'cash' (comptant) | 'interac' (virement) | null ; obligatoire à l'enregistrement, sauf usage interne
   var PAY_LABEL = { cash: 'Comptant', interac: 'Virement Interac' };
   var pickerKind = 'spool';      // filament : bobine | recharge
@@ -85,7 +86,7 @@
 
   /* ---------- éléments ---------- */
   var elReset = $('#fx-reset'), elNextHint = $('#fx-nexthint'),
-      elTax = $('#fx-tax'), elPay = $('#fx-pay'),
+      elTax = $('#fx-tax'), elPay = $('#fx-pay'), elUse = $('#fx-use'),
       elCliName = $('#fx-cli-name'), elCliEmail = $('#fx-cli-email'), elCliPhone = $('#fx-cli-phone'),
       elCliAddress = $('#fx-cli-address'), elCliCity = $('#fx-cli-city'),
       elDealerField = $('#fx-dealer-field'), elDealerSelect = $('#fx-dealer-select'),
@@ -363,6 +364,21 @@
   $$('.fx-pay-btn').forEach(function (b) {
     b.addEventListener('click', function () { setPay(b.getAttribute('data-pay')); });
   });
+  // usage interne : pour la production ou autre chose (les deux sont comptés à part dans les Statistiques)
+  function setUse(v) {
+    internalUse = v === 'production' || v === 'other' ? v : null;
+    $$('.fx-use-btn').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-use') === internalUse); });
+    if (elUse) elUse.classList.remove('is-missing');
+  }
+  $$('.fx-use-btn').forEach(function (b) {
+    b.addEventListener('click', function () { setUse(b.getAttribute('data-use')); });
+  });
+  function useMissing() {
+    if (!isInternal() || internalUse) return false;
+    if (elUse) { elUse.classList.add('is-missing'); elUse.scrollIntoView({ block: 'nearest' }); }
+    elStatus.textContent = 'Choisis : Production ou Autre.';
+    return true;
+  }
   // refuse l'enregistrement tant que le mode manque (usage interne : aucun paiement)
   function payMissing() {
     if (isInternal() || payMethod) return false;
@@ -481,6 +497,7 @@
     var isDlr = clientType === 'dealer', isInt = clientType === 'internal';
     if (elDealerField) elDealerField.hidden = !isDlr;
     if (elPay) elPay.hidden = isInt;        // usage interne : aucun paiement
+    if (elUse) elUse.hidden = !isInt;       // usage interne : production ou autre
     if (elClientField) elClientField.hidden = isDlr || isInt;
     if (elClientSearch) elClientSearch.value = '';
     hideClientResults();
@@ -952,6 +969,7 @@
       invoice_date: /^\d{4}-\d{2}-\d{2}$/.test(elDate.value) ? elDate.value : todayISO(),
       note: elNote.value.trim() || null,
       pay_method: isInternal() ? null : payMethod,
+      internal_use: isInternal() ? internalUse : null,
       tax_enabled: taxEnabled,
       subtotal: round2(t.sub), tax_gst: round2(t.gst), tax_qst: round2(t.qst),
       total: round2(t.total), cost_total: round2(t.cost)
@@ -984,7 +1002,7 @@
     if (editing) { onSaveEdit(); return; }
     var valid = lines.filter(function (l) { return l.qty > 0; });
     if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
-    if (payMissing()) return;
+    if (payMissing() || useMissing()) return;
     var order = fromOrder;   // commande dealer à marquer « Facturée » une fois la facture enregistrée
 
     saved = true;   // verrou pendant l'envoi (anti double-clic)
@@ -1051,7 +1069,7 @@
   function onSaveEdit() {
     var valid = lines.filter(function (l) { return l.qty > 0; });
     if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
-    if (payMissing()) return;
+    if (payMissing() || useMissing()) return;
     var ed = editing;
     saved = true;   // verrou pendant l'envoi (anti double-clic)
     elSave.disabled = true; elStatus.textContent = 'Enregistrement des modifications…';
@@ -1130,6 +1148,7 @@
     elNote.value = '';
     elDate.value = todayISO(); elStatus.textContent = '';
     payMethod = null; $$('.fx-pay-btn').forEach(function (b) { b.classList.remove('is-active'); }); if (elPay) elPay.classList.remove('is-missing');
+    setUse(null);
     setClientType('client');   // vide les champs client (le profil dealer reste mémorisé)
     loadNextNumberHint();
     render();
@@ -1236,6 +1255,7 @@
     if (elDealerSelect) { var d = dealer ? dealerByEmail(ct.email) : null; elDealerSelect.value = d ? d.email : ''; }
     elNote.value = inv.note || '';
     setPay(inv.pay_method);
+    setUse(inv.internal_use);
     elNumber.value = inv.number || '';
     elDate.value = inv.invoice_date || todayISO();
     taxEnabled = !!inv.tax_enabled; if (elTax) elTax.checked = taxEnabled;

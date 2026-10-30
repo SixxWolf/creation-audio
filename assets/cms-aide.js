@@ -54,6 +54,7 @@
       go: { href: '#facturation', label: 'Facturation' }, keys: 'usage interne perso stock 0',
       steps: [
         'Dans **Facturation**, clique [Interne].',
+        'Choisis [Production] (filament pris pour imprimer des spacers) ou [Autre] (toi, un projet).',
         'Ajoute les articles pris : les prix passent à 0 $.',
         'Clique [Enregistrer la sortie] (n° INT-…).',
         'Retrouve-les dans **Historique › Usage interne**.'
@@ -121,135 +122,20 @@
         'Reçois l\'article : les personnes inscrites sont avisées par courriel.'
       ] },
     { id: 'production', group: 'Stock', tab: 'production', title: 'Enregistrer une production de spacers',
-      go: { href: '#production', label: 'Production' }, keys: 'impression batch gcode bobine',
+      go: { href: '#production', label: 'Production' }, keys: 'impression batch gcode filament',
       steps: [
         'Ouvre **Production**.',
-        'Bobine neuve sur l\'imprimante ? [Sortir une bobine], choisis-la, puis [Sortir du stock].',
         'Glisse le fichier .gcode.3mf (ou envoie-le depuis AutoLoop) : il passe **En impression**.',
-        'Impression finie : clique [Terminé], ajuste les quantités.',
-        'Clique [Enregistrer la production] : les spacers entrent en stock.'
+        'Impression finie : clique [Terminé], ajuste les pièces bonnes et le filament (coût moyen du filament).',
+        'Clique [Enregistrer la production] : les spacers entrent en stock.',
+        'Pour retirer le filament du stock : **Facturation**, [Interne], [Production].'
       ] },
-    { id: 'bobines-vides', group: 'Stock', tab: 'production', title: 'Gérer les bobines vides',
-      go: { href: '#production', label: 'Production' }, keys: 'liberer garder revendre',
+    { id: 'bobines-vides', group: 'Stock', tab: 'inventaire', title: 'Ajouter des bobines vides',
+      go: { href: '#inventaire/reception', label: 'Réception' }, keys: 'scan vide revendre stock',
       steps: [
-        'Une bobine finie apparaît dans **Bobines vides**.',
-        '[Libérer] : elle entre en stock pour la vente.',
-        '[Garder] : tu la gardes pour toi.'
-      ] },
-
-    /* ---- Catalogue ---- */
-    { id: 'materiau', group: 'Catalogue', tab: 'filaments', title: 'Créer un matériau et ses prix',
-      go: { href: '#filaments', label: 'Filaments' }, keys: 'prix palier pla petg marque',
-      steps: [
-        'Ouvre **Filaments** et clique [Nouveau matériau].',
-        'Choisis la marque, entre le nom et le prix bobine / recharge.',
-        'Prix dégressif ? [Ajouter un palier].',
-        'Clique [Enregistrer] : toutes les couleurs de ce matériau suivent ce prix.'
-      ] },
-    { id: 'filament', group: 'Catalogue', tab: 'filaments', title: 'Ajouter une couleur de filament',
-      go: { href: '#filaments', label: 'Filaments' }, keys: 'couleur nouveau stock photo',
-      steps: [
-        'Dans **Filaments**, clique [Nouveau filament].',
-        'Choisis le matériau, puis la couleur (pastille).',
-        'Entre le stock bobine / recharge et [Ajouter des photos].',
-        'Clique [Enregistrer]. Elle apparaît dans la boutique.'
-      ] },
-    { id: 'spacer', group: 'Catalogue', tab: 'spacers', title: 'Ajouter un spacer',
-      go: { href: '#spacers', label: 'Spacers' }, keys: 'adaptateur vehicule haut-parleur code',
-      steps: [
-        'Ouvre **Spacers** et clique [Nouveau spacer].',
-        'Entre le code, le prix, le stock et [Ajouter des photos].',
-        '[Ajouter un véhicule] pour chaque modèle et années compatibles.',
-        '[Ajouter un haut-parleur] : marque, modèle, Confirmé ou Compatible.',
-        'Clique [Enregistrer]. Sa page publique se crée au prochain passage du robot.'
-      ] },
-    { id: 'accessoire', group: 'Catalogue', tab: 'accessoires', title: 'Ajouter un accessoire',
-      go: { href: '#accessoires', label: 'Accessoires' }, keys: 'produit nouveau',
-      steps: [
-        'Ouvre **Accessoires** et clique [Nouvel accessoire].',
-        'Entre le nom, le prix, le stock et [Ajouter des photos].',
-        'Clique [Enregistrer].'
-      ] },
-
-    /* ---- Contacts ---- */
-    { id: 'messages', group: 'Contacts', tab: 'messages', title: 'Répondre à un message',
-      go: { href: '#messages', label: 'Messages' }, keys: 'conversation client repondre regle',
-      steps: [
-        'Ouvre **Messages** : [Ouvertes] montre ce qui attend.',
-        'Ouvre la conversation et réponds.',
-        'Le client reçoit un courriel s\'il ne l\'a pas lue après 5 min.',
-        'Réglé ? Clique [Réglée] : elle passe dans [Réglées].'
-      ] },
-    { id: 'client', group: 'Contacts', tab: 'clients', title: 'Relier un compte en ligne à un client',
-      go: { href: '#clients', label: 'Clients' }, keys: 'compte historique relier reserver approuver',
-      steps: [
-        'Ouvre **Clients**, section **Comptes en ligne**.',
-        'Sur le compte, clique [Relier] et choisis sa fiche client.',
-        'Ses anciennes factures apparaissent dans son compte.',
-        'Coche [Peut réserver] pour lui permettre de réserver 72 h.'
-      ] },
-    { id: 'dealer', group: 'Contacts', tab: 'dealers', title: 'Ouvrir un compte dealer',
-      go: { href: '#dealers', label: 'Dealers' }, keys: 'revendeur portail acces',
-      steps: [
-        'Ouvre **Dealers** et clique [Ajouter un dealer].',
-        'Entre le nom, le courriel du compte et les coordonnées.',
-        'Clique [Enregistrer] : il peut se connecter au portail dealer.'
-      ],
-      tip: 'Supprimer un dealer coupe son accès tout de suite.' },
-
-    /* ---- Atelier ---- */
-    { id: 'autoloop', group: 'Atelier', tab: 'autoloop', title: 'Générer un batch AutoLoop',
-      go: { href: '#autoloop', label: 'AutoLoop' }, keys: 'gcode imprimante batch',
-      steps: [
-        'Ouvre **AutoLoop › Générateur de batch**.',
-        'Dépose le fichier .gcode.3mf et règle le nombre de passes.',
-        'Clique [Générer le batch].',
-        '[Télécharger le gcode], puis [Envoyer à la production].'
-      ] },
-    { id: 'calculateur', group: 'Atelier', tab: 'autoloop', title: 'Calculer un prix d\'impression',
-      go: { href: '#autoloop', label: 'AutoLoop' }, keys: 'prix cout paire piece',
-      steps: [
-        'Ouvre **AutoLoop › Calculateur de prix**.',
-        'Dépose le fichier ou entre le temps et le poids.',
-        'Lis le coût et le prix suggéré, à la pièce ou à la paire.'
-      ] },
-    { id: 'silhouette', group: 'Atelier', tab: 'silhouettes', title: 'Créer une silhouette murale',
-      go: { href: '#silhouettes', label: 'Silhouettes' }, keys: 'image mur decoupe ia',
-      steps: [
-        'Ouvre **Silhouettes** : [Mon image] ou [De zéro].',
-        'Au besoin, [Préparer avec l\'IA].',
-        'Retouche avec [Pinceau] et [Gomme], puis [Valider].',
-        'Vérifie en [Mur] et [3D], puis exporte.'
-      ] },
-
-    /* ---- Réglages ---- */
-    { id: 'accent', group: 'Réglages', tab: 'apparence', title: 'Changer la couleur des accents',
-      go: { href: '#apparence', label: 'Apparence' }, keys: 'couleur theme orange',
-      steps: [
-        'Ouvre **Apparence**.',
-        'Choisis une couleur : tout l\'admin suit.',
-        'Pour revenir : [Orange d\'origine].'
-      ] },
-    { id: 'appareil', group: 'Réglages', tab: 'securite', title: 'Ajouter un appareil (double authentification)',
-      go: { href: '#securite', label: 'Sécurité' }, keys: '2fa code telephone connexion',
-      steps: [
-        'Ouvre **Sécurité**.',
-        'Clique [Ajouter un appareil] et scanne le code QR avec ton appli d\'authentification.',
-        'Entre le **Code affiché**, puis [Ajouter].'
-      ] },
-    { id: 'entreprise', group: 'Réglages', tab: 'entreprise', title: 'Modifier les infos des factures',
-      go: { href: '#entreprise', label: 'Entreprise' }, keys: 'tps tvq taxes logo adresse',
-      steps: [
-        'Ouvre **Entreprise**.',
-        'Modifie coordonnées, n° TPS · TVQ, taux ou logo.',
-        'Clique [Enregistrer] : les prochaines factures suivent.'
-      ] },
-    { id: 'recherche', group: 'Réglages', tab: 'aujourdhui', title: 'Tout retrouver avec Ctrl K',
-      keys: 'recherche raccourci facture client',
-      steps: [
-        'Appuie sur **Ctrl K** (ou [Rechercher] en haut).',
-        'Tape un n° de facture, un client, une couleur ou un code.',
-        'Entrée : tu y vas directement.'
+        'Ouvre **Inventaire › Réception**, puis [Réception sans commande] : les bobines vides ne viennent d\'aucune commande.',
+        'Scanne chaque bobine vide : elle entre en stock pour la vente.',
+        'Clique [Confirmer la réception].'
       ] }
   ];
 

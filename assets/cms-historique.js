@@ -183,7 +183,7 @@
       var badge = '<span class="hist-cat">' + esc(CAT_LABEL[inv.category] || inv.category || '—') + '</span>';
       var internal = inv.client_type === 'internal';
       var dealer = inv.client_type === 'dealer' ? '<span class="hist-dealer">Dealer</span>'
-        : internal ? '<span class="hist-dealer hist-int">Interne</span>' : '';
+        : internal ? '<span class="hist-dealer hist-int">' + (inv.internal_use === 'production' ? 'Interne · production' : 'Interne') + '</span>' : '';
       var pend = pendingOf(inv);
       // usage interne : 0 $ -> on montre plutôt le nombre d'articles pris
       var nItems = (linesByInv[inv.id] || []).reduce(function (s, l) { return s + ((+l.qty) || 0); }, 0);

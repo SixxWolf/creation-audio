@@ -484,6 +484,10 @@ alter table public.invoices add column if not exists client_city    text;
 alter table public.invoices add column if not exists cancelled_at   timestamptz;   -- Phase 5 : annulation
 -- mode de paiement (obligatoire à l'enregistrement dans Facturation, sauf usage interne) ; null = anciennes factures
 alter table public.invoices add column if not exists pay_method text check (pay_method in ('cash', 'interac'));   -- 'cash' = comptant, 'interac' = virement Interac
+-- Usage interne (client_type = 'internal'), 2026-10-29 : 'production' = filament pris pour imprimer des spacers (le stock baisse ici, plus de bobines assignées en Production) | 'other' = perso, autres projets
+alter table public.invoices add column if not exists internal_use text;
+alter table public.invoices drop constraint if exists invoices_internal_use_chk;
+alter table public.invoices add constraint invoices_internal_use_chk check (internal_use in ('production', 'other'));
 
 create index if not exists invoices_date_idx        on public.invoices (invoice_date desc);
 create index if not exists invoices_category_idx     on public.invoices (category);
@@ -869,6 +873,7 @@ begin
     invoice_date   = coalesce((p_invoice ->> 'invoice_date')::date, invoice_date),
     note           = p_invoice ->> 'note',
     pay_method     = case when p_invoice ? 'pay_method' then nullif(p_invoice ->> 'pay_method', '') else pay_method end,
+    internal_use   = case when p_invoice ? 'internal_use' then nullif(p_invoice ->> 'internal_use', '') else internal_use end,
     tax_enabled    = coalesce((p_invoice ->> 'tax_enabled')::boolean, false),
     subtotal       = coalesce((p_invoice ->> 'subtotal')::numeric, 0),
     tax_gst        = coalesce((p_invoice ->> 'tax_gst')::numeric, 0),
@@ -2968,31 +2973,18 @@ grant execute on function public.admin_reopen_invoice_orders(uuid) to authentica
 
 -- ============================================================
 -- PRODUCTION DE SPACERS (Stock › Production, 2026-10-11)
--- Bobines sorties du stock de vente pour imprimer (production_spools : −1 au stock
--- du filament, prix payé figé), productions lues dans le G-code AutoLoop
--- (productions + production_uses : grammes par bobine). Une production ajoute
--- ses paires au stock du spacer et recalcule son coût moyen :
+-- Productions lues dans le G-code AutoLoop : une production ajoute ses paires au stock
+-- du spacer et recalcule son coût moyen :
 --   products.attrs.avg_cost.item = (stock de départ × coût saisi + Σ paires × coût/paire)
 --                                  / (stock de départ + Σ paires)
 --   attrs.prod_seed {qty, cost} = stock et coût saisi au moment de la 1re production
 --   attrs.loose {n:1, cost}     = pièce seule en réserve (complétée à la production suivante)
+-- Depuis le 2026-10-29 : PLUS de bobines assignées à la production (ni production_spools,
+-- production_uses, production_removals). Le coût du filament = grammes du G-code × coût moyen
+-- (CMP) du filament ; le stock de filament baisse par « Usage interne › Production »
+-- (Facturation). Le détail des filaments est gardé dans productions.fils.
 -- Tout est PRIVÉ (admin) ; écritures par RPC (stock + coût en une transaction).
 -- ============================================================
-create table if not exists public.production_spools (
-  id          uuid primary key default gen_random_uuid(),
-  product_id  uuid references public.products(id) on delete set null,
-  label       text not null default '',           -- « Bambu Lab · ABS · Black » (figé)
-  material    text,
-  hex         text,
-  kind        text not null default 'spool' check (kind in ('spool', 'refill')),
-  unit_cost   numeric(10,2) not null default 0,   -- [PRIVÉ] prix payé de la bobine (taxes incluses)
-  weight_g    integer not null default 1000 check (weight_g > 0),
-  stock_taken integer not null default 0,         -- 1 = retirée du stock de vente (0 : stock déjà à 0)
-  status      text not null default 'active' check (status in ('active', 'done')),
-  taken_at    date not null default current_date,
-  closed_at   timestamptz,
-  created_at  timestamptz not null default now()
-);
 create table if not exists public.productions (
   id            uuid primary key default gen_random_uuid(),
   made_at       date not null default current_date,
@@ -3018,54 +3010,47 @@ create table if not exists public.productions (
   note          text,
   created_at    timestamptz not null default now()
 );
-create table if not exists public.production_uses (
-  id            uuid primary key default gen_random_uuid(),
-  production_id uuid not null references public.productions(id) on delete cascade,
-  spool_id      uuid not null references public.production_spools(id) on delete restrict,
-  grams         numeric(10,2) not null default 0,
-  cost          numeric(10,2) not null default 0
-);
--- terminée toute seule (vidée par une production) : rouverte si cette production est supprimée
-alter table public.production_spools add column if not exists closed_auto boolean not null default false;
--- Retraits de grammes (2026-10-29) : filament pris sur une bobine de production pour autre chose
--- que des spacers (aucun coût, aucun stock). `batch` = un retrait réparti sur plusieurs bobines.
-create table if not exists public.production_removals (
-  id         uuid primary key default gen_random_uuid(),
-  batch      uuid not null default gen_random_uuid(),
-  spool_id   uuid not null references public.production_spools(id) on delete restrict,
-  grams      numeric(10,2) not null check (grams > 0),
-  note       text,
-  removed_at date not null default current_date,
-  created_at timestamptz not null default now()
-);
-create index if not exists production_removals_spool_idx on public.production_removals (spool_id);
-create index if not exists production_removals_batch_idx on public.production_removals (batch);
-alter table public.production_removals enable row level security;
-drop policy if exists production_removals_admin_all on public.production_removals;
-create policy production_removals_admin_all on public.production_removals for all to authenticated
-  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
-revoke all on public.production_removals from anon;
-create index if not exists production_spools_status_idx  on public.production_spools (status, taken_at desc);
-create index if not exists production_spools_product_idx on public.production_spools (product_id);
-create index if not exists productions_spacer_idx        on public.productions (spacer_id, created_at desc);
-create index if not exists production_uses_prod_idx      on public.production_uses (production_id);
-create index if not exists production_uses_spool_idx     on public.production_uses (spool_id);
-
-alter table public.production_spools enable row level security;
-alter table public.productions       enable row level security;
-alter table public.production_uses   enable row level security;
-drop policy if exists production_spools_admin_all on public.production_spools;
-create policy production_spools_admin_all on public.production_spools for all to authenticated
-  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+-- filaments de la production (figés) : [{ product_id, label, material, hex, grams, cost }]
+alter table public.productions add column if not exists fils jsonb not null default '[]'::jsonb;
+create index if not exists productions_spacer_idx on public.productions (spacer_id, created_at desc);
+alter table public.productions enable row level security;
 drop policy if exists productions_admin_all on public.productions;
 create policy productions_admin_all on public.productions for all to authenticated
   using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
-drop policy if exists production_uses_admin_all on public.production_uses;
-create policy production_uses_admin_all on public.production_uses for all to authenticated
-  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
-revoke all on public.production_spools from anon;
-revoke all on public.productions       from anon;
-revoke all on public.production_uses   from anon;
+revoke all on public.productions from anon;
+
+-- 2026-10-29 : ménage du système de bobines. Le détail des anciennes productions (filament
+-- par bobine) passe dans productions.fils AVANT de supprimer les tables ; les coûts déjà
+-- calculés (filament_cost, total_cost, pair_cost) ne changent pas.
+do $$
+begin
+  if to_regclass('public.production_uses') is not null and to_regclass('public.production_spools') is not null then
+    update public.productions p set fils = coalesce((
+      select jsonb_agg(jsonb_build_object('product_id', x.product_id, 'label', x.label, 'material', x.material,
+                                          'hex', x.hex, 'grams', x.grams, 'cost', x.cost) order by x.label)
+        from (select s.product_id, s.label, s.material, s.hex, sum(u.grams) grams, sum(u.cost) cost
+                from public.production_uses u join public.production_spools s on s.id = u.spool_id
+               where u.production_id = p.id
+               group by s.product_id, s.label, s.material, s.hex) x), '[]'::jsonb)
+     where p.fils = '[]'::jsonb;
+  end if;
+end $$;
+drop function if exists public.admin_take_spool(uuid, text, numeric, integer, integer, date);
+drop function if exists public.admin_take_spool(uuid, text, numeric, integer);
+drop function if exists public.admin_spool_delete(uuid);
+drop function if exists public.admin_take_grams(jsonb);
+drop function if exists public.admin_removal_undo(uuid);
+drop function if exists public.admin_empty_spools();
+drop function if exists public.admin_release_empty(uuid, integer, integer);
+drop function if exists public.admin_empty_undo(uuid);
+drop function if exists public._empty_prod_queue(uuid);
+drop function if exists public._empty_internal(uuid);
+drop function if exists public._empty_value(uuid, numeric);
+drop function if exists public._empty_recost(uuid);
+drop table if exists public.production_uses cascade;
+drop table if exists public.production_removals cascade;
+drop table if exists public.production_spools cascade;
+drop table if exists public.empty_spool_moves cascade;
 
 -- Coût moyen d'un spacer rejoué depuis son stock de départ + ses productions.
 -- Plus aucune production : avg_cost et prod_seed retirés (retour au coût saisi).
@@ -3095,79 +3080,18 @@ begin
 end $$;
 revoke all on function public._spacer_recost(uuid) from public, anon, authenticated;
 
--- Sortir des bobines du stock de vente pour la production : p_count bobines d'un coup
--- (une ligne production_spools chacune, 1000 g par défaut) ; −1 au stock par bobine tant
--- qu'il en reste (au-delà : bobine « hors stock », stock_taken = 0). p_date = date locale
--- de l'admin (current_date est en UTC : le soir au Québec, ce serait déjà demain).
--- -> { ids: [...], taken }
-drop function if exists public.admin_take_spool(uuid, text, numeric, integer);
-create or replace function public.admin_take_spool(p_product uuid, p_kind text, p_cost numeric,
-  p_weight integer default 1000, p_count integer default 1, p_date date default null)
-returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_p public.products%rowtype; v_kind text; v_n integer; v_stock integer; v_taken integer; v_id uuid;
-        v_ids jsonb := '[]'::jsonb; i integer;
-begin
-  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
-  v_kind := case when p_kind = 'refill' then 'refill' else 'spool' end;
-  v_n := least(50, greatest(1, coalesce(p_count, 1)));
-  select * into v_p from public.products where id = p_product and type = 'filament' for update;
-  if not found then raise exception 'Filament introuvable.'; end if;
-  v_stock := greatest(0, case when v_kind = 'refill' then coalesce(v_p.qty_2, 0) else coalesce(v_p.qty, 0) end);
-  v_taken := least(v_n, v_stock);
-  update public.products
-     set qty   = case when v_kind = 'spool'  then coalesce(qty, 0)   - v_taken else qty   end,
-         qty_2 = case when v_kind = 'refill' then coalesce(qty_2, 0) - v_taken else qty_2 end,
-         updated_at = now()
-   where id = p_product;
-  for i in 1 .. v_n loop
-    insert into public.production_spools (product_id, label, material, hex, kind, unit_cost, weight_g, stock_taken, taken_at, created_at)
-    values (p_product, concat_ws(' · ', nullif(v_p.brand, ''), nullif(v_p.material, ''), v_p.name), v_p.material, v_p.hex,
-            v_kind, round(greatest(0, coalesce(p_cost, 0)), 2), greatest(1, coalesce(p_weight, 1000)),
-            case when i <= v_taken then 1 else 0 end, coalesce(p_date, current_date), clock_timestamp())
-    returning id into v_id;
-    v_ids := v_ids || to_jsonb(v_id);
-  end loop;
-  return jsonb_build_object('ids', v_ids, 'taken', v_taken);
-end $$;
-revoke all on function public.admin_take_spool(uuid, text, numeric, integer, integer, date) from public, anon;
-grant execute on function public.admin_take_spool(uuid, text, numeric, integer, integer, date) to authenticated;
-
--- Retirer une bobine jamais utilisée (erreur de saisie) : elle revient au stock de vente.
-create or replace function public.admin_spool_delete(p_id uuid)
-returns void language plpgsql security definer set search_path = '' as $$
-declare v_s public.production_spools%rowtype;
-begin
-  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
-  select * into v_s from public.production_spools where id = p_id for update;
-  if not found then return; end if;
-  if exists (select 1 from public.production_uses where spool_id = p_id) then
-    raise exception 'Cette bobine a servi à une production : termine-la plutôt.';
-  end if;
-  if exists (select 1 from public.production_removals where spool_id = p_id) then
-    raise exception 'Des grammes ont été retirés de cette bobine : termine-la plutôt.';
-  end if;
-  if v_s.product_id is not null and v_s.stock_taken > 0 then
-    update public.products
-       set qty   = case when v_s.kind = 'spool'  then coalesce(qty, 0)   + v_s.stock_taken else qty   end,
-           qty_2 = case when v_s.kind = 'refill' then coalesce(qty_2, 0) + v_s.stock_taken else qty_2 end,
-           updated_at = now()
-     where id = v_s.product_id;
-  end if;
-  delete from public.production_spools where id = p_id;
-end $$;
-revoke all on function public.admin_spool_delete(uuid) from public, anon;
-grant execute on function public.admin_spool_delete(uuid) to authenticated;
-
 -- Enregistrer une production :
 -- p = { spacer_id, made_at, file_name, loops, per_plate, pieces, good, minutes,
---       machine_cost, rates, note, uses: [{ spool_id, grams }] }
--- Coût filament = grammes × prix de la bobine / poids (calculé ici, pas par le navigateur).
+--       machine_cost, rates, note, fils: [{ product_id, grams, unit_cost }] }
+-- unit_cost = coût moyen (CMP) d'une bobine de 1 000 g de ce filament, lu par le navigateur
+-- (CA.costing.costOf) ; le coût filament = grammes × unit_cost / 1 000 est calculé ici.
+-- Aucun stock de filament touché (usage interne › Production, en Facturation).
 -- -> { id, pairs, pair_cost, loose_out, total_cost, avg_cost }
 create or replace function public.admin_save_production(p jsonb)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
-  v_sp public.products%rowtype; v_s public.production_spools%rowtype; v_u jsonb; v_id uuid;
-  v_uses jsonb := '[]'::jsonb; v_g numeric; v_c numeric; v_fil numeric := 0; v_grams numeric := 0;
+  v_sp public.products%rowtype; v_f public.products%rowtype; v_e jsonb; v_id uuid;
+  v_fils jsonb := '[]'::jsonb; v_g numeric; v_c numeric; v_fil numeric := 0; v_grams numeric := 0;
   v_mach numeric := round(greatest(0, coalesce((p ->> 'machine_cost')::numeric, 0)), 2);
   v_good integer := greatest(0, coalesce((p ->> 'good')::integer, 0));
   v_total numeric; v_piece numeric; v_lin integer := 0; v_linc numeric := 0; v_all integer;
@@ -3176,18 +3100,19 @@ begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   select * into v_sp from public.products where id = (p ->> 'spacer_id')::uuid and type = 'spacer' for update;
   if not found then raise exception 'Spacer introuvable.'; end if;
-  if jsonb_typeof(p -> 'uses') is distinct from 'array' or jsonb_array_length(p -> 'uses') = 0 then
-    raise exception 'Choisis la bobine utilisée.';
+  if jsonb_typeof(p -> 'fils') is distinct from 'array' or jsonb_array_length(p -> 'fils') = 0 then
+    raise exception 'Choisis le filament utilisé.';
   end if;
 
-  for v_u in select value from jsonb_array_elements(p -> 'uses') loop
-    v_g := round(greatest(0, coalesce((v_u ->> 'grams')::numeric, 0)), 2);
-    select * into v_s from public.production_spools where id = (v_u ->> 'spool_id')::uuid for update;
-    if not found then raise exception 'Bobine de production introuvable.'; end if;
-    -- prix payé complet (depuis le 2026-10-19 : la bobine vide n'est plus déduite, elle n'a de coût qu'à la vente)
-    v_c := round(v_g * v_s.unit_cost / v_s.weight_g, 2);
+  for v_e in select value from jsonb_array_elements(p -> 'fils') loop
+    v_g := round(greatest(0, coalesce((v_e ->> 'grams')::numeric, 0)), 2);
+    select * into v_f from public.products where id = (v_e ->> 'product_id')::uuid and type = 'filament';
+    if not found then raise exception 'Filament introuvable.'; end if;
+    v_c := round(v_g * greatest(0, coalesce((v_e ->> 'unit_cost')::numeric, 0)) / 1000, 2);
     v_fil := v_fil + v_c; v_grams := v_grams + v_g;
-    v_uses := v_uses || jsonb_build_object('spool_id', v_s.id, 'grams', v_g, 'cost', v_c);
+    v_fils := v_fils || jsonb_build_object('product_id', v_f.id,
+      'label', concat_ws(' · ', nullif(v_f.brand, ''), nullif(v_f.material, ''), v_f.name),
+      'material', v_f.material, 'hex', v_f.hex, 'grams', v_g, 'cost', v_c);
   end loop;
 
   v_total := round(v_fil + v_mach, 2);
@@ -3209,26 +3134,14 @@ begin
   end if;
 
   insert into public.productions (made_at, spacer_id, spacer_label, file_name, loops, per_plate, pieces, good, minutes,
-         grams, filament_cost, machine_cost, total_cost, piece_cost, loose_in, loose_in_cost, loose_out, pairs, pair_cost, rates, note, created_at)
+         grams, filament_cost, machine_cost, total_cost, piece_cost, loose_in, loose_in_cost, loose_out, pairs, pair_cost, rates, note, fils, created_at)
   values (coalesce((p ->> 'made_at')::date, current_date), v_sp.id, v_sp.name, nullif(p ->> 'file_name', ''),
           greatest(1, coalesce((p ->> 'loops')::integer, 1)), greatest(1, coalesce((p ->> 'per_plate')::integer, 1)),
           greatest(0, coalesce((p ->> 'pieces')::integer, 0)), v_good, greatest(0, coalesce((p ->> 'minutes')::integer, 0)),
           v_grams, round(v_fil, 2), v_mach, v_total, v_piece, v_lin, case when v_lin > 0 then v_linc end, v_lout, v_pairs, v_pairc,
-          coalesce(p -> 'rates', '{}'::jsonb), nullif(p ->> 'note', ''),
+          coalesce(p -> 'rates', '{}'::jsonb), nullif(p ->> 'note', ''), v_fils,
           clock_timestamp())   -- heure exacte : ordre des productions d'un spacer (suppression de la plus récente)
   returning id into v_id;
-
-  insert into public.production_uses (production_id, spool_id, grams, cost)
-  select v_id, (e ->> 'spool_id')::uuid, (e ->> 'grams')::numeric, (e ->> 'cost')::numeric
-    from jsonb_array_elements(v_uses) e;
-
-  -- bobine vidée par ce G-code (≤ 5 g restants) : terminée toute seule (closed_auto -> rouverte si on supprime la production)
-  update public.production_spools s
-     set status = 'done', closed_at = now(), closed_auto = true
-   where s.status = 'active'
-     and s.id in (select (e ->> 'spool_id')::uuid from jsonb_array_elements(v_uses) e)
-     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id)
-                    - (select coalesce(sum(r.grams), 0) from public.production_removals r where r.spool_id = s.id) <= 5;
 
   v_attrs := jsonb_set(v_sp.attrs, '{prod_seed}', v_seed);
   v_attrs := case when v_lout = 1 then jsonb_set(v_attrs, '{loose}', jsonb_build_object('n', 1, 'cost', round(v_loutc, 4)))
@@ -3245,10 +3158,10 @@ grant execute on function public.admin_save_production(jsonb) to authenticated;
 
 -- Supprimer une production (la plus récente de son spacer seulement : la pièce seule
 -- en réserve s'enchaîne d'une production à l'autre). Stock −paires, réserve d'avant
--- remise, coût moyen rejoué ; ses grammes reviennent aux bobines.
+-- remise, coût moyen rejoué.
 create or replace function public.admin_delete_production(p_id uuid)
 returns void language plpgsql security definer set search_path = '' as $$
-declare v_pr public.productions%rowtype; v_spools uuid[];
+declare v_pr public.productions%rowtype;
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   select * into v_pr from public.productions where id = p_id;
@@ -3266,155 +3179,23 @@ begin
            updated_at = now()
      where id = v_pr.spacer_id;
   end if;
-  select array_agg(distinct spool_id) into v_spools from public.production_uses where production_id = p_id;
   delete from public.productions where id = p_id;
-  -- bobines terminées toutes seules par cette production : rouvertes si elles ont de nouveau du filament
-  update public.production_spools s
-     set status = 'active', closed_at = null, closed_auto = false
-   where s.id = any(coalesce(v_spools, '{}')) and s.status = 'done' and s.closed_auto
-     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id)
-                    - (select coalesce(sum(r.grams), 0) from public.production_removals r where r.spool_id = s.id) > 5;
   if v_pr.spacer_id is not null then perform public._spacer_recost(v_pr.spacer_id); end if;
 end $$;
 revoke all on function public.admin_delete_production(uuid) from public, anon;
 grant execute on function public.admin_delete_production(uuid) to authenticated;
 
--- Retirer des grammes de bobines de production (2026-10-29), sans raison ni coût :
--- p = { parts: [{ spool_id, grams }], note, date }. Une bobine vidée (≤ 5 g) est terminée toute seule.
--- -> { batch }
-create or replace function public.admin_take_grams(p jsonb)
-returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_batch uuid := gen_random_uuid(); v_e jsonb; v_g numeric; v_ids uuid[] := '{}'; v_n integer := 0;
-begin
-  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
-  if jsonb_typeof(p -> 'parts') is distinct from 'array' then raise exception 'Indique les grammes à retirer.'; end if;
-  for v_e in select value from jsonb_array_elements(p -> 'parts') loop
-    v_g := round(coalesce((v_e ->> 'grams')::numeric, 0), 2);
-    if v_g <= 0 then continue; end if;
-    perform 1 from public.production_spools where id = (v_e ->> 'spool_id')::uuid and status = 'active' for update;
-    if not found then raise exception 'Bobine de production introuvable.'; end if;
-    insert into public.production_removals (batch, spool_id, grams, note, removed_at)
-    values (v_batch, (v_e ->> 'spool_id')::uuid, v_g, nullif(btrim(coalesce(p ->> 'note', '')), ''),
-            coalesce((p ->> 'date')::date, current_date));
-    v_ids := v_ids || (v_e ->> 'spool_id')::uuid; v_n := v_n + 1;
-  end loop;
-  if v_n = 0 then raise exception 'Indique les grammes à retirer.'; end if;
-  update public.production_spools s
-     set status = 'done', closed_at = now(), closed_auto = true
-   where s.status = 'active' and s.id = any(v_ids)
-     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id)
-                    - (select coalesce(sum(r.grams), 0) from public.production_removals r where r.spool_id = s.id) <= 5;
-  return jsonb_build_object('batch', v_batch);
-end $$;
-revoke all on function public.admin_take_grams(jsonb) from public, anon;
-grant execute on function public.admin_take_grams(jsonb) to authenticated;
-
--- Annuler un retrait de grammes : ses grammes reviennent aux bobines (rouvertes si elles étaient fermées toutes seules).
-create or replace function public.admin_removal_undo(p_batch uuid)
-returns void language plpgsql security definer set search_path = '' as $$
-declare v_spools uuid[];
-begin
-  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
-  select array_agg(distinct spool_id) into v_spools from public.production_removals where batch = p_batch;
-  delete from public.production_removals where batch = p_batch;
-  update public.production_spools s
-     set status = 'active', closed_at = null, closed_auto = false
-   where s.id = any(coalesce(v_spools, '{}')) and s.status = 'done' and s.closed_auto
-     and s.weight_g - (select coalesce(sum(u.grams), 0) from public.production_uses u where u.spool_id = s.id)
-                    - (select coalesce(sum(r.grams), 0) from public.production_removals r where r.spool_id = s.id) > 5;
-end $$;
-revoke all on function public.admin_removal_undo(uuid) from public, anon;
-grant execute on function public.admin_removal_undo(uuid) to authenticated;
-
 -- ============================================================
--- BOBINES VIDES ← PRODUCTION / USAGE INTERNE (2026-10-12)
--- Les bobines vides (accessoires « Bobines vides ») ne viennent que des bobines
--- que Théo vide lui-même. Lien dans la fiche du matériau (materials.empty_spool_id).
--- Coût (révisé le 2026-10-19) : la production paie la bobine au complet ; la bobine
--- vide n'a de coût qu'à la vente = prix bobine − prix recharge du jour
--- (admin_empty_spool_costs, lu par CA.costing.emptySpoolCost) et figé sur la ligne de
--- facture. Les libérations ne portent donc plus de valeur (unit_cost 0) et ne touchent
--- plus attrs.avg_cost. (production_spools.empty_cost : reste de l'ancien calcul, plus écrit.)
--- « À libérer » : bobines terminées en production (empty_state null) + bobines (pas
--- les recharges) des factures Interne depuis le 2026-10-12. Rien n'entre au stock
--- sans confirmation : admin_release_empty (combien libérer / garder).
+-- BOBINES VIDES (accessoires « Bobines vides »)
+-- Depuis le 2026-10-29 : plus de « à libérer » ni de Libérer / Garder. Les bobines vides ne
+-- viennent que de la production ; Théo les SCANNE en Réception (Inventaire), comme n'importe
+-- quel accessoire. Lien dans la fiche du matériau (materials.empty_spool_id).
+-- Coût (2026-10-19) : la production paie la bobine au complet ; la bobine vide n'a de coût
+-- qu'à la vente = prix bobine − prix recharge du jour (admin_empty_spool_costs, lu par
+-- CA.costing.emptySpoolCost) et figé sur la ligne de facture.
 -- ============================================================
 alter table public.materials add column if not exists empty_spool_id uuid references public.products(id) on delete set null;
-alter table public.production_spools add column if not exists empty_cost  numeric(10,2);   -- [PRIVÉ] valeur de la bobine vide (figée au 1er usage)
-alter table public.production_spools add column if not exists empty_state text;            -- null = à libérer (si terminée) | released | kept
-alter table public.production_spools add column if not exists empty_at    timestamptz;
-alter table public.production_spools drop constraint if exists production_spools_empty_state_chk;
-alter table public.production_spools add constraint production_spools_empty_state_chk check (empty_state in ('released', 'kept'));
-
-create table if not exists public.empty_spool_moves (
-  id           uuid primary key default gen_random_uuid(),
-  accessory_id uuid not null references public.products(id) on delete cascade,
-  source       text not null check (source in ('production', 'internal')),
-  action       text not null check (action in ('released', 'kept')),
-  n            integer not null check (n > 0),
-  unit_cost    numeric(12,4) not null default 0,   -- [PRIVÉ] valeur moyenne d'une bobine de ce mouvement
-  spool_ids    uuid[] not null default '{}',       -- bobines de production concernées
-  created_at   timestamptz not null default now()
-);
-alter table public.empty_spool_moves add column if not exists batch uuid;   -- une confirmation (libérées + gardées) = un lot, annulé d'un coup
-create index if not exists empty_spool_moves_acc_idx on public.empty_spool_moves (accessory_id, created_at desc);
 create index if not exists materials_empty_spool_idx on public.materials (empty_spool_id);
-alter table public.empty_spool_moves enable row level security;
-drop policy if exists empty_spool_moves_admin_all on public.empty_spool_moves;
-create policy empty_spool_moves_admin_all on public.empty_spool_moves for all to authenticated
-  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
-revoke all on public.empty_spool_moves from anon;
-
--- Valeur de la bobine vide d'un filament acheté p_spool_cost : bobine − recharge
--- (coût moyen recharge du produit, sinon dernier prix payé, sinon coût du matériau) ;
--- pas de recharge connue : coût saisi sur l'accessoire. 0 si le matériau n'en donne pas.
-create or replace function public._empty_value(p_product uuid, p_spool_cost numeric)
-returns numeric language plpgsql stable security definer set search_path = '' as $$
-declare v_p public.products%rowtype; v_m public.materials%rowtype; v_r numeric; v_acc numeric; v_c numeric;
-begin
-  v_c := greatest(0, coalesce(p_spool_cost, 0));
-  if p_product is null then return 0; end if;
-  select * into v_p from public.products where id = p_product;
-  if not found then return 0; end if;
-  select * into v_m from public.materials where brand = v_p.brand and name = v_p.material;
-  if not found or v_m.empty_spool_id is null then return 0; end if;
-  v_r := coalesce(nullif(v_p.attrs -> 'avg_cost' ->> 'refill', '')::numeric,
-                  nullif(v_p.attrs -> 'last_cost' ->> 'refill', '')::numeric, v_m.cost_refill);
-  if v_r is null or v_r <= 0 or v_r >= v_c then
-    select cost_price into v_acc from public.products where id = v_m.empty_spool_id;
-    return round(least(v_c, greatest(0, coalesce(v_acc, 0))), 2);
-  end if;
-  return round(v_c - v_r, 2);
-end $$;
-revoke all on function public._empty_value(uuid, numeric) from public, anon, authenticated;
-
--- Bobines de production terminées, pas encore libérées, de cet accessoire (plus vieille d'abord)
-create or replace function public._empty_prod_queue(p_acc uuid)
-returns uuid[] language sql stable security definer set search_path = '' as $$
-  select coalesce(array_agg(s.id order by s.closed_at, s.created_at), '{}')
-    from public.production_spools s
-    join public.products p on p.id = s.product_id
-    join public.materials m on m.brand = p.brand and m.name = p.material
-   where m.empty_spool_id = p_acc and s.kind = 'spool' and s.status = 'done' and s.empty_state is null;
-$$;
-revoke all on function public._empty_prod_queue(uuid) from public, anon, authenticated;
-
--- Bobines (pas les recharges) sorties en usage interne depuis le 2026-10-12 : { n, value }
-create or replace function public._empty_internal(p_acc uuid)
-returns jsonb language sql stable security definer set search_path = '' as $$
-  select jsonb_build_object('n', coalesce(sum(l.qty), 0),
-           'value', case when sum(l.qty) > 0 then sum(l.qty * public._empty_value(l.product_id, l.unit_cost)) / sum(l.qty) end)
-    from public.invoices i
-    join public.invoice_lines l on l.invoice_id = i.id
-    join public.products p on p.id = l.product_id
-    join public.materials m on m.brand = p.brand and m.name = p.material
-   where m.empty_spool_id = p_acc and i.client_type = 'internal' and i.status is distinct from 'cancelled'
-     and i.invoice_date >= date '2026-10-12' and l.kind = 'spool';
-$$;
-revoke all on function public._empty_internal(uuid) from public, anon, authenticated;
-
--- Coût moyen de la bobine vide (libérations) : retiré le 2026-10-19, le coût se calcule à la vente.
-drop function if exists public._empty_recost(uuid);
 
 -- Coût du jour de chaque bobine vide (2026-10-19) -> { "<accessory_id>": coût }.
 -- = écart bobine − recharge de la COMMANDE REÇUE la plus récente qui contient les deux
@@ -3458,120 +3239,6 @@ begin
 end $$;
 revoke all on function public.admin_empty_spool_costs() from public, anon;
 grant execute on function public.admin_empty_spool_costs() to authenticated;
-
--- Carte « Bobines vides » (Production) : une ligne par bobine vide liée à un matériau
--- (ou de la catégorie « Bobines vides ») -> à libérer (production / interne), en cours, dernier mouvement.
-create or replace function public.admin_empty_spools()
-returns jsonb language plpgsql stable security definer set search_path = '' as $$
-begin
-  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
-  return coalesce((
-    select jsonb_agg(x.j order by x.so, x.nm)
-      from (
-        select a.sort_order so, a.name nm, jsonb_build_object(
-          'id', a.id, 'name', a.name, 'qty', a.qty, 'cost_price', a.cost_price,
-          'avg_cost', a.attrs -> 'avg_cost' ->> 'item', 'image_path', a.image_path,
-          'prod', coalesce(array_length(public._empty_prod_queue(a.id), 1), 0),
-          'internal', greatest(0, (public._empty_internal(a.id) ->> 'n')::numeric
-                      - coalesce((select sum(n) from public.empty_spool_moves mv where mv.accessory_id = a.id and mv.source = 'internal'), 0)),
-          'active', (select count(*) from public.production_spools s
-                       join public.products p on p.id = s.product_id
-                       join public.materials m on m.brand = p.brand and m.name = p.material
-                      where m.empty_spool_id = a.id and s.kind = 'spool' and s.status = 'active'),
-          'materials', (select coalesce(jsonb_agg(m.brand || ' · ' || m.name order by m.brand, m.sort_order), '[]'::jsonb)
-                          from public.materials m where m.empty_spool_id = a.id),
-          'last', (select jsonb_build_object('batch', mv.batch, 'at', max(mv.created_at),
-                            'released', coalesce(sum(mv.n) filter (where mv.action = 'released'), 0),
-                            'kept', coalesce(sum(mv.n) filter (where mv.action = 'kept'), 0))
-                     from public.empty_spool_moves mv where mv.accessory_id = a.id
-                    group by mv.batch order by max(mv.created_at) desc limit 1)
-        ) j
-        from public.products a
-       where a.type = 'accessory'
-         and (exists (select 1 from public.materials m where m.empty_spool_id = a.id) or a.attrs ->> 'category' = 'Bobines vides')
-      ) x), '[]'::jsonb);
-end $$;
-revoke all on function public.admin_empty_spools() from public, anon;
-grant execute on function public.admin_empty_spools() to authenticated;
-
--- Libérer p_release bobines vides pour la vente (+stock) et en garder p_keep (sorties du compte).
--- Production d'abord (plus vieille d'abord), puis usage interne. -> { qty, avg_cost, released, kept }
-create or replace function public.admin_release_empty(p_acc uuid, p_release integer, p_keep integer default 0)
-returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_a public.products%rowtype; v_rel integer; v_keep integer; v_q uuid[]; v_np integer; v_int jsonb; v_ni integer;
-        v_relp uuid[]; v_keepp uuid[]; v_reli integer; v_keepi integer;
-        v_b uuid := gen_random_uuid();
-begin
-  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
-  select * into v_a from public.products where id = p_acc and type = 'accessory' for update;
-  if not found then raise exception 'Bobine vide introuvable.'; end if;
-  v_rel := greatest(0, coalesce(p_release, 0)); v_keep := greatest(0, coalesce(p_keep, 0));
-  if v_rel + v_keep = 0 then raise exception 'Indique combien en libérer.'; end if;
-
-  v_q := public._empty_prod_queue(p_acc); v_np := coalesce(array_length(v_q, 1), 0);
-  v_int := public._empty_internal(p_acc);
-  v_ni := greatest(0, (v_int ->> 'n')::numeric
-          - coalesce((select sum(n) from public.empty_spool_moves where accessory_id = p_acc and source = 'internal'), 0))::integer;
-  if v_rel + v_keep > v_np + v_ni then
-    raise exception 'Il n''y en a que % à libérer.', v_np + v_ni;
-  end if;
-
-  v_relp  := v_q[1 : least(v_rel, v_np)];
-  v_reli  := v_rel - coalesce(array_length(v_relp, 1), 0);
-  v_keepp := v_q[coalesce(array_length(v_relp, 1), 0) + 1 : least(coalesce(array_length(v_relp, 1), 0) + v_keep, v_np)];
-  v_keepi := v_keep - coalesce(array_length(v_keepp, 1), 0);
-
-  -- stock seulement : le coût se calcule à la vente (2026-10-19)
-  if coalesce(array_length(v_relp, 1), 0) > 0 then
-    insert into public.empty_spool_moves (accessory_id, source, action, n, unit_cost, spool_ids, batch)
-    values (p_acc, 'production', 'released', array_length(v_relp, 1), 0, v_relp, v_b);
-    update public.production_spools set empty_state = 'released', empty_at = now() where id = any(v_relp);
-  end if;
-  if v_reli > 0 then
-    insert into public.empty_spool_moves (accessory_id, source, action, n, unit_cost, batch)
-    values (p_acc, 'internal', 'released', v_reli, 0, v_b);
-  end if;
-  if coalesce(array_length(v_keepp, 1), 0) > 0 then
-    insert into public.empty_spool_moves (accessory_id, source, action, n, unit_cost, spool_ids, batch)
-    values (p_acc, 'production', 'kept', array_length(v_keepp, 1), 0, v_keepp, v_b);
-    update public.production_spools set empty_state = 'kept', empty_at = now() where id = any(v_keepp);
-  end if;
-  if v_keepi > 0 then
-    insert into public.empty_spool_moves (accessory_id, source, action, n, batch) values (p_acc, 'internal', 'kept', v_keepi, v_b);
-  end if;
-
-  if v_rel > 0 then
-    update public.products set qty = coalesce(qty, 0) + v_rel, updated_at = now() where id = p_acc;
-  end if;
-  return (select jsonb_build_object('qty', qty, 'avg_cost', attrs -> 'avg_cost' ->> 'item', 'released', v_rel, 'kept', v_keep)
-            from public.products where id = p_acc);
-end $$;
-revoke all on function public.admin_release_empty(uuid, integer, integer) from public, anon;
-grant execute on function public.admin_release_empty(uuid, integer, integer) to authenticated;
-
--- Annuler une confirmation (erreur de saisie), tout son lot : les bobines redeviennent
--- « à libérer » ; les libérées retirent aussi leur stock (jamais sous 0), coût moyen rejoué.
-drop function if exists public.admin_empty_undo(uuid);
-create or replace function public.admin_empty_undo(p_batch uuid)
-returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_acc uuid; v_rel integer;
-begin
-  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
-  select accessory_id into v_acc from public.empty_spool_moves where batch = p_batch limit 1;
-  if v_acc is null then return null; end if;
-  perform 1 from public.products where id = v_acc for update;
-  select coalesce(sum(n) filter (where action = 'released'), 0) into v_rel from public.empty_spool_moves where batch = p_batch;
-  if v_rel > 0 then
-    update public.products set qty = greatest(0, coalesce(qty, 0) - v_rel), updated_at = now() where id = v_acc;
-  end if;
-  update public.production_spools set empty_state = null, empty_at = null
-   where id in (select unnest(spool_ids) from public.empty_spool_moves where batch = p_batch);
-  delete from public.empty_spool_moves where batch = p_batch;
-  return (select jsonb_build_object('qty', qty, 'avg_cost', attrs -> 'avg_cost' ->> 'item', 'released', v_rel)
-            from public.products where id = v_acc);
-end $$;
-revoke all on function public.admin_empty_undo(uuid) from public, anon;
-grant execute on function public.admin_empty_undo(uuid) to authenticated;
 
 -- ------------------------------------------------------------
 -- PRODUCTION — FILE « EN IMPRESSION » (2026-10-20)

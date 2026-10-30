@@ -199,11 +199,16 @@
     // usage interne (ce que Théo prend dans son stock, à 0 $) : jamais compté comme une vente
     var rows = all.filter(function (inv) { return inv.client_type !== 'internal'; });
     var intInv = all.filter(function (inv) { return inv.client_type === 'internal'; });
-    var intQty = 0, intCost = 0;
+    // deux usages, comptés à part : « production » (filament pris pour imprimer des spacers) et « autre » (perso, projets ; anciennes sorties comprises)
+    var intUse = { production: { cost: 0, qty: 0, n: 0 }, other: { cost: 0, qty: 0, n: 0 } };
     intInv.forEach(function (inv) {
-      intCost += (+inv.cost_total) || 0;
-      (linesByInv[inv.id] || []).forEach(function (l) { intQty += (+l.qty) || 0; });
+      var u = intUse[inv.internal_use === 'production' ? 'production' : 'other'];
+      u.n++; u.cost += (+inv.cost_total) || 0;
+      (linesByInv[inv.id] || []).forEach(function (l) { u.qty += (+l.qty) || 0; });
     });
+    function intCard(title, u) {
+      return u.n ? card(title, money(u.cost), u.qty + ' article' + (u.qty > 1 ? 's' : '') + ' pris · au coûtant') : '';
+    }
     var n = rows.length;
     var ca = 0, cost = 0, collected = 0;
     var byCat = {}, prod = {};
@@ -245,7 +250,7 @@
       card('Factures', String(n), n > 1 ? n + ' factures' : n + ' facture') +
       card('Panier moyen', money(avg), 'par facture') +
       card('Encaissé', money(collected), 'taxes incluses') +
-      (intInv.length ? card('Usage interne', money(intCost), intQty + ' article' + (intQty > 1 ? 's' : '') + ' pris · au coûtant') : '');
+      intCard('Interne · production', intUse.production) + intCard('Interne · autre', intUse.other);
 
     // répartition par gabarit
     var catRows = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; }).map(function (c) {

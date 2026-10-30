@@ -1,23 +1,21 @@
 /* =========================================================
    Création Audio V2 — Stock › Production (spacers imprimés)
-   1) BOBINES EN PRODUCTION : une bobine (ou recharge) du stock de vente est
-      « sortie » pour imprimer (RPC admin_take_spool : −1 au stock, prix payé
-      figé, 1000 g par défaut). Grammes restants = poids − Σ productions.
-      Retirer (jamais utilisée) la remet au stock ; Terminer la range.
-   2) EN IMPRESSION → PRODUCTION : le batch sorti d'AutoLoop (.gcode.3mf ou .gcode)
+   1) EN IMPRESSION → PRODUCTION : le batch sorti d'AutoLoop (.gcode.3mf ou .gcode)
       entre dans la file production_queue (AutoLoop › « Envoyer à la production »
       ou glissé ici) ; « Terminé » le charge dans le formulaire.
       Lu dans l'en-tête : loops (« ; === LOOP 1 OF N === »), durée du batch
       (« Durée estimée du batch », cooldown compris), grammes par filament
-      (déjà × loops), type + couleur de chaque filament (pré-choix des bobines).
-      Coût = filament (g × prix / poids de la bobine) + électricité et usure
+      (déjà × loops), type + couleur de chaque filament (pré-choix du filament).
+      Coût = filament (g × coût moyen CMP du filament / 1 000 g) + électricité et usure
       (durée × taux $/h des défauts du calculateur AutoLoop). Les pièces bonnes
       font des paires ; une pièce seule attend la production suivante.
+      Aucune bobine à assigner (retirées le 2026-10-29) : le stock de filament baisse
+      par Facturation › Interne › « Production ».
       RPC admin_save_production : stock du spacer + coût moyen (attrs.avg_cost.item,
-      lu par Facturation / Spacers) en une transaction.
-   3) HISTORIQUE : supprimer = la plus récente de chaque spacer seulement
+      lu par Facturation / Spacers) en une transaction ; filaments figés dans productions.fils.
+   2) HISTORIQUE : supprimer = la plus récente de chaque spacer seulement
       (RPC admin_delete_production : stock, pièce seule et coût moyen rejoués).
-   Tables : production_spools · productions · production_uses (schema-v2.sql).
+   Tables : productions · production_queue (schema-v2.sql).
    ========================================================= */
 (function () {
   'use strict';
@@ -153,30 +151,25 @@
     if (this.o.onPick) this.o.onPick(this.value);
   };
 
+
   var loaded = false, saving = false;
-  var spacers = [], filaments = [], spools = [], uses = [], removals = [], prods = [];
+  var spacers = [], filaments = [], prods = [];
   var rates = { elec: 0.2, deprec: 0.25 };
   var file = null;          // G-code lu : { name, isAuto, loops, minutes, objects, fils: [{ type, hex, perLoop }] }
-  var rows = [];            // filament utilisé : [{ block: clé du bloc|'', grams, type, hex }]
+  var rows = [];            // filament utilisé : [{ fil: id du filament|'', grams, type, hex }]
   var edited = { good: false, perPlate: false };
   var lastLoops = 1;
   var perLoopMin = 0;       // minutes par loop du G-code chargé : la durée suit les loops (0 = saisie à la main)
 
   var el = {
-    takeOpen: $('#pr-take-open'), take: $('#pr-take'), takeFil: $('#pr-take-fil'), takeKind: $('#pr-take-kind'), takeQty: $('#pr-take-qty'),
-    takeCost: $('#pr-take-cost'), takeWeight: $('#pr-take-weight'), takeSave: $('#pr-take-save'),
-    takeCancel: $('#pr-take-cancel'), takeStatus: $('#pr-take-status'),
-    spools: $('#pr-spools'), doneWrap: $('#pr-done-wrap'), doneN: $('#pr-done-n'), done: $('#pr-done'),
     drop: $('#pr-drop'), file: $('#pr-file'), fileWarn: $('#pr-file-warn'), queue: $('#pr-queue'), qN: $('#pr-queue-n'),
     spacer: $('#pr-spacer'), loops: $('#pr-loops'), perPlate: $('#pr-per-plate'), good: $('#pr-good'),
     timeH: $('#pr-time-h'), timeM: $('#pr-time-m'), date: $('#pr-date'),
     uses: $('#pr-uses'), useAdd: $('#pr-use-add'),
     save: $('#pr-save'), report: $('#pr-report'), status: $('#pr-status'),
-    history: $('#pr-history'), refresh: $('#pr-refresh'),
-    emptiesCard: $('#pr-empties-card'), empties: $('#pr-empties')
+    history: $('#pr-history'), refresh: $('#pr-refresh')
   };
-  var empties = [];         // bobines vides (admin_empty_spools) : à libérer, en cours, dernier lot
-  if (!el.spools) return;
+  if (!el.uses) return;
 
   /* ---- activation à l'ouverture de l'onglet ---- */
   var prevOnTab = window.CA.onTab;
@@ -184,18 +177,18 @@
     if (typeof prevOnTab === 'function') prevOnTab(name);
     if (name !== 'production') return;
     if (!loaded) { loaded = true; el.date.value = todayISO(); }
-    loadAll();   // à chaque visite : une vente / réception a pu changer les stocks entre-temps
+    loadAll();   // à chaque visite : une réception a pu changer les coûts moyens entre-temps
   };
 
   function loadAll() {
     return Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : null,
-      loadSpacers(), loadFilaments(), loadSpools(), loadProds(), loadRates(), loadBrandOrder(), loadEmpties(), loadQueue()
+      loadSpacers(), loadFilaments(), loadProds(), loadRates(), loadBrandOrder(), loadQueue()
     ]).then(function () {
       sortAll();
-      renderSpools(); renderEmpties(); renderTakeOptions(); renderSpacerOptions(); renderRows(); recalc(); renderHistory(); renderQueue();
+      renderSpacerOptions(); renderRows(); recalc(); renderHistory(); renderQueue();
     }, function (err) {
-      el.spools.innerHTML = '<p class="empty">Impossible de charger : ' + esc(errText(err)) + '</p>';
+      el.history.innerHTML = '<p class="empty">Impossible de charger : ' + esc(errText(err)) + '</p>';
     });
   }
   function q(res) { if (res.error) throw res.error; return res.data || []; }
@@ -209,17 +202,6 @@
       .eq('type', 'filament').order('brand', { ascending: true }).order('material', { ascending: true })
       .order('sort_order', { ascending: true }).order('name', { ascending: true })
       .then(function (res) { filaments = q(res); });
-  }
-  function loadSpools() {
-    return Promise.all([
-      sb.from('production_spools').select('*').order('taken_at', { ascending: true }).order('created_at', { ascending: true }),
-      sb.from('production_uses').select('production_id,spool_id,grams,cost'),
-      sb.from('production_removals').select('*').order('created_at', { ascending: true })
-    ]).then(function (r) { spools = q(r[0]); uses = q(r[1]); removals = r[2].error ? [] : (r[2].data || []); });
-  }
-  function loadEmpties() {
-    var costs = window.CA.costing && window.CA.costing.loadEmptyCosts ? window.CA.costing.loadEmptyCosts(true) : null;
-    return Promise.all([sb.rpc('admin_empty_spools'), costs]).then(function (all) { var res = all[0]; empties = res.error ? [] : (res.data || []); }, function () { empties = []; });
   }
   function loadProds() {
     return sb.from('productions').select('*').order('created_at', { ascending: false })
@@ -239,9 +221,8 @@
     }, function () {});
   }
 
-  /* ---- Ordre de la section Filaments (peu importe quand la bobine a été sortie) :
-     marque (brands.sort_order) → matériau (materials.sort_order) → couleur (sort_order) ;
-     bobine avant recharge ; à filament égal, la plus vieille d'abord (consommée en premier). ---- */
+  /* ---- Ordre de la section Filaments : marque (brands.sort_order) → matériau
+     (materials.sort_order) → couleur (sort_order). ---- */
   var brandOrder = [];
   function loadBrandOrder() {
     return sb.from('brands').select('name,sort_order').order('sort_order', { ascending: true }).order('name', { ascending: true })
@@ -262,479 +243,13 @@
     filaments = stableSort(filaments, function (a, z) {
       return (brandIdx(a.brand) - brandIdx(z.brand)) || (matIdx(a.brand, a.material) - matIdx(z.brand, z.material));
     });
-    var rank = {};
-    filaments.forEach(function (f, i) { rank[f.id] = i; });
-    var rk = function (s) { return rank[s.product_id] != null ? rank[s.product_id] : 1e6; };
-    // bobines : chargées par date de sortie -> l'ordre d'origine départage les bobines du même filament
-    spools = stableSort(spools, function (a, z) {
-      return (rk(a) - rk(z)) || ((a.kind === 'refill' ? 1 : 0) - (z.kind === 'refill' ? 1 : 0)) ||
-        (rk(a) === 1e6 ? String(a.label).localeCompare(String(z.label), 'fr') : 0);
-    });
   }
 
-  function spoolById(id) { return spools.filter(function (s) { return String(s.id) === String(id); })[0] || null; }
   function spacerById(id) { return spacers.filter(function (s) { return String(s.id) === String(id); })[0] || null; }
   function filById(id) { return filaments.filter(function (f) { return String(f.id) === String(id); })[0] || null; }
-  // grammes sortis d'une bobine : productions + retraits (filament pris pour autre chose)
-  function usedOf(id) {
-    var sum = function (t, u) { return t + (String(u.spool_id) === String(id) ? (+u.grams || 0) : 0); };
-    return uses.reduce(sum, 0) + removals.reduce(sum, 0);
-  }
-  // retraits d'un bloc, regroupés par action (un retrait peut toucher plusieurs bobines)
-  function removalsOf(b) {
-    var ids = {}, out = [], map = {};
-    b.spools.forEach(function (s) { ids[s.id] = 1; });
-    removals.forEach(function (r) {
-      if (!ids[r.spool_id]) return;
-      var g = map[r.batch];
-      if (!g) { g = map[r.batch] = { batch: r.batch, grams: 0, note: r.note || '', at: r.removed_at }; out.push(g); }
-      g.grams += +r.grams || 0;
-    });
-    return out;
-  }
-  function leftOf(s) { return (+s.weight_g || 0) - usedOf(s.id); }
-  function activeSpools() { return spools.filter(function (s) { return s.status === 'active'; }); }
-  function kindTxt(k) { return k === 'refill' ? 'Recharge' : 'Bobine'; }
   function swatch(hex) { return swatchBg(isHex(hex) ? hex : 'var(--line-2)'); }
-  // pastille d'une bobine de production : celle de son filament (multicolore, paillettes), sinon sa couleur figée
-  function spoolBg(s) { return s ? filBg(filById(s.product_id), s.hex) : 'var(--line-2)'; }
   // « Bambu Lab · PETG Basic · Black » -> « PETG Basic · Black » (la marque prend de la place)
-  function shortLabel(s) { var p = String(s.label || '').split(' · '); return p.length > 2 ? p.slice(1).join(' · ') : (s.label || ''); }
-
-  /* =========================================================
-     1) BOBINES EN PRODUCTION — regroupées en BLOCS (2026-10-11) :
-     un bloc = même filament + même format (« Black ×10 »), une jauge pour le total ;
-     dans le bloc, des LOTS = même date de sortie + même prix + même poids. On déplie
-     (chevron) pour voir les lots et chaque bobine. En base, une ligne par bobine.
-     ========================================================= */
-  function blockKey(s) { return (s.product_id ? String(s.product_id) : 'x:' + s.label) + '|' + (s.kind === 'refill' ? 'refill' : 'spool'); }
-  function lotKey(s) { return s.taken_at + '|' + (+s.unit_cost || 0).toFixed(2) + '|' + s.weight_g; }
-  // blocs dans l'ordre de `spools` (déjà trié : ordre des Filaments, puis la plus vieille d'abord)
-  function blocksOf(list) {
-    var map = {}, out = [];
-    list.forEach(function (s) {
-      var k = blockKey(s), b = map[k];
-      if (!b) { b = map[k] = { key: k, spools: [], lots: [], lotMap: {} }; out.push(b); }
-      b.spools.push(s);
-      var lk = lotKey(s), l = b.lotMap[lk];
-      if (!l) { l = b.lotMap[lk] = { key: lk, spools: [] }; b.lots.push(l); }
-      l.spools.push(s);
-    });
-    return out;
-  }
-  var openBlocks = {};   // blocs dépliés (clé -> true), gardés d'un rendu à l'autre
-  function isUsed(s) { return usedOf(s.id) > 0.05; }
-  function priceRange(b) {
-    var ps = b.lots.map(function (l) { return +l.spools[0].unit_cost || 0; });
-    var lo = Math.min.apply(null, ps), hi = Math.max.apply(null, ps);
-    return lo === hi ? money(lo) : money(lo).replace(' $', '') + '–' + money(hi);
-  }
-  function blockMeta(b, done) {
-    var s = b.spools[0], m = [kindTxt(s.kind)];
-    if (b.lots.length === 1) m.push(money(s.unit_cost), 'sortie' + (b.spools.length > 1 ? 's' : '') + ' le ' + shortDay(s.taken_at));
-    else m.push(b.lots.length + ' lots', priceRange(b));
-    if (!done) {
-      var ent = b.spools.filter(isUsed).length;
-      if (ent && b.spools.length > 1) m.push(ent + ' entamée' + (ent > 1 ? 's' : ''));
-    }
-    var hs = b.spools.filter(function (x) { return !x.stock_taken; }).length;
-    if (hs) m.push(b.spools.length > 1 ? hs + ' hors stock' : 'hors stock');
-    if (!done && isLow(b)) m.push('presque vide');
-    return m.join(' · ');
-  }
-  // bloc actif dont il reste moins de LOW_G grammes en tout : à remplacer avant le prochain batch
-  var LOW_G = 150;
-  function isLow(b) { return b.spools.reduce(function (t, x) { return t + Math.max(0, leftOf(x)); }, 0) < LOW_G; }
-  // détail à déplier : plusieurs bobines, ou des retraits à voir / annuler
-  function expandable(b) { return b.spools.length > 1 || removalsOf(b).length > 0; }
-  function chevron(b) {
-    return expandable(b)
-      ? '<button class="pr-chev" type="button" data-act="toggle" aria-expanded="' + (!!openBlocks[b.key]) + '" aria-label="Voir les bobines"></button>' : '';
-  }
-  // une bobine (dans le détail d'un bloc déplié)
-  function spoolLine(s, i, done) {
-    var used = usedOf(s.id), w = +s.weight_g || 1000, left = w - used;
-    var st = done ? grams(used) + ' utilisés' + (left > 0.5 ? ' · perte ' + grams(left) : '') + (s.closed_auto ? ' · vidée' : '')
-      : used > 0.05 ? grams(left) + ' <em>/ ' + grams(w) + '</em> · entamée' : 'pleine';
-    var act = done ? '<button class="btn btn-ghost btn-sm" type="button" data-act="reopen">Rouvrir</button>'
-      : used > 0.05 ? '<button class="btn btn-ghost btn-sm" type="button" data-act="close">Terminer</button>'
-      : '<button class="btn btn-ghost btn-sm" type="button" data-act="remove" title="Remettre au stock de vente">Retirer</button>';
-    return '<div class="pr-sline" data-id="' + esc(s.id) + '"><span class="pr-sline-n">' + kindTxt(s.kind) + ' ' + (i + 1) + '</span>' +
-      '<span class="pr-sline-st">' + st + (s.stock_taken ? '' : ' · hors stock') + '</span>' + act + '</div>';
-  }
-  // détail d'un bloc déplié : par lot, chaque bobine entamée (ou terminée) + UNE ligne pour les pleines
-  function blockDetail(b, done) {
-    if (!expandable(b) || !openBlocks[b.key]) return '';
-    var rem = removalsOf(b), remHtml = rem.length
-      ? '<div class="pr-lot"><div class="pr-lot-h">Retraits</div>' + rem.map(function (r) {
-          return '<div class="pr-sline" data-batch="' + esc(r.batch) + '"><span class="pr-sline-n">Retrait</span>' +
-            '<span class="pr-sline-st">' + grams(r.grams) + ' · ' + esc(shortDay(r.at)) + (r.note ? ' · ' + esc(r.note) : '') + '</span>' +
-            '<button class="btn btn-ghost btn-sm" type="button" data-act="undo-removal">Annuler</button></div>';
-        }).join('') + '</div>' : '';
-    if (b.spools.length < 2) return '<div class="pr-detail">' + remHtml + '</div>';
-    return '<div class="pr-detail">' + b.lots.map(function (l) {
-      var s = l.spools[0], full = done ? [] : l.spools.filter(function (x) { return !isUsed(x); });
-      var lines = l.spools.filter(function (x) { return done || isUsed(x); }).map(function (x, i) { return spoolLine(x, i, done); }).join('');
-      if (full.length) {
-        lines += '<div class="pr-sline" data-lot="' + esc(l.key) + '"><span class="pr-sline-n">' + full.length + ' pleine' + (full.length > 1 ? 's' : '') + '</span>' +
-          '<span class="pr-sline-st">' + grams(full.length * (+s.weight_g || 1000)) + '</span>' +
-          '<button class="btn btn-ghost btn-sm" type="button" data-act="remove-lot" title="Remettre au stock de vente">Retirer</button></div>';
-      }
-      return '<div class="pr-lot"><div class="pr-lot-h">' + esc(shortDay(s.taken_at)) + ' · ' + money(s.unit_cost) + ' · ×' + l.spools.length +
-        (+s.weight_g !== 1000 ? ' · ' + grams(s.weight_g) : '') + '</div>' + lines + '</div>';
-    }).join('') + remHtml + '</div>';
-  }
-  function blockRow(b, done) {
-    var s = b.spools[0], n = b.spools.length;
-    var W = b.spools.reduce(function (t, x) { return t + (+x.weight_g || 1000); }, 0);
-    var U = b.spools.reduce(function (t, x) { return t + usedOf(x.id); }, 0), L = W - U;
-    var pct = Math.max(0, Math.min(100, L / W * 100));
-    var act = '';
-    if (done) {
-      if (n === 1) act = '<button class="btn btn-ghost btn-sm" type="button" data-act="reopen">Rouvrir</button>';
-    } else {
-      var ent = b.spools.filter(isUsed).length, full = n - ent;
-      act += '<button class="btn btn-ghost btn-sm" type="button" data-act="take-g">Retirer des g</button>';
-      if (ent) act += '<button class="btn btn-ghost btn-sm" type="button" data-act="close-block">Terminer</button>';
-      if (full) act += '<button class="btn btn-ghost btn-sm" type="button" data-act="remove-block" title="Remettre au stock de vente">Retirer</button>';
-    }
-    var nprod = Object.keys(uses.filter(function (u) { return b.spools.some(function (x) { return String(x.id) === String(u.spool_id); }); })
-      .reduce(function (acc, u) { acc[u.production_id] = 1; return acc; }, {})).length;
-    return '<div class="pr-spool' + (done ? ' is-done' : '') + (!done && isLow(b) ? ' is-low' : '') + (openBlocks[b.key] && expandable(b) ? ' is-open' : '') + '" data-block="' + esc(b.key) + '">' +
-      swatchBg(spoolBg(s)) +
-      '<div class="pr-sp-main"><b>' + esc(s.label) + (n > 1 ? ' <span class="pr-n">×' + n + '</span>' : '') + '</b>' +
-        '<span class="pr-sp-meta">' + esc(blockMeta(b, done)) + '</span></div>' +
-      (done
-        ? '<span class="pr-sp-left">' + grams(U) + ' · ' + nprod + ' prod.' + (L > 0.5 ? ' · perte ' + grams(L) : '') + '</span>'
-        : '<div class="pr-sp-gauge"><div class="pr-bar"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
-          '<span class="pr-sp-left' + (L < 0 ? ' is-neg' : '') + '">' + grams(L) + ' <em>/ ' + grams(W) + '</em></span></div>') +
-      '<div class="pr-sp-act">' + act + chevron(b) + '</div>' +
-      blockDetail(b, done) +
-    '</div>';
-  }
-  function renderSpools() {
-    var act = blocksOf(activeSpools()), doneSp = spools.filter(function (s) { return s.status === 'done'; }), done = blocksOf(doneSp);
-    el.spools.innerHTML = act.length ? act.map(function (b) { return blockRow(b, false); }).join('')
-      : '<p class="muted pr-empty">Aucune bobine en production.</p>';
-    el.doneWrap.hidden = !doneSp.length;
-    el.doneN.textContent = doneSp.length ? '(' + doneSp.length + ')' : '';
-    el.done.innerHTML = done.map(function (b) { return blockRow(b, true); }).join('');
-  }
-  function blockOf(key, done) {
-    return blocksOf(spools.filter(function (s) { return done ? s.status === 'done' : s.status === 'active'; }))
-      .filter(function (b) { return b.key === key; })[0] || null;
-  }
-  [el.spools, el.done].forEach(function (box) {
-    box.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-act]');
-      if (!btn) return;
-      var act = btn.getAttribute('data-act'), row = btn.closest('.pr-spool'), done = box === el.done;
-      var b = row ? blockOf(row.getAttribute('data-block'), done) : null;
-      if (act === 'toggle' && b) { openBlocks[b.key] = !openBlocks[b.key]; renderSpools(); return; }
-      if (act === 'close-block' && b) { closeBlock(b, btn); return; }
-      if (act === 'take-g' && b) { takeGrams(b, btn); return; }
-      if (act === 'undo-removal') { undoRemoval(btn); return; }
-      if (act === 'remove-block' && b) { removeBlock(b.spools); return; }
-      if (act === 'remove-lot' && b) {
-        var lk = btn.closest('.pr-sline').getAttribute('data-lot'), lot = b.lotMap[lk];
-        if (lot) removeBlock(lot.spools);
-        return;
-      }
-      // action sur une bobine : ligne du détail, ou bloc d'une seule bobine
-      var line = btn.closest('.pr-sline');
-      var s = line ? spoolById(line.getAttribute('data-id')) : (b && b.spools.length === 1 ? b.spools[0] : null);
-      if (s) spoolAction(s, act, btn);
-    });
-  });
-  // Retirer des g : filament pris pour autre chose que des spacers, sans raison ni coût.
-  // Pris sur les bobines du bloc dans l'ordre (la plus vieille d'abord, comme l'imprimante).
-  function takeGrams(b, btn) {
-    var left = b.spools.reduce(function (t, x) { return t + Math.max(0, leftOf(x)); }, 0);
-    var body = document.createElement('div');
-    body.innerHTML = '<input type="number" class="dlg-field" min="0" step="0.1" inputmode="decimal" placeholder="Grammes" aria-label="Grammes">' +
-      '<input type="text" class="dlg-field" placeholder="Note (facultatif)" aria-label="Note" maxlength="80">';
-    var gIn = body.querySelector('input[type=number]'), nIn = body.querySelector('input[type=text]');
-    caDialog.confirm({ title: 'Retirer des grammes', message: shortLabel(b.spools[0]) + ' : il reste ' + grams(left) + '.',
-      body: body, ok: 'Retirer', icon: 'edit' }).then(function (ok) {
-      if (!ok) return;
-      var g = round1(num(gIn.value) || 0);
-      if (g <= 0) return;
-      if (g > left + 0.05) { toast('Il ne reste que ' + grams(left) + ' dans ce bloc.', 'bad'); return; }
-      var need = g, parts = [];
-      b.spools.forEach(function (s) {
-        var take = round2(Math.min(need, Math.max(0, leftOf(s))));
-        if (take > 0) { parts.push({ spool_id: s.id, grams: take }); need = round2(need - take); }
-      });
-      btn.disabled = true;
-      sb.rpc('admin_take_grams', { p: { parts: parts, note: nIn.value, date: todayISO() } }).then(function (res) {
-        btn.disabled = false;
-        if (res.error) { caDialog.error(res.error); return; }
-        toast(grams(g) + ' retirés');
-        openBlocks[b.key] = true;
-        reloadAfterChange();
-      });
-    });
-    gIn.focus();
-  }
-  function undoRemoval(btn) {
-    var line = btn.closest('[data-batch]'); if (!line) return;
-    btn.disabled = true;
-    sb.rpc('admin_removal_undo', { p_batch: line.getAttribute('data-batch') }).then(function (res) {
-      btn.disabled = false;
-      if (res.error) { caDialog.error(res.error); return; }
-      toast('Retrait annulé');
-      reloadAfterChange();
-    });
-  }
-  // Terminer : la bobine entamée du bloc (le reste éventuel compte comme perte)
-  function closeBlock(b, btn) {
-    var ent = b.spools.filter(isUsed);
-    if (!ent.length) return;
-    var left = ent.reduce(function (t, s) { return t + Math.max(0, leftOf(s)); }, 0);
-    caDialog.confirm({ title: ent.length > 1 ? 'Terminer les ' + ent.length + ' bobines entamées ?' : 'Terminer la bobine entamée ?',
-      message: shortLabel(b.spools[0]) + (left > 0.5 ? ' — il reste ' + grams(left) + ', compté comme perte.' : '.'), ok: 'Terminer' }).then(function (ok) {
-      if (!ok) return;
-      btn.disabled = true;
-      var ids = ent.map(function (s) { return s.id; });
-      sb.from('production_spools').update({ status: 'done', closed_at: new Date().toISOString(), closed_auto: false }).in('id', ids).select().then(function (res) {
-        btn.disabled = false;
-        if (res.error) { caDialog.error(res.error); return; }
-        toast(ent.length > 1 ? ent.length + ' bobines terminées' : 'Bobine terminée');
-        reloadAfterChange();
-      });
-    });
-  }
-  // Retirer : n bobines pleines d'un bloc ou d'un lot (les plus récentes) retournent au stock de vente
-  function removeBlock(list) {
-    var full = list.filter(function (s) { return !isUsed(s); });
-    if (!full.length) return;
-    var ask = full.length === 1
-      ? caDialog.confirm({ title: 'Retirer cette bobine ?', message: shortLabel(full[0]) + (full[0].stock_taken ? ' retourne au stock de vente.' : ' est retirée de la production.'),
-          ok: 'Retirer', danger: true, icon: 'trash' }).then(function (ok) { return ok ? 1 : 0; })
-      : caDialog.prompt({ title: 'Retirer combien de bobines ?', message: shortLabel(full[0]) + ' : ' + full.length + ' pleines. Elles retournent au stock de vente.',
-          value: String(full.length), ok: 'Retirer', icon: 'trash' }).then(function (v) {
-          var n = parseInt(v, 10);
-          return isFinite(n) ? Math.max(0, Math.min(full.length, n)) : 0;
-        });
-    ask.then(function (n) {
-      if (!n) return;
-      var pick = full.slice(-n);
-      Promise.all(pick.map(function (s) { return sb.rpc('admin_spool_delete', { p_id: s.id }); })).then(function (res) {
-        var err = res.filter(function (r) { return r.error; })[0];
-        if (err) caDialog.error(err.error);
-        else toast(n > 1 ? n + ' bobines remises au stock' : 'Bobine remise au stock');
-        reloadAfterChange();
-      });
-    });
-  }
-  function spoolAction(s, act, btn) {
-    if (act === 'remove') {
-      caDialog.confirm({ title: 'Retirer cette bobine ?', message: s.label + (s.stock_taken ? ' retourne au stock de vente.' : ' est retirée de la production.'),
-        ok: 'Retirer', danger: true, icon: 'trash' }).then(function (ok) {
-        if (!ok) return;
-        sb.rpc('admin_spool_delete', { p_id: s.id }).then(function (res) {
-          if (res.error) { caDialog.error(res.error); return; }
-          toast(s.stock_taken ? 'Bobine remise au stock' : 'Bobine retirée');
-          reloadAfterChange();
-        });
-      });
-      return;
-    }
-    btn.disabled = true;
-    var patch = act === 'close' ? { status: 'done', closed_at: new Date().toISOString(), closed_auto: false }
-                                : { status: 'active', closed_at: null, closed_auto: false };
-    sb.from('production_spools').update(patch).eq('id', s.id).select().then(function (res) {
-      btn.disabled = false;
-      if (res.error) { caDialog.error(res.error); return; }
-      toast(act === 'close' ? 'Bobine terminée' : 'Bobine rouverte');
-      Object.assign(s, patch);
-      renderSpools(); renderRows(); recalc();
-      loadEmpties().then(renderEmpties);   // terminée / rouverte : compte « à libérer »
-    });
-  }
-
-  /* =========================================================
-     BOBINES VIDES (2026-10-12) — une bobine terminée (format bobine) laisse une bobine
-     vide réutilisable, vendue en accessoire ; aussi les bobines sorties en usage interne.
-     Rien n'entre au stock sans confirmation : Libérer (vente) / Garder (sorties du compte).
-     Lien filament -> bobine vide : fiche du matériau (materials.empty_spool_id).
-     ========================================================= */
-  // Depuis le 2026-10-19 : la production paie la bobine au complet ; la bobine vide n'a de coût
-  // qu'à la vente (bobine − recharge aux prix du jour, cms-costing.js) -> affiché ici à titre indicatif.
-  function emptyCostOf(e) {
-    var v = window.CA.costing && window.CA.costing.emptySpoolCost ? window.CA.costing.emptySpoolCost(e) : null;
-    return v != null ? v : (+e.cost_price || 0);
-  }
-  function emptyImg(e) {
-    if (!e.image_path) return '<span class="pr-e-img is-none" aria-hidden="true"></span>';
-    var url = sb.storage.from('products').getPublicUrl(e.image_path).data.publicUrl;
-    return '<span class="pr-e-img"><img src="' + esc(url) + '" alt="" loading="lazy"></span>';
-  }
-  function emptyRow(e) {
-    var prod = +e.prod || 0, intl = +e.internal || 0, pend = prod + intl, act = +e.active || 0;
-    var cost = emptyCostOf(e);
-    var mats = (e.materials || []).map(function (x) { var p = String(x).split(' · '); return p[p.length - 1]; });
-    var meta = ['Stock ' + (e.qty | 0), money(cost)];
-    if (act) meta.push(act + ' en cours');
-    var metaHtml = esc(meta.join(' · ')) + ' · ' + (mats.length ? esc(mats.join(', ')) : '<span class="is-warn">aucun matériau lié</span>');
-    var src = [];
-    if (prod) src.push(prod + ' production');
-    if (intl) src.push(intl + ' interne');
-    var last = '';
-    if (e.last && e.last.batch) {
-      var bits = [];
-      if (+e.last.released) bits.push('+' + e.last.released + ' en vente');
-      if (+e.last.kept) bits.push(e.last.kept + ' gardée' + (e.last.kept > 1 ? 's' : ''));
-      last = '<span class="pr-e-last">' + esc(shortDay(String(e.last.at).slice(0, 10))) + ' · ' + esc(bits.join(' · ')) +
-        ' <button class="pr-e-undo" type="button" data-act="undo">Annuler</button></span>';
-    }
-    return '<div class="pr-e" data-id="' + esc(e.id) + '">' + emptyImg(e) +
-      '<div class="pr-sp-main"><b>' + esc(e.name) + '</b><span class="pr-sp-meta">' + metaHtml + '</span>' + last + '</div>' +
-      '<div class="pr-e-n"><b class="' + (pend ? 'is-on' : '') + '">' + pend + ' à libérer</b>' +
-        (src.length ? '<span>' + esc(src.join(' · ')) + '</span>' : '') + '</div>' +
-      '<div class="pr-sp-act">' +
-        (pend ? '<button class="btn btn-accent btn-sm" type="button" data-act="release" data-ic="check">Libérer</button>' +
-                '<button class="btn btn-ghost btn-sm" type="button" data-act="keep">Garder</button>' : '') +
-      '</div></div>';
-  }
-  function renderEmpties() {
-    if (!el.empties) return;
-    el.emptiesCard.hidden = !empties.length;
-    el.empties.innerHTML = empties.map(emptyRow).join('');
-  }
-  function emptyById(id) { return empties.filter(function (e) { return String(e.id) === String(id); })[0] || null; }
-  if (el.empties) el.empties.addEventListener('click', function (ev) {
-    var btn = ev.target.closest('[data-act]'); if (!btn) return;
-    var e = emptyById(btn.closest('.pr-e').getAttribute('data-id')); if (!e) return;
-    var act = btn.getAttribute('data-act'), pend = (+e.prod || 0) + (+e.internal || 0);
-    if (act === 'undo') { undoEmpty(e, btn); return; }
-    var rel = act === 'release';
-    caDialog.prompt({
-      title: rel ? 'Combien en vente ?' : 'Combien en garder ?',
-      message: e.name + ' : ' + pend + ' à libérer.' + (rel ? ' Elles entrent au stock de la boutique.' : ' Elles sortent du compte, sans stock.'),
-      value: String(pend), ok: rel ? 'Libérer' : 'Garder', icon: rel ? 'plus' : 'info'
-    }).then(function (v) {
-      if (v == null) return;
-      var n = parseInt(v, 10);
-      if (!isFinite(n) || n <= 0) return;
-      n = Math.min(n, pend);
-      btn.disabled = true;
-      sb.rpc('admin_release_empty', { p_acc: e.id, p_release: rel ? n : 0, p_keep: rel ? 0 : n }).then(function (res) {
-        btn.disabled = false;
-        if (res.error) { caDialog.error(res.error); return; }
-        toast(rel ? n + ' bobine' + (n > 1 ? 's' : '') + ' vide' + (n > 1 ? 's' : '') + ' en vente' : n + ' gardée' + (n > 1 ? 's' : ''));
-        if (rel) waitlistCheck(e);
-        loadEmpties().then(renderEmpties);
-      });
-    });
-  });
-  // le stock remonte : quelqu'un attendait cette bobine vide ? (alerte de la liste d'attente)
-  function waitlistCheck(e) {
-    var wl = window.CA.waitlist;
-    if (!wl) return;
-    wl.reload().then(function () {
-      var n = wl.count(e.id, 'item');
-      if (!n) return;
-      wl.onScan(e.id, 'item');
-      caDialog.alert({ title: n > 1 ? n + ' personnes l\'attendent' : 'Quelqu\'un l\'attend',
-        message: e.name + ' — Inventaire › Liste d\'attente pour aviser.', icon: 'info' });
-    }, function () {});
-  }
-  function undoEmpty(e, btn) {
-    var l = e.last || {};
-    caDialog.confirm({ title: 'Annuler ce lot ?',
-      message: e.name + (+l.released ? ' perd ' + l.released + ' de stock ; ' : ' : ') + 'les bobines redeviennent à libérer.',
-      ok: 'Annuler le lot', cancel: 'Retour', danger: !!+l.released, icon: 'warn' }).then(function (ok) {
-      if (!ok) return;
-      btn.disabled = true;
-      sb.rpc('admin_empty_undo', { p_batch: l.batch }).then(function (res) {
-        if (res.error) { btn.disabled = false; caDialog.error(res.error); return; }
-        toast('Lot annulé');
-        loadEmpties().then(renderEmpties);
-      });
-    });
-  }
-
-  // --- Sortir des bobines du stock de vente (une ou plusieurs d'un coup) ---
-  function stockOf(f, kind) { return Math.max(0, (kind === 'refill' ? f.qty_2 : f.qty) | 0); }
-  // en stock d'abord dans chaque marque · matière ; rupture grisée (reste choisissable)
-  var takePk = new Picker(el.takeFil, {
-    placeholder: 'Choisir le filament', search: true,
-    items: function () {
-      return filaments.map(function (f) {
-        var st = [];
-        if ((f.qty | 0) > 0) st.push((f.qty | 0) + ' bob.');
-        if ((f.qty_2 | 0) > 0) st.push((f.qty_2 | 0) + ' rech.');
-        return { id: f.id, group: (f.brand || '') + ' · ' + (f.material || ''), label: f.name || '(sans nom)',
-          btn: (f.material ? f.material + ' · ' : '') + (f.name || ''), meta: st.length ? st.join(' · ') : 'rupture',
-          bg: filBg(f), dim: !st.length, find: f.brand };
-      });
-    },
-    onPick: function () { takeDefaults(true); }
-  });
-  function takeKind() { var b = $('.fx-seg-btn.is-active', el.takeKind); return b ? b.getAttribute('data-kind') : 'spool'; }
-  function setTakeKind(k) {
-    $$('.fx-seg-btn', el.takeKind).forEach(function (b) {
-      var on = b.getAttribute('data-kind') === k;
-      b.classList.toggle('is-active', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
-    });
-  }
-  // libellés du format avec le stock (« Bobine · 3 ») + bouton « Sortir 4 bobines »
-  function takeLabels() {
-    var f = filById(takePk.value), n = Math.max(1, num(el.takeQty.value) | 0), k = takeKind();
-    $$('.fx-seg-btn', el.takeKind).forEach(function (b) {
-      var kk = b.getAttribute('data-kind');
-      b.innerHTML = kindTxt(kk) + (f ? ' <em>' + stockOf(f, kk) + '</em>' : '');
-    });
-    var word = k === 'refill' ? 'recharge' : 'bobine';
-    el.takeSave.textContent = 'Sortir ' + (n > 1 ? n + ' ' + word + 's' : '1 ' + word);
-    var over = f ? n - stockOf(f, k) : 0;
-    el.takeStatus.textContent = over > 0 ? over + ' hors stock' : '';
-  }
-  function takeDefaults(kindToo) {
-    var f = filById(takePk.value);
-    if (f && kindToo) setTakeKind(stockOf(f, 'spool') > 0 ? 'spool' : stockOf(f, 'refill') > 0 ? 'refill' : 'spool');
-    var c = f && window.CA.costing ? window.CA.costing.costOf(f, takeKind(), filaments) : null;
-    el.takeCost.value = c != null ? (+c).toFixed(2) : '';
-    takeLabels();
-  }
-  function renderTakeOptions() { takePk.render(); takeLabels(); }
-  el.takeKind.addEventListener('click', function (e) {
-    var b = e.target.closest('.fx-seg-btn'); if (!b) return;
-    setTakeKind(b.getAttribute('data-kind')); takeDefaults(false);
-  });
-  el.takeQty.addEventListener('input', takeLabels);
-  el.takeOpen.addEventListener('click', function () {
-    el.take.hidden = !el.take.hidden;
-    if (!el.take.hidden) {
-      var last = null;
-      try { last = localStorage.getItem('pr-last-fil'); } catch (e) {}
-      if (!takePk.value && last && filById(last)) takePk.set(last);
-      el.takeQty.value = 1;
-      takeDefaults(true);
-      takePk.btn.focus();
-    }
-  });
-  el.takeCancel.addEventListener('click', function () { el.take.hidden = true; });
-  el.take.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var f = filById(takePk.value);
-    if (!f) { el.takeStatus.textContent = 'Choisis le filament.'; return; }
-    var cost = num(el.takeCost.value), w = Math.round(num(el.takeWeight.value) || 0), n = Math.max(1, Math.min(50, num(el.takeQty.value) | 0));
-    if (cost == null || cost < 0) { el.takeStatus.textContent = 'Indique le prix payé.'; return; }
-    if (w < 1) { el.takeStatus.textContent = 'Indique le poids.'; return; }
-    el.takeSave.disabled = true; el.takeStatus.textContent = 'Enregistrement…';
-    sb.rpc('admin_take_spool', { p_product: f.id, p_kind: takeKind(), p_cost: round2(cost), p_weight: w, p_count: n, p_date: todayISO() }).then(function (res) {
-      el.takeSave.disabled = false;
-      if (res.error) { el.takeStatus.textContent = 'Erreur : ' + res.error.message; return; }
-      try { localStorage.setItem('pr-last-fil', f.id); } catch (e) {}
-      el.take.hidden = true; el.takeStatus.textContent = '';
-      var taken = (res.data && res.data.taken) | 0, word = takeKind() === 'refill' ? 'recharge' : 'bobine';
-      toast(n + ' ' + word + (n > 1 ? 's' : '') + ' en production' + (taken < n ? ' · ' + (n - taken) + ' hors stock' : ''));
-      reloadAfterChange();
-    }, function (err) { el.takeSave.disabled = false; el.takeStatus.textContent = 'Erreur : ' + errText(err); });
-  });
-
+  function shortLabel(label) { var p = String(label || '').split(' · '); return p.length > 2 ? p.slice(1).join(' · ') : (label || ''); }
   /* =========================================================
      2) EN IMPRESSION — file des batchs lancés : AutoLoop › « Envoyer à la
         production » (CA.prodQueue) ou glissés ici, plusieurs d'un coup.
@@ -805,26 +320,8 @@
       if (res.error) throw res.error;
       queue.push(res.data); renderQueue();
       toast('En impression · ' + name);
-      stockWarn(info);   // avertit, sans bloquer l'envoi
       return res.data;
     });
-  }
-  // Les bobines en production suffisent-elles pour ce batch ? (par filament : bobines du même type, couleur d'abord)
-  function stockWarn(info) {
-    loadSpools().then(function () {
-      sortAll(); if (loaded) renderSpools();
-      var miss = [];
-      (info.fils || []).forEach(function (f) {
-        var need = (+f.perLoop || 0) * (info.loops || 1);
-        if (!(need > 0)) return;
-        var cands = candidates(f.type, f.hex);
-        var pool = cands.filter(function (b) { return isHex(f.hex) && isHex(b.spools[0].hex) && b.spools[0].hex.toLowerCase() === f.hex.toLowerCase(); });
-        if (!pool.length) pool = cands;
-        var have = pool.reduce(function (t, b) { return t + blockLeft(b); }, 0);
-        if (need > have + 0.5) miss.push((f.type || 'Filament') + ' : il manque ' + grams(need - have) + (have > 0.5 ? ' (reste ' + grams(have) + ')' : ' (aucune bobine)'));
-      });
-      if (miss.length) caDialog.alert({ title: 'Pas assez de filament', message: miss.join(' · '), icon: 'warn' });
-    }, function () {});
   }
   // Envoi direct depuis AutoLoop : texte du batch (+ projet .3mf pour compter les objets du plateau)
   window.CA.prodQueue = {
@@ -1028,91 +525,57 @@
     el.good.value = Math.max(1, num(el.loops.value) | 0) * Math.max(1, num(el.perPlate.value) | 0);
   }
 
-  /* ---- Bobines utilisées : une rangée par filament du fichier, BLOC pré-choisi.
-     On choisit un bloc (ex. PETG Basic · Black ×10) ; les grammes sont répartis sur ses
-     bobines, la plus vieille d'abord (comme l'imprimante les vide) : allocate(). ---- */
-  function typeMatch(s, type) {
+  /* ---- Filament utilisé : une rangée par filament du fichier, filament pré-choisi (type + couleur
+     du G-code). Coût = grammes × coût moyen (CMP) d'une bobine de ce filament / 1 000 g. ---- */
+  function typeMatch(f, type) {
     if (!type) return false;
-    var words = ' ' + String(s.material || s.label || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ') + ' ';
+    var words = ' ' + String(f.material || f.name || '').toUpperCase().replace(/[^A-Z0-9]+/g, ' ') + ' ';
     return words.indexOf(' ' + type.toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim() + ' ') !== -1;
   }
-  function activeBlocks() { return blocksOf(activeSpools()); }
-  function blockByKey(k) { return activeBlocks().filter(function (b) { return b.key === k; })[0] || null; }
-  function blockLeft(b) { return b.spools.reduce(function (s, x) { return s + Math.max(0, leftOf(x)); }, 0); }
-  // grammes encore libres dans un bloc, sans compter la rangée `skip`
-  function availOfBlock(b, skip) {
-    return blockLeft(b) - rows.reduce(function (sum, r, i) { return sum + (i !== skip && r.block === b.key ? (+r.grams || 0) : 0); }, 0);
+  // coût moyen d'une bobine (1 000 g) du filament ; null = aucun coût connu (ni réception, ni matière, ni catalogue)
+  function costKg(f) {
+    if (!f || !window.CA.costing) return null;
+    return window.CA.costing.costOf(f, 'spool', filaments);
   }
+  function rowCost(r) {
+    var c = costKg(filById(r.fil));
+    return c == null ? 0 : round2((+r.grams || 0) * c / 1000);
+  }
+  // filaments qui correspondent au G-code : type d'abord, couleur ensuite (ordre des Filaments à score égal)
   function candidates(type, hex) {
-    return activeBlocks().map(function (b) {
-      var s = b.spools[0];
-      var sc = (typeMatch(s, type) ? 2 : 0) + (isHex(hex) && isHex(s.hex) && s.hex.toLowerCase() === hex.toLowerCase() ? 1 : 0);
-      return { b: b, sc: sc };
+    return filaments.map(function (f) {
+      var sc = (typeMatch(f, type) ? 2 : 0) + (isHex(hex) && isHex(f.hex) && f.hex.toLowerCase() === hex.toLowerCase() ? 1 : 0);
+      return { f: f, sc: sc };
     }).filter(function (c) { return !type || c.sc >= 2; })
-      .sort(function (a, z) { return z.sc - a.sc; })   // tri stable : ordre des Filaments à score égal
-      .map(function (c) { return c.b; });
+      .sort(function (a, z) { return z.sc - a.sc; })
+      .map(function (c) { return c.f; });
   }
   function buildRows() {
     rows = [];
     var loops = Math.max(1, num(el.loops.value) | 0);
     (file ? file.fils : []).forEach(function (f) {
-      var need = round1(f.perLoop * loops), cands = candidates(f.type, f.hex);
-      // remplit le meilleur bloc, la suite sur le suivant s'il ne suffit pas
-      while (need > 0) {
-        var free = cands.filter(function (b) { return availOfBlock(b, -1) > 0.05; });
-        if (!free.length) { rows.push({ block: '', grams: need, type: f.type, hex: f.hex }); break; }
-        var pick = free[0], g = free.length === 1 ? need : Math.min(need, round1(availOfBlock(pick, -1)));
-        rows.push({ block: pick.key, grams: g, type: f.type, hex: f.hex });
-        need = round1(need - g);
-      }
+      var pick = candidates(f.type, f.hex)[0];
+      rows.push({ fil: pick ? pick.id : '', grams: round1(f.perLoop * loops), type: f.type, hex: f.hex });
     });
     return rows;
   }
-  // Répartition réelle : chaque rangée sur les bobines de son bloc, dans l'ordre (plus vieille d'abord).
-  // -> [{ parts: [{ s, g }], over }] (over = grammes qui ne tiennent pas dans le bloc, mis sur sa dernière bobine)
-  function allocate() {
-    var free = {}, bmap = {};
-    activeSpools().forEach(function (s) { free[s.id] = Math.max(0, leftOf(s)); });
-    activeBlocks().forEach(function (b) { bmap[b.key] = b; });
-    return rows.map(function (r) {
-      var b = bmap[r.block], need = round2(+r.grams || 0), parts = [];
-      if (!b || need <= 0) return { parts: parts, over: 0 };
-      b.spools.forEach(function (s) {
-        if (need <= 0) return;
-        var g = round2(Math.min(need, free[s.id]));
-        if (g <= 0) return;
-        parts.push({ s: s, g: g }); free[s.id] = round2(free[s.id] - g); need = round2(need - g);
-      });
-      if (need > 0) {
-        var last = b.spools[b.spools.length - 1], p = parts.filter(function (x) { return x.s === last; })[0];
-        if (p) p.g = round2(p.g + need); else parts.push({ s: last, g: need });
-      }
-      return { parts: parts, over: need };
-    });
-  }
-  // prix payé complet de la bobine (la bobine vide ne réduit plus le coût — comme admin_save_production)
-  function partsCost(parts) {
-    return parts.reduce(function (sum, p) {
-      return sum + round2(p.g * (+p.s.unit_cost || 0) / (+p.s.weight_g || 1000));
-    }, 0);
-  }
-  // blocs en production pour le menu d'une rangée : marque · matière, couleur ×N, grammes restants
-  function blockItems() {
-    return activeBlocks().map(function (b) {
-      var s = b.spools[0], p = String(s.label || '').split(' · '), left = blockLeft(b), n = b.spools.length;
-      var nm = (p.length > 2 ? p.slice(2).join(' · ') : s.label) + (s.kind === 'refill' ? ' · recharge' : '');
-      return { id: b.key, group: p.length > 2 ? p.slice(0, 2).join(' · ') : '', label: nm + (n > 1 ? ' ×' + n : ''),
-        btn: shortLabel(s) + (n > 1 ? ' ×' + n : ''), meta: grams(left), bg: spoolBg(s), dim: left <= 0.05, find: s.label };
+  // menu d'une rangée : marque · matière, couleur, coût de la bobine
+  function filItems() {
+    return filaments.map(function (f) {
+      var c = costKg(f);
+      return { id: f.id, group: (f.brand || '') + ' · ' + (f.material || ''), label: f.name || '(sans nom)',
+        btn: (f.material ? f.material + ' · ' : '') + (f.name || ''), meta: c != null ? money(c) : 'coût inconnu',
+        bg: filBg(f), dim: c == null, find: f.brand };
     });
   }
   function renderRows() {
     if (!rows.length) {
-      el.uses.innerHTML = '<p class="muted pr-empty">' + (file ? 'Ajoute la bobine utilisée.' : 'Rempli à partir du G-code.') + '</p>';
+      el.uses.innerHTML = '<p class="muted pr-empty">' + (file ? 'Ajoute le filament utilisé.' : 'Rempli à partir du G-code.') + '</p>';
       return;
     }
     el.uses.innerHTML = rows.map(function (r, i) {
       return '<div class="pr-use" data-i="' + i + '">' +
-        // pastille de gauche = couleur demandée par le G-code (le bloc choisi a la sienne dans le menu)
+        // pastille de gauche = couleur demandée par le G-code (le filament choisi a la sienne dans le menu)
         '<span class="pr-use-sw" title="' + esc(r.type ? 'G-code : ' + r.type : '') + '"' + (r.hex ? '' : ' style="visibility:hidden"') + '>' + swatch(r.hex) + '</span>' +
         '<div class="pr-use-spool"></div>' +
         '<span class="unit unit-sm" data-unit="g"><input type="number" class="pr-use-g num" min="0" step="0.1" value="' + esc(r.grams) + '" aria-label="Grammes"></span>' +
@@ -1124,28 +587,22 @@
     $$('.pr-use', el.uses).forEach(function (row) {
       var i = +row.getAttribute('data-i');
       var pk = new Picker($('.pr-use-spool', row), {
-        placeholder: 'Choisir la bobine', search: activeBlocks().length > 6, items: blockItems,
-        onPick: function (k) { rows[i].block = k; refreshRows(); recalc(); }
+        placeholder: 'Choisir le filament', search: true, items: filItems,
+        onPick: function (id) { rows[i].fil = id; refreshRows(); recalc(); }
       });
-      pk.btn.setAttribute('aria-label', 'Bobine');
-      pk.set(rows[i].block);
+      pk.btn.setAttribute('aria-label', 'Filament');
+      pk.set(rows[i].fil);
     });
     refreshRows();
   }
   // coûts et alertes de chaque rangée (sans reconstruire les champs en cours de saisie)
   function refreshRows() {
-    var al = allocate();
     $$('.pr-use', el.uses).forEach(function (row) {
-      var i = +row.getAttribute('data-i'), r = rows[i], b = blockByKey(r.block);
-      $('.pr-use-cost', row).textContent = b ? money(partsCost(al[i].parts)) : '—';
+      var i = +row.getAttribute('data-i'), r = rows[i], f = filById(r.fil);
+      $('.pr-use-cost', row).textContent = f && costKg(f) != null ? money(rowCost(r)) : '—';
       var warn = '';
-      if (b) {
-        if (al[i].over > 0.05) {
-          var other = candidates(r.type, b.spools[0].hex).some(function (x) { return x !== b && availOfBlock(x, -1) > 0.05; });
-          warn = 'Il manque ' + grams(al[i].over) + (other ? ' · <button type="button" class="al-link" data-split>Répartir</button>' : '');
-        }
-        if (r.type && !typeMatch(b.spools[0], r.type)) warn = (warn ? warn + ' · ' : '') + 'Le fichier dit ' + esc(r.type);
-      }
+      if (f && costKg(f) == null) warn = 'Aucun coût connu pour ce filament';
+      else if (f && r.type && !typeMatch(f, r.type)) warn = 'Le fichier dit ' + esc(r.type);
       var w = $('.pr-use-warn', row);
       w.innerHTML = warn; w.hidden = !warn;
     });
@@ -1157,26 +614,13 @@
   el.uses.addEventListener('click', function (e) {
     var row = e.target.closest('.pr-use'); if (!row) return;
     var i = +row.getAttribute('data-i');
-    if (e.target.closest('.pr-x')) { rows.splice(i, 1); renderRows(); recalc(); return; }
-    if (e.target.closest('[data-split]')) {
-      var r = rows[i], b = blockByKey(r.block);
-      if (!b) return;
-      var free = Math.max(0, round1(availOfBlock(b, i))), over = round1(r.grams - free);
-      r.grams = free;
-      var next = candidates(r.type, b.spools[0].hex).filter(function (x) { return x !== b && availOfBlock(x, -1) > 0.05; })[0];
-      // le bloc suivant a déjà sa rangée : le surplus s'y ajoute
-      var same = next ? rows.filter(function (x) { return x.block === next.key; })[0] : null;
-      if (same) same.grams = round1((+same.grams || 0) + over);
-      else rows.splice(i + 1, 0, { block: next ? next.key : '', grams: over, type: r.type, hex: r.hex });
-      renderRows(); recalc();
-    }
+    if (e.target.closest('.pr-x')) { rows.splice(i, 1); renderRows(); recalc(); }
   });
   el.useAdd.addEventListener('click', function () {
-    rows.push({ block: '', grams: 0, type: '', hex: '' });
+    rows.push({ fil: '', grams: 0, type: '', hex: '' });
     renderRows(); recalc();
     var last = $$('.pr-use-spool .pr-pk-btn', el.uses).pop(); if (last) last.focus();
   });
-
   /* ---- champs ---- */
   // spacer : code maison + n° remplacés + stock ; recherche aussi par anciens noms
   function refsOf(sp) { return ((sp.attrs && sp.attrs.replaces) || []).map(function (r) { return r && r.ref; }).filter(Boolean); }
@@ -1206,6 +650,7 @@
 
   function renderSpacerOptions() { spacerPk.render(); }
 
+
   /* ---- calcul (même règle que admin_save_production) ---- */
   function minutesOf() { return Math.max(0, (num(el.timeH.value) || 0) * 60 + (num(el.timeM.value) || 0)); }
   function avgOf(sp) {
@@ -1214,17 +659,13 @@
   }
   function calc() {
     var sp = spacerById(spacerPk.value);
-    var al = allocate(), used = rows.filter(function (r) { return r.block && (+r.grams || 0) > 0; });
+    var used = rows.filter(function (r) { return r.fil && (+r.grams || 0) > 0; });
     var g = used.reduce(function (s, r) { return s + (+r.grams || 0); }, 0);
-    var fil = al.reduce(function (s, a) { return s + partsCost(a.parts); }, 0);
-    // grammes par bobine (rangées fusionnées) -> envoyés tels quels à admin_save_production
-    var bySpool = {}, spoolUses = [];
-    al.forEach(function (a) {
-      a.parts.forEach(function (p) {
-        if (!bySpool[p.s.id]) { bySpool[p.s.id] = { spool_id: p.s.id, grams: 0 }; spoolUses.push(bySpool[p.s.id]); }
-        bySpool[p.s.id].grams = round2(bySpool[p.s.id].grams + p.g);
-      });
-    });
+    var fil = used.reduce(function (s, r) { return s + rowCost(r); }, 0);
+    // filaments envoyés tels quels à admin_save_production (unit_cost = coût moyen d'une bobine de 1 000 g)
+    var fils = used.map(function (r) { return { product_id: r.fil, grams: round2(r.grams), unit_cost: costKg(filById(r.fil)) }; });
+    var unknown = used.filter(function (r) { return costKg(filById(r.fil)) == null; })
+      .map(function (r) { var f = filById(r.fil); return f ? (f.name || f.material || 'filament') : 'filament'; });
     var minutes = minutesOf(), rate = rates.elec + rates.deprec;
     var mach = round2(minutes / 60 * rate);
     var total = round2(fil + mach), good = Math.max(0, num(el.good.value) | 0);
@@ -1246,9 +687,9 @@
       Q += pairs; C += pairs * pairc;
       next = round2(C / Q);
     }
-    return { sp: sp, used: used, spoolUses: spoolUses, g: g, fil: round2(fil), minutes: minutes, rate: rate, mach: mach, total: total, good: good,
+    return { sp: sp, used: used, fils: fils, unknown: unknown, g: g, fil: round2(fil), minutes: minutes, rate: rate, mach: mach, total: total, good: good,
       lin: lin, lout: lout, pairs: pairs, pairc: pairc, cur: cur, next: next,
-      missing: rows.filter(function (r) { return !r.block && (+r.grams || 0) > 0; }).length };
+      missing: rows.filter(function (r) { return !r.fil && (+r.grams || 0) > 0; }).length };
   }
   function srow(k, v, cls) { return '<div class="al-srow"><span>' + k + '</span><span' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</span></div>'; }
   function marginTxt(price, cost) {
@@ -1259,9 +700,10 @@
     var r = calc(), problem = '';
     if (!file && !rows.length) problem = '';
     else if (!r.sp) problem = 'Choisis le spacer.';
-    else if (r.missing) problem = 'Choisis la bobine de chaque filament.';
-    else if (!r.used.length) problem = 'Indique la bobine utilisée.';
-    el.save.disabled = !r.sp || !r.used.length || !!r.missing || saving;
+    else if (r.missing) problem = 'Choisis le filament de chaque rangée.';
+    else if (!r.used.length) problem = 'Indique le filament utilisé.';
+    else if (r.unknown.length) problem = 'Aucun coût connu : ' + r.unknown.join(', ') + '.';
+    el.save.disabled = !r.sp || !r.used.length || !!r.missing || !!r.unknown.length || saving;
     el.status.textContent = problem;
     if (!file && !rows.length) { el.report.innerHTML = '<p class="muted">« Terminé » sur un batch en impression pour commencer.</p>'; return; }
     var html = '';
@@ -1283,7 +725,7 @@
   /* ---- enregistrement ---- */
   el.save.addEventListener('click', function () {
     var r = calc();
-    if (!r.sp || !r.used.length || r.missing || saving) return;
+    if (!r.sp || !r.used.length || r.missing || r.unknown.length || saving) return;
     saving = true; el.save.disabled = true; el.status.textContent = 'Enregistrement…';
     var loops = Math.max(1, num(el.loops.value) | 0), per = Math.max(1, num(el.perPlate.value) | 0);
     var payload = {
@@ -1291,7 +733,7 @@
       loops: loops, per_plate: per, pieces: loops * per,
       good: r.good, minutes: Math.round(r.minutes), machine_cost: r.mach,
       rates: { elec: rates.elec, deprec: rates.deprec },
-      uses: r.spoolUses
+      fils: r.fils
     };
     sb.rpc('admin_save_production', { p: payload }).then(function (res) {
       saving = false;
@@ -1316,58 +758,19 @@
   }
 
   /* =========================================================
-     3) HISTORIQUE
+     2) HISTORIQUE
      ========================================================= */
   el.refresh.addEventListener('click', loadAll);
   function renderHistory() {
-    if (!prods.length && !removals.length) { el.history.innerHTML = '<p class="muted pr-empty">Aucune production pour l\'instant.</p>'; return; }
+    if (!prods.length) { el.history.innerHTML = '<p class="muted pr-empty">Aucune production pour l\'instant.</p>'; return; }
     var latest = {};   // la plus récente de chaque spacer (seule supprimable)
     prods.forEach(function (p) { var k = String(p.spacer_id); if (!latest[k]) latest[k] = p.id; });
-    var byProd = {};
-    uses.forEach(function (u) { (byProd[u.production_id] = byProd[u.production_id] || []).push(u); });
-    // productions + retraits de grammes (un retrait = un batch), du plus récent au plus ancien
-    var entries = prods.map(function (p) { return { p: p, d: p.made_at, c: p.created_at }; }), remMap = {};
-    removals.forEach(function (r) {
-      var g = remMap[r.batch];
-      if (!g) { g = remMap[r.batch] = { rem: true, batch: r.batch, d: r.removed_at, c: r.created_at, note: r.note || '', rows: [] }; entries.push(g); }
-      g.rows.push(r);
-    });
-    entries.sort(function (a, z) { return String(z.d).localeCompare(String(a.d)) || String(z.c).localeCompare(String(a.c)); });
-    function remRow(en) {
-      var grp = {}, order = [], tot = 0;
-      en.rows.forEach(function (r) {
-        var s = spoolById(r.spool_id), k = s ? blockKey(s) : '?';
-        if (!grp[k]) { grp[k] = { s: s, g: 0 }; order.push(k); }
-        grp[k].g += +r.grams || 0; tot += +r.grams || 0;
-      });
-      var fil = order.map(function (k) {
-        var x = grp[k];
-        return '<span class="pr-hfil">' + swatchBg(spoolBg(x.s)) + esc(x.s ? shortLabel(x.s) : 'Bobine retirée') + ' <em>' + grams(x.g) + '</em></span>';
-      }).join('');
-      return '<tr data-batch="' + esc(en.batch) + '">' +
-        '<td class="pr-nowrap">' + esc(shortDay(en.d)) + '</td>' +
-        '<td><b>Retrait</b>' + (en.note ? '<span class="pr-file" title="' + esc(en.note) + '">' + esc(en.note) + '</span>' : '') + '</td>' +
-        '<td>' + (fil || '—') + '</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>' +
-        '<td class="pr-nowrap pr-act"><button class="btn btn-ghost btn-sm" type="button" data-undo-rem>Annuler</button></td>' +
-      '</tr>';
-    }
     el.history.innerHTML = '<div class="rcp-table-wrap"><table class="rcp-table pr-table"><thead><tr>' +
       '<th>Date</th><th>Spacer</th><th>Filament</th><th class="num">Pièces</th><th class="num">Paires</th><th class="num">Coût / paire</th><th></th>' +
-      '</tr></thead><tbody>' + entries.map(function (en) {
-        if (en.rem) return remRow(en);
-        var p = en.p;
-        // filaments de la production, regroupés par bloc (même filament + format), dans l'ordre des Filaments
-        var grp = {}, order = [];
-        (byProd[p.id] || []).slice().sort(function (a, z) { return spools.indexOf(spoolById(a.spool_id)) - spools.indexOf(spoolById(z.spool_id)); })
-          .forEach(function (u) {
-            var s = spoolById(u.spool_id), k = s ? blockKey(s) : '?';
-            if (!grp[k]) { grp[k] = { s: s, g: 0, n: 0 }; order.push(k); }
-            grp[k].g += +u.grams || 0; grp[k].n++;
-          });
-        var fil = order.map(function (k) {
-          var x = grp[k];
-          return '<span class="pr-hfil">' + swatchBg(spoolBg(x.s)) + esc(x.s ? shortLabel(x.s) : 'Bobine retirée') +
-            (x.n > 1 ? ' ×' + x.n : '') + ' <em>' + grams(x.g) + '</em></span>';
+      '</tr></thead><tbody>' + prods.map(function (p) {
+        // filaments figés de la production (productions.fils), puis pastille de leur filament s'il existe encore
+        var fil = (Array.isArray(p.fils) ? p.fils : []).map(function (x) {
+          return '<span class="pr-hfil">' + swatchBg(filBg(filById(x.product_id), x.hex)) + esc(shortLabel(x.label) || 'Filament') + ' <em>' + grams(x.grams) + '</em></span>';
         }).join('');
         var canDel = latest[String(p.spacer_id)] === p.id;
         return '<tr data-id="' + esc(p.id) + '">' +
@@ -1382,14 +785,12 @@
       }).join('') + '</tbody></table></div>';
   }
   el.history.addEventListener('click', function (e) {
-    var u = e.target.closest('[data-undo-rem]');
-    if (u) { undoRemoval(u.closest('tr')); return; }
     var b = e.target.closest('[data-del]'); if (!b) return;
     var id = b.closest('tr').getAttribute('data-id');
     var p = prods.filter(function (x) { return String(x.id) === id; })[0];
     if (!p) return;
     caDialog.confirm({ title: 'Supprimer cette production ?',
-      message: p.spacer_label + ' perd ' + (p.pairs | 0) + ' paire' + ((p.pairs | 0) > 1 ? 's' : '') + ' de stock ; les grammes reviennent aux bobines.',
+      message: p.spacer_label + ' perd ' + (p.pairs | 0) + ' paire' + ((p.pairs | 0) > 1 ? 's' : '') + ' de stock et son coût moyen est recalculé.',
       ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
       if (!ok) return;
       b.disabled = true;
