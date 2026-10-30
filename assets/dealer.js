@@ -626,9 +626,6 @@
       var ed = $('.js-edit', el), ca = $('.js-cancel', el);
       if (ed) ed.addEventListener('click', function () { editOrder(o); });
       if (ca) ca.addEventListener('click', function () { cancelOrder(o, ca); });
-      $$('.js-doc', el).forEach(function (b) {
-        b.addEventListener('click', function () { printDoc(o, b); });
-      });
     });
   }
   // suivi Envoyée → Préparation → Prête → Facturée (étape actuelle allumée)
@@ -676,27 +673,12 @@
           (isNew ? '<span class="dl-order-actions">' +
             _t('<button type="button" class="dl-btn js-edit">Modifier</button>') +
             _t('<button type="button" class="dl-btn is-danger js-cancel">Annuler</button></span>') : '') +
-          (o.status === 'invoiced' && o.invoice_id ? '<span class="dl-order-actions">' +
-            _t('<button type="button" class="dl-btn js-doc" data-kind="invoice">Facture</button>') +
-            (o.paid_at ? _t('<button type="button" class="dl-btn js-doc" data-kind="receipt">Reçu</button>') : _t('<span class="dl-order-unpaid">Paiement à venir</span>')) +
-            '</span>' : '') +
         '</footer>') +
       (past ? '</div></details>' : '</article>');
   }
   function fmtDay(iso) {
     try { return new Date(iso).toLocaleDateString(window.CA.locale, { day: 'numeric', month: 'short', year: 'numeric' }); }
     catch (e) { return String(iso || '').slice(0, 10); }
-  }
-  // facture / reçu : relu à chaque clic (le reçu n'existe qu'une fois le virement confirmé)
-  function printDoc(o, btn) {
-    var kind = btn.getAttribute('data-kind');
-    btn.disabled = true;
-    sb.rpc('dealer_order_docs', { p_id: o.id }).then(function (res) {
-      btn.disabled = false;
-      if (res.error || !res.data) throw res.error || new Error(_t('Document introuvable.'));
-      if (kind === 'receipt' && !res.data.paid_at) { caDialog.alert({ message: _t('Le reçu sera disponible une fois ton virement confirmé.') }); loadOrders(); return; }
-      window.CA.docPrint(kind, res.data);
-    }).then(null, function (err) { btn.disabled = false; caDialog.error(errMsg(err), _t('Impression impossible')); });
   }
   function editOrder(o) {
     if (editing && editing.id === o.id) { openCart(); return; }
