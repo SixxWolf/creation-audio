@@ -96,76 +96,68 @@
       '</article>';
   }
 
-  var marquee = $('#rv-marquee'), track = $('#rv-track');
-  var setW = 0, x = 0, setHtml = '', running = false, visible = true, hover = false, holdUntil = 0, last = 0;
-  var SPEED = 26;   // px / s, vers la droite
+  var car = $('#rv-car'), track = $('#rv-track'), dotsEl = $('#rv-dots');
+  var prevBtn = $('.rv-prev', car), nextBtn = $('.rv-next', car);
+  var cards = [], cur = 0;
 
-  // nombre de copies du jeu pour couvrir l'écran pendant toute la boucle
-  function layout() {
-    if (!setHtml) return;
-    var vw = marquee.clientWidth || window.innerWidth;
-    track.innerHTML = setHtml;
-    setW = track.scrollWidth + parseFloat(getComputedStyle(track).columnGap || 20);
-    var copies = Math.max(2, Math.ceil(vw / setW) + 1), html = setHtml;
-    for (var c = 1; c < copies; c++) html += setHtml;
-    track.innerHTML = html;
-    // les copies : décoratives (lecteurs d'écran et tabulation ne voient que le 1er jeu)
-    var n = $$('.rv-card', track).length / copies;
-    $$('.rv-card', track).forEach(function (el, i) {
-      if (i < n) return;
-      el.setAttribute('aria-hidden', 'true');
-      $$('a', el).forEach(function (a) { a.tabIndex = -1; });
+  function centerOf(i) { var c = cards[i]; return c.offsetLeft + c.offsetWidth / 2 - track.clientWidth / 2; }
+  function go(i) {
+    if (!cards.length) return;
+    i = Math.max(0, Math.min(cards.length - 1, i));
+    track.scrollTo({ left: centerOf(i), behavior: reduce ? 'auto' : 'smooth' });
+  }
+  // carte centrale mise en avant (--near 0..1), points et flèches suivent le défilement
+  function update() {
+    if (!cards.length) return;
+    var mid = track.scrollLeft + track.clientWidth / 2, best = 0, bestD = 1e9;
+    cards.forEach(function (c, i) {
+      var d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid);
+      c.style.setProperty('--near', Math.max(0, 1 - d / (c.offsetWidth + 20)).toFixed(3));
+      if (d < bestD) { bestD = d; best = i; }
     });
-    x = ((x % setW) + setW) % setW;
-    paint();
+    cur = best;
+    $$('.rv-dot', dotsEl).forEach(function (d, i) { d.classList.toggle('is-on', i === cur); if (i === cur) d.setAttribute('aria-current', 'true'); else d.removeAttribute('aria-current'); });
+    prevBtn.disabled = track.scrollLeft <= 2;
+    nextBtn.disabled = track.scrollLeft >= track.scrollWidth - track.clientWidth - 2;
   }
-  function paint() { track.style.transform = 'translate3d(' + (x - setW).toFixed(2) + 'px,0,0)'; }
-  function frame(t) {
-    if (!running) return;
-    var dt = last ? Math.min(0.05, (t - last) / 1000) : 0; last = t;
-    if (!drag && !hover && visible && !reduce && t > holdUntil) { x = (x + SPEED * dt) % setW; paint(); }
-    requestAnimationFrame(frame);
+  function build(html) {
+    track.innerHTML = html;
+    cards = $$('.rv-card', track);
+    dotsEl.innerHTML = cards.map(function (c, i) { return '<button type="button" class="rv-dot" aria-label="' + (i + 1) + ' / ' + cards.length + '"></button>'; }).join('');
+    $$('.rv-dot', dotsEl).forEach(function (d, i) { d.addEventListener('click', function () { go(i); }); });
+    track.scrollLeft = 0;
+    update();
   }
-  function start() { if (running) return; running = true; last = 0; requestAnimationFrame(frame); }
+  track.addEventListener('scroll', update, { passive: true });
+  prevBtn.addEventListener('click', function () { go(cur - 1); });
+  nextBtn.addEventListener('click', function () { go(cur + 1); });
+  track.addEventListener('keydown', function (e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault(); go(cur + (e.key === 'ArrowRight' ? 1 : -1));
+  });
 
-  // saisie souris / doigt : la rangée suit le pointeur ; un vrai glissé n'ouvre pas le lien sous le doigt
+  // souris : glisser à la main (le doigt utilise le défilement natif) ; un vrai glissé n'ouvre pas le lien sous le curseur
   var drag = null, moved = false;
-  marquee.addEventListener('pointerdown', function (e) {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    drag = { id: e.pointerId, x0: e.clientX, base: x }; moved = false;
+  track.addEventListener('pointerdown', function (e) {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    drag = { x0: e.clientX, base: track.scrollLeft }; moved = false;
   });
-  marquee.addEventListener('pointermove', function (e) {
-    if (!drag || e.pointerId !== drag.id) return;
+  window.addEventListener('pointermove', function (e) {
+    if (!drag) return;
     var dx = e.clientX - drag.x0;
-    if (!moved && Math.abs(dx) > 6) {
-      moved = true; marquee.classList.add('is-drag');
-      try { marquee.setPointerCapture(e.pointerId); } catch (err) {}
-    }
-    if (moved) { x = (((drag.base + dx) % setW) + setW) % setW; paint(); }
+    if (!moved && Math.abs(dx) > 6) { moved = true; track.classList.add('is-drag'); }
+    if (moved) track.scrollLeft = drag.base - dx;
   });
-  function endDrag(e) {
-    if (!drag || (e && e.pointerId !== drag.id)) return;
-    drag = null; marquee.classList.remove('is-drag');
-    holdUntil = performance.now() + 1200;
+  function endDrag() {
+    if (!drag) return;
+    drag = null;
+    if (moved) { track.classList.remove('is-drag'); go(cur); }
   }
-  marquee.addEventListener('pointerup', endDrag);
-  marquee.addEventListener('pointercancel', endDrag);
-  marquee.addEventListener('lostpointercapture', endDrag);
-  marquee.addEventListener('click', function (e) { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; } }, true);
-  marquee.addEventListener('pointerenter', function (e) { if (e.pointerType === 'mouse') hover = true; });
-  marquee.addEventListener('pointerleave', function () { hover = false; });
-  marquee.addEventListener('focusin', function () { hover = true; });
-  marquee.addEventListener('focusout', function () { hover = false; });
-  marquee.addEventListener('keydown', function (e) {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' || !setW) return;
-    e.preventDefault();
-    x = (((x + (e.key === 'ArrowRight' ? 1 : -1) * 292) % setW) + setW) % setW; paint();
-  });
-  if ('IntersectionObserver' in window) {
-    new IntersectionObserver(function (ents) { visible = ents[0].isIntersecting; }).observe(marquee);
-  }
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  track.addEventListener('click', function (e) { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; } }, true);
   var rsz = 0;
-  window.addEventListener('resize', function () { clearTimeout(rsz); rsz = setTimeout(layout, 150); });
+  window.addEventListener('resize', function () { clearTimeout(rsz); rsz = setTimeout(function () { go(cur); update(); }, 150); });
 
   /* ---------- héros : photo qui change + compteurs ---------- */
   function hero(list) {
@@ -205,8 +197,7 @@
       .then(function (res) {
         var list = res.error ? [] : (res.data || []);
         if (!list.length) { track.innerHTML = '<p class="rv-loading">' + esc(_t('Gamme momentanément indisponible.')) + '</p>'; return; }
-        setHtml = list.map(cardHtml).join('') + endCardHtml();
-        layout(); start();
+        build(list.map(cardHtml).join('') + endCardHtml());
         hero(list); stats(list);
       }, function () { track.innerHTML = '<p class="rv-loading">' + esc(_t('Gamme momentanément indisponible.')) + '</p>'; });
   }
