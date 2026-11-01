@@ -255,6 +255,7 @@
       '<table class="hist-lines"><thead><tr><th>Article</th><th class="num">Qté</th><th class="num">Prix</th><th class="num">Montant</th></tr></thead>' +
         '<tbody>' + (linesHtml || '<tr><td colspan="4" class="muted">(aucune ligne)</td></tr>') + '</tbody></table>' +
       (inv.note ? '<div class="hd-note">' + esc(inv.note) + '</div>' : '') +
+      (pend ? '<div class="hd-pickup"></div>' : '') +
       '<div class="hist-actions">' +
         '<span class="hd-sum">Sous-total ' + money(inv.subtotal) + (inv.tax_enabled ? ' · taxes ' + money((+inv.tax_gst) + (+inv.tax_qst)) : '') + ' · <b>Total ' + money(inv.total) + '</b></span>' +
         stockNote +
@@ -275,12 +276,48 @@
       b.addEventListener('click', function (e) { e.stopPropagation(); deliver(inv, b.getAttribute('data-line'), b); });
     });
     var ga = $('.hd-give-all', box); if (ga) ga.addEventListener('click', function (e) { e.stopPropagation(); deliver(inv, null, ga); });
+    if (pend) paintPickup(inv, box);
     // grand écran : la facture s'affiche dans le panneau de droite, sous un rappel de son en-tête (n°, client, date, total)
     if (isWide()) {
       var head = $('.hist-head', el).cloneNode(true);
       head.className = 'hist-head hist-pv-head';
       previewEl.innerHTML = ''; previewEl.appendChild(head); previewEl.appendChild(box); previewEl.scrollTop = 0;
     }
+  }
+
+  /* ---------- cueillette des articles « à venir » : arrivés → client prévenu → plage choisie → confirmée ---------- */
+  function paintPickup(inv, box) {
+    var host = $('.hd-pickup', box), R = window.CA.reserved;
+    if (!host || !R || !R.invoiceState) return;
+    R.invoiceState(inv.id).then(function (st) {
+      if (!st || !host.isConnected) return;
+      var first = String(inv.client_name || '').trim().split(/\s+/)[0] || 'le client';
+      var h = '';
+      if (!st.has_account) h = '<span class="hd-stock">Pas de compte lié : client à prévenir à la main</span>';
+      else if (!st.ready_at) {
+        h = '<span class="hd-stock">' + st.n_in + ' de ' + st.n_tot + ' reçu' + (st.n_tot > 1 ? 's' : '') + '</span>' +
+          '<button class="btn btn-accent btn-sm hd-ready" type="button" data-ic="mail"' + (st.n_in >= st.n_tot ? '' : ' disabled') + '>Prévenir ' + esc(first) + '</button>';
+      } else {
+        h = '<span class="hd-stock ok">Prévenu le ' + esc(fmtStampFR(st.ready_at)) + '</span>';
+        if (st.pickup_date) {
+          h += '<span class="hd-stock">Cueillette ' + esc(window.CA.fmtPickup ? window.CA.fmtPickup({ pickup_date: st.pickup_date, pickup_start: st.pickup_start }) : st.pickup_date) + '</span>' +
+            (st.pickup_confirmed ? '<span class="hd-stock ok">Confirmée</span>'
+              : '<button class="btn btn-accent btn-sm hd-pkok" type="button" data-ic="check">Confirmer</button>');
+        } else h += '<span class="hd-stock">Plage à choisir par le client</span><button class="btn btn-ghost btn-sm hd-ready" type="button" data-ic="mail">Renvoyer</button>';
+      }
+      host.innerHTML = h;
+      var rb = $('.hd-ready', host), kb = $('.hd-pkok', host);
+      if (rb) rb.addEventListener('click', function (e) {
+        e.stopPropagation();
+        focusId = inv.id;
+        R.notifyInvoice(inv.id, rb, load);
+      });
+      if (kb) kb.addEventListener('click', function (e) {
+        e.stopPropagation();
+        focusId = inv.id;
+        window.CA.confirmPickup('invoice', { id: inv.id }, kb, function () { R.reload().then(load); });
+      });
+    });
   }
 
   /* ---------- courriel de la facture (EF invoice-notify, via CA.invoiceMail de cms-facturation.js) ---------- */

@@ -301,13 +301,24 @@
         .in('status', ['new', 'preparing', 'ready']).or('pickup_date.gte.' + t + ',and(status.eq.ready,pickup_date.is.null)')
         .order('pickup_date', { ascending: true }).limit(300),
       sb.from('customer_reservations').select('id,number,name,email,status,expires_at,pickup_date,pickup_start,pickup_end,pickup_req,pickup_confirmed_at')
-        .eq('status', 'active').gte('pickup_date', t).limit(300)
+        .eq('status', 'active').gte('pickup_date', t).limit(300),
+      // factures « À venir » dont le client a choisi sa plage (seules celles qui ont encore des articles à remettre)
+      sb.from('invoices').select('id,number,client_name,pickup_date,pickup_start,pickup_end,pickup_confirmed_at')
+        .eq('status', 'final').gte('pickup_date', t).limit(300).then(function (r) {
+          if (r.error || !(r.data || []).length) return { data: [] };
+          return sb.from('invoice_lines').select('invoice_id').in('invoice_id', r.data.map(function (i) { return i.id; })).gt('qty_pending', 0)
+            .then(function (l) {
+              var open = {}; ((l && l.data) || []).forEach(function (x) { open[x.invoice_id] = 1; });
+              return { data: r.data.filter(function (i) { return open[i.id]; }) };
+            });
+        })
     ]).then(function (rs) {
       var err = rs[0].error || rs[1].error;
       if (err) { listEl.innerHTML = '<p class="empty">Impossible de charger les cueillettes.<br>' + esc(err.message) + '</p>'; return; }
       var items = [], todo = [];
       (rs[0].data || []).forEach(function (o) { (o.pickup_date ? items : todo).push(Object.assign({ kind: 'order' }, o)); });
       (rs[1].data || []).forEach(function (r) { if (Date.parse(r.expires_at) > now) items.push(Object.assign({ kind: 'resv' }, r)); });
+      (rs[2].data || []).forEach(function (i) { items.push(Object.assign({ kind: 'inv', name: i.client_name }, i)); });
       lastItems = items.slice();
       render(items, todo);
     }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; })
@@ -329,11 +340,11 @@
   var lastItems = [];
   function itemHtml(it) {
     var who = it.name || it.email;
-    return '<button type="button" class="cq-item" data-go="' + (it.kind === 'resv' ? 'reservations' : 'clients') + '" data-id="' + esc(it.id) + '">' +
+    return '<button type="button" class="cq-item" data-go="' + (it.kind === 'resv' ? 'reservations' : it.kind === 'inv' ? 'facture' : 'clients') + '" data-id="' + esc(it.id) + '">' +
       (CA.avatar ? CA.avatar(who) : '') +
       '<span class="cq-who"><b>' + esc(who) + '</b><small>' + esc(it.number) + (it.phone ? ' · ' + CA.pv(it.phone) : '') + '</small></span>' +
-      '<span class="co-status is-' + (it.kind === 'resv' ? 'ready' : esc(it.status)) + '">' +
-        (it.kind === 'resv' ? 'Réservation' : esc(STATUS[it.status] || it.status)) + '</span>' +
+      '<span class="co-status is-' + (it.kind === 'resv' || it.kind === 'inv' ? 'ready' : esc(it.status)) + '">' +
+        (it.kind === 'resv' ? 'Réservation' : it.kind === 'inv' ? 'Facture' : esc(STATUS[it.status] || it.status)) + '</span>' +
       (it.pickup_date && !it.pickup_confirmed_at ? '<span class="co-status is-new">À confirmer</span>' : '') +
       (it.pickup_req && it.pickup_req.state === 'pending' ? '<span class="co-status is-new">Exception</span>' : '') +
     '</button>';
@@ -379,6 +390,11 @@
   }
   // ouvre la carte de la commande / réservation (sous-onglet Clients en ligne / Réservations) et la fait clignoter
   function openItem(sub, id) {
+    if (sub === 'facture') {   // facture « À venir » : dépliée dans l'Historique
+      if (CA.focusInvoice) CA.focusInvoice(id);
+      location.hash = '#historique';
+      return;
+    }
     if (CA.route && CA.route.goSub) CA.route.goSub(sub); else location.hash = '#commandes/' + sub;
     var tries = 0;
     (function seek() {

@@ -486,6 +486,14 @@ alter table public.invoices add column if not exists cancelled_at   timestamptz;
 alter table public.invoices add column if not exists pay_method text check (pay_method in ('cash', 'interac'));   -- 'cash' = comptant, 'interac' = virement Interac
 -- Usage interne (client_type = 'internal'), 2026-10-29 : 'production' = filament pris pour imprimer des spacers (le stock baisse ici, plus de bobines assignées en Production) | 'other' = perso, autres projets
 alter table public.invoices add column if not exists internal_use text;
+-- Cueillette des articles « À venir » (2026-10-31) : pickup_ready_at = « tes articles sont arrivés » envoyé (admin_invoice_ready) ;
+-- le client choisit alors sa plage dans Mon compte (customer_set_pickup, kind 'invoice')
+alter table public.invoices add column if not exists pickup_date date;
+alter table public.invoices add column if not exists pickup_start time;
+alter table public.invoices add column if not exists pickup_end time;
+alter table public.invoices add column if not exists pickup_ready_at timestamptz;
+alter table public.invoices add column if not exists pickup_notified_at timestamptz;
+alter table public.invoices add column if not exists pickup_confirmed_at timestamptz;
 alter table public.invoices drop constraint if exists invoices_internal_use_chk;
 alter table public.invoices add constraint invoices_internal_use_chk check (internal_use in ('production', 'other'));
 
@@ -1566,6 +1574,9 @@ returns jsonb language sql stable security definer set search_path = '' as $$
       'client_name', i.client_name, 'client_contact', i.client_contact,
       'client_address', i.client_address, 'client_city', i.client_city, 'note', i.note, 'pay_method', i.pay_method,
       'tax_enabled', i.tax_enabled, 'subtotal', i.subtotal, 'tax_gst', i.tax_gst, 'tax_qst', i.tax_qst, 'total', i.total,
+      'pickup_ready', i.pickup_ready_at is not null, 'pickup_date', i.pickup_date,
+      'pickup_start', to_char(i.pickup_start, 'HH24:MI'), 'pickup_confirmed', i.pickup_confirmed_at is not null,
+      'pickup_address', case when i.pickup_confirmed_at is not null then (select s.value ->> 'address' from public.admin_settings s where s.key = 'cueillette') end,
       'lines', coalesce((
         select jsonb_agg(jsonb_build_object(
           'label', l.label, 'meta', l.meta, 'kind', l.kind, 'ptype', l.ptype, 'qty', l.qty,
@@ -2391,7 +2402,11 @@ language sql stable security definer set search_path = '' as $$
               and o.id is distinct from p_self)
         + (select count(*) from public.customer_reservations r
             where r.pickup_date = b.d and r.pickup_start = b.s and r.status = 'active' and r.expires_at > now()
-              and r.id is distinct from p_self))::int,
+              and r.id is distinct from p_self)
+        + (select count(*) from public.invoices v
+            where v.pickup_date = b.d and v.pickup_start = b.s and v.status = 'final'
+              and exists (select 1 from public.invoice_lines l where l.invoice_id = v.id and l.qty_pending > 0)
+              and v.id is distinct from p_self))::int,
          p.cap
     from q b, p
    where b.d + b.s >= p.lnow + make_interval(hours => p.notice)
@@ -2441,10 +2456,27 @@ revoke all on function public._pickup_check(jsonb, timestamptz, uuid, boolean) f
 -- seulement une fois Prête) ; réservation active, avant son échéance. -> { d, s, e }
 create or replace function public.customer_set_pickup(p_kind text, p_id uuid, p_pickup jsonb)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_uid uuid := (select auth.uid()); o public.customer_orders; r public.customer_reservations; v_pk jsonb;
+declare v_uid uuid := (select auth.uid()); o public.customer_orders; r public.customer_reservations; v_pk jsonb; v_inv public.invoices;
 begin
   if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
   if p_pickup is null then raise exception 'Choisis une date et une plage de cueillette.'; end if;
+  if p_kind = 'invoice' then
+    -- facture « À venir » : le client lié à la fiche, une fois ses articles arrivés (admin_invoice_ready)
+    select i.* into v_inv from public.invoices i join public.customers c on c.client_id = i.client_id
+     where i.id = p_id and c.id = v_uid for update of i;
+    if not found then raise exception 'Facture introuvable.'; end if;
+    if v_inv.status <> 'final' or not exists (select 1 from public.invoice_lines l where l.invoice_id = p_id and l.qty_pending > 0) then
+      raise exception 'Cette facture n''a plus d''article à venir.';
+    end if;
+    if v_inv.pickup_ready_at is null then
+      raise exception 'On t''écrit dès que tes articles sont arrivés : tu choisiras ta cueillette à ce moment-là.';
+    end if;
+    v_pk := public._pickup_check(p_pickup, null, p_id, true);
+    update public.invoices
+       set pickup_date = (v_pk ->> 'd')::date, pickup_start = (v_pk ->> 's')::time, pickup_end = null, pickup_confirmed_at = null
+     where id = p_id;
+    return v_pk;
+  end if;
   if p_kind = 'reservation' then
     select * into r from public.customer_reservations where id = p_id and customer_id = v_uid for update;
     if not found then raise exception 'Réservation introuvable.'; end if;
@@ -2550,6 +2582,14 @@ declare n int;
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   if p_d is null or p_s is null then raise exception 'Choisis un jour et une heure.'; end if;
+  if p_kind = 'invoice' then
+    update public.invoices set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_confirmed_at = null
+     where id = p_id and status = 'final'
+       and exists (select 1 from public.invoice_lines l where l.invoice_id = p_id and l.qty_pending > 0);
+    get diagnostics n = row_count;
+    if n = 0 then raise exception 'Facture introuvable ou sans article à venir.'; end if;
+    return jsonb_build_object('d', p_d, 's', to_char(p_s, 'HH24:MI'));
+  end if;
   if p_kind = 'reservation' then
     update public.customer_reservations set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_req = null, pickup_confirmed_at = null, updated_at = now()
      where id = p_id and status = 'active';
@@ -2567,6 +2607,12 @@ returns void language plpgsql security definer set search_path = '' as $$
 declare n int;
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  if p_kind = 'invoice' then
+    update public.invoices set pickup_confirmed_at = now() where id = p_id and status = 'final' and pickup_date is not null;
+    get diagnostics n = row_count;
+    if n = 0 then raise exception 'Aucune cueillette à confirmer.'; end if;
+    return;
+  end if;
   if p_kind = 'reservation' then
     update public.customer_reservations set pickup_confirmed_at = now(), updated_at = now()
      where id = p_id and status = 'active' and pickup_date is not null;
@@ -2602,6 +2648,51 @@ revoke all on function public.admin_confirm_order(uuid) from public, anon;
 grant execute on function public.admin_confirm_order(uuid) to authenticated;
 revoke all on function public.admin_confirm_pickup(text, uuid) from public, anon;
 grant execute on function public.admin_confirm_pickup(text, uuid) to authenticated;
+-- Factures « À venir » (2026-10-31) : où en est chaque facture ? n_tot = articles à remettre, n_in = déjà en stock
+-- (par produit et format ; une ligne sans produit compte comme reçue). -> Réception (alerte « Prévenir ») et Historique.
+create or replace function public.admin_pending_invoices()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  return coalesce((
+    with pl as (
+      select l.invoice_id, l.product_id, case when l.kind = 'refill' then 'refill' else 'spool' end as k, sum(l.qty_pending)::int as q
+        from public.invoice_lines l join public.invoices i on i.id = l.invoice_id and i.status = 'final'
+       where l.qty_pending > 0 group by 1, 2, 3
+    ), g as (
+      select pl.invoice_id, pl.q,
+             case when pl.product_id is null then pl.q
+                  else least(pl.q, greatest(coalesce(case when pl.k = 'refill' then p.qty_2 else p.qty end, 0), 0)) end as got
+        from pl left join public.products p on p.id = pl.product_id
+    ), s as (select invoice_id, sum(q)::int as n_tot, sum(got)::int as n_in from g group by 1)
+    select jsonb_agg(jsonb_build_object(
+        'id', i.id, 'number', i.number, 'client_name', i.client_name, 'n_tot', s.n_tot, 'n_in', s.n_in,
+        'has_account', exists (select 1 from public.customers c where c.client_id = i.client_id),
+        'ready_at', i.pickup_ready_at, 'pickup_date', i.pickup_date, 'pickup_start', to_char(i.pickup_start, 'HH24:MI'),
+        'pickup_confirmed', i.pickup_confirmed_at is not null) order by i.created_at desc)
+      from s join public.invoices i on i.id = s.invoice_id), '[]'::jsonb);
+end $$;
+-- « Prévenir » : marque la facture « articles arrivés » (le client peut alors choisir sa cueillette) ; le courriel part ensuite (EF pickup-request-notify, event 'ready').
+create or replace function public.admin_invoice_ready(p_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_inv public.invoices;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into v_inv from public.invoices where id = p_id for update;
+  if not found or v_inv.status <> 'final' then raise exception 'Facture introuvable.'; end if;
+  if not exists (select 1 from public.invoice_lines l where l.invoice_id = p_id and l.qty_pending > 0) then
+    raise exception 'Cette facture n''a plus d''article à venir.';
+  end if;
+  if not exists (select 1 from public.customers c where c.client_id = v_inv.client_id) then
+    raise exception 'Ce client n''a pas de compte lié : impossible de le prévenir ici.';
+  end if;
+  update public.invoices set pickup_ready_at = now() where id = p_id;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function public.admin_pending_invoices() from public, anon;
+revoke all on function public.admin_invoice_ready(uuid) from public, anon;
+grant execute on function public.admin_pending_invoices() to authenticated;
+grant execute on function public.admin_invoice_ready(uuid) to authenticated;
 revoke all on function public.admin_set_pickup(text, uuid, date, time) from public, anon;
 grant execute on function public.admin_set_pickup(text, uuid, date, time) to authenticated;
 revoke all on function public.customer_request_pickup(text, uuid, jsonb) from public, anon;

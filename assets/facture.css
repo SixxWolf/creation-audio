@@ -581,3 +581,4 @@
   .hist-client { grid-area:client; min-width:0; }
   .stat-card-value { font-size:1.45rem; }
 }
+.hd-pickup { display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; margin-top:10px; }

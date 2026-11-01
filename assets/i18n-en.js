@@ -879,5 +879,7 @@ window.CA_EN = (function (pairs) {
   [`Envoi impossible pour l'instant. Écris-nous à contact@creationaudio.ca.`, `Can't send right now. Email us at contact@creationaudio.ca.`],
   [`Trop de demandes d'un coup. Réessaie dans une heure.`, `Too many requests at once. Try again in an hour.`],
   [`Vérifie ton courriel et les champs requis.`, `Check your email and the required fields.`],
-  [`Erreur réseau. Vérifie ta connexion et réessaie.`, `Network error. Check your connection and try again.`]
+  [`Erreur réseau. Vérifie ta connexion et réessaie.`, `Network error. Check your connection and try again.`],
+  [`Tes articles sont arrivés !`, `Your items have arrived!`],
+  [`Facture `, `Invoice `]
 ]);

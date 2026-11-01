@@ -75,8 +75,33 @@
     }).then(null, function () { return []; });
   }
 
+  /* ---------- factures « À venir » : où en est chacune (articles reçus, client prévenu, cueillette) ---------- */
+  var invState = {};   // id de facture -> { n_tot, n_in, has_account, ready_at, pickup_* } (RPC admin_pending_invoices)
+  function loadInvState() {
+    return sb.rpc('admin_pending_invoices').then(function (res) {
+      invState = {};
+      if (!res.error) (res.data || []).forEach(function (r) { invState[r.id] = r; });
+    }, function () { invState = {}; });
+  }
+  // « Prévenir » : marque la facture arrivée (RPC) puis envoie le courriel (EF pickup-request-notify, event 'ready')
+  function notifyInvoice(id, btn, done) {
+    if (btn) btn.disabled = true;
+    sb.rpc('admin_invoice_ready', { p_id: id }).then(function (res) {
+      if (res.error) throw res.error;
+      return sb.functions.invoke('pickup-request-notify', { body: { kind: 'invoice', id: id, event: 'ready' } }).then(function (r) {
+        var d = (r && r.data) || {};
+        if ((r && r.error) || d.error || d.result === 'skipped' || (d.client && d.client !== 'sent')) caDialog.toast('Marquée, mais courriel non envoyé.', 'bad');
+        else caDialog.toast('Client prévenu.');
+      }, function () { caDialog.toast('Marquée, mais courriel non envoyé.', 'bad'); });
+    }).then(function () { return load(); }).then(function () { if (done) done(); }, function (err) {
+      if (btn) btn.disabled = false;
+      caDialog.error(err);
+    });
+  }
+
   function load() {
     loading = Promise.all([
+      loadInvState(),
       pendingInvoices(),
       openCustomer(sb.from('customer_reservations')
         .select('id,number,name,email,status,expires_at,customer_reservation_lines(product_id,kind,name,meta,qty)')
@@ -85,7 +110,7 @@
         .select('id,number,name,email,status,customer_order_lines(product_id,kind,name,meta,qty)')
         .in('status', ['new', 'preparing', 'ready']), 'customer_order_lines', 'order')
     ]).then(function (r) {
-      rows = r[0].concat(r[1], r[2]);
+      rows = r[1].concat(r[2], r[3]);
       loaded = true;
       renderAlert();
       try { document.dispatchEvent(new CustomEvent('ca:reserved')); } catch (e) {}
@@ -137,12 +162,34 @@
             '</div>';
           }).join('') +
         '</div>';
-      }).join('');
+      }).join('') + notifyHtml(groups);
     el.hidden = false;
+    $$('.res-ready', el).forEach(function (b) {
+      b.addEventListener('click', function () { notifyInvoice(b.getAttribute('data-id'), b); });
+    });
     $('.wl-alert-close', el).addEventListener('click', function () { alerted = []; renderAlert(); });
     $$('.res-open', el).forEach(function (b) {
       b.addEventListener('click', function () { openSrc(b.getAttribute('data-type'), b.getAttribute('data-id')); });
     });
+  }
+  // une ligne par facture « À venir » touchée : « 1 de 2 reçus » (bouton grisé) puis « Prévenir David » quand tout est là
+  function notifyHtml(groups) {
+    var seen = {}, out = '';
+    groups.forEach(function (g) {
+      g.forEach(function (x) {
+        var id = x.src.type === 'invoice' ? x.src.id : null, st = id && invState[id];
+        if (!st || seen[id]) return;
+        seen[id] = 1;
+        var all = st.n_in >= st.n_tot, first = String(st.client_name || '').trim().split(/\s+/)[0] || 'le client';
+        var act = st.ready_at ? '<span class="res-ready-st">Prévenu</span>'
+          : !st.has_account ? '<span class="res-ready-st">Pas de compte lié</span>'
+          : '<button type="button" class="btn btn-accent btn-sm res-ready" data-id="' + esc(id) + '" data-ic="mail"' + (all ? '' : ' disabled') + '>Prévenir ' + esc(first) + '</button>';
+        out += '<div class="wl-req res-notify"><div class="wl-req-main"><span class="wl-req-who">' + esc(st.client_name || 'Sans nom') + '</span>' +
+          '<span class="wl-req-meta">' + esc(st.number) + ' · ' + st.n_in + ' de ' + st.n_tot + ' reçu' + (st.n_tot > 1 ? 's' : '') + '</span></div>' +
+          '<div class="wl-req-act">' + act + '</div></div>';
+      });
+    });
+    return out;
   }
   function flag(pid, kind) {
     if (!pid) return;
@@ -185,6 +232,10 @@
     },
     // ouvre la facture (Historique), la réservation ou la commande (Commandes)
     open: function (type, id) { openSrc(type, id); },
+    // « Prévenir » un client dont la facture est arrivée (aussi Historique) ; done : appelé après le rechargement
+    notifyInvoice: notifyInvoice,
+    // état d'une facture « À venir » : { n_tot, n_in, has_account, ready_at, pickup_date, pickup_start, pickup_confirmed } ou null
+    invoiceState: function (id) { return ensure().then(function () { return invState[id] || null; }); },
     reload: load
   };
 })();

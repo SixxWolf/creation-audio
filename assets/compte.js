@@ -286,7 +286,7 @@
   }
   // #/messages/<id> (lien du courriel « On t'a répondu ») : onglet Messages + fil ouvert dans le panneau
   // #/cueillette/c|r/<id> : écran « Ma cueillette » (après l'envoi du panier, courriel « Prête »)
-  var ROUTE = /^#\/(commandes|alertes|messages|infos|apparence|cueillette)(?:\/(?:([cr])\/)?([0-9a-f-]{36}))?$/;
+  var ROUTE = /^#\/(commandes|alertes|messages|infos|apparence|cueillette)(?:\/(?:([crf])\/)?([0-9a-f-]{36}))?$/;
   function route() {
     if ($('#acct-home').hidden) return;
     var m = ROUTE.exec(location.hash), tab = m ? m[1] : 'commandes';
@@ -333,11 +333,12 @@
       myOrders = (!res.error && res.data) || [];
       ordersReady = true;
       renderCmds(); renderPkv();
-      if (!acct.linked) { renderOrders(); return; }
+      if (!acct.linked) { invReady = true; renderOrders(); renderPkv(); return; }
       return sb.rpc('me_invoices').then(function (r2) {
         if (r2.error) { ordersEl.innerHTML = _t('<p class="acct-empty">Impossible de charger tes factures. Réessaie plus tard.</p>'); return; }
         invoices = r2.data || [];
-        renderOrders();
+        invReady = true;
+        renderOrders(); renderPkv();
       });
     }).then(null, function () { ordersEl.innerHTML = _t('<p class="acct-empty">Erreur réseau — réessaie.</p>'); });
   }
@@ -421,32 +422,35 @@
       (can && hasSlots ? '<button class="pk-change" type="button">' + (x ? _t('Changer') : _t('Choisir')) + '</button>' : '') + '</p>';
   }
   /* ---- écran « Ma cueillette » (#/cueillette/c|r/<id>) : la commande à gauche, le calendrier à droite ---- */
-  var pkv = null, pkvFor = '', ordersReady = false, resvReady = false;
+  var pkv = null, pkvFor = '', ordersReady = false, resvReady = false, invReady = false;
   function renderPkv() {
     var host = $('#acct-pkv');
     if (!pkv || !host) return;
-    var isC = pkv.kind === 'c', x = (isC ? myOrders : myResv).filter(function (y) { return String(y.id) === pkv.id; })[0];
+    var isC = pkv.kind === 'c', isF = pkv.kind === 'f', kn = isC ? 'order' : isF ? 'invoice' : 'reservation';
+    var x = isF ? invoiceView(invoices.filter(function (y) { return String(y.id) === pkv.id; })[0])
+      : (isC ? myOrders : myResv).filter(function (y) { return String(y.id) === pkv.id; })[0];
     if (!x) {
-      if (isC ? ordersReady : resvReady) { pkvFor = ''; location.hash = '#/commandes'; return; }
+      if (isF ? invReady : isC ? ordersReady : resvReady) { pkvFor = ''; location.hash = '#/commandes'; return; }
       host.innerHTML = _t('<p class="acct-empty">Chargement…</p>'); pkvFor = ''; return;
     }
-    var open = isC ? ['new', 'preparing', 'ready'].indexOf(x.status) >= 0 : x.status === 'active' && new Date(x.expires_at) > new Date();
+    var open = isF ? x.open : isC ? ['new', 'preparing', 'ready'].indexOf(x.status) >= 0 : x.status === 'active' && new Date(x.expires_at) > new Date();
     if (!open) { pkvFor = ''; location.hash = '#/commandes'; return; }
     var key = pkv.kind + x.id;
     if (pkvFor === key) return;   // déjà affiché : on ne remet pas le choix en cours à zéro
     pkvFor = key;
-    var CO = window.CA.custOrder;
+    var CO = window.CA.custOrder, until = kn === 'reservation' ? x.expires_at : null;
     var later = isC && x.has_backorder && x.status !== 'ready';
-    var title = !isC ? _t('Réservation ') + x.number + _t(' confirmée !')
+    var title = isF ? _t('Tes articles sont arrivés !') : !isC ? _t('Réservation ') + x.number + _t(' confirmée !')
       : x.status === 'ready' ? _t('Ta commande ') + x.number + _t(' est prête !') : _t('Commande ') + x.number + _t(' reçue !');
-    var sub = isC ? fmtDate(x.created_at) + ' · ' + plural(itemsOf(x), 'article', 'articles')
+    var sub = isF ? _t('Facture ') + x.number + ' · ' + plural(x.count, 'article', 'articles')
+      : isC ? fmtDate(x.created_at) + ' · ' + plural(itemsOf(x), 'article', 'articles')
       : _t('Gardée jusqu\'au ') + whenTxt(x.expires_at);
     var lines = (x.lines || []).map(function (l) { return lineLi(l, isC ? (+l.qty_to_order || 0) : 0); }).join('');
     host.innerHTML = '<div class="pkv">' +
       '<section class="pkv-ord">' +
         '<h2 class="pkv-h">' + esc(title) + '</h2><p class="pkv-sub">' + esc(sub) + '</p>' +
         '<ul class="ord-lines">' + lines + '</ul>' +
-        _t('<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>') + money(x.total) + '</span></div></div>' +
+        (isF ? '' : _t('<div class="ord-tot"><div class="grand"><span>Total estimé</span><span>') + money(x.total) + '</span></div></div>') +
         (x.note ? _t('<p class="ord-note"><span>Note</span>') + esc(x.note) + '</p>' : '') +
       '</section>' +
       '<section class="pkv-pick"></section>' +
@@ -461,13 +465,13 @@
       return;
     }
     side.innerHTML = _t('<p class="acct-empty">Chargement des plages…</p>');
-    CO.slots(isC ? null : x.expires_at, x.id).then(function (list) {
+    CO.slots(until, x.id).then(function (list) {
       if (pkvFor !== key) return;
       if (!list.length) {
         side.innerHTML = _t('<h2 class="pkv-h">Ta cueillette</h2><p class="pkv-wait">Aucune plage offerte pour le moment. ') +
           askHtml(_t('Cueillette ') + x.number, _t('Bonjour, pour la cueillette de ') + x.number + ' : ') + '</p>' +
-          reqHtml() + _t('<div class="pkv-foot"><button class="acct-btn pkv-exc" type="button">Demander une exception</button></div>');
-        $('.pkv-exc', side).addEventListener('click', exView);
+          (isF ? '' : reqHtml() + _t('<div class="pkv-foot"><button class="acct-btn pkv-exc" type="button">Demander une exception</button></div>'));
+        if (!isF) $('.pkv-exc', side).addEventListener('click', exView);
         return;
       }
       pickView(list);
@@ -499,7 +503,7 @@
         var d = $('#pkx-d', side).value, t = $('#pkx-t', side).value;
         if (!d || !t) { msg.textContent = _t('Choisis un jour et une heure.'); return; }
         ok.disabled = true; msg.textContent = _t('Envoi…');
-        CO.requestPickup(isC ? 'order' : 'reservation', x.id, { d: d, s: t, note: $('#pkx-n', side).value }).then(function (q) {
+        CO.requestPickup(kn, x.id,{ d: d, s: t, note: $('#pkx-n', side).value }).then(function (q) {
           x.pickup_req = q;
           side.innerHTML = '<div class="pkv-done"><span class="pkv-check" aria-hidden="true"></span>' +
             _t('<h2 class="pkv-h">Demande envoyée</h2>') +
@@ -518,10 +522,10 @@
         '<div class="pkv-cal"></div>' + reqHtml() +
         '<div class="pkv-foot"><button class="acct-submit pkv-ok" type="button">' + (had ? _t('Enregistrer') : _t('Confirmer ma cueillette')) + '</button>' +
         (had ? _t('<button class="acct-btn pkv-keep" type="button">Garder ') + esc(CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end, true)) + '</button>' : '') +
-        _t('<button class="acct-btn pkv-exc" type="button">Demander une exception</button>') +
+        (isF ? '' : _t('<button class="acct-btn pkv-exc" type="button">Demander une exception</button>')) +
         '<p class="pkv-msg" role="status"></p></div>';
       var msg = $('.pkv-msg', side), ok = $('.pkv-ok', side), keep = $('.pkv-keep', side);
-      $('.pkv-exc', side).addEventListener('click', exView);
+      if (!isF) $('.pkv-exc', side).addEventListener('click', exView);
       var p = CO.picker($('.pkv-cal', side), { big: true, onChange: function () { msg.textContent = ''; } });
       p.load(list, had ? { d: x.pickup_date, s: x.pickup_start } : null);
       if (keep) keep.addEventListener('click', doneView);
@@ -530,14 +534,14 @@
         if (!v) { msg.textContent = _t('Choisis une date et une plage.'); return; }
         if (v.d === x.pickup_date && v.s === x.pickup_start) { doneView(); return; }
         ok.disabled = true; msg.textContent = _t('Enregistrement…');
-        CO.setPickup(isC ? 'order' : 'reservation', x.id, v).then(function (r) {
+        CO.setPickup(kn, x.id, v).then(function (r) {
           x.pickup_date = r.d || v.d; x.pickup_start = r.s || v.s; x.pickup_end = r.e || v.e;
           x.pickup_confirmed = false; x.pickup_address = null;
           doneView();
-          if (isC) loadOrders(); else loadResv();   // listes de Mes commandes à jour (l'écran reste tel quel)
+          if (isC || isF) loadOrders(); else loadResv();   // listes de Mes commandes à jour (l'écran reste tel quel)
         }, function (err) {
           ok.disabled = false; msg.textContent = (err && err.message) || _t('Cueillette non enregistrée. Réessaie.');
-          CO.slots(isC ? null : x.expires_at, x.id).then(function (l2) { if (pkvFor === key) p.load(l2, v); });
+          CO.slots(until, x.id).then(function (l2) { if (pkvFor === key) p.load(l2, v); });
         });
       });
     }
@@ -551,9 +555,20 @@
         _t('<button class="acct-btn pkv-change" type="button">Changer</button></div></div>');
       $('.pkv-change', side).addEventListener('click', function () {
         side.innerHTML = _t('<p class="acct-empty">Chargement des plages…</p>');
-        CO.slots(isC ? null : x.expires_at, x.id).then(function (l2) { if (pkvFor === key) pickView(l2); });
+        CO.slots(until, x.id).then(function (l2) { if (pkvFor === key) pickView(l2); });
       });
     }
+  }
+  // facture « À venir » vue comme une commande : seulement les articles encore à remettre, ouverte une fois prévenue
+  function invoiceView(inv) {
+    if (!inv) return null;
+    var pl = (inv.lines || []).filter(function (l) { return (+l.qty_pending || 0) > 0; });
+    return { id: inv.id, number: inv.number, note: inv.note, open: inv.status === 'final' && inv.pickup_ready && pl.length > 0,
+      count: pl.reduce(function (s, l) { return s + (+l.qty_pending); }, 0),
+      lines: pl.map(function (l) { return { name: l.label, meta: l.meta, hex: l.hex, ptype: l.ptype, qty: +l.qty_pending, unit_price: l.unit_price,
+        line_total: (+l.unit_price || 0) * (+l.qty_pending) }; }),
+      pickup_date: inv.pickup_date, pickup_start: inv.pickup_start, pickup_end: null,
+      pickup_confirmed: inv.pickup_confirmed, pickup_address: inv.pickup_address, pickup_req: null };
   }
   function cancelOrder(o, btn) {
     caDialog.confirm({ title: _t('Annuler la commande ') + o.number + ' ?', message: _t('Tu pourras en passer une nouvelle au besoin.'),
@@ -679,6 +694,8 @@
           (inv.pay_method === 'cash' || inv.pay_method === 'interac'
             ? '<p class="ord-note"><span>' + _t('Paiement') + '</span>' + (inv.pay_method === 'cash' ? _t('Comptant') : _t('Virement Interac')) + '</p>' : '') +
           (inv.note ? _t('<p class="ord-note"><span>Note</span>') + esc(inv.note) + '</p>' : '') +
+          (!off && pend ? (inv.pickup_ready ? pkRow(inv.pickup_date ? invoiceView(inv) : null, true, false, null)
+            : pkRow(null, false, true, null)) : '') +
           _t('<button class="acct-btn ord-print" type="button">Imprimer / PDF</button>') +
         '</div>' +
       '</details>';
@@ -686,6 +703,8 @@
     $$('.ord', ordersEl).forEach(function (el) {
       var inv = invoices.filter(function (x) { return String(x.id) === el.getAttribute('data-id'); })[0];
       $('.ord-print', el).addEventListener('click', function () { printInvoice(inv); });
+      var pk = $('.pk-change', el);
+      if (pk) pk.addEventListener('click', function () { location.hash = '#/cueillette/f/' + inv.id; });
     });
   }
 

@@ -1963,3 +1963,5 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 /* production : bloc presque vide (< 150 g) et retraits de grammes */
 .pr-spool.is-low .pr-bar > span { background:var(--bad); }
 .pr-spool.is-low .pr-sp-left { color:var(--bad); }
+.res-notify { border-top:1px solid var(--line); margin-top:6px; padding-top:8px; }
+.res-ready-st { padding:3px 9px; font-size:.72rem; font-weight:600; color:var(--muted); background:var(--wash); border:1px solid var(--line); border-radius:100px; white-space:nowrap; }

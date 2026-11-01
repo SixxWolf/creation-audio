@@ -86,16 +86,21 @@ Deno.serve(async (req) => {
   let kind = "order", id = "";
   try {
     const body = await req.json();
-    kind = body?.kind === "reservation" ? "reservation" : "order";
+    kind = body?.kind === "reservation" ? "reservation" : body?.kind === "invoice" ? "invoice" : "order";
     id = typeof body?.id === "string" ? body.id : "";
   } catch { /* corps invalide */ }
   if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Identifiant invalide." }, 400);
 
   // 2) doit appartenir au client connecté
-  const table = kind === "reservation" ? "customer_reservations" : "customer_orders";
+  const table = kind === "reservation" ? "customer_reservations" : kind === "invoice" ? "invoices" : "customer_orders";
   const db = createClient(url, service);
-  const { data: x, error } = await db.from(table).select("*").eq("id", id).maybeSingle();
+  let { data: x, error } = await db.from(table).select("*").eq("id", id).maybeSingle();
   if (error) return json({ error: error.message }, 500);
+  if (x && kind === "invoice") {
+    // facture « À venir » : appartient au compte lié à la fiche (customers.client_id)
+    const { data: c } = x.client_id ? await db.from("customers").select("id,email,name,phone").eq("client_id", x.client_id).maybeSingle() : { data: null };
+    if (c) x = { ...x, customer_id: c.id, email: c.email, name: c.name || x.client_name, phone: c.phone };
+  }
   if (!x || x.customer_id !== uid) return json({ error: "Introuvable." }, 404);
   const pk = fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end);
   if (!pk) return json({ result: "skipped", reason: "aucune plage" });
@@ -109,10 +114,11 @@ Deno.serve(async (req) => {
   if (!resendKey) return json({ error: "Envoi non configuré : secret RESEND_API_KEY manquant." }, 503);
   if (/@resend\.dev$/i.test(x.email || "")) adminTo = "delivered@resend.dev";   // tests
 
-  const what = (kind === "reservation" ? "Réservation " : "Commande ") + x.number;
+  const what = (kind === "reservation" ? "Réservation " : kind === "invoice" ? "Facture " : "Commande ") + x.number;
   const first = String(x.name || "").trim().split(/\s+/)[0] || "";
-  const accountUrl = SITE + "/compte.html#/cueillette/" + (kind === "reservation" ? "r/" : "c/") + id;
-  const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes/" + (kind === "reservation" ? "reservations" : "clients");
+  const kslug = kind === "reservation" ? "r/" : kind === "invoice" ? "f/" : "c/";
+  const accountUrl = SITE + "/compte.html#/cueillette/" + kslug + id;
+  const adminUrl = SITE + "/coulisses-t6avzpe2.html#" + (kind === "invoice" ? "historique" : "commandes/" + (kind === "reservation" ? "reservations" : "clients"));
   const results: Record<string, string> = {};
 
   // ---- au client, dans sa langue ----
@@ -121,8 +127,8 @@ Deno.serve(async (req) => {
   let cText: string, cHtml: string, cSubject: string;
   if (en) {
     const pkE = fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end, true);
-    const whatE = (kind === "reservation" ? "reservation " : "order ") + x.number;
-    const accE = SITE + "/en/compte.html#/cueillette/" + (kind === "reservation" ? "r/" : "c/") + id;
+    const whatE = (kind === "reservation" ? "reservation " : kind === "invoice" ? "invoice " : "order ") + x.number;
+    const accE = SITE + "/en/compte.html#/cueillette/" + kslug + id;
     cSubject = "Pickup request " + pkE + " — Création Audio";
     cText = "Hello " + first + ",\n\n" +
       "Got it: you picked " + pkE + " for " + whatE + ". We'll confirm by email shortly.\n\n" +

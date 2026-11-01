@@ -89,9 +89,9 @@ Deno.serve(async (req) => {
   let kind = "order", id = "", event = "request";
   try {
     const body = await req.json();
-    kind = body?.kind === "reservation" ? "reservation" : "order";
+    kind = body?.kind === "reservation" ? "reservation" : body?.kind === "invoice" ? "invoice" : "order";
     id = typeof body?.id === "string" ? body.id : "";
-    event = ["request", "approved", "refused", "confirmed"].includes(body?.event) ? body.event : "request";
+    event = ["request", "approved", "refused", "confirmed", "ready"].includes(body?.event) ? body.event : "request";
   } catch { /* corps invalide */ }
   if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Identifiant invalide." }, 400);
   if (event !== "request") {
@@ -99,20 +99,27 @@ Deno.serve(async (req) => {
     if (jwtClaim(authHeader, "aal") !== "aal2") return json({ error: "Double authentification requise." }, 403);
   }
 
-  const table = kind === "reservation" ? "customer_reservations" : "customer_orders";
+  const table = kind === "reservation" ? "customer_reservations" : kind === "invoice" ? "invoices" : "customer_orders";
   const db = createClient(url, service);
-  const { data: x, error } = await db.from(table).select("*").eq("id", id).maybeSingle();
+  let { data: x, error } = await db.from(table).select("*").eq("id", id).maybeSingle();
   if (error) return json({ error: error.message }, 500);
   if (!x || (event === "request" && x.customer_id !== uid)) return json({ error: "Introuvable." }, 404);
+  if (kind === "invoice") {
+    // facture « À venir » : le client est le compte lié à la fiche (customers.client_id), jamais d'exception ni de demande
+    if (event === "request" || event === "approved" || event === "refused") return json({ error: "Événement non permis pour une facture." }, 400);
+    const { data: c } = x.client_id ? await db.from("customers").select("id,email,name,phone").eq("client_id", x.client_id).maybeSingle() : { data: null };
+    if (!c?.email) return json({ result: "skipped", reason: "aucun compte lié" });
+    x = { ...x, customer_id: c.id, email: c.email, name: c.name || x.client_name, phone: c.phone };
+  }
   if (!resendKey) return json({ error: "Envoi non configuré : secret RESEND_API_KEY manquant." }, 503);
   if (/@resend\.dev$/i.test(x.email || "")) adminTo = "delivered@resend.dev";   // tests
 
   const rq = x.pickup_req as { d?: string; s?: string; note?: string; state?: string; reply?: string } | null;
-  const what = (kind === "reservation" ? "Réservation " : "Commande ") + x.number;
+  const what = (kind === "reservation" ? "Réservation " : kind === "invoice" ? "Facture " : "Commande ") + x.number;
   const first = String(x.name || "").trim().split(/\s+/)[0] || "";
   const who = x.name || x.email;
-  const slug = (kind === "reservation" ? "r/" : "c/") + id;
-  const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes/" + (kind === "reservation" ? "reservations" : "clients");
+  const slug = (kind === "reservation" ? "r/" : kind === "invoice" ? "f/" : "c/") + id;
+  const adminUrl = SITE + "/coulisses-t6avzpe2.html#" + (kind === "invoice" ? "historique" : "commandes/" + (kind === "reservation" ? "reservations" : "clients"));
   const { data: cust } = x.customer_id ? await db.from("customers").select("lang").eq("id", x.customer_id).maybeSingle() : { data: null };
   const en = cust?.lang === "en";
   const accountUrl = SITE + (en ? "/en" : "") + "/compte.html#/cueillette/" + slug;
@@ -148,7 +155,24 @@ Deno.serve(async (req) => {
 
   // réponse de l'admin -> client
   let cSubject: string, cText: string, cHtml: string;
-  if (event === "approved" || event === "confirmed") {
+  if (event === "ready") {
+    // « tes articles sont arrivés » : le client choisit sa cueillette dans Mon compte
+    if (kind !== "invoice" || !x.pickup_ready_at) return json({ result: "skipped", reason: "facture non prévenue" });
+    const { data: pl } = await db.from("invoice_lines").select("label,meta,qty_pending").eq("invoice_id", id).gt("qty_pending", 0).order("sort_order");
+    const items = (pl || []) as { label: string; meta: string | null; qty_pending: number }[];
+    const li = items.map((l) => l.qty_pending + " × " + l.label + (l.meta ? " — " + l.meta : ""));
+    const listHtml = '<ul style="margin:0 0 16px;padding-left:20px;color:#3A3D45">' + li.map((t) => "<li>" + esc(t) + "</li>").join("") + "</ul>";
+    const listTxt = li.map((t) => "- " + t).join("\n");
+    const nTxt = (items.reduce((s, l) => s + l.qty_pending, 0) > 1) ? true : false;
+    cSubject = en ? "Your items have arrived — Création Audio" : (nTxt ? "Tes articles sont arrivés" : "Ton article est arrivé") + " — Création Audio";
+    cText = en
+      ? "Hello " + first + ",\n\nYour items for invoice " + x.number + " have arrived:\n" + listTxt + "\n\nPick a time to come get them: " + accountUrl + "\n\nCréation Audio\n" + SITE + "/en/"
+      : "Bonjour " + first + ",\n\n" + (nTxt ? "Tes articles de la facture " : "Ton article de la facture ") + x.number + (nTxt ? " sont arrivés :\n" : " est arrivé :\n") + listTxt +
+        "\n\nChoisis ton heure de cueillette : " + accountUrl + "\n\nCréation Audio\n" + SITE;
+    cHtml = en
+      ? wrap("Création Audio", "Your items have arrived", '<p style="margin:0 0 14px">Hello ' + esc(first) + ', your items for invoice ' + esc(x.number) + ' are here.</p>' + listHtml + btn(accountUrl, "Pick my pickup time"))
+      : wrap("Création Audio", nTxt ? "Tes articles sont arrivés" : "Ton article est arrivé", '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', c\'est arrivé pour la facture ' + esc(x.number) + '.</p>' + listHtml + btn(accountUrl, "Choisir ma cueillette"));
+  } else if (event === "approved" || event === "confirmed") {
     if (!x.pickup_date) return json({ result: "skipped", reason: "aucune cueillette" });
     const pk = fmtPickup(x.pickup_date, x.pickup_start), pkE = fmtPickup(x.pickup_date, x.pickup_start, true);
     const { data: cfg } = await db.from("admin_settings").select("value").eq("key", "cueillette").maybeSingle();
@@ -160,7 +184,7 @@ Deno.serve(async (req) => {
     cText = en ? "Hello " + first + ",\n\n" + (ok ? "Your pickup is confirmed" : "Good news: your request is approved") + ". See you " + pkE + "." + addrTxt + "\n" + accountUrl + "\n\nCréation Audio\n" + SITE + "/en/"
       : "Bonjour " + first + ",\n\n" + (ok ? "Ta cueillette est confirmée" : "Bonne nouvelle : ta demande est approuvée") + ". On t'attend " + pk + "." + addrTxt + "\n" + accountUrl + "\n\nCréation Audio\n" + SITE;
     cHtml = en
-      ? wrap("Création Audio", ok ? "Pickup confirmed" : "Request approved", '<p style="margin:0 0 14px">Hello ' + esc(first) + ', for ' + esc(what.toLowerCase().replace("commande", "order").replace("réservation", "reservation")) + '.</p>' + box("See you " + pkE + ".") + addrBox + btn(accountUrl, "See my order"))
+      ? wrap("Création Audio", ok ? "Pickup confirmed" : "Request approved", '<p style="margin:0 0 14px">Hello ' + esc(first) + ', for ' + esc(what.toLowerCase().replace("commande", "order").replace("réservation", "reservation").replace("facture", "invoice")) + '.</p>' + box("See you " + pkE + ".") + addrBox + btn(accountUrl, "See my order"))
       : wrap("Création Audio", ok ? "Cueillette confirmée" : "Demande approuvée", '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', pour ' + esc(what.toLowerCase()) + '.</p>' + box("On t'attend " + pk + ".") + addrBox + btn(accountUrl, "Voir ma commande"));
   } else {
     if (!rq || rq.state !== "refused") return json({ result: "skipped", reason: "aucun refus" });
