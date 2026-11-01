@@ -146,7 +146,8 @@
     if (filter === 'pending' && !pendingOf(inv)) return false;
     if (filter === 'internal' && inv.client_type !== 'internal') return false;   // ce que Théo a pris dans son stock
     if (query) {
-      if (!window.CA.searchMatch([inv.number, inv.client_name, inv.client_contact].join(' '), query)) return false;
+      var arts = (linesByInv[inv.id] || []).map(function (l) { return [l.label, l.meta].join(' '); });
+      if (!window.CA.searchMatch([inv.number, inv.client_name, inv.client_contact].concat(arts).join(' '), query)) return false;
     }
     return true;
   }
@@ -242,7 +243,9 @@
       // ligne « à venir » : pastille + bouton « Remis » dans la cellule (pas de colonne en plus : tient sur téléphone)
       if (lp) art = '<div class="hd-art"><span>' + art + ' <span class="hd-pend">' + (lp < +l.qty ? lp + ' à venir' : 'À venir') + '</span></span>' +
         '<button class="btn btn-ghost btn-sm hd-give" type="button" data-line="' + esc(l.id) + '">Remis</button></div>';
-      return '<tr' + (lp ? ' class="is-pending"' : '') + '><td>' + art + '</td>' +
+      var hit = query && window.CA.searchMatch([l.label, l.meta].join(' '), query);   // article trouvé par la recherche
+      var cls = (lp ? 'is-pending ' : '') + (hit ? 'is-hit' : '');
+      return '<tr' + (cls ? ' class="' + cls.trim() + '"' : '') + '><td>' + art + '</td>' +
         '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num">' + money(l.line_total) + '</td>' +
       '</tr>';
     }).join('');
