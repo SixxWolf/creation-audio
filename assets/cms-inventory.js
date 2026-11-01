@@ -790,10 +790,186 @@
   }
 
   /* =========================================================
+     RECHERCHE + HISTORIQUE DES PRIX
+     La barre du haut filtre le sous-onglet courant (À commander, Codes-barres,
+     historique des réceptions). Quand elle tombe sur un seul filament, la carte
+     « Historique des prix » liste ses achats reçus : receipt_lines.unit_cost
+     (prix payé, taxes et coupon inclus) + receipts (date, fournisseur, n°).
+     ========================================================= */
+  var invQEl = $('#inv-q'), priceEl = $('#inv-hist');
+  var histData = { receipts: [], by: {} };
+  var priceCache = {}, histPick = null, histFromList = false, histKind = null, histToken = 0, histTimer = null;
+  var priceLast = null;   // { p, rows } pour redessiner (format, largeur de l'écran)
+
+  function norm(s) { return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  function qTokens() { return norm(invQEl && invQEl.value).split(/\s+/).filter(Boolean); }
+  // tous les mots tapés doivent se trouver dans le texte, dans n'importe quel ordre
+  function matchQ(text) {
+    var t = qTokens(); if (!t.length) return true;
+    var h = norm(text);
+    return t.every(function (x) { return h.indexOf(x) !== -1; });
+  }
+  function hayOf(p) {
+    var b = (p && p.attrs && p.attrs.barcodes) || {};
+    return [p.brand, p.material, p.name, p.code, b.spool, b.refill, b.item].join(' ');
+  }
+  function applyQuery() {
+    histPick = null; histFromList = false; histKind = null;
+    renderPriceCard();
+    if (!loaded) return;
+    renderReorder(); renderCodes();
+    if (histData.receipts.length) renderHistory(histData.receipts, histData.by);
+  }
+  if (invQEl) {
+    var qLater = function () { clearTimeout(histTimer); histTimer = setTimeout(applyQuery, 120); };
+    invQEl.addEventListener('input', qLater);
+    invQEl.addEventListener('search', qLater);
+  }
+
+  function loadPrices(pid) {
+    if (priceCache[pid]) return priceCache[pid];
+    var pr = sb.from('receipt_lines').select('kind,qty,unit_cost,receipt_id').eq('product_id', pid).then(function (res) {
+      if (res.error) throw res.error;
+      var ls = res.data || [], ids = uniq(ls.map(function (l) { return l.receipt_id; }));
+      if (!ids.length) return [];
+      return sb.from('receipts').select('id,received_at,created_at,supplier,order_number').in('id', ids).then(function (r2) {
+        if (r2.error) throw r2.error;
+        var by = {};
+        (r2.data || []).forEach(function (r) { by[r.id] = r; });
+        return ls.map(function (l) {
+          var r = by[l.receipt_id] || {};
+          return { kind: l.kind === 'refill' ? 'refill' : 'spool', qty: l.qty | 0, cost: num(l.unit_cost),
+            date: r.received_at || '', w: (r.received_at || '') + '|' + (r.created_at || ''),
+            supplier: r.supplier || '', order: r.order_number || '' };
+        }).sort(function (a, z) { return a.w < z.w ? -1 : a.w > z.w ? 1 : 0; });
+      });
+    });
+    priceCache[pid] = pr;
+    pr.then(null, function () { delete priceCache[pid]; });
+    return pr;
+  }
+
+  function renderPriceCard() {
+    if (!priceEl) return;
+    var p = histPick;
+    if (!p && qTokens().length) {
+      var ms = filaments.filter(function (f) { return matchQ(hayOf(f)); });
+      if (ms.length === 1) p = ms[0];
+      else if (ms.length > 1 && ms.length <= 8) {
+        histToken++;
+        priceEl.hidden = false;
+        priceEl.innerHTML = '<div class="reorder-card-head"><h2>Historique des prix</h2></div><div class="ih-opts">' +
+          ms.map(function (f) {
+            return '<button type="button" class="btn btn-ghost btn-sm ih-opt" data-id="' + esc(f.id) + '"><span class="ro-sw" style="background:' + esc(swOf(f)) + '"></span>' + esc(filLabel(f)) + '</button>';
+          }).join('') + '</div>';
+        return;
+      }
+    }
+    if (!p) { histToken++; priceEl.hidden = true; priceEl.innerHTML = ''; priceLast = null; return; }
+    var token = ++histToken;
+    priceEl.hidden = false;
+    priceEl.innerHTML = priceHead(p, '') + '<p class="muted">Chargement…</p>';
+    loadPrices(p.id).then(function (rows) {
+      if (token === histToken) drawPrice(p, rows);
+    }, function (err) {
+      if (token === histToken) priceEl.innerHTML = priceHead(p, '') + '<p class="empty">Impossible de lire les achats. ' + esc(err && err.message || '') + '</p>';
+    });
+  }
+  function priceHead(p, extra) {
+    return '<div class="reorder-card-head"><span class="ro-sw" style="background:' + esc(swOf(p)) + '"></span><h2>' + esc(filLabel(p)) + '</h2>' +
+      '<span class="grow"></span>' + (histFromList ? '<button type="button" class="btn btn-ghost btn-sm ih-back">Autres résultats</button>' : '') + extra + '</div>';
+  }
+
+  function drawPrice(p, rows) {
+    priceLast = { p: p, rows: rows };
+    var has = { spool: rows.some(function (r) { return r.kind === 'spool'; }), refill: rows.some(function (r) { return r.kind === 'refill'; }) };
+    if (!has.spool && !has.refill) { priceEl.innerHTML = priceHead(p, '') + '<p class="empty">Aucun achat reçu pour ce filament.</p>'; return; }
+    var both = has.spool && has.refill;
+    if (!histKind || (!both && histKind === 'all') || (histKind !== 'all' && !has[histKind])) histKind = has.spool ? 'spool' : 'refill';
+    var kinds = histKind === 'all' ? ['spool', 'refill'] : [histKind];
+    var seg = both ? '<div class="ih-seg" role="group">' + [['spool', 'Bobine'], ['refill', 'Recharge'], ['all', 'Tous']].map(function (k) {
+      return '<button type="button" class="btn btn-ghost btn-sm' + (histKind === k[0] ? ' is-on' : '') + '" data-k="' + k[0] + '">' + k[1] + '</button>';
+    }).join('') + '</div>' : '';
+
+    // variation par rapport à l'achat précédent du même format
+    var prev = {}, deltas = new Map();
+    rows.forEach(function (r) {
+      if (!(r.cost > 0)) return;
+      if (prev[r.kind] != null) deltas.set(r, round2(r.cost - prev[r.kind]));
+      prev[r.kind] = r.cost;
+    });
+    var shown = rows.filter(function (r) { return kinds.indexOf(r.kind) !== -1; });
+    var priced = shown.filter(function (r) { return r.cost > 0; });
+
+    var stats = '';
+    if (histKind !== 'all' && priced.length) {
+      var vals = priced.map(function (r) { return r.cost; });
+      var cmp = p.attrs && p.attrs.avg_cost ? num(p.attrs.avg_cost[histKind]) : null;
+      stats = '<div class="ih-stats">' + [
+        ['Dernier', vals[vals.length - 1]], ['Plus bas', Math.min.apply(null, vals)], ['Plus haut', Math.max.apply(null, vals)], ['Coût moyen', cmp]
+      ].map(function (s) { return '<div><span>' + s[0] + '</span><b>' + (s[1] != null ? money(s[1]) : '—') + '</b></div>'; }).join('') + '</div>';
+    }
+    var list = shown.slice().reverse().map(function (r) {
+      var d = deltas.get(r);
+      var src = [r.supplier, r.order].filter(Boolean).join(' · ') || '—';
+      return '<li><span class="ih-date">' + esc(r.date) + '</span><span class="ih-src">' + esc(src) + '</span>' +
+        (histKind === 'all' ? CA.kindPill(r.kind) : '') +
+        '<span class="ih-q">×' + r.qty + '</span><span class="ih-price' + (r.cost > 0 ? '' : ' muted') + '">' + (r.cost != null ? money(r.cost) : '—') + '</span>' +
+        '<span class="ih-d' + (d > 0 ? ' up' : d < 0 ? ' down' : '') + '">' + (d ? (d > 0 ? '+' : '−') + money(Math.abs(d)) : '') + '</span></li>';
+    }).join('');
+    priceEl.innerHTML = priceHead(p, seg) + stats + (priced.length > 1 ? '<div class="ih-chart" id="ih-chart"></div>' : '') +
+      '<ul class="ih-rows">' + list + '</ul>';
+    var ch = $('#ih-chart', priceEl);
+    if (ch) drawChart(ch, kinds.map(function (k) { return { kind: k, pts: priced.filter(function (r) { return r.kind === k; }) }; }));
+  }
+
+  // courbe du prix par achat (échelle de temps, une ligne par format)
+  function drawChart(el, series) {
+    var W = Math.max(240, el.clientWidth || 300), H = 120, L = 10, R = 10, T = 14, B = 22;
+    var all = [];
+    series.forEach(function (s) { s.pts.forEach(function (r) { all.push(r); }); });
+    var tms = all.map(function (r) { return Date.parse(r.date) || 0; });
+    var t0 = Math.min.apply(null, tms), t1 = Math.max.apply(null, tms);
+    var vs = all.map(function (r) { return r.cost; });
+    var v0 = Math.min.apply(null, vs), v1 = Math.max.apply(null, vs);
+    function X(r) { return t1 === t0 ? W / 2 : L + (Date.parse(r.date) - t0) / (t1 - t0) * (W - L - R); }
+    function Y(r) { return v1 === v0 ? (T + H - B) / 2 : H - B - (r.cost - v0) / (v1 - v0) * (H - B - T); }
+    var out = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Prix par achat">' +
+      '<line x1="' + L + '" y1="' + (H - B) + '" x2="' + (W - R) + '" y2="' + (H - B) + '" style="stroke:var(--line)"/>';
+    series.forEach(function (s) {
+      var col = s.kind === 'refill' ? 'var(--ink-2)' : 'var(--ember)';
+      if (s.pts.length > 1) out += '<polyline fill="none" stroke-width="2" stroke-linejoin="round" style="stroke:' + col + '" points="' +
+        s.pts.map(function (r) { return X(r).toFixed(1) + ',' + Y(r).toFixed(1); }).join(' ') + '"/>';
+      s.pts.forEach(function (r) {
+        out += '<circle cx="' + X(r).toFixed(1) + '" cy="' + Y(r).toFixed(1) + '" r="4" style="fill:' + col + '"><title>' + esc(r.date + ' · ' + money(r.cost)) + '</title></circle>';
+      });
+    });
+    out += '<text x="' + L + '" y="' + (H - 6) + '" font-size="11" style="fill:var(--muted)">' + esc(all[0] && new Date(t0).toISOString().slice(0, 10)) + '</text>' +
+      '<text x="' + (W - R) + '" y="' + (H - 6) + '" font-size="11" text-anchor="end" style="fill:var(--muted)">' + esc(new Date(t1).toISOString().slice(0, 10)) + '</text></svg>';
+    el.innerHTML = out;
+  }
+
+  if (priceEl) {
+    priceEl.addEventListener('click', function (e) {
+      var opt = e.target.closest('.ih-opt'), back = e.target.closest('.ih-back'), k = e.target.closest('.ih-seg button');
+      if (opt) { histPick = filProd(opt.getAttribute('data-id')); histFromList = true; histKind = null; renderPriceCard(); }
+      else if (back) { histPick = null; histFromList = false; histKind = null; renderPriceCard(); }
+      else if (k && priceLast) { histKind = k.getAttribute('data-k'); drawPrice(priceLast.p, priceLast.rows); }
+    });
+    var rzTimer;
+    window.addEventListener('resize', function () {
+      clearTimeout(rzTimer);
+      rzTimer = setTimeout(function () { if (priceLast && !priceEl.hidden && $('#ih-chart', priceEl)) drawPrice(priceLast.p, priceLast.rows); }, 150);
+    });
+  }
+
+  /* =========================================================
      HISTORIQUE — inchangé
      ========================================================= */
   if (refreshBtn) refreshBtn.addEventListener('click', loadHistory);
   function loadHistory() {
+    priceCache = {};   // une réception a pu changer : l'historique des prix se relit
+    renderPriceCard();
     historyEl.innerHTML = '<p class="muted">Chargement…</p>';
     sb.from('receipts').select('*').order('received_at', { ascending: false }).order('created_at', { ascending: false })
       .then(function (res) {
@@ -809,6 +985,16 @@
       });
   }
   function renderHistory(receipts, byReceipt) {
+    histData = { receipts: receipts, by: byReceipt };
+    if ((invQEl && invQEl.value || '').trim()) {
+      receipts = receipts.filter(function (rc) {
+        return (byReceipt[rc.id] || []).some(function (l) {
+          var p = l.product_id ? bcProd(l.product_id) : null;
+          return matchQ(p ? hayOf(p) : (l.label || ''));
+        }) || matchQ((rc.order_number || '') + ' ' + (rc.supplier || ''));
+      });
+      if (!receipts.length) { historyEl.innerHTML = '<p class="empty">Aucun résultat.</p>'; return; }
+    }
     historyEl.innerHTML = receipts.map(function (rc) {
       var lines = byReceipt[rc.id] || [];
       var totalRolls = lines.reduce(function (s, l) { return s + (l.qty | 0); }, 0);
@@ -1026,6 +1212,7 @@
     filaments.forEach(function (f) {
       if (roBrand && (f.brand || '—') !== roBrand) return;
       if (roMaterial && (f.material || '(sans matériau)') !== roMaterial) return;
+      if (!matchQ(hayOf(f))) return;
       var hasS = offersSpool(f), hasR = offersRefill(f);
       if (!hasS && !hasR) return;  // couleur sans format vendable -> hors réappro
       if (onlyMiss && missOf(f, 'spool') <= 0 && missOf(f, 'refill') <= 0) return;
@@ -1228,13 +1415,12 @@
      CODES-BARRES — voir / corriger / supprimer les associations
      (products.attrs.barcodes.{spool,refill} ; accessoires : .item)
      ========================================================= */
-  var bcBody = $('#bc-body'), bcSearch = $('#bc-search'), bcCount = $('#bc-count'),
+  var bcBody = $('#bc-body'), bcCount = $('#bc-count'),
       bcAddBtn = $('#bc-add'), bcRefreshBtn = $('#bc-refresh');
   var bcScan = $('#bc-scan'), bcScanToggle = $('#bc-scan-toggle'), bcScanInput = $('#bc-scan-input'), bcScanFeedback = $('#bc-scan-feedback');
   var bcEditing = null;      // clé "productId:kind" en édition, ou '__new__', ou null
   var pendingScanCode = '';  // code scanné inconnu, pré-rempli dans le formulaire d'association
 
-  if (bcSearch) bcSearch.addEventListener('input', function () { renderCodes(); });
   if (bcAddBtn) bcAddBtn.addEventListener('click', function () { pendingScanCode = ''; bcEditing = '__new__'; renderCodes(); });
   if (bcRefreshBtn) bcRefreshBtn.addEventListener('click', function () {
     Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderCodes(); renderReorder(); });
@@ -1275,7 +1461,7 @@
     if (hit) {
       // connu -> confirme le filament + met la ligne en évidence
       bcScanFb('✓ ' + code + ' → ' + bcLabel(hit.f) + (hit.acc ? '' : ' · ' + kindLabel(hit.kind)), 'ok');
-      if (bcSearch && bcSearch.value) { bcSearch.value = ''; }   // s'assure que la ligne est visible
+      if (invQEl && invQEl.value) { invQEl.value = ''; applyQuery(); }   // s'assure que la ligne est visible
       renderCodes();
       var tr = bcBody && bcBody.querySelector('tr[data-key="' + hit.key.replace(/"/g, '\\"') + '"]');
       if (tr) { tr.classList.remove('bc-flash'); void tr.offsetWidth; tr.classList.add('bc-flash'); tr.scrollIntoView({ block: 'nearest' }); }
@@ -1353,10 +1539,9 @@
     if (!bcBody) return;
     if (!loaded) { ensureLoad(); return; }
     var entries = allBarcodeEntries();
-    var q = (bcSearch && bcSearch.value || '').trim().toLowerCase();
+    var q = (invQEl && invQEl.value || '').trim();
     var shown = entries.filter(function (e) {
-      if (!q) return true;
-      return (e.code + ' ' + bcLabel(e.f) + ' ' + kindLabel(e.kind)).toLowerCase().indexOf(q) !== -1;
+      return matchQ(e.code + ' ' + bcLabel(e.f) + ' ' + kindLabel(e.kind));
     });
     if (bcCount) bcCount.textContent = entries.length + ' code' + (entries.length > 1 ? 's' : '') + ' associé' + (entries.length > 1 ? 's' : '');
 
