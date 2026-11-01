@@ -73,7 +73,7 @@
   function estCostOf(f, kind) {
     var lc = f && f.attrs && f.attrs.last_cost;
     var v = lc ? num(lc[kind]) : null;
-    return v != null ? v : costOf(f, kind);
+    return v != null && v > 0 ? v : costOf(f, kind);
   }
 
   /* ---- activation quand on ouvre l'onglet ---- */
@@ -764,7 +764,8 @@
           (l.kind === 'refill' ? g.refill : g.spool).push({ qty: l.qty, unit_cost: l.unit_cost, w: when[l.receipt_id] || '' });
         });
         var last = function (arr) {
-          var priced = arr.filter(function (l) { return num(l.unit_cost) != null; });
+          // un don à 0 $ baisse le coût moyen, mais n'est pas un prix de rachat : il ne devient pas le « dernier prix »
+          var priced = arr.filter(function (l) { return num(l.unit_cost) > 0; });
           if (!priced.length) return null;
           priced.sort(function (a, z) { return a.w < z.w ? -1 : a.w > z.w ? 1 : 0; });
           return round2(priced[priced.length - 1].unit_cost);
