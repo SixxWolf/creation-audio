@@ -1318,6 +1318,12 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .co-status.is-cancelled { color:var(--bad); background:var(--bad-wash); border-color:transparent; }
 :root[data-theme="dark"] .co-status.is-preparing { color:#8DB8F0; background:#172536; }
 .co-edited { font-size:.8rem; font-weight:600; color:var(--ember-ink); }
+.co-link { display:inline-flex; align-items:center; padding:3px 10px; font:inherit; font-size:.8rem; font-weight:700; color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 14%, transparent); border:1px solid color-mix(in srgb, var(--ember) 35%, transparent); border-radius:100px; white-space:nowrap; }
+.co-link::before { content:'⇄'; margin-right:6px; }
+button.co-link { cursor:pointer; border-style:dashed; }
+button.co-link:hover { background:color-mix(in srgb, var(--ember) 24%, transparent); }
+.co-linkpick { display:flex; flex-direction:column; gap:10px; margin:12px 0 4px; text-align:left; }
+.co-linkpick label { display:flex; align-items:center; gap:8px; cursor:pointer; }
 .co-who { display:flex; align-items:center; gap:10px; }
 .co-who .person-av { width:36px; height:36px; font-size:.8rem; }
 .co-who > span:not(.person-av) { display:flex; flex-direction:column; line-height:1.25; }

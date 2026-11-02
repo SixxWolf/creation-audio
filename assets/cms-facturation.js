@@ -1300,10 +1300,12 @@
      commande au PRIX DE LA COMMANDE (verrouillé si le tarif a changé depuis), note
      « Commande dealer D-0007 — … ». Rien n'est enregistré avant « Enregistrer » ;
      alors la commande passe « Facturée » (invoice_id) — voir linkOrder(). */
+  // commandes en ligne liées facturées ensemble : « C-0019 + C-0018 » (order.also = les autres commandes du groupe)
+  function orderNums(o) { return [o.number].concat((o.also || []).map(function (x) { return x.number; })).join(' + '); }
   function setFromOrder(o) {
-    fromOrder = o ? { id: o.id, number: o.number, kind: o.kind || 'dealer' } : null;
+    fromOrder = o ? { id: o.id, number: o.number, kind: o.kind || 'dealer', also: o.also || [] } : null;
     if (elOrderBanner) elOrderBanner.hidden = !fromOrder;
-    if (elOrderNum) elOrderNum.textContent = fromOrder ? (fromOrder.kind === 'reservation' ? 'la réservation ' : 'la commande ') + fromOrder.number : '';
+    if (elOrderNum) elOrderNum.textContent = fromOrder ? (fromOrder.kind === 'reservation' ? 'de la réservation ' : fromOrder.also.length ? 'des commandes ' : 'de la commande ') + orderNums(fromOrder) : '';
   }
   if (elOrderDetach) elOrderDetach.addEventListener('click', function () {
     // garde la facture en cours, mais ne la relie plus à la commande (qui reste à facturer)
@@ -1333,13 +1335,15 @@
       }, function () {});
       return;
     }
-    if (order.kind === 'client') {   // commande en ligne : Facturée + compte du client relié à sa fiche (RPC)
-      sb.rpc('admin_invoice_customer_order', { p_order: order.id, p_invoice: inv.id }).then(function (res) {
-        if (res.error) { elStatus.appendChild(document.createTextNode(' ⚠ Commande ' + order.number + ' non marquée « Facturée » — fais-le dans l\'onglet Commandes. ')); return; }
-        elStatus.insertBefore(document.createTextNode('Commande ' + order.number + ' → Facturée. '), elStatus.firstChild ? elStatus.firstChild.nextSibling : null);
-        if (window.CA.reloadCustomerOrders) window.CA.reloadCustomerOrders();
-        if (window.CA.loadAccounts) window.CA.loadAccounts().then(null, function () {});
-      }, function () {});
+    if (order.kind === 'client') {   // commande en ligne (+ ses commandes liées) : Facturée + compte du client relié à sa fiche (RPC)
+      [{ id: order.id, number: order.number }].concat(order.also || []).forEach(function (oc) {
+        sb.rpc('admin_invoice_customer_order', { p_order: oc.id, p_invoice: inv.id }).then(function (res) {
+          if (res.error) { elStatus.appendChild(document.createTextNode(' ⚠ Commande ' + oc.number + ' non marquée « Facturée » — fais-le dans l\'onglet Commandes. ')); return; }
+          elStatus.insertBefore(document.createTextNode('Commande ' + oc.number + ' → Facturée. '), elStatus.firstChild ? elStatus.firstChild.nextSibling : null);
+          if (window.CA.reloadCustomerOrders) window.CA.reloadCustomerOrders();
+          if (window.CA.loadAccounts) window.CA.loadAccounts().then(null, function () {});
+        }, function () {});
+      });
       return;
     }
     sb.from('dealer_orders').update({ status: 'invoiced', invoice_id: inv.id, updated_at: new Date().toISOString() })
@@ -1381,7 +1385,7 @@
             return ln;
           });
           settleLoadedPrices();
-          elNote.value = (order.kind === 'reservation' ? 'Réservation ' : 'Commande en ligne ') + order.number + (order.note ? ' — ' + order.note : '');
+          elNote.value = (order.kind === 'reservation' ? 'Réservation ' : order.also && order.also.length ? 'Commandes en ligne ' : 'Commande en ligne ') + orderNums(order) + (order.note ? ' — ' + order.note : '');
           var c0 = lines[0] && ['filament', 'spacer', 'accessory'].indexOf(lines[0].ptype) !== -1 ? lines[0].ptype : 'filament';
           setCat(c0);
           unlock();

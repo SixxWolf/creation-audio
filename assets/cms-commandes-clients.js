@@ -286,24 +286,50 @@
   }
 
   /* ---- liste ---- */
+  // commandes liées (même client, même cueillette, facturées ensemble) : link_id partagé, voir admin_link_orders
+  function sibsOf(o) {
+    return o.link_id && OPEN[o.status] ? orders.filter(function (x) { return x.link_id === o.link_id && x.id !== o.id && OPEN[x.status]; }) : [];
+  }
+  function candsOf(o) {
+    var em = String(o.email || '').toLowerCase();
+    return orders.filter(function (x) {
+      return x.id !== o.id && OPEN[x.status] && String(x.email || '').toLowerCase() === em && (!o.link_id || x.link_id !== o.link_id);
+    });
+  }
+  function samePickup(a, b) { return a.pickup_date && a.pickup_date === b.pickup_date && String(a.pickup_start || '').slice(0, 5) === String(b.pickup_start || '').slice(0, 5); }
   function actionsFor(o) {
+    var sibs = sibsOf(o);
     var b = function (act, label, cls) {
       return '<button type="button" class="btn ' + (cls || 'btn-ghost') + ' btn-sm" data-act="' + act + '"' +
-        (act === 'invoice' ? ' data-ic="receipt"' : act === 'confirm' ? ' data-ic="check"' : act === 'edit' ? ' data-ic="edit"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
+        (act === 'invoice' || act === 'invoice-all' ? ' data-ic="receipt"' : act === 'confirm' ? ' data-ic="check"' : act === 'edit' ? ' data-ic="edit"' : act === 'delete' ? ' data-ic="trash"' : '') + '>' + label + '</button>';
     };
-    var hold = OPEN[o.status] ? b(o.stock_hold ? 'unhold' : 'hold', o.stock_hold ? 'Libérer le stock' : 'Mettre en attente') + b('edit', 'Modifier') + b('pickup', 'Cueillette') : '';
+    // « Facturer ensemble » (principal) + « Facturer seule » quand la commande est liée
+    var bill = function (cls) {
+      return sibs.length ? b('invoice-all', 'Facturer ensemble', cls) + b('invoice', 'Facturer seule') : b('invoice', 'Facturer', cls);
+    };
+    var link = !OPEN[o.status] ? '' : o.link_id ? b('unlink', 'Délier') : candsOf(o).length ? b('link', 'Lier') : '';
+    var hold = OPEN[o.status] ? b(o.stock_hold ? 'unhold' : 'hold', o.stock_hold ? 'Libérer le stock' : 'Mettre en attente') + b('edit', 'Modifier') + b('pickup', 'Cueillette') + link : '';
     switch (o.status) {
       case 'new': case 'preparing': {
         var go = o.has_backorder ? b('confirm', 'Articles reçus, prête', 'btn-accent')
           : o.pickup_date ? b('confirm', 'Confirmer la cueillette', 'btn-accent')
           : '<button type="button" class="btn btn-accent btn-sm" data-act="confirm" data-ic="check" disabled>Confirmer la cueillette</button>';
-        return go + hold + b('invoice', 'Facturer') + b('cancel', 'Annuler', 'btn-ghost co-danger');
+        return go + hold + bill() + b('cancel', 'Annuler', 'btn-ghost co-danger');
       }
-      case 'ready': return b('invoice', 'Facturer', 'btn-accent') + hold + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
+      case 'ready': return bill('btn-accent') + hold + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'invoiced': return o.invoice_id ? b('see-invoice', 'Voir la facture') : '';
       case 'cancelled': return b('new', 'Rouvrir') + b('delete', 'Supprimer', 'btn-ghost co-danger');
     }
     return '';
+  }
+  // badge « Liée à C-0018 » ; sinon proposition de lier quand le même client a une autre commande à la même cueillette
+  function linkChip(o) {
+    if (!OPEN[o.status]) return '';
+    var sibs = sibsOf(o);
+    if (sibs.length) return '<span class="co-link">Liée à ' + sibs.map(function (s) { return esc(s.number); }).join(', ') + '</span>';
+    if (o.link_id) return '';
+    var hit = candsOf(o).filter(function (x) { return !x.link_id && samePickup(o, x); })[0];
+    return hit ? '<button type="button" class="co-link is-sug" data-act="link-sug" data-with="' + esc(hit.id) + '">Lier à ' + esc(hit.number) + ' ?</button>' : '';
   }
   function render() {
     var open = orders.filter(function (o) { return OPEN[o.status]; });
@@ -339,6 +365,7 @@
           '<div class="co-id"><b>' + esc(o.number) + '</b><span class="co-status is-' + esc(o.status) + '">' + esc(STATUS[o.status] || o.status) + '</span>' +
             (o.edited_at && OPEN[o.status] ? '<span class="co-edited">modifiée par le client ' + esc(ago(o.edited_at)) + '</span>' : '') +
             (o.stock_hold && OPEN[o.status] ? '<span class="co-status is-preparing">Stock en attente</span>' : '') +
+            linkChip(o) +
             (o.status === 'cancelled' ? '<span class="co-edited">' + (o.cancelled_by === 'client' ? 'par le client' : o.cancelled_by === 'auto' ? 'automatique : pas de cueillette' : 'par toi') + '</span>' : '') +
             (o.status === 'new' && !o.pickup_date && !o.has_backorder && o.pickup_due ? '<span class="co-edited">annulée ' + esc(dueIn(o.pickup_due)) + ' sans cueillette</span>' : '') +
           '</div>' +
@@ -498,10 +525,38 @@
   function act(o, what, btn) {
     if (what === 'confirm') { confirmOrder(o, btn); return; }
     if (what === 'pickup') { CA.editPickup(o, 'order', load, btn.closest('.co-card')); return; }
-    if (what === 'invoice') {
+    if (what === 'invoice' || what === 'invoice-all') {
       if (!CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
-      var ord = Object.assign({ kind: 'client' }, o);
-      if (CA.invoiceFromOrder(ord, linesOf(o)) !== false) location.hash = '#facturation';
+      var sibs = what === 'invoice-all' ? sibsOf(o) : [], ord = Object.assign({ kind: 'client' }, o), ls = linesOf(o);
+      if (sibs.length) {   // une seule facture : les lignes de toutes les commandes liées ; chacune passe « Facturée » à l'enregistrement
+        ord.also = sibs.map(function (s) { return { id: s.id, number: s.number }; });
+        sibs.forEach(function (s) { ls = ls.concat(linesOf(s)); });
+      }
+      if (CA.invoiceFromOrder(ord, ls) !== false) location.hash = '#facturation';
+      return;
+    }
+    if (what === 'link-sug') { linkOrders([o.id, btn.getAttribute('data-with')], btn); return; }
+    if (what === 'unlink') {
+      btn.disabled = true;
+      sb.rpc('admin_unlink_order', { p_id: o.id }).then(function (res) {
+        if (res.error) throw res.error;
+        caDialog.toast('Commande ' + o.number + ' déliée.'); load();
+      }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
+      return;
+    }
+    if (what === 'link') {
+      var cands = candsOf(o), body = document.createElement('div');
+      body.className = 'co-linkpick';
+      body.innerHTML = cands.map(function (x) {
+        return '<label><input type="checkbox" value="' + esc(x.id) + '"' + (cands.length === 1 || samePickup(o, x) ? ' checked' : '') + '> <b>' + esc(x.number) + '</b> ' + esc(money(x.total)) +
+          (x.pickup_date ? ' · ' + esc(CA.fmtPickup(x)) : '') + '</label>';
+      }).join('');
+      caDialog.confirm({ title: 'Lier ' + o.number + ' à…', body: body, ok: 'Lier' }).then(function (ok) {
+        if (!ok) return;
+        var ids = [o.id].concat($$('input:checked', body).map(function (i) { return i.value; }));
+        if (ids.length < 2) return;
+        linkOrders(ids, btn);
+      });
       return;
     }
     if (what === 'see-invoice') {
@@ -530,6 +585,13 @@
     }
     if (what === 'hold' || what === 'unhold') { setHold(o, what === 'hold', btn); return; }
     setStatus(o, what, btn);
+  }
+  function linkOrders(ids, btn) {
+    btn.disabled = true;
+    sb.rpc('admin_link_orders', { p_ids: ids }).then(function (res) {
+      if (res.error) throw res.error;
+      caDialog.toast('Commandes liées : même cueillette, facturées ensemble.'); load();
+    }).then(null, function (err) { btn.disabled = false; caDialog.error(err); });
   }
   // bouton unique : Prête + cueillette confirmée + courriel (confirmation avec adresse, ou « articles arrivés »)
   function confirmOrder(o, btn) {

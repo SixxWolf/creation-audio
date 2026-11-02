@@ -419,6 +419,7 @@
     var txt = x ? CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end) : later ? _t('à choisir quand tout sera arrivé') : due ? _t('à choisir avant ') + new Date(due).toLocaleString(CA.locale, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : _t('à choisir');
     return '<p class="ord-note ord-pk' + (x ? '' : ' is-todo') + _t('"><span>Cueillette</span><b>') + esc(txt) + '</b>' +
       (x ? '<span class="pk-st' + (x.pickup_confirmed ? ' is-ok' : '') + '">' + (x.pickup_confirmed ? _t('Confirmée') : _t('À confirmer')) + '</span>' : '') +
+      (x && x.linked && x.linked.length ? '<span class="pk-st">' + _t('Avec') + ' ' + esc(x.linked.join(', ')) + '</span>' : '') +   // commandes liées : même cueillette
       (can && hasSlots ? '<button class="pk-change" type="button">' + (x ? _t('Changer') : _t('Choisir')) + '</button>' : '') + '</p>';
   }
   /* ---- écran « Ma cueillette » (#/cueillette/c|r/<id>) : la commande à gauche, le calendrier à droite ---- */
@@ -443,7 +444,7 @@
     var title = isF ? _t('Tes articles sont arrivés !') : !isC ? _t('Réservation ') + x.number + _t(' confirmée !')
       : x.status === 'ready' ? _t('Ta commande ') + x.number + _t(' est prête !') : _t('Commande ') + x.number + _t(' reçue !');
     var sub = isF ? _t('Facture ') + x.number + ' · ' + plural(x.count, 'article', 'articles')
-      : isC ? fmtDate(x.created_at) + ' · ' + plural(itemsOf(x), 'article', 'articles')
+      : isC ? fmtDate(x.created_at) + ' · ' + plural(itemsOf(x), 'article', 'articles') + (x.linked && x.linked.length ? ' · ' + _t('Avec') + ' ' + x.linked.join(', ') : '')
       : _t('Gardée jusqu\'au ') + whenTxt(x.expires_at);
     var lines = (x.lines || []).map(function (l) { return lineLi(l, isC ? (+l.qty_to_order || 0) : 0); }).join('');
     host.innerHTML = '<div class="pkv">' +

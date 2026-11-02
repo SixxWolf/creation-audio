@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 11;
+window.CA_EN_V = 12;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -592,6 +592,7 @@ window.CA_EN = (function (pairs) {
   [`<p class="pkv-addr">On te confirme par courriel.</p>`, `<p class="pkv-addr">We'll confirm by email.</p>`],
   [`Confirmée`, `Confirmed`],
   [`À confirmer`, `To be confirmed`],
+  [`Avec`, `With`],
   [`Adresse`, `Address`],
   [`<div class="pkv-foot"><a class="acct-submit" href="#/commandes">Mes commandes</a>`, `<div class="pkv-foot"><a class="acct-submit" href="#/commandes">My orders</a>`],
   [`<button class="acct-btn pkv-change" type="button">Changer</button></div></div>`, `<button class="acct-btn pkv-change" type="button">Change</button></div></div>`],

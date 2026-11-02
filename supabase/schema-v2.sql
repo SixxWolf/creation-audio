@@ -1735,6 +1735,9 @@ alter table public.customer_orders add column if not exists pickup_notified_at t
 alter table public.customer_orders add column if not exists pickup_req         jsonb;   -- demande d'exception (voir CUEILLETTE)
 alter table public.customer_orders add column if not exists pickup_confirmed_at timestamptz;   -- cueillette confirmée par l'admin (remise à null si la plage change)
 alter table public.customer_orders add column if not exists ready_notified_at  timestamptz;   -- courriel « commande prête » (EF customer-order-notify, event ready)
+-- commandes liées (même client, même cueillette) : même link_id = un groupe (admin_link_orders / admin_unlink_order, _sync_order_pickup)
+alter table public.customer_orders add column if not exists link_id            uuid;
+create index if not exists customer_orders_link_idx on public.customer_orders (link_id) where link_id is not null;
 alter table public.customer_orders add column if not exists stock_hold boolean not null default false;   -- stock retiré du site en attendant le paiement (voir _held_stock) ; mis à vrai à l'envoi
 alter table public.customer_orders add column if not exists pickup_due timestamptz;          -- cueillette à choisir avant : sinon annulée par reservations_tick (null = pas d'échéance : articles à commander)
 alter table public.customer_orders add column if not exists pickup_reminded_at timestamptz;  -- rappel « choisis ta cueillette » envoyé
@@ -1929,6 +1932,9 @@ returns jsonb language sql stable security definer set search_path = '' as $$
       'pickup_date', o.pickup_date, 'pickup_start', to_char(o.pickup_start, 'HH24:MI'), 'pickup_end', to_char(o.pickup_end, 'HH24:MI'),
       'pickup_req', o.pickup_req, 'pickup_due', o.pickup_due,
       'pickup_confirmed', o.pickup_confirmed_at is not null,
+      'linked', coalesce((select jsonb_agg(x.number order by x.number) from public.customer_orders x
+                           where o.link_id is not null and x.link_id = o.link_id and x.id <> o.id and x.customer_id = o.customer_id
+                             and x.status in ('new', 'preparing', 'ready')), '[]'::jsonb),
       'pickup_address', case when o.pickup_confirmed_at is not null then (select s.value ->> 'address' from public.admin_settings s where s.key = 'cueillette') end,
       'invoice_number', (select i.number from public.invoices i where i.id = o.invoice_id),
       'lines', coalesce((
@@ -2397,9 +2403,10 @@ language sql stable security definer set search_path = '' as $$
      where b.e > b.s
   )
   select b.d, b.s, null::time as e,
-         ((select count(*) from public.customer_orders o
+         ((select count(distinct coalesce(o.link_id, o.id)) from public.customer_orders o   -- un groupe de commandes liées = 1 client
             where o.pickup_date = b.d and o.pickup_start = b.s and o.status in ('new', 'preparing', 'ready')
-              and o.id is distinct from p_self)
+              and o.id is distinct from p_self
+              and (o.link_id is null or o.link_id is distinct from (select x.link_id from public.customer_orders x where x.id = p_self)))
         + (select count(*) from public.customer_reservations r
             where r.pickup_date = b.d and r.pickup_start = b.s and r.status = 'active' and r.expires_at > now()
               and r.id is distinct from p_self)
@@ -2498,6 +2505,7 @@ begin
        set pickup_date = (v_pk ->> 'd')::date, pickup_start = (v_pk ->> 's')::time, pickup_end = (v_pk ->> 'e')::time,
            pickup_confirmed_at = null, updated_at = now()
      where id = p_id;
+    perform public._sync_order_pickup(p_id);   -- commandes liées : même cueillette
   end if;
   return v_pk;
 end $$;
@@ -2599,6 +2607,7 @@ begin
   end if;
   get diagnostics n = row_count;
   if n = 0 then raise exception 'Commande introuvable ou fermée.'; end if;
+  if p_kind <> 'reservation' then perform public._sync_order_pickup(p_id); end if;   -- commandes liées
   return jsonb_build_object('d', p_d, 's', to_char(p_s, 'HH24:MI'));
 end $$;
 -- Confirmation de la cueillette par l'admin (bouton « Confirmer » des cartes) -> courriel au client (EF pickup-request-notify, event 'confirmed').
@@ -2622,6 +2631,7 @@ begin
   end if;
   get diagnostics n = row_count;
   if n = 0 then raise exception 'Aucune cueillette à confirmer.'; end if;
+  if p_kind <> 'reservation' then perform public._sync_order_pickup(p_id); end if;   -- commandes liées
 end $$;
 -- Bouton unique « Confirmer la cueillette » (carte d'une commande en ligne) : Nouvelle -> Prête, cueillette confirmée,
 -- stock gardé. Article à commander : « Articles reçus, prête » (le tout passe en stock, le client choisit sa cueillette ensuite).
@@ -2642,8 +2652,64 @@ begin
   update public.customer_orders
      set status = 'ready', stock_hold = true, pickup_due = null, pickup_confirmed_at = now(), ready_notified_at = now(), updated_at = now()
    where id = p_id;
+  if o.link_id is not null then   -- commandes liées : même cueillette, et les autres « Nouvelle » passent Prête avec elle (un seul courriel)
+    perform public._sync_order_pickup(p_id);
+    update public.customer_orders
+       set status = 'ready', stock_hold = true, pickup_due = null, ready_notified_at = now(), updated_at = now()
+     where link_id = o.link_id and id <> p_id and status = 'new' and not has_backorder and customer_id is not distinct from o.customer_id;
+  end if;
   return jsonb_build_object('event', 'confirmed');
 end $$;
+
+-- Commandes liées d'un même client (même cueillette, facturées ensemble) : copie la cueillette de p_id sur les autres commandes
+-- ouvertes de son groupe (link_id).
+create or replace function public._sync_order_pickup(p_id uuid)
+returns void language sql security definer set search_path = '' as $$
+  update public.customer_orders s
+     set pickup_date = o.pickup_date, pickup_start = o.pickup_start, pickup_end = o.pickup_end,
+         pickup_confirmed_at = o.pickup_confirmed_at, updated_at = now()
+    from public.customer_orders o
+   where o.id = p_id and o.link_id is not null and s.link_id = o.link_id and s.id <> o.id
+     and s.status in ('new', 'preparing', 'ready') and s.customer_id is not distinct from o.customer_id;
+$$;
+revoke all on function public._sync_order_pickup(uuid) from public, anon, authenticated;
+
+-- Lier des commandes en cours du même client (la première qui a une cueillette donne la sienne aux autres).
+create or replace function public.admin_link_orders(p_ids uuid[])
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_link uuid; v_n int; v_who int; v_src uuid;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  if coalesce(array_length(p_ids, 1), 0) < 2 then raise exception 'Choisis au moins deux commandes.'; end if;
+  select count(*), count(distinct lower(o.email)) into v_n, v_who
+    from public.customer_orders o where o.id = any(p_ids) and o.status in ('new', 'preparing', 'ready');
+  if v_n <> array_length(p_ids, 1) then raise exception 'Seules des commandes en cours peuvent être liées.'; end if;
+  if v_who <> 1 then raise exception 'Les commandes doivent être du même client.'; end if;
+  select o.link_id into v_link from public.customer_orders o where o.id = any(p_ids) and o.link_id is not null limit 1;
+  v_link := coalesce(v_link, gen_random_uuid());
+  update public.customer_orders set link_id = v_link, updated_at = now() where id = any(p_ids);
+  select o.id into v_src from public.customer_orders o
+   where o.id = any(p_ids) and o.pickup_date is not null order by array_position(p_ids, o.id) limit 1;
+  if v_src is not null then perform public._sync_order_pickup(v_src); end if;
+  return jsonb_build_object('link_id', v_link);
+end $$;
+
+-- Délier une commande (le groupe disparaît s'il ne reste qu'une commande).
+create or replace function public.admin_unlink_order(p_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_link uuid;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select link_id into v_link from public.customer_orders where id = p_id;
+  update public.customer_orders set link_id = null, updated_at = now() where id = p_id;
+  if v_link is not null and (select count(*) from public.customer_orders where link_id = v_link and status in ('new', 'preparing', 'ready')) < 2 then
+    update public.customer_orders set link_id = null where link_id = v_link;
+  end if;
+end $$;
+revoke all on function public.admin_link_orders(uuid[]) from public, anon;
+grant execute on function public.admin_link_orders(uuid[]) to authenticated;
+revoke all on function public.admin_unlink_order(uuid) from public, anon;
+grant execute on function public.admin_unlink_order(uuid) to authenticated;
 revoke all on function public.admin_confirm_order(uuid) from public, anon;
 grant execute on function public.admin_confirm_order(uuid) to authenticated;
 revoke all on function public.admin_confirm_pickup(text, uuid) from public, anon;
