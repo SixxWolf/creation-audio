@@ -427,7 +427,7 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
 .home-page .news-mini:focus-visible { outline:3px solid var(--ember-dim); outline-offset:2px; }
 .news-thumb { display:grid; place-items:center; width:88px; height:62px; flex:none; padding:4px; background:var(--wash); border-radius:11px; }
 .news-thumb img { width:100%; height:100%; object-fit:contain; }
-.news-mini-txt { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.news-mini-txt { display:flex; flex-direction:column; gap:6px; flex:1; min-width:0; }
 .news-mini-t { font-weight:700; line-height:1.3; color:var(--ink); }
 
 @media (max-width:900px) {
