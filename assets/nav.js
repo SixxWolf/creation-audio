@@ -229,11 +229,18 @@
      « ca-fetes-voir » ; ?fetes=0 force le site normal).
    - Ici : on relit le réglage en ligne, on met le cache à jour, on corrige
      la classe et on charge les décors (fetes.js) quand le thème est actif.
+   - Choix du visiteur (2026-11-02) : activé d'office, mais refusable. localStorage
+     « ca-fetes-off » = '1' (refusé) / '0' (gardé) ; « ca-fetes-vu » = le bandeau
+     « Garder / Thème normal » a été répondu. Le <head> des pages respecte « 1 »
+     avant le rendu. Interrupteur dans le pied de page + Mon compte › Apparence
+     (look.js, copie dans user_metadata.look.fetes = false pour les autres appareils).
+     L'aperçu ?fetes=1 ignore le refus. API : CA.fetesChoice.
    ========================================================= */
 (function () {
   'use strict';
   var CA = window.CA = window.CA || {};
-  var FETES_V = 2, KEY = 'ca-fetes', PREV = 'ca-fetes-voir', root = document.documentElement;
+  var FETES_V = 2, KEY = 'ca-fetes', PREV = 'ca-fetes-voir', OFF = 'ca-fetes-off', SEEN = 'ca-fetes-vu', root = document.documentElement;
+  var _t = CA.t || function (x) { return x; };
   if (root.hasAttribute('data-fetes-off')) return;   // page à ambiance propre (revendeur.html) : jamais de thème des fêtes
   var q = /[?&]fetes=([01])/.exec(location.search), preview = q ? q[1] : null;
   try {
@@ -250,10 +257,64 @@
     s.src = (CA.siteRoot || '') + 'assets/fetes.js?v=' + FETES_V;
     document.body.appendChild(s);
   }
+  function stored() {   // refus enregistré sur cet appareil : true / false, ou null (jamais choisi)
+    try { var v = localStorage.getItem(OFF); return v === '1' ? true : v === '0' ? false : null; } catch (e) { return null; }
+  }
   function set(on) {
+    if (on && !preview && stored() === true) on = false;
     root.classList.toggle('fetes', on);
     if (on) decor();
   }
+  function inWindow() {   // dans les dates du thème (refusé ou non)
+    if (preview) return preview === '1';
+    try { var w = JSON.parse(localStorage.getItem(KEY)), t = Date.now(); return !!w && t >= w.a && t < w.b; } catch (e) { return false; }
+  }
+  function seen() { try { return localStorage.getItem(SEEN) === '1'; } catch (e) { return false; } }
+  // off = true : le thème est refusé ; quiet : copie venue du compte
+  function choose(off, quiet) {
+    try { localStorage.setItem(OFF, off ? '1' : '0'); localStorage.setItem(SEEN, '1'); } catch (e) {}
+    if (off) root.classList.remove('fetes'); else if (inWindow()) { root.classList.add('fetes'); decor(); }
+    paint();
+    try { window.dispatchEvent(new CustomEvent('ca-fetes-choice', { detail: { off: off, quiet: !!quiet } })); } catch (e) {}
+  }
+  CA.fetesChoice = { inWindow: inWindow, stored: stored, set: choose };
+
+  /* ---- bandeau (une seule fois) + interrupteur du pied de page ---- */
+  var ban = null, foot = null;
+  function paint() {
+    var win = inWindow();
+    if (foot) {
+      foot.hidden = !win;
+      foot.textContent = stored() === true ? _t('Activer le thème des fêtes') : _t('Désactiver le thème des fêtes');
+    }
+    if (ban && (!win || seen())) { if (ban.parentNode) ban.parentNode.removeChild(ban); ban = null; }
+  }
+  function chrome() {
+    if (!inWindow() || preview) return;
+    var inner = document.querySelector('.foot-bottom-inner');
+    if (inner && !foot) {
+      foot = document.createElement('button');
+      foot.type = 'button'; foot.className = 'foot-fetes';
+      foot.addEventListener('click', function () { choose(stored() !== true); });
+      inner.insertBefore(foot, inner.lastElementChild);
+    }
+    if (!seen() && !ban && document.body) {
+      ban = document.createElement('div');
+      ban.className = 'fetes-ask'; ban.setAttribute('role', 'region'); ban.setAttribute('aria-label', _t('Thème des fêtes'));
+      ban.innerHTML = '<p>' + _t('Thème des fêtes activé') + '</p><div><button type="button" class="fa-keep">' + _t('Garder') + '</button>' +
+        '<button type="button" class="fa-off">' + _t('Thème normal') + '</button></div>';
+      ban.querySelector('.fa-keep').addEventListener('click', function () { choose(false); });
+      ban.querySelector('.fa-off').addEventListener('click', function () { choose(true); });
+      var mine = ban;
+      setTimeout(function () {
+        if (ban !== mine) return;
+        document.body.appendChild(mine);
+        setTimeout(function () { mine.classList.add('is-in'); }, 30);
+      }, 1200);
+    }
+    paint();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', chrome); else chrome();
   // { on, from: "AAAA-MM-JJ", to } → fenêtre { a, b } en ms (minuit local, fin incluse), ou null
   function windowOf(f) {
     if (!f || !f.on || !f.from || !f.to) return null;
@@ -277,6 +338,7 @@
       var w = windowOf(f), t = Date.now();
       try { if (w) localStorage.setItem(KEY, JSON.stringify(w)); else localStorage.removeItem(KEY); } catch (e) {}
       if (!preview) set(!!w && t >= w.a && t < w.b);
+      chrome();
     });
   }).then(null, function () {});
 })();

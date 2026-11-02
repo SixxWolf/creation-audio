@@ -368,3 +368,38 @@ a.ask:focus-visible { outline:2px solid var(--ember-ink); outline-offset:2px; }
   .look-sw { gap:8px; }
   .look-dot { width:34px; height:34px; }
 }
+
+/* =========================================================
+   Thème des fêtes — choix du visiteur (nav.js, look.js)
+   Bandeau « Garder / Thème normal » (une seule fois), interrupteur du pied de page
+   et rangée « Thème des fêtes » de Mon compte › Apparence.
+   ========================================================= */
+.fetes-ask { position:fixed; left:16px; bottom:16px; z-index:45; display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px;
+  max-width:min(520px, calc(100vw - 32px)); padding:12px 14px 12px 18px; color:var(--ink); background:var(--paper);
+  border:1px solid var(--line); border-radius:16px; box-shadow:0 12px 32px rgba(20,22,26,.2);
+  opacity:0; transform:translateY(14px); transition:opacity .25s, transform .25s; }
+.fetes-ask.is-in { opacity:1; transform:none; }
+.fetes-ask p { margin:0; font-weight:700; font-size:.95rem; }
+.fetes-ask div { display:flex; gap:8px; margin-left:auto; }
+.fetes-ask button { padding:9px 16px; font:inherit; font-weight:700; font-size:.88rem; cursor:pointer; border-radius:100px; white-space:nowrap; }
+.fetes-ask .fa-keep { color:#fff; background:var(--fill-strong); border:1px solid var(--fill-strong); }
+.fetes-ask .fa-off { color:var(--ink); background:var(--paper); border:1px solid var(--line-2); }
+.fetes-ask .fa-off:hover { background:var(--wash); }
+.fetes-ask button:focus-visible { outline:3px solid var(--ember-ink); outline-offset:2px; }
+.foot-fetes { padding:0; font:inherit; color:inherit; cursor:pointer; background:none; border:0; text-decoration:underline; text-underline-offset:3px; }
+.foot-fetes:hover { color:var(--ember-ink); }
+.foot-fetes[hidden] { display:none; }
+.foot-fetes:focus-visible { outline:2px solid var(--ember-ink); outline-offset:3px; }
+.look-onoff { display:flex; flex-wrap:wrap; gap:10px; }
+.look-tg { padding:9px 20px; font:inherit; font-weight:700; font-size:.9rem; color:var(--ink); cursor:pointer; background:var(--paper);
+  border:1.5px solid var(--line); border-radius:100px; transition:border-color .15s, box-shadow .15s; }
+.look-tg:hover { border-color:var(--line-2); }
+.look-tg[aria-checked="true"] { border-color:var(--ember); box-shadow:0 0 0 3px color-mix(in srgb, var(--ember) 22%, transparent); }
+.look-tg:focus-visible { outline:3px solid var(--ember-ink); outline-offset:3px; }
+.look-row[hidden] { display:none; }
+@media (max-width:560px) {
+  .fetes-ask { left:12px; right:12px; bottom:12px; max-width:none; }
+  .fetes-ask div { width:100%; margin-left:0; }
+  .fetes-ask button { flex:1; }
+}
+@media (prefers-reduced-motion:reduce) { .fetes-ask { transition:none; } }

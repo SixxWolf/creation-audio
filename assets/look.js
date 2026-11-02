@@ -18,6 +18,9 @@
      compte, définitivement (« Revenir à l'origine » ne le reverrouille pas). Ancre de
      couleur fixe pour les jetons + rainbow.css (dégradé qui glisse sur les surfaces
      pleines), chargé seulement quand html[data-rainbow] est posé.
+   - Thème des fêtes refusable (2026-11-02) : look.fetes === false = refusé ; le vrai choix vit dans
+     localStorage « ca-fetes-off » (nav.js, CA.fetesChoice) et marche sans compte. Rangée « Thème des
+     fêtes » dans l'onglet seulement si mount(…, { fetes: true }) et pendant les dates du thème.
    API : caLook.get() · caLook.set(look, k) · caLook.clear(k) · caLook.mount(el, { save }).
    ========================================================= */
 (function () {
@@ -85,8 +88,10 @@
   function clean(v) {
     v = v || {};
     var rb = v.rainbow === true;   // débloqué : « arc » n'est valable que dans ce cas
-    return { mode: MODES.indexOf(v.mode) >= 0 ? v.mode : DEF.mode,
-             accent: hexOf(v.accent) && (rb || v.accent !== ARC) ? v.accent : DEF.accent, rainbow: rb };
+    var c = { mode: MODES.indexOf(v.mode) >= 0 ? v.mode : DEF.mode,
+              accent: hexOf(v.accent) && (rb || v.accent !== ARC) ? v.accent : DEF.accent, rainbow: rb };
+    if (v.fetes === false) c.fetes = false;   // thème des fêtes refusé (copie du choix fait sur l'appareil)
+    return c;
   }
   function has(k) { try { return !!(KEYS[k] && localStorage.getItem(KEYS[k])); } catch (e) { return false; } }
   function read() {
@@ -189,6 +194,10 @@
           ACCENTS.map(function (a) {
             return '<button type="button" role="radio" class="look-dot" data-accent="' + a[0] + '" style="--c:' + a[1] + '" title="' + _t(a[2]) + '" aria-label="' + _t(a[2]) + '"></button>';
           }).join('') + (l.rainbow ? arcDot() : '') + '</div></div>' +
+        (opts.fetes ? '<div class="look-row" data-row="fetes" hidden><span class="look-lbl" id="look-fe-lbl">' + _t('Thème des fêtes') + '</span>' +
+          '<div class="look-onoff" role="radiogroup" aria-labelledby="look-fe-lbl">' +
+          '<button type="button" role="radio" class="look-tg" data-fetes="on">' + _t('Activé') + '</button>' +
+          '<button type="button" role="radio" class="look-tg" data-fetes="off">' + _t('Désactivé') + '</button></div></div>' : '') +
         '<div class="look-foot"><button type="button" class="look-reset">' + _t('Revenir à l\'origine') + '</button>' +
           '<button type="button" class="look-reset look-love">' + _t('J\'aime les arcs-en-ciel') + '</button>' +
           '<span class="look-msg" role="status" aria-live="polite"></span></div>' +
@@ -201,10 +210,18 @@
       el.querySelectorAll('.look-dot').forEach(function (b) { b.setAttribute('aria-checked', String(b.getAttribute('data-accent') === l.accent)); });
       reset.disabled = l.mode === DEF.mode && l.accent === DEF.accent;
       el.querySelector('.look-fetes').hidden = !fetes();
+      var fe = el.querySelector('[data-row="fetes"]'), ch = window.CA && window.CA.fetesChoice;
+      if (fe) {
+        fe.hidden = !(ch && ch.inWindow());
+        var off = ch ? ch.stored() === true : false;
+        el.querySelectorAll('[data-fetes]').forEach(function (b) { b.setAttribute('aria-checked', String((b.getAttribute('data-fetes') === 'off') === off)); });
+      }
     }
     function say(s, tone) { msg.textContent = s; msg.className = 'look-msg' + (tone ? ' is-' + tone : ''); }
     function choose(patch) {
-      l = clean(Object.assign({}, l, patch));
+      l = Object.assign({}, l, patch);
+      if (patch.fetes === null) delete l.fetes;
+      l = clean(l);
       set(l, k);
       sync();
       say('');
@@ -214,6 +231,7 @@
         say(_t('Enregistrement…'));
         var out = { mode: l.mode, accent: l.accent };
         if (l.rainbow) out.rainbow = true;
+        if (l.fetes === false) out.fetes = false;
         Promise.resolve(opts.save(out)).then(function (r) {
           if (r && r.error) say(_t('Non enregistré — réessaie.'), 'bad'); else say(_t('Enregistré ✓'), 'ok');
         }, function () { say(_t('Non enregistré — réessaie.'), 'bad'); });
@@ -224,6 +242,11 @@
       if (!b || !el.contains(b)) return;
       if (b.hasAttribute('data-mode')) choose({ mode: b.getAttribute('data-mode') });
       else if (b.hasAttribute('data-accent')) choose({ accent: b.getAttribute('data-accent') });
+      else if (b.hasAttribute('data-fetes')) {
+        var offNow = b.getAttribute('data-fetes') === 'off';
+        if (window.CA && window.CA.fetesChoice) window.CA.fetesChoice.set(offNow);
+        choose({ fetes: offNow ? false : null });
+      }
       else if (b === reset) choose(DEF);
       else if (b === love) unlock();
     });
@@ -248,11 +271,22 @@
       e.preventDefault(); n.focus(); n.click();
     });
     sync();
+    // le choix fait sur cet appareil (bandeau, pied de page) l'emporte sur la copie du compte
+    var chd = opts.fetes && window.CA && window.CA.fetesChoice;
+    if (chd && chd.stored() !== null && chd.stored() !== (l.fetes === false)) choose({ fetes: chd.stored() ? false : null });
+    window.addEventListener('ca-fetes-choice', function () {
+      if (!el.isConnected) return;
+      var c = window.CA && window.CA.fetesChoice;
+      if (opts.fetes && c && c.stored() !== null && (c.stored() === true) !== (l.fetes === false)) choose({ fetes: c.stored() ? false : null }); else sync();
+    });
   }
 
   /* ---- API ---- */
   function set(v, k) {
     if (!v) { cur = null; } else { cur = clean(v); cur.k = KEYS[k] ? k : 'c'; }
+    // nouvel appareil : le refus du compte s'applique tant que rien n'a été choisi ici
+    var ch = window.CA && window.CA.fetesChoice;
+    if (v && v.fetes === false && ch && ch.stored() === null) ch.set(true, true);
     store(); apply();
   }
   window.caLook = {

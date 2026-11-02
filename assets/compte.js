@@ -279,7 +279,7 @@
   }
   function mountLook() {
     lookMounted = true;
-    window.caLook.mount($('#acct-look'), { k: 'c', initial: myLook, save: function (l) {
+    window.caLook.mount($('#acct-look'), { k: 'c', fetes: true, initial: myLook, save: function (l) {
       myLook = l;
       return sb.auth.updateUser({ data: { look: l } });
     } });

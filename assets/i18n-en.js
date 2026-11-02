@@ -836,6 +836,15 @@ window.CA_EN = (function (pairs) {
   [`Couper la neige`, `Stop the snow`],
   [`Faire neiger`, `Let it snow`],
   [`Neige`, `Snow`],
+  // ---- nav.js : choix du thème des fêtes (bandeau, pied de page) + look.js
+  [`Thème des fêtes`, `Holiday theme`],
+  [`Thème des fêtes activé`, `Holiday theme on`],
+  [`Garder`, `Keep`],
+  [`Thème normal`, `Normal theme`],
+  [`Désactiver le thème des fêtes`, `Turn off the holiday theme`],
+  [`Activer le thème des fêtes`, `Turn on the holiday theme`],
+  [`Activé`, `On`],
+  [`Désactivé`, `Off`],
   // ---- look.js : onglet Apparence (Mon compte, portail dealer)
   [`Apparence — Portail dealer · Création Audio`, `Appearance — Dealer portal · Création Audio`],
   [`Clair`, `Light`],
