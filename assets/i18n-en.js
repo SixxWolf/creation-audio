@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 15;
+window.CA_EN_V = 16;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -907,5 +907,10 @@ window.CA_EN = (function (pairs) {
   [`Remplis la ville et tes machines.`, `Fill in the city and your machines.`],
   [`Bonjour, je veux un entretien mensuel de mes imprimantes.`, `Hello, I would like monthly maintenance for my printers.`],
   [`Ville ou secteur :`, `City or area:`],
-  [`Machines :`, `Machines:`]
+  [`Machines :`, `Machines:`],
+  [`Bambu Lab A1`, `Bambu Lab A1`],
+  [`Bambu Lab série X / P`, `Bambu Lab X / P series`],
+  [`Snapmaker U1`, `Snapmaker U1`],
+  [`+ {n} machine sur évaluation`, `+ {n} machine to be assessed`],
+  [`+ {n} machines sur évaluation`, `+ {n} machines to be assessed`]
 ]);

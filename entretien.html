@@ -31,9 +31,10 @@
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=12">
 <link rel="stylesheet" href="assets/accueil.css?v=23">
-<link rel="stylesheet" href="assets/entretien.css?v=4">
+<link rel="stylesheet" href="assets/entretien.css?v=8">
 <link rel="stylesheet" href="assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
+<script>if(window.IntersectionObserver)document.documentElement.classList.add('en-js')</script>
 <script src="assets/look.js?v=5"></script>
 <script src="assets/i18n.js?v=1"></script>
 </head>
@@ -71,86 +72,182 @@
 
 <main id="main">
 
-<!-- ======================= HÉROS ======================= -->
+<!-- ======================= HÉROS : le parc qui s'allume ======================= -->
 <section class="en-hero">
   <div class="wrap en-hero-grid">
     <div class="en-hero-tx">
-      <p class="eyebrow">Entretien d'imprimantes</p>
-      <h1 class="en-title">Ton parc propre, graissé, <span class="en-hl">prêt à imprimer.</span></h1>
-      <p class="en-lead">Une visite chaque mois, à prix fixe par machine. Tu imprimes, on s'occupe du reste.</p>
-      <div class="hero-cta">
+      <p class="eyebrow en-in" style="--d:0">Entretien d'imprimantes</p>
+      <h1 class="en-title en-in" style="--d:1">Ton parc propre, graissé, <span class="en-hl">prêt à imprimer.</span></h1>
+      <p class="en-lead en-in" style="--d:2">Une visite chaque mois, à prix fixe par machine. Tu imprimes, on s'occupe du reste.</p>
+      <div class="hero-cta en-in" style="--d:3">
         <a class="btn btn-ember btn-lg" href="#demande">Demander un entretien
           <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
         <a class="btn btn-ghost btn-lg" href="#tarifs">Voir les tarifs</a>
       </div>
+      <ul class="en-chips en-in" style="--d:4" aria-label="Ce qui est inclus">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Nettoyage complet</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Lubrification des axes</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Produits inclus</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Constats notés</li>
+      </ul>
     </div>
-    <ul class="en-checks" aria-label="Ce qui est inclus">
-      <li><span class="en-ck" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><b>Nettoyage complet</b><small>Plateau, buse, zone de purge, extérieur</small></li>
-      <li><span class="en-ck" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><b>Lubrification des axes</b><small>Rails, tiges et vis, au bon produit</small></li>
-      <li><span class="en-ck" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><b>Produits inclus</b><small>Alcool, graisse, huile, essuie-tout</small></li>
-      <li><span class="en-ck" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><b>Constats notés</b><small>On te signale ce qui s'use</small></li>
-    </ul>
+
+    <div class="en-park en-in" style="--d:2" id="en-park" aria-hidden="true">
+      <div class="en-park-head">
+        <span class="en-park-t">Ton parc</span>
+        <span class="en-count"><b id="en-n">4</b><span>/ 4 prêtes à imprimer</span></span>
+      </div>
+      <span class="en-bar"><i id="en-bar-f"></i></span>
+      <div class="en-tiles">
+        <figure class="en-tile is-clean" style="--k:.45; --f:0s">
+          <span class="en-tile-img"><img src="assets/entretien/a1.webp" alt="" width="700" height="700" decoding="async"><i class="en-sweep"></i>
+            <svg class="en-glint" viewBox="0 0 24 24"><path d="M12 1.5c.7 5.6 2.9 7.8 8.5 8.5-5.6.7-7.8 2.9-8.5 8.5-.7-5.6-2.9-7.8-8.5-8.5 5.6-.7 7.8-2.9 8.5-8.5z" fill="currentColor"/></svg></span>
+          <figcaption><b>A1</b><span class="en-st"><span class="en-st-w">En attente</span><span class="en-st-o">Entretenue</span></span></figcaption>
+        </figure>
+        <figure class="en-tile is-clean" style="--k:.9; --f:-1.4s">
+          <span class="en-tile-img"><img src="assets/entretien/p2s.webp" alt="" width="700" height="700" decoding="async"><i class="en-sweep"></i>
+            <svg class="en-glint" viewBox="0 0 24 24"><path d="M12 1.5c.7 5.6 2.9 7.8 8.5 8.5-5.6.7-7.8 2.9-8.5 8.5-.7-5.6-2.9-7.8-8.5-8.5 5.6-.7 7.8-2.9 8.5-8.5z" fill="currentColor"/></svg></span>
+          <figcaption><b>P2S</b><span class="en-st"><span class="en-st-w">En attente</span><span class="en-st-o">Entretenue</span></span></figcaption>
+        </figure>
+        <figure class="en-tile is-clean" style="--k:.7; --f:-2.6s">
+          <span class="en-tile-img"><img src="assets/entretien/p1s.webp" alt="" width="700" height="700" decoding="async"><i class="en-sweep"></i>
+            <svg class="en-glint" viewBox="0 0 24 24"><path d="M12 1.5c.7 5.6 2.9 7.8 8.5 8.5-5.6.7-7.8 2.9-8.5 8.5-.7-5.6-2.9-7.8-8.5-8.5 5.6-.7 7.8-2.9 8.5-8.5z" fill="currentColor"/></svg></span>
+          <figcaption><b>P1S</b><span class="en-st"><span class="en-st-w">En attente</span><span class="en-st-o">Entretenue</span></span></figcaption>
+        </figure>
+        <figure class="en-tile is-clean" style="--k:1.1; --f:-3.8s">
+          <span class="en-tile-img"><img src="assets/entretien/x2d.webp" alt="" width="700" height="700" decoding="async"><i class="en-sweep"></i>
+            <svg class="en-glint" viewBox="0 0 24 24"><path d="M12 1.5c.7 5.6 2.9 7.8 8.5 8.5-5.6.7-7.8 2.9-8.5 8.5-.7-5.6-2.9-7.8-8.5-8.5 5.6-.7 7.8-2.9 8.5-8.5z" fill="currentColor"/></svg></span>
+          <figcaption><b>X2D</b><span class="en-st"><span class="en-st-w">En attente</span><span class="en-st-o">Entretenue</span></span></figcaption>
+        </figure>
+      </div>
+    </div>
   </div>
 </section>
 
-<!-- ======================= TARIFS ======================= -->
-<section class="sec sec-wash" id="tarifs" aria-labelledby="en-tarifs-t">
+<!-- ======================= TARIFS + CALCULATEUR (bande sombre) ======================= -->
+<section class="en-dark" id="tarifs" aria-labelledby="en-tarifs-t">
+  <div class="en-dark-bg" aria-hidden="true"><i class="en-blob b1"></i><i class="en-blob b2"></i></div>
+  <div class="wrap en-calc-grid">
+    <div class="en-calc-tx rv">
+      <p class="eyebrow">Tarifs</p>
+      <h2 id="en-tarifs-t">Un prix par machine, par mois.</h2>
+      <p class="en-dark-sub">Même prix que tu aies une machine ou cent. Aucune taxe ajoutée.</p>
+      <p class="en-note">Pièces et dépannage en sus, sur accord préalable. <a href="conditions.html#entretien">Détails</a></p>
+    </div>
+
+    <div class="en-calc rv" id="en-calc" style="--d:1">
+      <ul class="en-models">
+        <li class="en-model" data-model="a1" data-price="25" data-qty="3">
+          <span class="en-ph"><img src="assets/entretien/a1.webp" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
+          <span class="en-pm"><b>Bambu Lab A1</b><small><b class="en-unit" data-price="25">25 $</b> par machine</small></span>
+          <span class="en-stepper" role="group" aria-label="Nombre de machines">
+            <button type="button" class="en-minus" aria-label="Moins">−</button><output class="en-qty">3</output><button type="button" class="en-plus" aria-label="Plus">+</button>
+          </span>
+        </li>
+        <li class="en-model" data-model="xp" data-qty="0">
+          <span class="en-ph en-ph-3"><img src="assets/entretien/p2s.webp" alt="" width="72" height="72" loading="lazy" decoding="async"><img src="assets/entretien/p1s.webp" alt="" width="72" height="72" loading="lazy" decoding="async"><img src="assets/entretien/x2d.webp" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
+          <span class="en-pm"><b>Bambu Lab série X / P (X1C, P1S, P2S, X2D)</b><small>Sur évaluation</small></span>
+          <span class="en-stepper" role="group" aria-label="Nombre de machines">
+            <button type="button" class="en-minus" aria-label="Moins">−</button><output class="en-qty">0</output><button type="button" class="en-plus" aria-label="Plus">+</button>
+          </span>
+        </li>
+        <li class="en-model" data-model="snap" data-qty="0">
+          <span class="en-pm"><b>Snapmaker U1</b><small>Sur évaluation</small></span>
+          <span class="en-stepper" role="group" aria-label="Nombre de machines">
+            <button type="button" class="en-minus" aria-label="Moins">−</button><output class="en-qty">0</output><button type="button" class="en-plus" aria-label="Plus">+</button>
+          </span>
+        </li>
+      </ul>
+      <div class="en-total" aria-live="polite">
+        <div class="en-total-row">
+          <span class="en-total-l">Total par mois</span>
+          <span class="en-total-v"><b id="en-total">75 $</b></span>
+        </div>
+        <p class="en-extra" id="en-extra" hidden></p>
+        <p class="en-other">Autre modèle ? On regarde ensemble.</p>
+        <button class="btn btn-ember btn-lg en-go" type="button" id="en-calc-go">Demander cet entretien
+          <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= PENDANT LA VISITE ======================= -->
+<section class="sec" id="visite" aria-labelledby="en-visite-t">
   <div class="wrap">
-    <header class="sec-head">
+    <header class="sec-head is-center rv">
       <div>
-        <p class="eyebrow">Tarifs</p>
-        <h2 id="en-tarifs-t">Un prix par machine, par mois.</h2>
-        <p class="sec-sub">Même prix que tu aies une machine ou cent. Aucune taxe ajoutée.</p>
+        <p class="eyebrow">Pendant la visite</p>
+        <h2 id="en-visite-t">Tout ce qu'on fait sur tes machines.</h2>
       </div>
     </header>
-    <ul class="en-prices" id="en-prices">
-      <li class="en-price" data-model="a1">
-        <span class="en-ph"><img src="assets/entretien/a1.webp" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
-        <span class="en-pm"><b>Bambu Lab A1</b><small>Par machine, par mois</small></span>
-        <span class="en-pv"><b data-price="25">25 $</b></span>
+    <ul class="en-zones">
+      <li class="en-zone rv" style="--d:0">
+        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13 3 17h18l-2-4z"/><rect x="3" y="17" width="18" height="3" rx="1"/><path d="M9 9.5h.01M13 7.5h.01M16 10h.01"/></svg></span>
+        <h3>Plateau</h3>
+        <p>Nettoyé à l'alcool isopropylique.</p>
+        <i class="en-shine" aria-hidden="true"></i>
       </li>
-      <li class="en-price" data-model="xp">
-        <span class="en-ph en-ph-3"><img src="assets/entretien/p2s.webp" alt="" width="72" height="72" loading="lazy" decoding="async"><img src="assets/entretien/p1s.webp" alt="" width="72" height="72" loading="lazy" decoding="async"><img src="assets/entretien/x2d.webp" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
-        <span class="en-pm"><b>Bambu Lab série X / P (X1C, P1S, P2S, X2D)</b><small>Fermées, avec chambre</small></span>
-        <span class="en-pv en-eval">Sur évaluation</span>
+      <li class="en-zone rv" style="--d:1">
+        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8v5l-2.5 4h-3L8 8z"/><path d="M12 15.5c-1.2 1.4-1.6 2.3-1.6 3a1.6 1.6 0 0 0 3.2 0c0-.7-.4-1.6-1.6-3z"/></svg></span>
+        <h3>Buse et zone de purge</h3>
+        <p>Résidus retirés, zone de purge vidée.</p>
+        <i class="en-shine" aria-hidden="true"></i>
       </li>
-      <li class="en-price" data-model="snap">
-        <span class="en-pm"><b>Snapmaker U1</b><small>Changeur de 4 têtes</small></span>
-        <span class="en-pv en-eval">Sur évaluation</span>
+      <li class="en-zone rv" style="--d:2">
+        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18M3 16h18"/><rect x="7" y="5.5" width="5" height="5" rx="1"/><rect x="13" y="13.5" width="5" height="5" rx="1"/></svg></span>
+        <h3>Rails et tiges</h3>
+        <p>Nettoyés puis lubrifiés au bon produit.</p>
+        <small class="en-zn">Tiges en carbone des séries X et P : alcool seulement.</small>
+        <i class="en-shine" aria-hidden="true"></i>
       </li>
-      <li class="en-price" data-model="other">
-        <span class="en-pm"><b>Autre modèle</b><small>On regarde ensemble</small></span>
-        <span class="en-pv en-eval">Sur demande</span>
+      <li class="en-zone rv" style="--d:3">
+        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M7.5 6.5 16.5 8M7.5 10.5 16.5 12M7.5 14.5 16.5 16M7.5 18.5 16.5 20" transform="translate(0 -1.5)"/></svg></span>
+        <h3>Vis de l'axe Z</h3>
+        <p>Graissées à la graisse au lithium blanc.</p>
+        <i class="en-shine" aria-hidden="true"></i>
+      </li>
+      <li class="en-zone rv" style="--d:4">
+        <span class="en-zi en-zi-fan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1.7"/><path id="en-blade" d="M12 10.3C11.2 6.4 12.8 3.6 15 4.6c1.7.8.7 4.3-2.2 6z"/><use href="#en-blade" transform="rotate(120 12 12)"/><use href="#en-blade" transform="rotate(240 12 12)"/></svg></span>
+        <h3>Ventilateurs</h3>
+        <p>Dépoussiérés en douceur.</p>
+        <i class="en-shine" aria-hidden="true"></i>
+      </li>
+      <li class="en-zone rv" style="--d:5">
+        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3h6v1.5"/><path d="m9 13 2.2 2.2L15.5 11"/></svg></span>
+        <h3>Extérieur et constats</h3>
+        <p>Essuyé, et tout ce qui s'use est noté pour toi.</p>
+        <i class="en-shine" aria-hidden="true"></i>
       </li>
     </ul>
-    <p class="en-note">Pièces et dépannage en sus, sur accord préalable. <a href="conditions.html#entretien">Détails</a></p>
   </div>
 </section>
 
 <!-- ======================= COMMENT ÇA SE PASSE ======================= -->
-<section class="sec" id="etapes" aria-labelledby="en-etapes-t">
+<section class="sec sec-wash" id="etapes" aria-labelledby="en-etapes-t">
   <div class="wrap">
-    <header class="sec-head is-center">
+    <header class="sec-head is-center rv">
       <div>
         <p class="eyebrow">Comment ça se passe</p>
         <h2 id="en-etapes-t">Trois étapes.</h2>
       </div>
     </header>
-    <ol class="steps">
-      <li class="step">
+    <ol class="steps en-steps">
+      <li class="step" style="--d:0">
         <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 5.5h16v10.5H9l-5 3.5z"/><path d="M8 9.5h8M8 12.5h5"/></svg></span>
         <span class="step-n">1</span>
         <h3>Tu nous écris</h3>
         <p>Ta ville et les modèles de tes machines. C'est tout.</p>
       </li>
-      <li class="step">
+      <li class="step" style="--d:1">
         <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
         <span class="step-n">2</span>
         <h3>On confirme</h3>
         <p>Le prix, le déplacement et la date de la première visite.</p>
       </li>
-      <li class="step">
+      <li class="step" style="--d:2">
         <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></span>
         <span class="step-n">3</span>
         <h3>On passe chaque mois</h3>
@@ -160,16 +257,64 @@
   </div>
 </section>
 
+<!-- ======================= GALERIE : masquée tant qu'il n'y a pas de photos =======================
+     Pour l'activer : retirer l'attribut hidden de la section et ajouter des <li><img src="assets/entretien/galerie/xxx.webp" alt="…"></li> dans la liste. -->
+<section class="sec" id="galerie" aria-labelledby="en-galerie-t" hidden>
+  <div class="wrap">
+    <header class="sec-head is-center rv">
+      <div>
+        <p class="eyebrow">Sur le terrain</p>
+        <h2 id="en-galerie-t">Une visite en images.</h2>
+      </div>
+    </header>
+    <ul class="en-gal"></ul>
+  </div>
+</section>
+
+<!-- ======================= QUESTIONS ======================= -->
+<section class="sec" id="faq" aria-labelledby="en-faq-t">
+  <div class="wrap en-faq-wrap">
+    <header class="sec-head is-center rv">
+      <div>
+        <p class="eyebrow">Questions</p>
+        <h2 id="en-faq-t">Ce qu'on nous demande souvent.</h2>
+      </div>
+    </header>
+    <div class="en-faq">
+      <details class="en-fq rv" style="--d:0">
+        <summary>Combien de temps dure une visite ?</summary>
+        <p>Ça dépend du nombre de machines. À la confirmation, on te donne une durée estimée.</p>
+      </details>
+      <details class="en-fq rv" style="--d:1">
+        <summary>Qu'est-ce qui est inclus dans le prix ?</summary>
+        <p>Le nettoyage, la lubrification, les produits et un constat de ce qui s'use. Le dépannage et les pièces sont en sus, avec ton accord préalable.</p>
+      </details>
+      <details class="en-fq rv" style="--d:2">
+        <summary>Et si une pièce est usée ?</summary>
+        <p>On te le signale. Rien n'est remplacé ni facturé sans ton accord.</p>
+      </details>
+      <details class="en-fq rv" style="--d:3">
+        <summary>Quel secteur est desservi ?</summary>
+        <p>La ville de Québec, ses environs et la Rive-Sud. Le déplacement est confirmé selon ton adresse.</p>
+      </details>
+      <details class="en-fq rv" style="--d:4">
+        <summary>Mon modèle n'est pas dans la liste.</summary>
+        <p>Écris-nous : on regarde ensemble ce qu'on peut faire pour ta machine.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
 <!-- ======================= DEMANDE ======================= -->
 <section class="sec sec-wash" id="demande" aria-labelledby="en-demande-t">
   <div class="wrap en-join">
-    <div class="en-join-tx">
+    <div class="en-join-tx rv">
       <p class="eyebrow">Demander un entretien</p>
       <h2 id="en-demande-t">Dis-nous ce que tu as.</h2>
       <p class="sec-sub">Secteur desservi : la ville de Québec, ses environs et la Rive-Sud. Le déplacement est confirmé selon ton adresse.</p>
       <p class="en-q">Une question ? <a class="ask" href="/compte.html#/messages" data-msg="Entretien d'imprimantes">Écris-nous</a></p>
     </div>
-    <form class="en-form" id="en-form" novalidate>
+    <form class="en-form rv" style="--d:1" id="en-form" novalidate>
       <label class="en-field"><span>Ville ou secteur</span>
         <input name="city" id="en-city" required maxlength="120" autocomplete="address-level2" placeholder="ex. Lévis"></label>
       <label class="en-field"><span>Tes machines</span>
@@ -261,6 +406,6 @@
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=16"></script>
 <script src="assets/promo.js?v=1"></script>
-<script src="assets/entretien.js?v=2"></script>
+<script src="assets/entretien.js?v=3"></script>
 </body>
 </html>
