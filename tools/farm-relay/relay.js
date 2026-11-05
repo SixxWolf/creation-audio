@@ -89,6 +89,42 @@ async function push() {
   finally { pushing = false; }
 }
 
+// Caméra des A1/P1 : flux JPEG propriétaire (TLS, port 6000), converti en MJPEG pour un <img> du navigateur.
+// Serveur lié à 127.0.0.1 seulement (jamais au réseau), sans en-tête CORS ; connexion à l'imprimante ouverte
+// seulement tant qu'un navigateur regarde (elle n'accepte que peu de clients à la fois).
+const CAM_PORT = 1985;
+function camAuth(code) {
+  const h = Buffer.alloc(80);
+  h.writeUInt32LE(0x40, 0); h.writeUInt32LE(0x3000, 4);
+  h.write('bblp', 16); h.write(code, 48);
+  return h;
+}
+const camPrinters = printers.filter((p) => /^mjpeg:/.test(p.cam || ''));
+if (camPrinters.length) {
+  require('http').createServer((req, res) => {
+    const m = /^\/cam\/([\w-]+)\.mjpg$/.exec(req.url.split('?')[0]);
+    const p = m && camPrinters.find((x) => x.cam === 'mjpeg:' + m[1]);
+    if (!p) { res.writeHead(404); return res.end(); }
+    const s = require('tls').connect({ host: p.ip, port: 6000, rejectUnauthorized: false }, () => s.write(camAuth(p.code)));
+    let buf = Buffer.alloc(0), started = false;
+    const end = () => { s.destroy(); res.end(); };
+    s.on('data', (d) => {
+      buf = Buffer.concat([buf, d]);
+      while (buf.length >= 16) {
+        const size = buf.readUInt32LE(0);
+        if (size > 4 * 1024 * 1024) return end();             // flux incohérent
+        if (buf.length < 16 + size) break;
+        const jpg = buf.subarray(16, 16 + size); buf = buf.subarray(16 + size);
+        if (jpg[0] !== 0xff || jpg[1] !== 0xd8) continue;      // pas une image (réponse d'erreur)
+        if (!started) { started = true; res.writeHead(200, { 'Content-Type': 'multipart/x-mixed-replace; boundary=frame', 'Cache-Control': 'no-store' }); }
+        res.write(`--frame\r\nContent-Type: image/jpeg\r\nContent-Length: ${jpg.length}\r\n\r\n`); res.write(jpg); res.write('\r\n');
+      }
+    });
+    s.on('error', end); s.on('close', () => res.end()); s.setTimeout(15000, end);
+    res.on('close', () => s.destroy());
+  }).listen(CAM_PORT, '127.0.0.1', () => log('caméras JPEG sur 127.0.0.1:' + CAM_PORT));
+}
+
 printers.forEach(connect);
 setInterval(push, PUSH_EVERY);
 log('relais démarré —', printers.map((p) => p.name).join(', '));

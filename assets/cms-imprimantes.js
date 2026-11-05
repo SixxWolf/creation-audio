@@ -19,6 +19,7 @@
   }
 
   var GO2RTC = 'http://127.0.0.1:1984';
+  var RELAY = 'http://127.0.0.1:1985';   // relais : caméras JPEG des A1/P1
   var POLL = 3000;           // ms entre deux lectures
   var RELAY_STALE = 45000;   // ms sans nouvelle du relais = relais éteint
 
@@ -50,7 +51,9 @@
 
   // Disponibilité du flux go2rtc (seulement depuis le PC de l'atelier) — testée une fois, retestée au retour sur l'onglet
   function probeCam() {
-    return fetch(GO2RTC + '/api/streams', { mode: 'cors' }).then(function (r) { return r.ok; }, function () { return false; });
+    // no-cors : la réponse est opaque (aucune lecture), on sait seulement si le PC répond — aucune autorisation CORS à donner
+    var ping = function (url) { return fetch(url, { mode: 'no-cors' }).then(function () { return true; }, function () { return false; }); };
+    return Promise.all([ping(GO2RTC + '/api/streams'), ping(RELAY + '/')]).then(function (r) { return { g: r[0], r: r[1] }; });
   }
 
   function makeCard(p) {
@@ -78,13 +81,20 @@
   function attachCam(el, p) {
     var box = $('.fm-cam', el);
     if (!p.cam_src) return;
-    if (camOk && !el._cam) {
-      var f = document.createElement('iframe');
-      f.className = 'fm-frame'; f.setAttribute('loading', 'lazy'); f.setAttribute('title', 'Caméra ' + p.name);
-      f.setAttribute('allow', 'autoplay; fullscreen');
-      f.src = GO2RTC + '/stream.html?src=' + encodeURIComponent(p.cam_src) + '&mode=mse';
+    // « mjpeg:ID » = A1/P1 (flux JPEG converti par le relais) ; sinon flux go2rtc (P2S, X1…)
+    var jpeg = /^mjpeg:/.test(p.cam_src), ok = !!camOk && (jpeg ? camOk.r : camOk.g);
+    if (ok && !el._cam) {
+      var f;
+      if (jpeg) {
+        f = document.createElement('img'); f.alt = 'Caméra ' + p.name;
+        f.src = RELAY + '/cam/' + encodeURIComponent(p.cam_src.slice(6)) + '.mjpg';
+      } else {
+        f = document.createElement('iframe'); f.setAttribute('allow', 'autoplay; fullscreen');
+        f.src = GO2RTC + '/stream.html?src=' + encodeURIComponent(p.cam_src) + '&mode=mse';
+      }
+      f.className = 'fm-frame'; f.setAttribute('title', 'Caméra ' + p.name);
       box.appendChild(f); el._cam = true; box.classList.add('is-on');
-    } else if (!camOk && el._cam) {
+    } else if (!ok && el._cam) {
       var old = $('.fm-frame', box); if (old) old.remove();
       el._cam = false; box.classList.remove('is-on');
     }
