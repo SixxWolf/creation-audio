@@ -342,3 +342,58 @@
     });
   }).then(null, function () {});
 })();
+
+/* ---- Compteur de visites maison (Statistiques › Visites de l'admin) ----
+   Compteurs agrégés par jour dans Supabase (RPC track_visit) : page, langue, appareil, provenance générale.
+   Aucun témoin, aucune IP, aucun identifiant gardé. Deux repères locaux sans donnée personnelle :
+   sessionStorage ca-v (visite en cours, effacé à la fermeture de l'onglet) et localStorage ca-vd (date du dernier
+   jour compté, pour approximer les visiteurs du jour). Rien n'est compté si « Do Not Track », robot, localhost,
+   ou si ce navigateur est exclu (localStorage ca-notrack, posé par l'admin ou par ?notrack=1 ; ?notrack=0 l'enlève). */
+(function () {
+  'use strict';
+  try {
+    var n = navigator, ls = window.localStorage, ss = window.sessionStorage;
+    var q = /[?&]notrack=([01])/.exec(location.search);
+    if (q) { if (q[1] === '1') ls.setItem('ca-notrack', '1'); else ls.removeItem('ca-notrack'); }
+    if (ls.getItem('ca-notrack') || n.doNotTrack === '1' || window.doNotTrack === '1' || n.webdriver) return;
+    if (/bot|crawl|spider|slurp|headless|lighthouse|preview|facebookexternalhit|monitor/i.test(n.userAgent || '')) return;
+    if (/^(localhost|127\.|\[::1\]|.*\.localhost$)/.test(location.hostname) || /coulisses/.test(location.pathname)) return;
+    var CA = window.CA = window.CA || {};
+    if (!window.fetch || !CA.supaCfg) return;
+
+    var path = location.pathname.replace(/\/index\.html$/, '/').replace(/\.html$/, '');
+    var lang = 'fr';
+    if (/^\/en(\/|$)/.test(path)) { lang = 'en'; path = path.replace(/^\/en/, '') || '/'; }
+    if (path.charAt(0) !== '/') path = '/' + path;
+    var device = (/Mobi|Android|iPhone|iPad/i.test(n.userAgent || '') || window.innerWidth < 760) ? 'mobile' : 'desktop';
+
+    var host = '';
+    try { host = document.referrer ? new URL(document.referrer).hostname.replace(/^www\./, '') : ''; } catch (e) {}
+    var source = !host ? 'direct' : host === location.hostname.replace(/^www\./, '') ? 'interne'
+      : /(^|\.)google\./.test(host) ? 'google' : /(^|\.)bing\.com$/.test(host) ? 'bing'
+      : /(^|\.)duckduckgo\.com$/.test(host) ? 'duckduckgo'
+      : /(^|\.)(facebook\.com|fb\.com|messenger\.com|l\.facebook\.com)$/.test(host) ? 'facebook'
+      : /(^|\.)instagram\.com$/.test(host) ? 'instagram' : /(^|\.)(youtube\.com|youtu\.be)$/.test(host) ? 'youtube'
+      : /(^|\.)reddit\.com$/.test(host) ? 'reddit' : 'autre';
+
+    var newVisit = false, newVisitor = false, d0 = new Date(), today = d0.getFullYear() + '-' + (d0.getMonth() + 1) + '-' + d0.getDate();
+    try { if (!ss.getItem('ca-v')) { ss.setItem('ca-v', '1'); newVisit = true; } } catch (e) {}
+    try { if (ls.getItem('ca-vd') !== today) { ls.setItem('ca-vd', today); newVisitor = true; } } catch (e) {}
+    // le premier chargement d'une visite garde sa vraie provenance ; les suivants (même visite) sont « interne »
+    if (!newVisit && source !== 'interne') source = 'interne';
+
+    var send = function () {
+      CA.supaCfg().then(function (c) {
+        if (!c) return;
+        return fetch(c.url + '/rest/v1/rpc/track_visit', {
+          method: 'POST', keepalive: true,
+          headers: { apikey: c.anonKey, Authorization: 'Bearer ' + c.anonKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_path: path, p_lang: lang, p_device: device, p_source: source,
+                                 p_new_visit: newVisit, p_new_visitor: newVisitor })
+        });
+      }).then(null, function () {});
+    };
+    if (document.readyState === 'complete') setTimeout(send, 400);
+    else window.addEventListener('load', function () { setTimeout(send, 400); });
+  } catch (e) {}
+})();

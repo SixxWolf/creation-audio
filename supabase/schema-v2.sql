@@ -3991,6 +3991,89 @@ revoke all on function public.printer_push(text, jsonb) from public;
 grant execute on function public.printer_push(text, jsonb) to anon, authenticated;
 
 -- ------------------------------------------------------------
+-- VISITES DU SITE (Statistiques › Visites) — compteurs agrégés, sans témoin, sans IP, sans identifiant
+-- Le site public (assets/nav.js) appelle la RPC track_visit à chaque page ; une ligne = un jour × une page
+-- × langue × appareil × provenance (des compteurs, jamais un visiteur). L'admin lit par site_stats_summary.
+-- Garde-fous : chemin validé, au plus ~1500 lignes par jour (le surplus tombe dans « /autre »).
+-- ------------------------------------------------------------
+create table if not exists public.site_stats (
+  day      date not null,
+  path     text not null,
+  lang     text not null default 'fr',
+  device   text not null default 'desktop',
+  source   text not null default 'direct',
+  views    int  not null default 0,
+  visits   int  not null default 0,
+  visitors int  not null default 0,
+  primary key (day, path, lang, device, source)
+);
+alter table public.site_stats enable row level security;
+drop policy if exists site_stats_admin_read on public.site_stats;
+create policy site_stats_admin_read on public.site_stats for select to authenticated
+  using ( (select public.is_admin()) );
+revoke all on public.site_stats from anon;
+
+create or replace function public.track_visit(
+  p_path text, p_lang text, p_device text, p_source text, p_new_visit boolean, p_new_visitor boolean)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  d   date := (now() at time zone 'America/Toronto')::date;
+  v_p text := coalesce(p_path, '/');
+  v_l text := case when p_lang = 'en' then 'en' else 'fr' end;
+  v_d text := case when p_device = 'mobile' then 'mobile' else 'desktop' end;
+  v_s text := case when p_source in ('direct','interne','google','bing','duckduckgo','facebook','instagram','youtube','reddit')
+                   then p_source else 'autre' end;
+begin
+  if v_p !~ '^/[A-Za-z0-9/_.-]{0,100}$' then v_p := '/autre'; end if;
+  if v_p <> '/autre'
+     and not exists (select 1 from public.site_stats where day = d and path = v_p)
+     and (select count(*) from public.site_stats where day = d) > 1500 then
+    v_p := '/autre';
+  end if;
+  insert into public.site_stats (day, path, lang, device, source, views, visits, visitors)
+  values (d, v_p, v_l, v_d, v_s, 1, case when p_new_visit then 1 else 0 end, case when p_new_visitor then 1 else 0 end)
+  on conflict (day, path, lang, device, source) do update
+    set views    = public.site_stats.views + 1,
+        visits   = public.site_stats.visits + excluded.visits,
+        visitors = public.site_stats.visitors + excluded.visitors;
+end $$;
+revoke all on function public.track_visit(text, text, text, text, boolean, boolean) from public;
+grant execute on function public.track_visit(text, text, text, text, boolean, boolean) to anon, authenticated;
+
+create or replace function public.site_stats_summary(p_from date, p_to date)
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not (select public.is_admin()) then
+    raise exception 'admin seulement' using errcode = '42501';
+  end if;
+  return jsonb_build_object(
+    'days', coalesce((select jsonb_agg(x order by x.day) from (
+        select day, sum(views)::int as views, sum(visits)::int as visits, sum(visitors)::int as visitors
+        from public.site_stats where day between p_from and p_to group by day) x), '[]'::jsonb),
+    'pages', coalesce((select jsonb_agg(x) from (
+        select path, sum(views)::int as views, sum(visits)::int as visits
+        from public.site_stats where day between p_from and p_to
+        group by path order by sum(views) desc, path limit 12) x), '[]'::jsonb),
+    'sources', coalesce((select jsonb_agg(x) from (
+        select source, sum(visits)::int as visits
+        from public.site_stats where day between p_from and p_to
+        group by source having sum(visits) > 0 order by sum(visits) desc) x), '[]'::jsonb),
+    'devices', coalesce((select jsonb_agg(x) from (
+        select device, sum(visits)::int as visits
+        from public.site_stats where day between p_from and p_to
+        group by device having sum(visits) > 0 order by sum(visits) desc) x), '[]'::jsonb),
+    'langs', coalesce((select jsonb_agg(x) from (
+        select lang, sum(visits)::int as visits
+        from public.site_stats where day between p_from and p_to
+        group by lang having sum(visits) > 0 order by sum(visits) desc) x), '[]'::jsonb)
+  );
+end $$;
+revoke all on function public.site_stats_summary(date, date) from public, anon;
+grant execute on function public.site_stats_summary(date, date) to authenticated;
+
+-- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
 select count(*) as produits_v2 from public.products;

@@ -25,7 +25,7 @@
   var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', divers: 'Divers', mixte: 'Mixte' };
 
   var loaded = false, invoices = [], linesByInv = {}, periodDays = 30, periodMonth = '', prodInfo = {};
-  var bodyEl = $('#stat-body'), soldEl = $('#stat-sold'), refreshBtn = $('#stat-refresh'), monthSel = $('#stat-month');
+  var bodyEl = $('#stat-body'), soldEl = $('#stat-sold'), refreshBtn = $('#stat-refresh'), monthSel = $('#stat-month'), visEl = $('#stat-visits');
 
   // Groupes de produits (Top produits + onglet « Produits vendus »).
   // Divers / mixte -> « Autres » (affiché seulement s'il y a des ventes).
@@ -53,7 +53,7 @@
   // sous-onglets : Vue d'ensemble / Produits vendus (URL #statistiques/produits)
   var curSub = 'apercu';
   function showSub(sub) {
-    curSub = (sub === 'produits') ? 'produits' : 'apercu';
+    curSub = (sub === 'produits' || sub === 'visites') ? sub : 'apercu';
     $$('.stat-subtab').forEach(function (b) {
       var on = b.getAttribute('data-sub') === curSub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on));
@@ -62,6 +62,7 @@
     var both = !!(panelEl && panelEl.classList.contains('is-wide'));
     if (bodyEl) bodyEl.hidden = !both && (curSub !== 'apercu');
     if (soldEl) soldEl.hidden = !both && (curSub !== 'produits');
+    if (visEl) visEl.hidden = !both && (curSub !== 'visites');
   }
   var panelEl = bodyEl && bodyEl.closest('.tabpanel');
   if (panelEl) panelEl.addEventListener('ca:wide', function () { showSub(curSub); });
@@ -96,6 +97,7 @@
       $$('.stat-pbtn').forEach(function (x) { x.classList.toggle('is-active', x === b); });
       syncMonthSel();
       render();
+      loadVisits();
     });
   });
 
@@ -135,6 +137,7 @@
       $$('.stat-pbtn').forEach(function (x) { x.classList.remove('is-active'); });
       syncMonthSel();
       render();
+      loadVisits();
     });
     buildMonths();
   }
@@ -142,6 +145,7 @@
   function load() {
     bodyEl.innerHTML = '<p class="muted">Chargement…</p>';
     if (soldEl) soldEl.innerHTML = '<p class="muted">Chargement…</p>';
+    loadVisits();
     // couleurs des produits (pastilles) — en parallèle, non bloquant
     sb.from('products').select('id,type,hex,attrs').then(function (pr) {
       if (pr && !pr.error && pr.data) {
@@ -325,6 +329,113 @@
         '<span class="stat-toprev">' + money(p.rev) + '</span>' +
         '<span class="stat-topmargin ' + (m >= 0 ? 'pos' : 'neg') + '">marge ' + money(m) + '</span></div>' +
     '</div>';
+  }
+
+  // ---------- Visites : compteur maison (RPC site_stats_summary — schema-v2.sql, collecte dans nav.js) ----------
+  var SRC_LABEL = { direct: 'Direct', interne: 'Interne', google: 'Google', bing: 'Bing', duckduckgo: 'DuckDuckGo', facebook: 'Facebook',
+    instagram: 'Instagram', youtube: 'YouTube', reddit: 'Reddit', autre: 'Autre site' };
+  var DEV_LABEL = { mobile: 'Mobile', desktop: 'Ordinateur' };
+  var LANG_LABEL = { fr: 'Français', en: 'Anglais' };
+  var PAGE_LABEL = { '/': 'Accueil', '/boutique': 'Boutique', '/spacers': 'Spacers', '/compte': 'Mon compte', '/dealer': 'Portail dealer',
+    '/revendeur': 'Revendeurs', '/aide': 'Aide', '/conditions': 'Conditions', '/confidentialite': 'Confidentialité',
+    '/retours': 'Retours', '/autre': 'Autres pages' };
+  var visSeq = 0;
+  function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function parseYmd(s) { var p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function fmtShort(d) { return d.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' }); }
+  function num(n) { return (Number(n) || 0).toLocaleString('fr-CA'); }
+  function pageLabel(p) { return PAGE_LABEL[p] || (/^\/spacer\//.test(p) ? 'Spacer ' + p.slice(8) : p); }
+
+  function visRange() {
+    var now = new Date(), to = now, from = null;
+    if (periodMonth) {
+      var y = +periodMonth.slice(0, 4), m = +periodMonth.slice(5);
+      from = new Date(y, m - 1, 1); to = new Date(y, m, 0); if (to > now) to = now;
+    } else if (periodDays) {
+      from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - periodDays + 1);
+    }
+    return { from: from, to: to };
+  }
+
+  function loadVisits() {
+    if (!visEl) return;
+    var seq = ++visSeq, r = visRange();
+    visEl.innerHTML = '<p class="muted">Chargement…</p>';
+    sb.rpc('site_stats_summary', { p_from: ymd(r.from || new Date(2020, 0, 1)), p_to: ymd(r.to) }).then(function (res) {
+      if (seq !== visSeq) return;
+      if (res.error) { visEl.innerHTML = '<p class="empty">Impossible de charger les visites.<br>As-tu relancé <strong>schema-v2.sql</strong> ?</p>'; return; }
+      renderVisits(res.data || {}, r);
+    }, function () { if (seq === visSeq) visEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
+  }
+
+  function shareRows(list, key, labels) {
+    var sum = list.reduce(function (s, x) { return s + x.visits; }, 0);
+    if (!sum) return '<p class="muted stat-none">—</p>';
+    return list.map(function (x) {
+      var p = pct(x.visits, sum);
+      return '<div class="stat-catrow"><span class="stat-catname">' + esc(labels[x[key]] || x[key]) + '</span>' +
+        '<span class="stat-bar"><span class="stat-bar-fill" style="width:' + p + '%"></span></span>' +
+        '<span class="stat-catval">' + p + ' %</span></div>';
+    }).join('');
+  }
+
+  function renderVisits(d, r) {
+    var days = d.days || [];
+    if (!days.length) { visEl.innerHTML = '<div class="empty">Aucune visite sur cette période.</div>'; return; }
+    var tot = { visits: 0, views: 0, visitors: 0 }, byDay = {}, todayKey = ymd(new Date());
+    days.forEach(function (x) { tot.visits += x.visits; tot.views += x.views; tot.visitors += x.visitors; byDay[x.day] = x; });
+
+    // une valeur par jour (zéros compris) ; par semaine au-delà de 120 jours
+    var start = r.from || parseYmd(days[0].day), weekly = (r.to - start) / 86400000 > 120, series = [];
+    for (var cur = new Date(start.getFullYear(), start.getMonth(), start.getDate()); cur <= r.to; cur.setDate(cur.getDate() + 1)) {
+      var x = byDay[ymd(cur)] || { visits: 0, views: 0 };
+      if (weekly) {
+        var mon = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() - ((cur.getDay() + 6) % 7)), key = ymd(mon);
+        var last = series[series.length - 1];
+        if (last && last.key === key) { last.visits += x.visits; last.views += x.views; }
+        else series.push({ key: key, label: 'Semaine du ' + fmtShort(mon), short: fmtShort(mon), visits: x.visits, views: x.views });
+      } else {
+        series.push({ key: ymd(cur), label: cur.toLocaleDateString('fr-CA', { weekday: 'short', day: 'numeric', month: 'short' }),
+          short: fmtShort(cur), visits: x.visits, views: x.views });
+      }
+    }
+    var max = 0, peak = null;
+    series.forEach(function (s) { if (s.visits > max) { max = s.visits; peak = s; } });
+    var bars = series.map(function (s) {
+      return '<span class="vis-bar' + (s.visits ? '' : ' is-zero') + '" style="height:' + (max ? Math.max(s.visits / max * 100, s.visits ? 2 : 0) : 0) + '%" title="' +
+        esc(s.label + ' : ' + num(s.visits) + ' visite' + (s.visits > 1 ? 's' : '') + ' · ' + num(s.views) + ' page' + (s.views > 1 ? 's' : '')) + '"></span>';
+    }).join('');
+
+    var today = byDay[todayKey] || { visits: 0 };
+    var kpis =
+      card('Visites', num(tot.visits), 'sessions') +
+      card('Visiteurs', num(tot.visitors), 'uniques par jour') +
+      card('Pages vues', num(tot.views), 'au total') +
+      card('Pages par visite', tot.visits ? (tot.views / tot.visits).toFixed(1).replace('.', ',') : '—', 'en moyenne') +
+      card("Aujourd'hui", num(today.visits), 'visite' + (today.visits > 1 ? 's' : ''));
+
+    var pageMax = (d.pages && d.pages[0]) ? d.pages[0].views : 0;
+    var pagesHtml = (d.pages || []).map(function (p) {
+      return '<div class="stat-toprow"><div class="stat-topmain"><span class="stat-topname">' + esc(pageLabel(p.path)) + '</span>' +
+        '<span class="stat-bar"><span class="stat-bar-fill" style="width:' + pct(p.views, pageMax) + '%"></span></span></div>' +
+        '<div class="stat-topnums"><span class="stat-topqty">' + num(p.visits) + ' entrée' + (p.visits > 1 ? 's' : '') + '</span>' +
+        '<span class="stat-toprev">' + num(p.views) + ' vue' + (p.views > 1 ? 's' : '') + '</span></div></div>';
+    }).join('') || '<p class="muted stat-none">—</p>';
+
+    visEl.innerHTML =
+      '<p class="muted vis-note">Compteurs anonymes. Tes propres visites ne sont pas comptées.</p>' +
+      '<div class="stat-cards">' + kpis + '</div>' +
+      '<div class="stat-panel vis-chart"><h2>Visites par ' + (weekly ? 'semaine' : 'jour') + '</h2>' +
+        '<div class="vis-bars" role="img" aria-label="Visites par ' + (weekly ? 'semaine' : 'jour') + '">' + bars + '</div>' +
+        '<div class="vis-axis"><span>' + esc(series[0].short) + '</span>' +
+          (peak ? '<span>Pic : ' + num(peak.visits) + ' · ' + esc(peak.short) + '</span>' : '') +
+          '<span>' + esc(series[series.length - 1].short) + '</span></div></div>' +
+      '<div class="vis-cols">' +
+        '<div class="stat-panel"><h2>Pages les plus vues</h2>' + pagesHtml + '</div>' +
+        '<div class="stat-panel vis-rows"><h2>Provenance</h2>' + shareRows(d.sources || [], 'source', SRC_LABEL) + '</div>' +
+        '<div class="stat-panel vis-rows"><h2>Appareil</h2>' + shareRows(d.devices || [], 'device', DEV_LABEL) +
+          '<h2 class="vis-h2b">Langue</h2>' + shareRows(d.langs || [], 'lang', LANG_LABEL) + '</div>' +
+      '</div>';
   }
 
   function card(label, value, sub) {

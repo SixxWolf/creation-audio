@@ -532,17 +532,29 @@
 /* Grand écran (≥ 1600 px — 2026-10-12) : Vue d'ensemble | Produits vendus côte à côte, sans sous-onglets */
 @media screen and (min-width:1600px) {
   .tabpanel[data-panel="statistiques"].is-wide:not([hidden]) { display:grid; grid-template-columns:minmax(0, 1fr) minmax(560px, .8fr);
-    column-gap:20px; align-items:start; grid-template-areas:"head head" "filt filt" "body sold"; }
+    column-gap:20px; align-items:start; grid-template-areas:"head head" "filt filt" "body sold" "vis vis"; }
   .tabpanel[data-panel="statistiques"].is-wide > .panel-head { grid-area:head; }
   .tabpanel[data-panel="statistiques"].is-wide > .stat-subtabs { display:none; }
   .tabpanel[data-panel="statistiques"].is-wide > .stat-filters { grid-area:filt; }
   .tabpanel[data-panel="statistiques"].is-wide > #stat-body { grid-area:body; min-width:0; }
   .tabpanel[data-panel="statistiques"].is-wide > #stat-sold { grid-area:sold; min-width:0; }
+  .tabpanel[data-panel="statistiques"].is-wide > #stat-visits { grid-area:vis; min-width:0; margin-top:20px; }
   /* colonne plus étroite : les noms passent à la ligne plutôt que d'être coupés (comme sur mobile) */
   .tabpanel[data-panel="statistiques"].is-wide .stat-soldname { align-items:flex-start; }
   .tabpanel[data-panel="statistiques"].is-wide .stat-soldlabel { white-space:normal; line-height:1.35; }
   .tabpanel[data-panel="statistiques"].is-wide .stat-soldname .stat-chip { margin-top:2px; }
 }
+
+/* onglet Visites (compteur maison) */
+.vis-note { margin:0 0 12px; font-size:.84rem; }
+.vis-bars { display:flex; align-items:flex-end; gap:2px; height:150px; border-bottom:1px solid var(--line); }
+.vis-bar { flex:1 1 0; min-width:1px; background:linear-gradient(180deg, var(--ember), var(--ember-dim)); border-radius:3px 3px 0 0; }
+.vis-bar:hover { filter:brightness(1.12); }
+.vis-bar.is-zero { background:none; }
+.vis-axis { display:flex; justify-content:space-between; gap:8px; margin-top:8px; font-size:.78rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.vis-cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:16px; align-items:start; }
+.vis-rows .stat-catname { width:96px; }
+.vis-h2b { margin-top:20px; }
 
 /* onglet Produits vendus */
 .stat-soldpanel + .stat-soldpanel { margin-top:16px; }

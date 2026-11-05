@@ -159,6 +159,8 @@ window.CA = window.CA || {};
     if (isReady) { try { cb(); } catch (e) {} }
     else readyCbs.push(cb);
   };
+  // ce navigateur n'est plus compté dans les visites du site (nav.js lit ca-notrack)
+  window.CA.onAdminReady(function () { try { localStorage.setItem('ca-notrack', '1'); } catch (e) {} });
 
   // Écran de connexion en 3 étapes : 'login' (mot de passe) · 'mfa' (code) · 'enroll' (activer la 2FA)
   function step(which) {
