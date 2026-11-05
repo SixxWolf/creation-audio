@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=12">
 <link rel="stylesheet" href="assets/accueil.css?v=23">
-<link rel="stylesheet" href="assets/entretien.css?v=2">
+<link rel="stylesheet" href="assets/entretien.css?v=4">
 <link rel="stylesheet" href="assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
 <script src="assets/look.js?v=5"></script>
@@ -106,10 +106,12 @@
     </header>
     <ul class="en-prices" id="en-prices">
       <li class="en-price" data-model="a1">
+        <span class="en-ph"><img src="assets/entretien/a1.webp" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
         <span class="en-pm"><b>Bambu Lab A1</b><small>Par machine, par mois</small></span>
         <span class="en-pv"><b data-price="25">25 $</b></span>
       </li>
       <li class="en-price" data-model="xp">
+        <span class="en-ph en-ph-3"><img src="assets/entretien/p2s.webp" alt="" width="72" height="72" loading="lazy" decoding="async"><img src="assets/entretien/p1s.webp" alt="" width="72" height="72" loading="lazy" decoding="async"><img src="assets/entretien/x2d.webp" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
         <span class="en-pm"><b>Bambu Lab série X / P (X1C, P1S, P2S, X2D)</b><small>Fermées, avec chambre</small></span>
         <span class="en-pv en-eval">Sur évaluation</span>
       </li>
