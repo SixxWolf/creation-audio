@@ -1,0 +1,78 @@
+/* =========================================================
+   Création Audio — page ENTRETIEN D'IMPRIMANTES
+   Gabarit de l'accueil (site.css + accueil.css) ; ici seulement l'en-tête de page,
+   la liste de prix et le formulaire de demande.
+   ========================================================= */
+.en-hero { position:relative; isolation:isolate; overflow:hidden; }
+.en-hero::before {
+  content:''; position:absolute; inset:0; z-index:-1; pointer-events:none;
+  background-image:radial-gradient(circle at 1px 1px, var(--line-2) 1.1px, transparent 1.4px);
+  background-size:24px 24px;
+  -webkit-mask-image:radial-gradient(ellipse 70% 85% at 78% 48%, #000 25%, transparent 78%);
+          mask-image:radial-gradient(ellipse 70% 85% at 78% 48%, #000 25%, transparent 78%);
+}
+.en-hero-grid {
+  display:grid; grid-template-columns:minmax(0, 1.1fr) minmax(0, 1fr); align-items:center;
+  gap:clamp(28px, 4vw, 64px);
+  padding-top:clamp(36px, 5.5vw, 72px); padding-bottom:clamp(44px, 6vw, 80px);
+}
+.en-title {
+  font-family:var(--display); font-size:clamp(2.3rem, 4.8vw, 4rem); line-height:1.04;
+  font-weight:700; letter-spacing:-.035em; color:var(--ink); text-wrap:balance;
+}
+.en-hl { color:var(--ember-dim); }
+.en-lead { margin:18px 0 28px; max-width:30em; font-size:1.1rem; line-height:1.55; color:var(--muted); }
+
+.en-checks { list-style:none; margin:0; padding:0; display:grid; gap:12px; }
+.en-checks li {
+  display:grid; grid-template-columns:auto 1fr; column-gap:14px; align-items:center;
+  padding:14px 18px; border-radius:var(--radius); background:var(--paper);
+  border:1px solid var(--line); box-shadow:var(--shadow-sm);
+}
+.en-checks b { color:var(--ink); }
+.en-checks small { grid-column:2; color:var(--muted); font-size:.9rem; }
+.en-ck {
+  grid-row:1 / span 2; display:grid; place-items:center; width:34px; height:34px; border-radius:50%;
+  background:var(--tint); color:var(--ember-dim); border:1px solid var(--tint-line);
+}
+.en-ck svg { width:18px; height:18px; }
+
+.en-prices { list-style:none; margin:28px 0 0; padding:0; display:grid; gap:0; max-width:760px;
+  background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-lg); overflow:hidden; }
+.en-price { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 22px; }
+.en-price + .en-price { border-top:1px solid var(--line); }
+.en-pm { display:grid; min-width:0; }
+.en-pm b { color:var(--ink); font-size:1.05rem; }
+.en-pm small { color:var(--muted); font-size:.9rem; }
+.en-pv { flex:none; text-align:right; white-space:nowrap; font-family:var(--display); font-size:1.7rem; font-weight:700;
+  color:var(--ink); font-variant-numeric:tabular-nums; }
+.en-pv b { font-weight:700; }
+.en-eval { font-family:var(--font); font-size:1rem; font-weight:600; color:var(--muted); }
+.en-note { margin:16px 0 0; color:var(--muted); font-size:.95rem; }
+.en-note a { color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
+
+.en-join { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:clamp(28px, 5vw, 72px); align-items:start; }
+.en-join h2 { font-size:clamp(1.8rem, 3.3vw, 2.6rem); line-height:1.08; font-weight:700; color:var(--ink); }
+.en-q { margin:18px 0 0; color:var(--muted); }
+.en-form {
+  display:grid; gap:16px; padding:clamp(18px, 3vw, 28px); background:var(--paper);
+  border:1px solid var(--line); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm);
+}
+.en-field { display:grid; gap:6px; font-size:.92rem; font-weight:600; color:var(--ink); }
+.en-field input, .en-field textarea {
+  width:100%; min-width:0; padding:12px 14px; font:inherit; font-weight:400; color:var(--ink);
+  background:var(--paper); border:1px solid var(--line-2); border-radius:var(--radius-sm);
+}
+.en-field textarea { resize:vertical; min-height:92px; }
+.en-field input:focus-visible, .en-field textarea:focus-visible { outline:2px solid var(--ember); outline-offset:1px; }
+.en-field .is-bad { border-color:#C2402A; }
+.en-status { margin:0; min-height:1.2em; font-size:.92rem; color:var(--muted); }
+.en-status.is-err { color:#C2402A; }
+
+@media (max-width:860px) {
+  .en-hero-grid, .en-join { grid-template-columns:1fr; }
+}
+@media (max-width:480px) {
+  .en-price { padding:16px; }
+  .en-pv { font-size:1.45rem; }
+}

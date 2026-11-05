@@ -298,6 +298,8 @@ a.pop-card:hover .pop-media img { transform:scale(1.04); }
 .bn-img img { max-width:70%; max-height:112px; object-fit:contain; }
 .bn-ic { width:54px; height:54px; display:grid; place-items:center; border-radius:15px; color:var(--ember-ink); background:var(--tint); }
 .bn-ic svg { width:26px; height:26px; }
+.bn-entretien { grid-column:span 4; flex-direction:row; align-items:center; gap:22px; }
+.bn-entretien .bn-go { margin-top:0; padding-top:0; flex:none; }
 
 /* ---- contact ---- */
 .contact-card {
@@ -332,6 +334,7 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
     margin:0 calc(var(--gutter) * -1); padding:4px var(--gutter) 12px; scrollbar-width:thin; }
   .pop-card { flex:0 0 clamp(190px, 40vw, 240px); scroll-snap-align:start; }
   .bento { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  .bn-entretien { grid-column:span 2; }
 }
 @media (max-width:980px) {
   .mat-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
@@ -343,6 +346,7 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
   .steps { grid-template-columns:1fr; gap:36px; }
   .steps::before { display:none; }
   .bento { grid-template-columns:1fr; }
+  .bn-entretien { grid-column:auto; flex-direction:column; align-items:flex-start; }
   .bn-spacers { grid-column:auto; flex-direction:column; }
   .bn-thumbs { flex:none; min-height:0; height:220px; }
 }
