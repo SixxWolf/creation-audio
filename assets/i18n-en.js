@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 16;
+window.CA_EN_V = 18;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -908,9 +908,33 @@ window.CA_EN = (function (pairs) {
   [`Bonjour, je veux un entretien mensuel de mes imprimantes.`, `Hello, I would like monthly maintenance for my printers.`],
   [`Ville ou secteur :`, `City or area:`],
   [`Machines :`, `Machines:`],
+  [`Précision :`, `Details:`],
+  [`Indique ta ville et au moins une machine.`, `Enter your city and at least one machine.`],
+  [`Sur évaluation`, `After assessment`],
   [`Bambu Lab A1`, `Bambu Lab A1`],
   [`Bambu Lab série X / P`, `Bambu Lab X / P series`],
   [`Snapmaker U1`, `Snapmaker U1`],
   [`+ {n} machine sur évaluation`, `+ {n} machine to be assessed`],
-  [`+ {n} machines sur évaluation`, `+ {n} machines to be assessed`]
+  [`+ {n} machines sur évaluation`, `+ {n} machines to be assessed`],
+
+  // ---- impression.js (page Impression 3D) + fichiers 3D de messagerie.js
+  [` Mo`, ` MB`],
+  [` Ko`, ` KB`],
+  [`Formats acceptés : STL, 3MF, STEP, OBJ.`, `Accepted formats: STL, 3MF, STEP, OBJ.`],
+  [`Fichier trop lourd (50 Mo maximum).`, `File too large (50 MB maximum).`],
+  [`Au plus 3 fichiers 3D par message.`, `At most 3 3D files per message.`],
+  [`" aria-label="Retirer le fichier `, `" aria-label="Remove file `],
+  [`Un fichier 3D n'a pas pu être envoyé. Réessaie.`, `A 3D file could not be sent. Please try again.`],
+  [`<span>Ajouter un fichier 3D</span></label></div>`, `<span>Add a 3D file</span></label></div>`],
+  [`Envoi des fichiers…`, `Sending the files…`],
+  [`Au plus 3 fichiers 3D par demande.`, `At most 3 3D files per request.`],
+  [`Ajoute un fichier ou décris ta pièce.`, `Add a file or describe your part.`],
+  [`Bonjour, je veux une soumission pour de l'impression 3D.`, `Hello, I would like a quote for 3D printing.`],
+  [`Service :`, `Service:`],
+  [`Matériau :`, `Material:`],
+  [`Quantité :`, `Quantity:`],
+  [`Détails :`, `Details:`],
+  [`La messagerie est indisponible. Écris-nous à contact@creationaudio.ca.`, `Messaging is unavailable. Write to us at contact@creationaudio.ca.`],
+  [`Impression 3D`, `3D printing`],
+  [`Demande envoyée.`, `Request sent.`]
 ]);

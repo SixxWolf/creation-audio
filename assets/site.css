@@ -118,7 +118,7 @@
 /* Navigation principale : onglets, trait ember posé sur la bordure basse */
 .home-nav { display:flex; align-items:center; gap:2px; }
 .home-nav a {
-  position:relative; height:40px; display:inline-flex; align-items:center; padding:0 12px;
+  position:relative; height:40px; display:inline-flex; align-items:center; padding:0 12px; white-space:nowrap;
   text-decoration:none; color:var(--ink-2); font-weight:600; font-size:.92rem; border-radius:10px;
   transition:color .15s, background .15s;
 }
@@ -224,18 +224,35 @@
 .drawer-foot { margin-top:auto; padding-top:22px; font-size:.84rem; color:var(--muted); line-height:1.6; }
 .drawer-foot a { color:var(--ink-2); font-weight:600; }
 
-/* Place de Mon compte + FR/EN : « Magasiner » (doublon de Filaments) part et les liens se resserrent sous 1100 px */
-@media (max-width:1100px) {
+/* Place de Mon compte + FR/EN : « Magasiner » (doublon de Filaments) part et les liens se resserrent sous 1450 px (6 liens de menu) */
+@media (max-width:1450px) {
   .home-top .home-cta { display:none; }
   .home-top { gap:14px; }
   .home-nav a { padding:0 9px; }
   .home-nav a.is-active::after { left:9px; right:9px; }
   .home-dealer { width:40px; padding:0; gap:0; justify-content:center; font-size:0; }   /* icône seule (le mot reste lu) */
 }
-@media (max-width:960px) {
+/* fêtes : le bouton ❄ prend 66 px de plus, « Magasiner » part un peu plus tôt */
+@media (max-width:1580px) {
+  html.fetes .home-top .home-cta { display:none; }
+}
+@media (max-width:1040px) {   /* burger : 6 liens de menu */
   .home-nav, .home-dealer, .home-lang { display:none; }
   .dealer-page .home-lang { display:inline-flex; }   /* portail dealer : pas de tiroir */
   .nav-burger { display:flex; }
+}
+/* fêtes : le bouton ❄ ajoute 54 px → tiroir un peu plus tôt ; pages avec panier (boutique, spacers) : le bouton Panier ajoute ~90 px */
+@media (max-width:1070px) {
+  html.fetes .home-nav, html.fetes .home-dealer, html.fetes body:not(.dealer-page) .home-lang { display:none; }
+  html.fetes .nav-burger { display:flex; }
+}
+@media (max-width:1140px) {
+  .home-top:has(.cart-btn) .home-nav, .home-top:has(.cart-btn) .home-dealer, .home-top:has(.cart-btn) .home-lang { display:none; }
+  .home-top:has(.cart-btn) .nav-burger { display:flex; }
+}
+@media (max-width:1190px) {
+  html.fetes .home-top:has(.cart-btn) .home-nav, html.fetes .home-top:has(.cart-btn) .home-dealer, html.fetes .home-top:has(.cart-btn) .home-lang { display:none; }
+  html.fetes .home-top:has(.cart-btn) .nav-burger { display:flex; }
 }
 /* petit écran : Mon compte reste dans le tiroir quand la place manque (panier présent, ou ≤ 340 px) */
 @media (max-width:480px) {
