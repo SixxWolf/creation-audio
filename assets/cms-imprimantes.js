@@ -92,6 +92,7 @@
         f = document.createElement('iframe'); f.setAttribute('allow', 'autoplay; fullscreen');
         f.src = GO2RTC + '/stream.html?src=' + encodeURIComponent(p.cam_src) + '&mode=mse';
       }
+      if (jpeg) f.addEventListener('error', function () { if (/^about:/.test(f.src)) return; setTimeout(function () { if (el._cam && f.parentNode && !document.hidden) reloadOne(el); }, 3000); });
       f.className = 'fm-frame'; f.setAttribute('title', 'Caméra ' + p.name);
       box.appendChild(f); el._cam = true; box.classList.add('is-on');
     } else if (!ok && el._cam) {
@@ -128,6 +129,8 @@
       bed: offline ? '—' : deg(s.bed) + (s.bed_t ? ' / ' + s.bed_t + '°' : '')
     };
     Object.keys(f).forEach(function (k) { var d = $('[data-f="' + k + '"]', el); if (d) d.textContent = f[k]; });
+    if (el._off && !offline) reloadOne(el);   // l'imprimante revient : sa caméra a coupé
+    el._off = offline;
     attachCam(el, p);
     return st.k;
   }
@@ -159,7 +162,11 @@
 
   function load() {
     if (busy) return; busy = true;
-    var cam = camOk === null ? probeCam().then(function (ok) { camOk = ok; }) : Promise.resolve();
+    var cam = probeCam().then(function (ok) {
+      var was = camOk; camOk = ok;
+      // go2rtc ou le relais viennent de redémarrer (ou le réseau est revenu) : les flux ouverts sont morts
+      if (was && ((ok.g && !was.g) || (ok.r && !was.r))) reloadCams();
+    });
     cam.then(function () {
       return sb.from('printers').select('id,name,model,cam_src,sort,status,seen_at').order('sort').order('name');
     }).then(function (res) {
@@ -169,7 +176,21 @@
     }, function () { busy = false; });
   }
 
-  function start() { stop(); camOk = null; load(); timer = setInterval(function () { if (!document.hidden) load(); }, POLL); }
+  // Onglet du navigateur en arrière-plan / autre onglet de l'admin : le navigateur fige les flux vidéo (MSE) qui prennent du retard.
+  // Au retour, on relance chaque flux pour repartir sur le direct.
+  function reloadOne(el) {
+    var f = $('.fm-frame', el); if (!f) return;
+    var s = f.getAttribute('data-src') || f.src; f.setAttribute('data-src', s);
+    f.src = 'about:blank'; setTimeout(function () { if (el._cam) f.src = s; }, 60);
+  }
+  function reloadCams() { Object.keys(cards).forEach(function (id) { reloadOne(cards[id]); }); }
+  function blankCams() { Object.keys(cards).forEach(function (id) { var f = $('.fm-frame', cards[id]); if (f) { f.setAttribute('data-src', f.getAttribute('data-src') || f.src); f.src = 'about:blank'; } }); }
+  // arrière-plan : on coupe les flux (ils se figent de toute façon) ; retour : on repart sur le direct
+  document.addEventListener('visibilitychange', function () { if (!timer) return; if (document.hidden) blankCams(); else reloadCams(); });
+  window.addEventListener('online', function () { if (timer) reloadCams(); });
+  setInterval(function () { if (timer && !document.hidden) reloadCams(); }, 20 * 60000);   // rafraîchissement préventif toutes les 20 min
+
+  function start() { stop(); camOk = null; reloadCams(); load(); timer = setInterval(function () { if (!document.hidden) load(); }, POLL); }
   function stop() { if (timer) { clearInterval(timer); timer = null; } }
 
   var prevOnTab = window.CA.onTab;
