@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 18;
+window.CA_EN_V = 19;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -936,5 +936,14 @@ window.CA_EN = (function (pairs) {
   [`Détails :`, `Details:`],
   [`La messagerie est indisponible. Écris-nous à contact@creationaudio.ca.`, `Messaging is unavailable. Write to us at contact@creationaudio.ca.`],
   [`Impression 3D`, `3D printing`],
-  [`Demande envoyée.`, `Request sent.`]
+  [`Demande envoyée.`, `Request sent.`],
+  [`Lecture du fichier…`, `Reading the file…`],
+  [`À conseiller`, `Advise me`],
+  [`Plus grand que nos plateaux (256 mm) : on en reparle dans la soumission.`, `Larger than our print beds (256 mm): we'll cover it in the quote.`],
+  [`Très petit : ton fichier est-il bien en millimètres ?`, `Very small: is your file really in millimetres?`],
+  [`Demander dans cette couleur`, `Request this colour`],
+  [`Conception maison`, `Designed in-house`],
+  [`Adaptateur`, `Adapter`],
+  [`Couleur :`, `Colour:`],
+  [`Fichier :`, `File:`]
 ]);

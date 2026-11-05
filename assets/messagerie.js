@@ -213,7 +213,10 @@
     if (!st.files.length) return Promise.resolve([]);
     return Promise.all(st.files.map(function (f) {
       var path = st.uid + '/' + uuid() + '.' + f.name.split('.').pop().toLowerCase();
-      return c.storage.from('print-files').upload(path, f.blob, { contentType: 'application/octet-stream', upsert: false }).then(function (r) {
+      // supabase-js ignore contentType pour un Blob : c'est le type du fichier qui part, et le bucket n'accepte que octet-stream.
+      // Safari et Firefox donnent un type (model/stl, application/vnd.ms-pki.stl…) : sans ceci, le téléversement est refusé.
+      var body = f.blob.slice(0, f.blob.size, 'application/octet-stream');
+      return c.storage.from('print-files').upload(path, body, { contentType: 'application/octet-stream', upsert: false }).then(function (r) {
         if (r.error) throw new Error(_t('Un fichier 3D n\'a pas pu être envoyé. Réessaie.'));
         return { p: path, n: f.name };
       });

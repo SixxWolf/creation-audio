@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Impression 3D sur mesure — Création Audio · Québec</title>
-<meta name="description" content="Impression 3D sur mesure à Québec : ton fichier, une série, une pièce à concevoir ou un prototype rapide. Soumission claire et date confirmée.">
+<meta name="description" content="Impression 3D sur mesure à Québec. Dépose ton fichier, on te dit combien et quand : une pièce, une série, un prototype ou une pièce à dessiner.">
 <meta name="theme-color" content="#0D0F12">
 <link rel="canonical" href="https://creationaudio.ca/impression.html">
 <link rel="alternate" hreflang="fr-CA" href="https://creationaudio.ca/impression.html">
@@ -15,11 +15,11 @@
 <meta property="og:locale" content="fr_CA">
 <meta property="og:url" content="https://creationaudio.ca/impression.html">
 <meta property="og:title" content="Impression 3D sur mesure — Création Audio · Québec">
-<meta property="og:description" content="Ton fichier, une série, une pièce à concevoir ou un prototype : soumission claire et date confirmée. Québec.">
+<meta property="og:description" content="Dépose ton fichier, on te dit combien et quand. Une pièce, une série, un prototype ou une pièce à dessiner. Québec.">
 <meta property="og:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Impression 3D sur mesure — Création Audio">
-<meta name="twitter:description" content="Ton fichier, une série, une pièce à concevoir ou un prototype : soumission claire et date confirmée.">
+<meta name="twitter:description" content="Dépose ton fichier, on te dit combien et quand. Une pièce, une série, un prototype ou une pièce à dessiner.">
 <meta name="twitter:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
@@ -31,11 +31,10 @@
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=19">
 <link rel="stylesheet" href="assets/accueil.css?v=23">
-<link rel="stylesheet" href="assets/entretien.css?v=8">
-<link rel="stylesheet" href="assets/impression.css?v=1">
+<link rel="stylesheet" href="assets/impression.css?v=2">
 <link rel="stylesheet" href="assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
-<script>if(window.IntersectionObserver)document.documentElement.classList.add('en-js')</script>
+<script>document.documentElement.classList.add('ip-ready')</script>
 <script src="assets/look.js?v=5"></script>
 <script src="assets/i18n.js?v=1"></script>
 </head>
@@ -74,265 +73,242 @@
 
 <main id="main">
 
-<!-- ======================= HÉROS : le plateau qui se remplit ======================= -->
-<section class="en-hero">
-  <div class="wrap en-hero-grid">
-    <div class="en-hero-tx">
-      <p class="eyebrow en-in" style="--d:0">Impression 3D</p>
-      <h1 class="en-title en-in" style="--d:1">De l'idée à la pièce, <span class="en-hl">imprimée à Québec.</span></h1>
-      <p class="en-lead en-in" style="--d:2">Une pièce, une série ou un prototype : on te fait une soumission claire et on confirme la date.</p>
-      <div class="hero-cta en-in" style="--d:3">
-        <a class="btn btn-ember btn-lg" href="#demande">Demander une soumission
-          <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </a>
-        <a class="btn btn-ghost btn-lg" href="#prix">Voir les prix</a>
+<!-- ======================= HÉROS : la zone de dépôt, l'aperçu 3D, le formulaire qui se déplie ======================= -->
+<section class="ip-hero">
+  <div class="wrap ip-hero-grid" id="ip-hero">
+    <div class="ip-left">
+      <div class="ip-head">
+        <p class="eyebrow ip-in" style="--d:0">Impression 3D à Québec</p>
+        <h1 class="ip-title ip-in" style="--d:1">Dépose ton fichier. <span>On te dit combien et quand.</span></h1>
+        <p class="ip-lead ip-in" style="--d:2">Une pièce, une série ou un prototype. Prix et date confirmés avant de commencer.</p>
       </div>
-      <ul class="en-chips en-in" style="--d:4" aria-label="Ce qui est inclus">
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Soumission avant de commencer</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Date confirmée</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Cueillette à Québec</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>STL · 3MF · STEP · OBJ</li>
-      </ul>
+      <form class="ip-form" id="demande" novalidate>
+        <label class="ip-drop ip-in" id="ip-drop" style="--d:3">
+          <input type="file" id="ip-file" class="sr-only" multiple>
+          <span class="ip-drop-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12 4 7.5"/></svg></span>
+          <span class="ip-drop-t">
+            <b class="ip-fine">Glisse ton fichier ici</b>
+            <b class="ip-touch">Choisis ton fichier</b>
+            <small>STL, 3MF, STEP, OBJ · 50 Mo</small>
+          </span>
+          <span class="ip-drop-go">Parcourir</span>
+        </label>
+        <ul class="ip-flist" id="ip-flist" hidden></ul>
+        <p class="ip-alt ip-in" id="ip-alt" style="--d:4">Pas de fichier ? <button type="button" class="ip-link" id="ip-nofile">Décris ta pièce, on la dessine.</button></p>
+
+        <div class="ip-more" id="ip-more"><div class="ip-more-in">
+          <fieldset class="ip-set">
+            <legend>Service</legend>
+            <div class="ip-chips">
+              <label class="ip-chip"><input type="radio" name="ip-svc" value="file" checked><span>Mon fichier</span></label>
+              <label class="ip-chip"><input type="radio" name="ip-svc" value="batch"><span>Une série</span></label>
+              <label class="ip-chip"><input type="radio" name="ip-svc" value="design"><span>À dessiner</span></label>
+              <label class="ip-chip"><input type="radio" name="ip-svc" value="proto"><span>Prototype</span></label>
+            </div>
+          </fieldset>
+          <fieldset class="ip-set">
+            <legend>Matériau</legend>
+            <div class="ip-chips">
+              <label class="ip-chip"><input type="radio" name="ip-mat" value="pla"><span>PLA</span></label>
+              <label class="ip-chip"><input type="radio" name="ip-mat" value="petg"><span>PETG</span></label>
+              <label class="ip-chip"><input type="radio" name="ip-mat" value="abs"><span>ABS</span></label>
+              <label class="ip-chip"><input type="radio" name="ip-mat" value="tpu"><span>TPU</span></label>
+              <label class="ip-chip"><input type="radio" name="ip-mat" value="any" checked><span>À conseiller</span></label>
+            </div>
+          </fieldset>
+          <div class="ip-set ip-colors" id="ip-colors" hidden>
+            <p class="ip-lab">Couleur <em id="ip-color-name">Au choix</em></p>
+            <div class="ip-swbox" id="ip-color-sw"></div>
+          </div>
+          <label class="ip-field ip-qty"><span>Quantité</span>
+            <input name="qty" id="ip-qty" type="number" inputmode="numeric" min="1" max="10000" value="1"></label>
+          <label class="ip-field"><span>Ta pièce</span>
+            <textarea name="desc" id="ip-desc" maxlength="1500" rows="3" placeholder="ex. 40 clips de 3 cm, noirs"></textarea></label>
+          <button class="btn btn-ember btn-lg ip-send" type="submit" id="ip-submit">Envoyer ma demande</button>
+          <p class="ip-status" id="ip-status" role="status" aria-live="polite"></p>
+        </div></div>
+      </form>
     </div>
 
-    <div class="en-park im-bed en-in" style="--d:2" id="im-bed" aria-hidden="true">
-      <div class="en-park-head">
-        <span class="en-park-t">Plateau</span>
-        <span class="en-count"><b id="im-n">25</b><span>/ 25 pièces</span></span>
+    <div class="ip-stage ip-in" id="ip-stage" style="--d:3">
+      <div class="ip-fbar"><b id="ip-fname">Exemple : adaptateur de haut-parleur</b><span id="ip-fsize">Glisse pour tourner</span></div>
+      <div class="ip-view" id="ip-view">
+        <svg class="ip-fallback" viewBox="0 0 400 300" aria-hidden="true"><ellipse cx="200" cy="186" rx="146" ry="74" fill="#3A3E46"/><ellipse cx="200" cy="150" rx="146" ry="74" fill="#6C727C"/><ellipse cx="200" cy="150" rx="88" ry="44" fill="#ECEDEA"/></svg>
+        <canvas id="ip-gl" tabindex="0" role="img" aria-label="Aperçu 3D de la pièce. Les flèches du clavier la font tourner."></canvas>
+        <div class="ip-nopreview" id="ip-nopreview" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="m12 11 3 1.7v3.4L12 17.8l-3-1.7v-3.4z"/></svg>
+          <b>Fichier ajouté</b>
+          <span id="ip-nopreview-t">Pas d'aperçu pour ce format. Il part quand même avec ta demande.</span>
+        </div>
       </div>
-      <span class="en-bar"><i id="im-bar-f"></i></span>
-      <div class="im-plate" id="im-plate">
-        <i class="im-part s0 c0"><b></b></i><i class="im-part s2 c1"><b></b></i><i class="im-part s4 c2"><b></b></i><i class="im-part s1 c0"><b></b></i><i class="im-part s3 c1"><b></b></i>
-        <i class="im-part s1 c2"><b></b></i><i class="im-part s3 c0"><b></b></i><i class="im-part s0 c1"><b></b></i><i class="im-part s2 c2"><b></b></i><i class="im-part s4 c0"><b></b></i>
-        <i class="im-part s2 c1"><b></b></i><i class="im-part s4 c2"><b></b></i><i class="im-part s1 c0"><b></b></i><i class="im-part s3 c1"><b></b></i><i class="im-part s0 c2"><b></b></i>
-        <i class="im-part s3 c0"><b></b></i><i class="im-part s0 c1"><b></b></i><i class="im-part s2 c2"><b></b></i><i class="im-part s4 c0"><b></b></i><i class="im-part s1 c1"><b></b></i>
-        <i class="im-part s4 c2"><b></b></i><i class="im-part s1 c0"><b></b></i><i class="im-part s3 c1"><b></b></i><i class="im-part s0 c2"><b></b></i><i class="im-part s2 c0"><b></b></i>
-      </div>
+      <dl class="ip-read">
+        <div><dt>Dimensions</dt><dd id="ip-r-dim">—</dd></div>
+        <div><dt>Poids estimé</dt><dd id="ip-r-g">—</dd></div>
+        <div><dt>Matériau</dt><dd id="ip-r-mat">ABS</dd></div>
+      </dl>
+      <p class="ip-warn" id="ip-warn" hidden></p>
     </div>
   </div>
 </section>
 
-<!-- ======================= LES 4 SERVICES ======================= -->
-<section class="sec" id="services" aria-labelledby="im-svc-t">
+<!-- ======================= PRIX + DATE : le parcours, sans montant ======================= -->
+<section class="ip-dark" id="prix" aria-labelledby="ip-prix-t">
   <div class="wrap">
-    <header class="sec-head is-center rv">
-      <div>
-        <p class="eyebrow">Services</p>
-        <h2 id="im-svc-t">Quatre façons de passer de l'idée à la pièce.</h2>
-      </div>
-    </header>
-    <ul class="im-svcs">
-      <li class="en-zone rv" style="--d:0">
-        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="m12 11 3 1.7v3.4L12 17.8l-3-1.7v-3.4z"/></svg></span>
-        <h3>Ton fichier, imprimé</h3>
-        <p>Tu as un STL, un 3MF ou un STEP. On l'imprime dans le matériau de ton choix.</p>
-        <a class="im-svc-go" href="#demande" data-svc="file">Demander
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-      <li class="en-zone rv" style="--d:1">
-        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg></span>
-        <h3>Séries et production</h3>
-        <p>Des dizaines ou des centaines de pièces identiques, produites en lot.</p>
-        <a class="im-svc-go" href="#demande" data-svc="batch">Demander
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-      <li class="en-zone rv" style="--d:2">
-        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"/><path d="m14.5 6.5 3 3"/></svg></span>
-        <h3>Conception de la pièce</h3>
-        <p>Une idée, des mesures ou une pièce cassée : on la dessine en 3D, puis on l'imprime.</p>
-        <a class="im-svc-go" href="#demande" data-svc="design">Demander
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-      <li class="en-zone rv" style="--d:3">
-        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l9-11h-6z"/></svg></span>
-        <h3>Prototypes rapides</h3>
-        <p>Une première version pour tester, puis des ajustements jusqu'à ce que ça fonctionne.</p>
-        <a class="im-svc-go" href="#demande" data-svc="proto">Demander
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-    </ul>
-  </div>
-</section>
-
-<!-- ======================= MATÉRIAUX + EXEMPLES DE PRIX (bande sombre) =======================
-     Montants d'exemple à valider par Théo avant la mise en ligne (data-price = dollars entiers). -->
-<section class="en-dark" id="prix" aria-labelledby="im-prix-t">
-  <div class="en-dark-bg" aria-hidden="true"><i class="en-blob b1"></i><i class="en-blob b2"></i></div>
-  <div class="wrap en-calc-grid">
-    <div class="en-calc-tx rv">
-      <p class="eyebrow">Matériaux et prix</p>
-      <h2 id="im-prix-t">Une soumission claire, avant de commencer.</h2>
-      <p class="en-dark-sub">Le prix dépend du matériau, du temps d'impression et de la quantité. Aucune taxe ajoutée.</p>
-      <ul class="im-mats">
-        <li style="--sw:#FF6A2B"><i></i><b>PLA</b><span>Prototypes, décoration, pièces rigides.</span></li>
-        <li style="--sw:#2F7BE5"><i></i><b>PETG</b><span>Solide, résiste à l'humidité.</span></li>
-        <li style="--sw:#B4BAC4"><i></i><b>ASA</b><span>Chaleur et soleil, idéal pour l'auto.</span></li>
-        <li style="--sw:#1F9D57"><i></i><b>TPU</b><span>Flexible : joints, protections.</span></li>
-      </ul>
-      <p class="en-note">D'autres matériaux sur demande. <a href="boutique.html">Voir les filaments</a></p>
+    <div class="rv">
+      <p class="eyebrow">Prix et date</p>
+      <h2 id="ip-prix-t">Tu sais combien et quand avant qu'on commence.</h2>
     </div>
-
-    <div class="en-calc rv" id="im-ex" style="--d:1">
-      <ul class="en-models">
-        <li class="im-ex">
-          <span class="im-ex-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2"/><path d="M3.5 12h17M8 8V5.5h8V8"/></svg></span>
-          <span class="en-pm"><b>Boîtier d'électronique</b><small>PETG · 1 pièce</small></span>
-          <span class="im-ex-p"><small>dès</small><b class="en-unit" data-price="28">28 $</b></span>
-        </li>
-        <li class="im-ex">
-          <span class="im-ex-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 17a8.5 8.5 0 0 1 17 0"/><path d="m12 17 3.2-5"/><circle cx="12" cy="17" r="1.3"/></svg></span>
-          <span class="en-pm"><b>Pièce de tableau de bord</b><small>ASA · 1 pièce</small></span>
-          <span class="im-ex-p"><small>dès</small><b class="en-unit" data-price="36">36 $</b></span>
-        </li>
-        <li class="im-ex">
-          <span class="im-ex-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/></svg></span>
-          <span class="en-pm"><b>Série de clips</b><small>PLA · 50 pièces</small></span>
-          <span class="im-ex-p"><small>dès</small><b class="en-unit" data-price="85">85 $</b></span>
-        </li>
-        <li class="im-ex">
-          <span class="im-ex-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/></svg></span>
-          <span class="en-pm"><b>Joint flexible</b><small>TPU · 1 pièce</small></span>
-          <span class="im-ex-p"><small>dès</small><b class="en-unit" data-price="14">14 $</b></span>
-        </li>
-      </ul>
-      <div class="en-total">
-        <p class="en-other">Exemples : le prix exact dépend de ton fichier.</p>
-        <a class="btn btn-ember btn-lg en-go" href="#demande">Demander une soumission
-          <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ======================= COMMENT ÇA SE PASSE ======================= -->
-<section class="sec sec-wash" id="etapes" aria-labelledby="im-etapes-t">
-  <div class="wrap">
-    <header class="sec-head is-center rv">
-      <div>
-        <p class="eyebrow">Comment ça se passe</p>
-        <h2 id="im-etapes-t">Quatre étapes.</h2>
-      </div>
-    </header>
-    <ol class="steps en-steps im-steps">
-      <li class="step" style="--d:0">
-        <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4.5 15v4.5h15V15"/></svg></span>
-        <span class="step-n">1</span>
-        <h3>Tu envoies ton fichier</h3>
-        <p>Ou ton idée, si la pièce reste à concevoir.</p>
-      </li>
-      <li class="step" style="--d:1">
-        <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 15.5h6"/></svg></span>
-        <span class="step-n">2</span>
-        <h3>On te fait une soumission</h3>
-        <p>Le prix et le matériau, avant de commencer.</p>
-      </li>
-      <li class="step" style="--d:2">
-        <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
-        <span class="step-n">3</span>
-        <h3>On imprime</h3>
-        <p>La date est confirmée par message. Si elle change, on te prévient d'avance.</p>
-      </li>
-      <li class="step" style="--d:3">
-        <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 21s-7-5.2-7-11a7 7 0 0 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
-        <span class="step-n">4</span>
-        <h3>Tu récupères ta pièce</h3>
-        <p>Cueillette à Québec, ou livraison locale arrangée par message.</p>
-      </li>
+    <ol class="ip-line rv" style="--d:1">
+      <li><i>1</i><b>Tu envoies ton fichier</b><span>Ou ton idée, si la pièce reste à dessiner.</span></li>
+      <li class="is-key"><i>2</i><b>Tu reçois le prix et la date</b><span>Par message, avant de commencer.</span></li>
+      <li><i>3</i><b>On imprime</b><span>Si la date change, on te prévient d'avance.</span></li>
+      <li><i>4</i><b>Tu récupères ta pièce</b><span>Cueillette à Québec, ou livraison locale arrangée par message.</span></li>
     </ol>
+    <div class="ip-vary rv" style="--d:2">
+      <p class="ip-vary-t">Ce qui fait varier le prix</p>
+      <ul>
+        <li>Le poids</li>
+        <li>Le temps d'impression</li>
+        <li>Le matériau</li>
+        <li>La quantité</li>
+      </ul>
+      <p class="ip-vary-n">Aucune taxe ajoutée.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= SERVICES : ce que tu as → ce qu'on fait ======================= -->
+<section class="ip-sec" id="services" aria-labelledby="ip-svc-t">
+  <div class="wrap">
+    <div class="rv">
+      <p class="eyebrow">Services</p>
+      <h2 class="ip-h2" id="ip-svc-t">Ce que tu as, ce qu'on en fait.</h2>
+    </div>
+    <div class="ip-tbl rv" style="--d:1">
+      <a class="ip-row" href="#demande" data-svc="file">
+        <span class="ip-has">Un fichier 3D</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <span class="ip-do">On l'imprime dans le matériau de ton choix.</span>
+      </a>
+      <a class="ip-row" href="#demande" data-svc="design">
+        <span class="ip-has">Un croquis, des mesures ou une photo</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <span class="ip-do">On dessine la pièce en 3D. Tu valides le modèle, puis on imprime.</span>
+      </a>
+      <a class="ip-row" href="#demande" data-svc="proto">
+        <span class="ip-has">Une idée à tester</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <span class="ip-do">Une première version, puis des ajustements jusqu'à ce que ça fonctionne.</span>
+      </a>
+      <a class="ip-row" href="#demande" data-svc="batch">
+        <span class="ip-has">Besoin de plusieurs pièces</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        <span class="ip-do">Des dizaines ou des centaines de pièces identiques, produites en lot.</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= MATÉRIAUX : usage + vraies couleurs en stock (lues en direct) ======================= -->
+<section class="ip-sec ip-wash" id="materiaux" aria-labelledby="ip-mat-t">
+  <div class="wrap">
+    <div class="rv">
+      <p class="eyebrow">Matériaux</p>
+      <h2 class="ip-h2" id="ip-mat-t">Le bon matériau, dans une couleur qu'on a déjà.</h2>
+      <p class="ip-sub">Ces couleurs sont en stock en ce moment. Touches-en une pour voir ta pièce.</p>
+    </div>
+    <div class="ip-mat-grid">
+      <ul class="ip-mats">
+        <li class="ip-mat rv" data-fam="PLA">
+          <div class="ip-mat-tx"><h3>PLA</h3><p>Rigide et précis. Craint la chaleur.</p><small class="ip-count"></small></div>
+          <div class="ip-sw"></div>
+        </li>
+        <li class="ip-mat rv" data-fam="PETG">
+          <div class="ip-mat-tx"><h3>PETG</h3><p>Solide, résiste à l'humidité.</p><small class="ip-count"></small></div>
+          <div class="ip-sw"></div>
+        </li>
+        <li class="ip-mat rv" data-fam="ABS">
+          <div class="ip-mat-tx"><h3>ABS</h3><p>Tient la chaleur d'un habitacle. Nos adaptateurs sont en ABS.</p><small class="ip-count"></small></div>
+          <div class="ip-sw"></div>
+        </li>
+        <li class="ip-mat rv" data-fam="TPU">
+          <div class="ip-mat-tx"><h3>TPU</h3><p>Souple : joints, protections.</p><small class="ip-count"></small></div>
+          <div class="ip-sw"></div>
+        </li>
+      </ul>
+      <aside class="ip-pick" id="ip-pick">
+        <canvas id="ip-mini" width="480" height="360" aria-hidden="true"></canvas>
+        <div class="ip-pick-tx" aria-live="polite"><b id="ip-pick-n">Touche une couleur</b><small id="ip-pick-m">Ta pièce change avec elle.</small></div>
+        <a class="btn btn-ember ip-pick-go" href="#demande" id="ip-pick-go">Demander une soumission</a>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= VRAIES PIÈCES (lues en direct ; la section reste masquée sans données) ======================= -->
+<section class="ip-sec" id="pieces" aria-labelledby="ip-part-t" hidden>
+  <div class="wrap ip-proof">
+    <div class="ip-proof-tx rv">
+      <p class="eyebrow">Déjà sur nos machines</p>
+      <h2 class="ip-h2" id="ip-part-t">On imprime déjà nos propres pièces.</h2>
+      <p class="ip-sub">Nos adaptateurs de haut-parleurs sortent du même atelier, à Québec.</p>
+      <a class="ip-more-link" href="spacers.html">Voir les spacers
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </div>
+    <ul class="ip-parts rv" id="ip-parts" style="--d:1"></ul>
   </div>
 </section>
 
 <!-- ======================= QUESTIONS ======================= -->
-<section class="sec" id="faq" aria-labelledby="im-faq-t">
-  <div class="wrap en-faq-wrap">
-    <header class="sec-head is-center rv">
-      <div>
-        <p class="eyebrow">Questions</p>
-        <h2 id="im-faq-t">Ce qu'on nous demande souvent.</h2>
-      </div>
-    </header>
-    <div class="en-faq">
-      <details class="en-fq rv" style="--d:0">
-        <summary>Quels fichiers acceptez-vous ?</summary>
-        <p>STL, 3MF, STEP et OBJ, jusqu'à 50 Mo chacun et 3 fichiers par demande. Pas de fichier ? Décris ta pièce, on s'en occupe.</p>
+<section class="ip-sec ip-wash" id="faq" aria-labelledby="ip-faq-t">
+  <div class="wrap ip-faq-grid">
+    <div class="rv">
+      <p class="eyebrow">Questions</p>
+      <h2 class="ip-h2" id="ip-faq-t">Ce qu'on nous demande souvent.</h2>
+      <p class="ip-faq-q">Une question ? <a class="ask" href="/compte.html#/messages" data-msg="autre" data-msg-ref="Impression 3D">Écris-nous</a><span class="ask-alt"> ou par <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:contact@creationaudio.ca?subject=Impression%203D">courriel</a></span></p>
+    </div>
+    <div class="ip-faq rv" style="--d:1">
+      <details class="ip-fq">
+        <summary>Quels fichiers acceptez-vous ?</summary>
+        <p>STL, 3MF, STEP et OBJ, jusqu'à 50 Mo chacun et 3 fichiers par demande. L'aperçu fonctionne avec les STL et les OBJ. Pas de fichier ? Décris ta pièce, on s'en occupe.</p>
       </details>
-      <details class="en-fq rv" style="--d:1">
-        <summary>Combien ça coûte ?</summary>
-        <p>Ça dépend du matériau, du temps d'impression et de la quantité. Tu reçois une soumission avant qu'on commence.</p>
+      <details class="ip-fq">
+        <summary>Combien ça coûte ?</summary>
+        <p>Ça dépend du poids, du temps d'impression, du matériau et de la quantité. Tu reçois le prix avant qu'on commence. Le poids affiché dans l'aperçu est une estimation.</p>
       </details>
-      <details class="en-fq rv" style="--d:2">
-        <summary>Et si la date change ?</summary>
+      <details class="ip-fq">
+        <summary>Et si la date change ?</summary>
         <p>La date est confirmée par message. Si quelque chose change, on te prévient d'avance.</p>
       </details>
-      <details class="en-fq rv" style="--d:3">
-        <summary>Pouvez-vous concevoir la pièce pour moi ?</summary>
-        <p>Oui. Envoie un croquis, des mesures ou une photo de la pièce cassée : on te propose un modèle 3D à valider avant l'impression.</p>
+      <details class="ip-fq">
+        <summary>Pouvez-vous dessiner la pièce pour moi ?</summary>
+        <p>Oui. Envoie un croquis, des mesures ou une photo de la pièce cassée : on te propose un modèle 3D à valider avant l'impression.</p>
       </details>
-      <details class="en-fq rv" style="--d:4">
-        <summary>Comment je récupère mes pièces ?</summary>
+      <details class="ip-fq">
+        <summary>Comment je récupère mes pièces ?</summary>
         <p>Cueillette à Québec, ou livraison locale arrangée par message.</p>
       </details>
-      <details class="en-fq rv" style="--d:5">
-        <summary>Mes fichiers restent-ils privés ?</summary>
-        <p>Oui. Ils servent seulement à ta demande et ne sont pas partagés.</p>
+      <details class="ip-fq">
+        <summary>Mes fichiers restent-ils privés ?</summary>
+        <p>Oui. L'aperçu se fait dans ton navigateur : rien ne part avant que tu envoies ta demande. Ensuite, tes fichiers servent seulement à ta demande et ne sont pas partagés.</p>
       </details>
     </div>
   </div>
 </section>
 
-<!-- ======================= DEMANDE ======================= -->
-<section class="sec sec-wash" id="demande" aria-labelledby="im-demande-t">
-  <div class="wrap en-join">
-    <div class="en-join-tx rv">
-      <p class="eyebrow">Demander une soumission</p>
-      <h2 id="im-demande-t">Dis-nous ce qu'il te faut.</h2>
-      <p class="sec-sub">Dépose ton fichier si tu en as un. Sinon, décris ta pièce.</p>
-      <p class="en-q">Une question ? <a class="ask" href="/compte.html#/messages" data-msg="autre" data-msg-ref="Impression 3D">Écris-nous</a></p>
-    </div>
-    <form class="en-form im-form rv" style="--d:1" id="im-form" novalidate>
-      <fieldset class="im-set">
-        <legend>Service</legend>
-        <div class="im-chips" role="radiogroup">
-          <label class="im-chip"><input type="radio" name="im-svc" value="file" checked><span>Mon fichier</span></label>
-          <label class="im-chip"><input type="radio" name="im-svc" value="batch"><span>Une série</span></label>
-          <label class="im-chip"><input type="radio" name="im-svc" value="design"><span>À concevoir</span></label>
-          <label class="im-chip"><input type="radio" name="im-svc" value="proto"><span>Prototype</span></label>
-        </div>
-      </fieldset>
-      <fieldset class="im-set">
-        <legend>Matériau</legend>
-        <div class="im-chips" role="radiogroup">
-          <label class="im-chip"><input type="radio" name="im-mat" value="pla"><span>PLA</span></label>
-          <label class="im-chip"><input type="radio" name="im-mat" value="petg"><span>PETG</span></label>
-          <label class="im-chip"><input type="radio" name="im-mat" value="asa"><span>ASA</span></label>
-          <label class="im-chip"><input type="radio" name="im-mat" value="tpu"><span>TPU</span></label>
-          <label class="im-chip"><input type="radio" name="im-mat" value="any" checked><span>À conseiller</span></label>
-        </div>
-      </fieldset>
-      <label class="en-field"><span>Quantité</span>
-        <input class="im-qty" name="qty" id="im-qty" type="number" inputmode="numeric" min="1" max="10000" value="1"></label>
-      <label class="en-field"><span>Ta pièce</span>
-        <textarea name="desc" id="im-desc" maxlength="1500" rows="4" placeholder="ex. 40 clips de 3 cm, noirs"></textarea></label>
-      <div class="im-files">
-        <label class="im-drop" id="im-drop">
-          <input type="file" id="im-file" class="sr-only" multiple>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12 4 7.5"/></svg>
-          <span class="im-drop-t"><b>Ajouter un fichier 3D</b><small>STL, 3MF, STEP, OBJ · 50 Mo</small></span>
-        </label>
-        <ul class="im-flist" id="im-flist" hidden></ul>
-      </div>
-      <button class="btn btn-ember btn-lg" type="submit" id="im-submit">Envoyer ma demande</button>
-      <p class="en-status" id="im-status" role="status" aria-live="polite"></p>
-    </form>
+<!-- ======================= RETOUR AU DÉPÔT ======================= -->
+<section class="ip-end">
+  <div class="wrap rv">
+    <h2 class="ip-h2">Prêt ? Dépose ton fichier.</h2>
+    <a class="btn btn-ember btn-lg" href="#demande" id="ip-end-go">Demander une soumission
+      <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
   </div>
 </section>
 
 </main>
+
+<div class="ip-overlay" aria-hidden="true"><b>Dépose ton fichier</b></div>
 
 <footer class="site-foot">
   <div class="foot-inner">
@@ -412,8 +388,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
-<script src="assets/nav.js?v=17"></script>
+<script src="assets/nav.js?v=18"></script>
 <script src="assets/promo.js?v=1"></script>
-<script src="assets/impression.js?v=1"></script>
+<script src="assets/impression.js?v=2"></script>
 </body>
 </html>
