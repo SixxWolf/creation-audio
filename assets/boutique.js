@@ -364,6 +364,7 @@
       if (/[?&]promo=1/.test(location.search)) { var ps = $('#promos'); if (ps) setTimeout(function () { ps.scrollIntoView({ block: 'start' }); }, 60); }
       renderCart();
       if (canBackorder() && window.CA.custOrder.editing()) openCart();
+      if (window.CA.panierCompte.resume()) openCart();   // code en attente (retour de l'appli courriel)
     }, function () { failCatalog(_t('Erreur réseau — recharge la page.')); });
   }
   function failCatalog(msg) {
@@ -1661,21 +1662,11 @@
     return _t('Bonjour,\n\nJe souhaite commander le filament suivant :\n\n') + blocks.join('\n\n') +
       _t('\n\nTotal estimé : ') + money(total()) + _t('\nRamassage : région de Québec.\n\nMerci !');
   }
-  function copyText(txt) {
-    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).catch(function () { fallbackCopy(txt); });
-    fallbackCopy(txt);
-  }
-  function fallbackCopy(txt) {
-    var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta); ta.select();
-    try { document.execCommand('copy'); } catch (e) {}
-    document.body.removeChild(ta);
-  }
   orderBtn.addEventListener('click', function () {
     if (count() === 0) return;
-    copyText(orderText());
-    cartMsg.textContent = _t('Liste copiée ✓ — colle-la dans Messenger et envoie.');
-    window.open(FB, '_blank', 'noopener');
+    window.CA.panierCompte.messenger(FB, orderText()).then(function (ok) {   // copie + avis + vrai lien vers Messenger
+      cartMsg.textContent = ok ? _t('Liste copiée ✓ — colle-la dans Messenger et envoie.') : '';
+    });
   });
   if (emailBtn) emailBtn.addEventListener('click', function () {
     if (count() === 0) return;
@@ -1687,9 +1678,9 @@
   /* ---------- commande en ligne (client connecté — assets/commande-client.js) ----------
      Prix recalculés par le serveur (même règle que ce panier). Les articles au-delà du
      stock partent « à commander ». Confirmation par courriel (customer-order-notify). */
-  var acctBox = $('#cart-acct'), sendBtn = $('#cart-send'), noteIn = $('#cart-note-in'),
+  var sendBtn = $('#cart-send'), noteIn = $('#cart-note-in'),
       editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login'),
-      resvBtn = $('#cart-resv'), resvWhy = $('#cart-resv-why'), resvInfo = null;
+      resvBtn = $('#cart-resv'), resvWhy = $('#cart-resv-why'), resvInfo = null, infoBtn = $('#cart-info');
   // Cueillette : choisie APRÈS l'envoi, sur l'écran « Ma cueillette » de Mon compte (compte.js)
   function goPickup(kind, id) { location.href = 'compte.html#/cueillette/' + kind + '/' + encodeURIComponent(id); }
   // Réservation 72 h (client approuvé) : articles EN STOCK seulement -> lignes au-delà du stock listées
@@ -1702,9 +1693,9 @@
   }
   function refreshAcctUi() {
     var on = canBackorder(), ed = on ? window.CA.custOrder.editing() : null;
-    if (acctBox) acctBox.hidden = !on;
     if (loginP) loginP.hidden = on;
-    orderBtn.classList.toggle('cart-email', on);   // Messenger passe en secondaire
+    if (noteIn) noteIn.hidden = !on;
+    if (infoBtn) infoBtn.hidden = on;
     if (editBar) { editBar.hidden = !ed; if (ed && editNum) editNum.textContent = ed.number; }
     if (sendBtn) {
       sendBtn.textContent = ed ? _t('Enregistrer les modifications') : _t('Envoyer ma commande');
@@ -1720,9 +1711,25 @@
       if (resvWhy) { resvWhy.hidden = !showR || !why; resvWhy.textContent = why; }
     }
   }
-  if (canBackorder() && window.CA.custOrder.reserveInfo) {
-    window.CA.custOrder.reserveInfo().then(function (i) { resvInfo = i; refreshAcctUi(); });
+  function loadResvInfo() {
+    if (canBackorder() && window.CA.custOrder.reserveInfo) {
+      window.CA.custOrder.reserveInfo().then(function (i) { resvInfo = i; refreshAcctUi(); });
+    }
   }
+  loadResvInfo();
+  // Visiteur sans compte : fenêtre courriel -> code -> nom, sans quitter le panier (panier-compte.js)
+  window.CA.panierCompte.setup({
+    onMessenger: function () { orderBtn.click(); },
+    onEmail: function () { if (emailBtn) emailBtn.click(); },
+    onSignedIn: function (send) {
+      // désormais connecté : note, réservation, articles hors stock commandables
+      renderCart(); loadResvInfo();
+      if (curColor && !screenProduct.hidden) renderConfig();
+      if (!screenAccs.hidden) renderAccs();
+      if (curAcc && !screenAcc.hidden) renderAcc();
+      if (send && count()) sendBtn.click();
+    }
+  });
   if (resvBtn) resvBtn.addEventListener('click', function () {
     if (!count() || resvBtn.disabled || resvBtn.classList.contains('is-disabled')) return;
     var until = new Date(Date.now() + 72 * 3600 * 1000).toLocaleString(window.CA.locale, { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
@@ -1740,6 +1747,7 @@
   });
   if (sendBtn) sendBtn.addEventListener('click', function () {
     if (!count() || sendBtn.disabled) return;
+    if (!canBackorder()) { window.CA.panierCompte.open(true); return; }
     var bo = overStock();
     if (!bo.length) { sendOrder(); return; }
     // articles au-delà du stock : le client confirme avoir compris le délai avant l'envoi

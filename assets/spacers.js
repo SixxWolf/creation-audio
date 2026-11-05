@@ -61,6 +61,7 @@
         loaded = true;
         applyRoute(); renderCart();
         if (canBackorder() && window.CA.custOrder.editing()) openCart();
+        if (window.CA.panierCompte.resume()) openCart();   // code en attente (retour de l'appli courriel)
       }, function () { $('#sp-list').innerHTML = _t('<p class="empty">Erreur réseau.</p>'); });
   }
 
@@ -213,19 +214,11 @@
     return _t('Bonjour,\n\nJe souhaite commander les spacers suivants :\n\n') + lines.join('\n') +
       _t('\n\nTotal estimé : ') + money(total()) + _t('\nRamassage : région de Québec.\n\nMerci !');
   }
-  function copyText(txt) {
-    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).catch(function () { fallbackCopy(txt); });
-    fallbackCopy(txt);
-  }
-  function fallbackCopy(txt) {
-    var ta = document.createElement('textarea'); ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(ta);
-  }
   orderBtn.addEventListener('click', function () {
     if (count() === 0) return;
-    copyText(orderText());
-    cartMsg.textContent = _t('Liste copiée ✓ — colle-la dans Messenger et envoie.');
-    window.open(FB, '_blank', 'noopener');
+    window.CA.panierCompte.messenger(FB, orderText()).then(function (ok) {   // copie + avis + vrai lien vers Messenger
+      cartMsg.textContent = ok ? _t('Liste copiée ✓ — colle-la dans Messenger et envoie.') : '';
+    });
   });
   if (emailBtn) emailBtn.addEventListener('click', function () {
     if (count() === 0) return;
@@ -235,24 +228,36 @@
   });
 
   /* ---- commande en ligne (client connecté) : même logique que la boutique ---- */
-  var acctBox = $('#cart-acct'), sendBtn = $('#cart-send'), noteIn = $('#cart-note-in'),
-      editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login');
+  var sendBtn = $('#cart-send'), noteIn = $('#cart-note-in'),
+      editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login'),
+      infoBtn = $('#cart-info');
   // Cueillette : choisie APRÈS l'envoi, sur l'écran « Ma cueillette » de Mon compte (compte.js)
   function goPickup(kind, id) { location.href = (PAGE ? '../' : '') + 'compte.html#/cueillette/' + kind + '/' + encodeURIComponent(id); }
   function refreshAcctUi() {
     var on = canBackorder(), ed = on ? window.CA.custOrder.editing() : null;
-    if (acctBox) acctBox.hidden = !on;
     if (loginP) loginP.hidden = on;
-    orderBtn.classList.toggle('cart-email', on);
+    if (noteIn) noteIn.hidden = !on;
+    if (infoBtn) infoBtn.hidden = on;
     if (editBar) { editBar.hidden = !ed; if (ed && editNum) editNum.textContent = ed.number; }
     if (sendBtn) {
       sendBtn.textContent = ed ? _t('Enregistrer les modifications') : _t('Envoyer ma commande');
       sendBtn.classList.toggle('is-disabled', count() === 0);
     }
   }
+  // Visiteur sans compte : fenêtre courriel -> code -> nom, sans quitter le panier (panier-compte.js)
+  window.CA.panierCompte.setup({
+    onMessenger: function () { orderBtn.click(); },
+    onEmail: function () { if (emailBtn) emailBtn.click(); },
+    onSignedIn: function (send) {
+      renderCart();
+      if (loaded) sc.refresh();
+      if (send && count()) sendBtn.click();
+    }
+  });
   if (sendBtn) sendBtn.addEventListener('click', function () {
     if (!count() || sendBtn.disabled) return;
-    var lines = entries().map(function (it) { return { product_id: it.id, kind: 'unit', qty: it.qty }; });
+    if (!canBackorder()) { window.CA.panierCompte.open(true); return; }
+    var lines =entries().map(function (it) { return { product_id: it.id, kind: 'unit', qty: it.qty }; });
     sendBtn.disabled = true; cartMsg.textContent = _t('Envoi…');
     window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
       cart = {}; saveCart(); if (noteIn) noteIn.value = '';

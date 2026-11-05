@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 20;
+window.CA_EN_V = 22;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -747,7 +747,39 @@ window.CA_EN = (function (pairs) {
   [`messenger courriel panier liste`, `messenger email cart list`],
   [`Choisis le format : **bobine** ou **recharge**, et la quantité.`, `Choose the format: **spool** or **refill**, and the quantity.`],
   [`Clique [Ajouter au panier]. Répète pour chaque article.`, `Click [Add to cart]. Repeat for each item.`],
-  [`Ouvre le panier et clique [Copier ma liste & écrire sur Messenger] — ou [Écrire par courriel].`, `Open the cart and click [Copy my list & write on Messenger] — or [Write by email].`],
+  [`Ouvre le panier et clique [Messenger] : ta liste est copiée, colle-la dans la conversation. Ou clique [Courriel].`, `Open the cart and click [Messenger]: your list is copied, paste it in the conversation. Or click [Email].`],
+  [`Clique [Envoyer ma commande].`, `Click [Send my order].`],
+  [`Pas encore connecté ? Entre ton courriel et le code reçu dans la fenêtre qui s'ouvre : ta commande part dès que c'est confirmé.`, `Not signed in yet? Enter your email and the code you receive in the window that opens: your order goes out as soon as it's confirmed.`],
+  [`Déjà connecté ? Tu peux ajouter une note avant d'envoyer (moment de ramassage, question…).`, `Already signed in? You can add a note before sending (pickup time, question…).`],
+  [`Il te faut un compte client`, `You need a customer account`],
+  [`Rapide : ton courriel suffit, aucun mot de passe. Déjà client ? Entre le même courriel.`, `Quick: your email is all it takes, no password. Already a customer? Enter the same email.`],
+  [`Ton courriel suffit, aucun mot de passe. On t'envoie un code.`, `Your email is all it takes, no password. We'll send you a code.`],
+  [`Connecte-toi`, `Sign in`],
+  [`Courriel`, `Email`],
+  [`ton@courriel.com`, `your@email.com`],
+  [`Recevoir mon code`, `Get my code`],
+  [`Ta commande part dès que c'est confirmé.`, `Your order goes out as soon as it's confirmed.`],
+  [`Confidentialité`, `Privacy`],
+  [`Sans compte :`, `Without an account:`],
+  [`courriel`, `email`],
+  [`Entre ton code`, `Enter your code`],
+  [`Envoyé à `, `Sent to `],
+  [`. Il expire dans 10 minutes.`, `. It expires in 10 minutes.`],
+  [`Code à 6 chiffres`, `6-digit code`],
+  [`Confirmer et envoyer`, `Confirm and send`],
+  [`Changer de courriel`, `Use another email`],
+  [`Ton compte est créé ✓`, `Your account is created ✓`],
+  [`Il nous manque ton nom pour préparer ta commande.`, `We just need your name to prepare your order.`],
+  [`Ton nom`, `Your name`],
+  [`Envoyer ma commande`, `Send my order`],
+  [`Enregistrer`, `Save`],
+  [`Te voilà connecté ✓`, `You're signed in ✓`],
+  [`Ta liste est copiée ✓`, `Your list is copied ✓`],
+  [`Copie ta liste`, `Copy your list`],
+  [`Copie ce texte, puis colle-le dans Messenger.`, `Copy this text, then paste it in Messenger.`],
+  [`Dans Messenger, colle-la dans la conversation et envoie.`, `In Messenger, paste it in the conversation and send.`],
+  [`Ouvrir Messenger`, `Open Messenger`],
+  [`Fermer`, `Close`],
   [`On te confirme la disponibilité et le moment du ramassage.`, `We confirm availability and the pickup time (or shipping).`],
   [`Tu paies au ramassage, à Québec.`, `You pay at pickup in Québec City — or before shipping.`],
   [`Commander en ligne avec ton compte`, `Order online with your account`],

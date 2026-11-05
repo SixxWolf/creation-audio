@@ -14,17 +14,17 @@
         'Ouvre la **Boutique** et choisis un matériau, puis une couleur.',
         _t('Choisis le format : **bobine** ou **recharge**, et la quantité.'),
         _t('Clique [Ajouter au panier]. Répète pour chaque article.'),
-        _t('Ouvre le panier et clique [Copier ma liste & écrire sur Messenger] — ou [Écrire par courriel].'),
+        _t('Ouvre le panier et clique [Messenger] : ta liste est copiée, colle-la dans la conversation. Ou clique [Courriel].'),
         _t('On te confirme la disponibilité et le moment du ramassage.'),
         _t('Tu paies au ramassage, à Québec.')
       ] },
     { id: 'commander-en-ligne', group: _t('Commander'), title: _t('Commander en ligne avec ton compte'),
       go: { href: 'compte.html', label: _t('Mon compte') }, keys: _t('envoyer commande connecte'),
       steps: [
-        'Connecte-toi dans **Mon compte** (voir « Créer un compte »).',
         _t('Ajoute tes articles au panier, comme d\'habitude.'),
-        _t('Dans le panier, ajoute une note au besoin (moment de ramassage, question…).'),
-        'Clique [Envoyer ma commande].',
+        _t('Clique [Envoyer ma commande].'),
+        _t('Pas encore connecté ? Entre ton courriel et le code reçu dans la fenêtre qui s\'ouvre : ta commande part dès que c\'est confirmé.'),
+        _t('Déjà connecté ? Tu peux ajouter une note avant d\'envoyer (moment de ramassage, question…).'),
         _t('Tu reçois une confirmation par courriel. On t\'écrit quand c\'est prêt.'),
         _t('Suis ta commande dans **Mon compte › Commandes**.')
       ] },

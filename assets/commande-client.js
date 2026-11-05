@@ -4,7 +4,7 @@
    La session du client vit sous « ca-compte-auth » (posée par compte.html) :
    ce module crée, seulement au besoin, un client Supabase sur cette clé.
    CA.custOrder :
-     signedIn() · email()
+     signedIn() · email() · client()  (client Supabase de la session, aussi utilisé par panier-compte.js)
      editing()    -> { id, number, at } | null  (commande en modification, posée par compte.html ;
                      oubliée après 6 h pour ne jamais modifier une vieille commande par erreur)
      cancelEdit()
@@ -250,7 +250,7 @@ window.CA = window.CA || {};
 
   window.CA.custOrder = {
     signedIn: function () { return !!email(); },
-    email: email, editing: editing, cancelEdit: cancelEdit, send: send,
+    email: email, client: cli, editing: editing, cancelEdit: cancelEdit, send: send,
     reserveInfo: reserveInfo, reserve: reserve,
     slots: slots, setPickup: setPickup, requestPickup: requestPickup, picker: picker, fmtPickup: fmtPickup
   };

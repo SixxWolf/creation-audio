@@ -27,7 +27,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../../assets/site.css?v=19">
-<link rel="stylesheet" href="../../assets/boutique.css?v=48">
+<link rel="stylesheet" href="../../assets/boutique.css?v=51">
+<link rel="stylesheet" href="../../assets/dialog.css?v=2">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="../../assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
@@ -37,7 +38,7 @@
 <!-- /spacers:head -->
 <script src="../../assets/look.js?v=5"></script>
 <script src="../../assets/i18n.js?v=1"></script>
-<script src="../../assets/i18n-en.js?v=20"></script>
+<script src="../../assets/i18n-en.js?v=22"></script>
 </head>
 <body class="home-page shop-page" data-spacer="ca-adp-ford-001">
 <a class="skip" href="#main">Skip to content</a>
@@ -99,17 +100,26 @@ Thank you!">Write to us before ordering</a><span class="ask-alt"> or by <a href=
   <div class="cart-items" id="cart-items"></div>
   <div class="cart-foot">
     <div class="cart-line cart-line-total"><span>Estimated total</span><span id="cart-total">0,00 $</span></div>
-    <div class="cart-acct" id="cart-acct" hidden>
+    <div class="cart-acct" id="cart-acct">
       <p class="cart-editbar" id="cart-editbar" hidden>Editing <b id="cart-edit-num"></b> <button type="button" id="cart-edit-cancel">Cancel</button></p>
-      <textarea id="cart-note-in" class="cart-note-in" rows="2" maxlength="500" aria-label="Note for Création Audio" placeholder="Note (optional)"></textarea>
-      <button type="button" class="cart-order cart-send" id="cart-send">Send my order</button>
+      <textarea id="cart-note-in" class="cart-note-in" rows="2" maxlength="500" aria-label="Note for Création Audio" placeholder="Note (optional)" hidden></textarea>
+      <div class="cart-send-row">
+        <button type="button" class="cart-order cart-send" id="cart-send">Send my order</button>
+        <button type="button" class="cart-info" id="cart-info" aria-label="Why an account?" aria-expanded="false" aria-controls="cart-tip">i</button>
+        <div class="cart-tip" id="cart-tip" hidden>
+          <b>This way of ordering requires a free account</b>
+          <ul><li>Pickup time slot of your choice</li><li>Out-of-stock items ordered for you</li><li>Your order history</li><li>Back-in-stock alerts</li></ul>
+        </div>
+      </div>
+      <a class="cart-have" id="cart-login" href="../compte.html">Already have an account? Sign in</a>
     </div>
-    <button type="button" class="cart-order" id="cart-order">Copy my list &amp; write on Messenger</button>
-    <button type="button" class="cart-order cart-email" id="cart-email">Write by email</button>
+    <div class="cart-alt">
+      <button type="button" class="cart-order cart-email" id="cart-order">Messenger</button>
+      <button type="button" class="cart-order cart-email" id="cart-email">Email</button>
+    </div>
     <p class="cart-msg" id="cart-msg" role="status"></p>
     <button type="button" class="cart-clear" id="cart-clear">Empty cart</button>
     <p class="cart-note">No online payment — we confirm availability and pickup in Québec City (shipping on request).</p>
-    <p class="cart-login" id="cart-login">Order online? <a href="../compte.html">Sign in</a></p>
   </div>
 </aside>
 
@@ -193,12 +203,14 @@ Thank you!">Write to us before ordering</a><span class="ask-alt"> or by <a href=
 </aside>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
+<script src="../../assets/dialog.js?v=5"></script>
 <script src="../../assets/supabase-config.js?v=1"></script>
 <script src="../../assets/supabase-client.js?v=1"></script>
 <script src="../../assets/nav.js?v=18"></script>
-<script src="../../assets/commande-client.js?v=9"></script>
+<script src="../../assets/commande-client.js?v=11"></script>
+<script src="../../assets/panier-compte.js?v=2"></script>
 <script src="../../assets/promo.js?v=1"></script>
 <script src="../../assets/spacer-catalog.js?v=17"></script>
-<script src="../../assets/spacers.js?v=17"></script>
+<script src="../../assets/spacers.js?v=19"></script>
 </body>
 </html>

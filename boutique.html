@@ -27,7 +27,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=19">
-<link rel="stylesheet" href="assets/boutique.css?v=48">
+<link rel="stylesheet" href="assets/boutique.css?v=51">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="assets/fetes.css?v=3">
@@ -161,23 +161,28 @@
   <div class="cart-items" id="cart-items"></div>
   <div class="cart-foot">
     <div class="cart-line cart-line-total"><span>Total estimé</span><span id="cart-total">0,00 $</span></div>
-    <div class="cart-acct" id="cart-acct" hidden>
+    <div class="cart-acct" id="cart-acct">
       <p class="cart-editbar" id="cart-editbar" hidden>Modification de <b id="cart-edit-num"></b> <button type="button" id="cart-edit-cancel">Annuler</button></p>
-      <textarea id="cart-note-in" class="cart-note-in" rows="2" maxlength="500" aria-label="Note pour Création Audio" placeholder="Note (facultatif)"></textarea>
-      <button type="button" class="cart-order cart-send" id="cart-send">Envoyer ma commande</button>
+      <textarea id="cart-note-in" class="cart-note-in" rows="2" maxlength="500" aria-label="Note pour Création Audio" placeholder="Note (facultatif)" hidden></textarea>
+      <div class="cart-send-row">
+        <button type="button" class="cart-order cart-send" id="cart-send">Envoyer ma commande</button>
+        <button type="button" class="cart-info" id="cart-info" aria-label="Pourquoi un compte ?" aria-expanded="false" aria-controls="cart-tip">i</button>
+        <div class="cart-tip" id="cart-tip" hidden>
+          <b>Cette façon de commander demande un compte gratuit</b>
+          <ul><li>Plage de cueillette au choix</li><li>Articles hors stock commandés pour toi</li><li>Historique de tes commandes</li><li>Alertes de retour en stock</li></ul>
+        </div>
+      </div>
+      <a class="cart-have" id="cart-login" href="compte.html">Déjà un compte ? Connecte-toi</a>
       <button type="button" class="cart-order cart-email cart-resv" id="cart-resv" hidden>Réserver 72 h</button>
       <p class="cart-resv-why" id="cart-resv-why" hidden></p>
     </div>
-    <button type="button" class="cart-order" id="cart-order">Copier ma liste &amp; écrire sur Messenger</button>
-    <button type="button" class="cart-order cart-email" id="cart-email">Écrire par courriel</button>
+    <div class="cart-alt">
+      <button type="button" class="cart-order cart-email" id="cart-order">Messenger</button>
+      <button type="button" class="cart-order cart-email" id="cart-email">Courriel</button>
+    </div>
     <p class="cart-msg" id="cart-msg" role="status"></p>
     <button type="button" class="cart-clear" id="cart-clear">Vider le panier</button>
     <p class="cart-note">Aucun paiement en ligne — on confirme la dispo et un ramassage à Québec.</p>
-    <div class="cart-login" id="cart-login">
-      <b>Crée ton compte gratuit</b>
-      <ul><li>Commande directe sur le site</li><li>Réservation et filament hors stock</li><li>Plage de cueillette au choix</li><li>Historique de tes commandes</li></ul>
-      <a class="cart-login-btn" href="compte.html">Créer mon compte ou me connecter</a>
-    </div>
   </div>
 </aside>
 
@@ -265,8 +270,9 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=18"></script>
-<script src="assets/commande-client.js?v=9"></script>
+<script src="assets/commande-client.js?v=11"></script>
+<script src="assets/panier-compte.js?v=2"></script>
 <script src="assets/promo.js?v=1"></script>
-<script src="assets/boutique.js?v=50"></script>
+<script src="assets/boutique.js?v=52"></script>
 </body>
 </html>
