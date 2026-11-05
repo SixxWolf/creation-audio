@@ -103,12 +103,15 @@
     el.setAttribute('data-k', st.k);
     $('.fm-file', el).textContent = (active || s.state === 'FINISH') && s.file ? s.file : '';
     var bar = $('.fm-bar', el); bar.setAttribute('aria-valuenow', pct); $('i', bar).style.width = pct + '%';
-    bar.classList.toggle('is-off', !active);
+    var done = !offline && s.state === 'FINISH';
+    if (done) { pct = 100; bar.setAttribute('aria-valuenow', 100); $('i', bar).style.width = '100%'; }
+    bar.classList.toggle('is-off', !active && !done);
+    bar.classList.toggle('is-done', done);
 
-    var show = active || s.state === 'FINISH';
+    var show = active || done;
     var f = {
-      pct: show && s.pct != null ? s.pct + ' %' : '—',
-      layer: show && s.layer != null ? s.layer + ' / ' + (s.layers != null ? s.layers : '—') : '—',
+      pct: show && s.pct != null ? (done ? 100 : s.pct) + ' %' : '—',
+      layer: show && s.layer != null ? (done && s.layers != null ? s.layers : s.layer) + ' / ' + (s.layers != null ? s.layers : '—') : '—',
       left: active ? fmtLeft(s.left) : '—',
       end: active ? (fmtEnd(s.left) || '—') : '—',
       nozzle: offline ? '—' : deg(s.nozzle) + (s.nozzle_t ? ' / ' + s.nozzle_t + '°' : ''),
