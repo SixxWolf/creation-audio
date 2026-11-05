@@ -28,3 +28,7 @@ tools/news-visuals/out/
 amazon/
 thermal labels/
 result.json
+
+# Relais de la ferme d imprimantes : dépendances npm (la config avec les codes est hors dépôt)
+tools/farm-relay/node_modules/
+tools/farm-relay/package-lock.json

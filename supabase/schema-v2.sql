@@ -3939,6 +3939,58 @@ insert into public.admin_settings (key, value)
   on conflict (key) do nothing;
 
 -- ------------------------------------------------------------
+-- IMPRIMANTES (Atelier › Imprimantes — tableau de bord de la ferme)
+-- Une ligne par imprimante ; « status » = dernier relevé poussé par le relais de l'atelier
+-- (tools/farm-relay/relay.js). Le relais n'a pas de compte : il appelle la RPC printer_push avec un
+-- jeton secret dont seul le hachage (sha-256) est gardé dans printer_tokens (RLS sans policy = fermée).
+-- L'IP et le code d'accès des imprimantes ne passent JAMAIS par la base (ils restent dans la config locale du relais).
+-- ------------------------------------------------------------
+create table if not exists public.printers (
+  id       text primary key,
+  name     text not null,
+  model    text not null default 'P2S',
+  serial   text,
+  cam_src  text,
+  sort     int  not null default 0,
+  status   jsonb not null default '{}'::jsonb,
+  seen_at  timestamptz
+);
+alter table public.printers enable row level security;
+drop policy if exists printers_admin_all on public.printers;
+create policy printers_admin_all on public.printers for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.printers from anon;
+
+create table if not exists public.printer_tokens (
+  hash text primary key,
+  note text
+);
+alter table public.printer_tokens enable row level security;
+revoke all on public.printer_tokens from anon, authenticated;
+
+create or replace function public.printer_push(p_token text, p_rows jsonb)
+returns int
+language plpgsql security definer set search_path = public as $$
+declare r jsonb; n int := 0;
+begin
+  if not exists (select 1 from public.printer_tokens
+                 where hash = encode(sha256(convert_to(coalesce(p_token, ''), 'utf8')), 'hex')) then
+    raise exception 'jeton invalide' using errcode = '42501';
+  end if;
+  for r in select * from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) loop
+    insert into public.printers (id, name, model, serial, cam_src, sort, status, seen_at)
+    values (r->>'id', coalesce(r->>'name', r->>'id'), coalesce(r->>'model', 'P2S'), r->>'serial', r->>'cam',
+            coalesce((r->>'sort')::int, 0), coalesce(r->'status', '{}'::jsonb), now())
+    on conflict (id) do update
+      set status = excluded.status, seen_at = now(), serial = excluded.serial, cam_src = excluded.cam_src;
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+revoke all on function public.printer_push(text, jsonb) from public;
+grant execute on function public.printer_push(text, jsonb) to anon, authenticated;
+
+-- ------------------------------------------------------------
 -- Vérification
 -- ------------------------------------------------------------
 select count(*) as produits_v2 from public.products;

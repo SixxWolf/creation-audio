@@ -1,0 +1,36 @@
+/* Atelier › Imprimantes — tableau de bord de la ferme (cms-imprimantes.js) */
+.fm-summary { margin:4px 0 0; font-size:.9rem; color:var(--muted); }
+.fm-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:var(--gap); align-items:start; }
+.fm-empty { grid-column:1 / -1; }
+
+.fm-card { display:flex; flex-direction:column; min-width:0; overflow:hidden; background:var(--paper);
+  border:1px solid var(--line); border-radius:var(--radius); }
+.fm-card[data-k="off"] { opacity:.65; }
+.fm-card[data-k="bad"] { border-color:var(--bad); }
+
+.fm-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; }
+.fm-name { margin:0; font-size:1rem; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fm-chip { flex:none; padding:3px 10px; border-radius:999px; font-size:.76rem; font-weight:700; white-space:nowrap;
+  color:var(--muted); background:var(--wash); }
+.fm-chip[data-k="run"]  { color:var(--on-ember); background:var(--ember); }
+.fm-chip[data-k="good"] { color:var(--good-ink); background:var(--good-wash); }
+.fm-chip[data-k="warn"] { color:var(--warn-ink); background:color-mix(in srgb, var(--warn-ink) 14%, var(--paper)); }
+.fm-chip[data-k="bad"]  { color:var(--bad-ink); background:var(--bad-wash); }
+
+.fm-cam { position:relative; aspect-ratio:16 / 9; background:var(--charcoal); display:flex; align-items:center; justify-content:center; }
+.fm-cam-off { font-size:.82rem; color:#9BA1AB; padding:0 12px; text-align:center; }
+.fm-cam.is-on .fm-cam-off { display:none; }
+.fm-frame { position:absolute; inset:0; width:100%; height:100%; border:0; background:#000; }
+
+.fm-body { display:flex; flex-direction:column; gap:10px; padding:12px 14px 14px; }
+.fm-file { margin:0; min-height:1.3em; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fm-bar { height:8px; border-radius:999px; background:var(--wash); overflow:hidden; }
+.fm-bar i { display:block; height:100%; width:0; background:var(--ember); border-radius:inherit; transition:width .6s ease; }
+.fm-bar.is-off i { background:var(--line); }
+
+.fm-stats { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px 14px; margin:0; }
+.fm-stats div { display:flex; justify-content:space-between; align-items:baseline; gap:8px; min-width:0; }
+.fm-stats dt { font-size:.8rem; color:var(--muted); }
+.fm-stats dd { margin:0; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+@media (max-width:480px) { .fm-stats { grid-template-columns:1fr; } }

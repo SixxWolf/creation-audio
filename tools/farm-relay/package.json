@@ -1,0 +1,9 @@
+{
+  "name": "farm-relay",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Relais atelier : imprimantes Bambu (MQTT local) vers Supabase",
+  "main": "relay.js",
+  "scripts": { "start": "node relay.js" },
+  "dependencies": { "mqtt": "^5.10.0" }
+}
