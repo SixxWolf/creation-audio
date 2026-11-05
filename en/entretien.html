@@ -31,10 +31,9 @@
 <link rel="stylesheet" href="../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../assets/site.css?v=19">
 <link rel="stylesheet" href="../assets/accueil.css?v=23">
-<link rel="stylesheet" href="../assets/entretien.css?v=8">
+<link rel="stylesheet" href="../assets/entretien-v2.css?v=1">
 <link rel="stylesheet" href="../assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
-<script>if(window.IntersectionObserver)document.documentElement.classList.add('en-js')</script>
 <script src="../assets/look.js?v=5"></script>
 <script src="../assets/i18n.js?v=1"></script>
 <script src="../assets/i18n-en.js?v=18"></script>
@@ -74,257 +73,196 @@
 
 <main id="main">
 
-<!-- ======================= HÉROS : le parc qui s'allume ======================= -->
-<section class="en-hero">
-  <div class="wrap en-hero-grid">
-    <div class="en-hero-tx">
-      <p class="eyebrow en-in" style="--d:0">Printer maintenance</p>
-      <h1 class="en-title en-in" style="--d:1">Your printers clean, greased, <span class="en-hl">ready to print.</span></h1>
-      <p class="en-lead en-in" style="--d:2">One visit a month, at a fixed price per machine. You print, we take care of the rest.</p>
-      <div class="hero-cta en-in" style="--d:3">
+<!-- ======================= HÉROS : la machine expliquée =======================
+     data-x / data-y : position du point sur la machine, en % du cadre (.et-view).
+     Pour ajouter une vraie photo à un point : data-photo="assets/entretien/galerie/xxx.webp" sur son <li>. -->
+<section class="et-hero" aria-labelledby="et-title">
+  <div class="wrap et-hero-grid">
+    <div class="et-hero-tx">
+      <p class="eyebrow et-in" style="--d:0">Printer maintenance</p>
+      <h1 class="et-title et-in" style="--d:1" id="et-title">We know your machines part by part. <span>You print, we take care of the rest.</span></h1>
+      <p class="et-lead et-in" style="--d:2">One on-site visit every month. Cleaning, lubrication and findings, products included.</p>
+      <div class="et-cta et-in" style="--d:3">
         <a class="btn btn-ember btn-lg" href="#demande">Request maintenance
           <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
-        <a class="btn btn-ghost btn-lg" href="#tarifs">See the prices</a>
+        <span class="et-price"><b class="et-unit" data-price="25">25 $</b> per A1, per month</span>
       </div>
-      <ul class="en-chips en-in" style="--d:4" aria-label="What's included">
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Full cleaning</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Axis lubrication</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Supplies included</li>
-        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Findings noted</li>
-      </ul>
+      <ol class="et-points et-in" style="--d:4" id="et-points">
+        <li data-x="64.1" data-y="41.8">
+          <button type="button" class="et-chip"><span class="et-chip-n">1</span><span class="et-chip-l">Rails and rods</span></button>
+          <div class="et-point-tx"><p>Cleaned, then lubricated with the right product.</p><small>Carbon rods on the X and P series: alcohol only.</small></div>
+        </li>
+        <li data-x="72.3" data-y="64.4">
+          <button type="button" class="et-chip"><span class="et-chip-n">2</span><span class="et-chip-l">Z-axis screws</span></button>
+          <div class="et-point-tx"><p>Greased with white lithium grease.</p></div>
+        </li>
+        <li data-x="45.9" data-y="46.5">
+          <button type="button" class="et-chip"><span class="et-chip-n">3</span><span class="et-chip-l">Nozzle and purge area</span></button>
+          <div class="et-point-tx"><p>Residue removed, purge area emptied.</p></div>
+        </li>
+        <li data-x="46.2" data-y="36.9">
+          <button type="button" class="et-chip"><span class="et-chip-n">4</span><span class="et-chip-l">Fans</span></button>
+          <div class="et-point-tx"><p>Dusted gently.</p></div>
+        </li>
+        <li data-x="33.4" data-y="80.6">
+          <button type="button" class="et-chip"><span class="et-chip-n">5</span><span class="et-chip-l">Build plate</span></button>
+          <div class="et-point-tx"><p>Cleaned with isopropyl alcohol.</p></div>
+        </li>
+        <li data-x="53.8" data-y="89.8">
+          <button type="button" class="et-chip"><span class="et-chip-n">6</span><span class="et-chip-l">Exterior and findings</span></button>
+          <div class="et-point-tx"><p>Wiped down, and anything wearing out is noted for you.</p></div>
+        </li>
+      </ol>
     </div>
 
-    <div class="en-park en-in" style="--d:2" id="en-park" aria-hidden="true">
-      <div class="en-park-head">
-        <span class="en-park-t">Your fleet</span>
-        <span class="en-count"><b id="en-n">4</b><span>/ 4 ready to print</span></span>
+    <div class="et-stage et-in" style="--d:2" id="et-stage">
+      <div class="et-view" id="et-view">
+        <img class="et-machine" src="../assets/entretien/a1.webp" alt="Bambu Lab A1 printer" width="700" height="700" decoding="async" fetchpriority="high">
+        <p class="et-tag"><b>Bambu Lab A1</b><span>Pick a point</span></p>
+        <i class="et-spot" aria-hidden="true"></i>
+        <i class="et-line" aria-hidden="true"></i>
       </div>
-      <span class="en-bar"><i id="en-bar-f"></i></span>
-      <div class="en-tiles">
-        <figure class="en-tile is-clean" style="--k:.45; --f:0s">
-          <span class="en-tile-img"><img src="../assets/entretien/a1.webp" alt="" width="700" height="700" decoding="async"><i class="en-sweep"></i>
-            <svg class="en-glint" viewBox="0 0 24 24"><path d="M12 1.5c.7 5.6 2.9 7.8 8.5 8.5-5.6.7-7.8 2.9-8.5 8.5-.7-5.6-2.9-7.8-8.5-8.5 5.6-.7 7.8-2.9 8.5-8.5z" fill="currentColor"/></svg></span>
-          <figcaption><b>A1</b><span class="en-st"><span class="en-st-w">Waiting</span><span class="en-st-o">Serviced</span></span></figcaption>
-        </figure>
-        <figure class="en-tile is-clean" style="--k:.9; --f:-1.4s">
-          <span class="en-tile-img"><img src="../assets/entretien/p2s.webp" alt="" width="700" height="700" decoding="async"><i class="en-sweep"></i>
-            <svg class="en-glint" viewBox="0 0 24 24"><path d="M12 1.5c.7 5.6 2.9 7.8 8.5 8.5-5.6.7-7.8 2.9-8.5 8.5-.7-5.6-2.9-7.8-8.5-8.5 5.6-.7 7.8-2.9 8.5-8.5z" fill="currentColor"/></svg></span>
-          <figcaption><b>P2S</b><span class="en-st"><span class="en-st-w">Waiting</span><span class="en-st-o">Serviced</span></span></figcaption>
-        </figure>
-        <figure class="en-tile is-clean" style="--k:.7; --f:-2.6s">
-          <span class="en-tile-img"><img src="../assets/entretien/p1s.webp" alt="" width="700" height="700" decoding="async"><i class="en-sweep"></i>
-            <svg class="en-glint" viewBox="0 0 24 24"><path d="M12 1.5c.7 5.6 2.9 7.8 8.5 8.5-5.6.7-7.8 2.9-8.5 8.5-.7-5.6-2.9-7.8-8.5-8.5 5.6-.7 7.8-2.9 8.5-8.5z" fill="currentColor"/></svg></span>
-          <figcaption><b>P1S</b><span class="en-st"><span class="en-st-w">Waiting</span><span class="en-st-o">Serviced</span></span></figcaption>
-        </figure>
-        <figure class="en-tile is-clean" style="--k:1.1; --f:-3.8s">
-          <span class="en-tile-img"><img src="../assets/entretien/x2d.webp" alt="" width="700" height="700" decoding="async"><i class="en-sweep"></i>
-            <svg class="en-glint" viewBox="0 0 24 24"><path d="M12 1.5c.7 5.6 2.9 7.8 8.5 8.5-5.6.7-7.8 2.9-8.5 8.5-.7-5.6-2.9-7.8-8.5-8.5 5.6-.7 7.8-2.9 8.5-8.5z" fill="currentColor"/></svg></span>
-          <figcaption><b>X2D</b><span class="en-st"><span class="en-st-w">Waiting</span><span class="en-st-o">Serviced</span></span></figcaption>
-        </figure>
+      <div class="et-cap" id="et-cap" aria-live="polite">
+        <span class="et-cap-n" id="et-cap-n" aria-hidden="true">1</span>
+        <div class="et-cap-tx" id="et-cap-tx"></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ======================= TARIFS + CALCULATEUR (bande sombre) ======================= -->
-<section class="en-dark" id="tarifs" aria-labelledby="en-tarifs-t">
-  <div class="en-dark-bg" aria-hidden="true"><i class="en-blob b1"></i><i class="en-blob b2"></i></div>
-  <div class="wrap en-calc-grid">
-    <div class="en-calc-tx rv">
-      <p class="eyebrow">Prices</p>
-      <h2 id="en-tarifs-t">One price per machine, per month.</h2>
-      <p class="en-dark-sub">Same price whether you have one machine or a hundred. No tax added.</p>
-      <p class="en-note">Parts and troubleshooting are extra, with prior approval. <a href="conditions.html#entretien">Details</a></p>
-    </div>
-
-    <div class="en-calc rv" id="en-calc" style="--d:1">
-      <ul class="en-models">
-        <li class="en-model" data-model="a1" data-price="25" data-qty="3">
-          <span class="en-ph"><img src="../assets/entretien/a1.webp" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
-          <span class="en-pm"><b>Bambu Lab A1</b><small><b class="en-unit" data-price="25">25 $</b> per machine</small></span>
-          <span class="en-stepper" role="group" aria-label="Number of machines">
-            <button type="button" class="en-minus" aria-label="Fewer">−</button><output class="en-qty">3</output><button type="button" class="en-plus" aria-label="More">+</button>
-          </span>
-        </li>
-        <li class="en-model" data-model="xp" data-qty="0">
-          <span class="en-ph en-ph-3"><img src="../assets/entretien/p2s.webp" alt="" width="72" height="72" loading="lazy" decoding="async"><img src="../assets/entretien/p1s.webp" alt="" width="72" height="72" loading="lazy" decoding="async"><img src="../assets/entretien/x2d.webp" alt="" width="72" height="72" loading="lazy" decoding="async"></span>
-          <span class="en-pm"><b>Bambu Lab X / P series (X1C, P1S, P2S, X2D)</b><small>After assessment</small></span>
-          <span class="en-stepper" role="group" aria-label="Number of machines">
-            <button type="button" class="en-minus" aria-label="Fewer">−</button><output class="en-qty">0</output><button type="button" class="en-plus" aria-label="More">+</button>
-          </span>
-        </li>
-        <li class="en-model" data-model="snap" data-qty="0">
-          <span class="en-pm"><b>Snapmaker U1</b><small>After assessment</small></span>
-          <span class="en-stepper" role="group" aria-label="Number of machines">
-            <button type="button" class="en-minus" aria-label="Fewer">−</button><output class="en-qty">0</output><button type="button" class="en-plus" aria-label="More">+</button>
-          </span>
-        </li>
-      </ul>
-      <div class="en-total" aria-live="polite">
-        <div class="en-total-row">
-          <span class="en-total-l">Total per month</span>
-          <span class="en-total-v"><b id="en-total">75 $</b></span>
-        </div>
-        <p class="en-extra" id="en-extra" hidden></p>
-        <p class="en-other">Another model? We'll look at it together.</p>
-        <button class="btn btn-ember btn-lg en-go" type="button" id="en-calc-go">Request this service
-          <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-        </button>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ======================= PENDANT LA VISITE ======================= -->
-<section class="sec" id="visite" aria-labelledby="en-visite-t">
+<!-- ======================= TOI / NOUS ======================= -->
+<section class="et-sec sec-wash" id="visite" aria-labelledby="et-duo-t">
   <div class="wrap">
-    <header class="sec-head is-center rv">
-      <div>
-        <p class="eyebrow">During the visit</p>
-        <h2 id="en-visite-t">Everything we do on your machines.</h2>
+    <div class="rv">
+      <p class="eyebrow">Who does what</p>
+      <h2 class="et-h2" id="et-duo-t">To each their trade.</h2>
+    </div>
+    <div class="et-duo rv" style="--d:1">
+      <div class="et-toi">
+        <p class="et-who">You</p>
+        <ul>
+          <li>You print.</li>
+          <li>You sell.</li>
+          <li>You deliver.</li>
+        </ul>
+        <p class="et-toi-note">Maintenance is off your list.</p>
       </div>
-    </header>
-    <ul class="en-zones">
-      <li class="en-zone rv" style="--d:0">
-        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13 3 17h18l-2-4z"/><rect x="3" y="17" width="18" height="3" rx="1"/><path d="M9 9.5h.01M13 7.5h.01M16 10h.01"/></svg></span>
-        <h3>Build plate</h3>
-        <p>Cleaned with isopropyl alcohol.</p>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-      <li class="en-zone rv" style="--d:1">
-        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8v5l-2.5 4h-3L8 8z"/><path d="M12 15.5c-1.2 1.4-1.6 2.3-1.6 3a1.6 1.6 0 0 0 3.2 0c0-.7-.4-1.6-1.6-3z"/></svg></span>
-        <h3>Nozzle and purge area</h3>
-        <p>Residue removed, purge area emptied.</p>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-      <li class="en-zone rv" style="--d:2">
-        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18M3 16h18"/><rect x="7" y="5.5" width="5" height="5" rx="1"/><rect x="13" y="13.5" width="5" height="5" rx="1"/></svg></span>
-        <h3>Rails and rods</h3>
-        <p>Cleaned, then lubricated with the right product.</p>
-        <small class="en-zn">Carbon rods on the X and P series: alcohol only.</small>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-      <li class="en-zone rv" style="--d:3">
-        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M7.5 6.5 16.5 8M7.5 10.5 16.5 12M7.5 14.5 16.5 16M7.5 18.5 16.5 20" transform="translate(0 -1.5)"/></svg></span>
-        <h3>Z-axis screws</h3>
-        <p>Greased with white lithium grease.</p>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-      <li class="en-zone rv" style="--d:4">
-        <span class="en-zi en-zi-fan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1.7"/><path id="en-blade" d="M12 10.3C11.2 6.4 12.8 3.6 15 4.6c1.7.8.7 4.3-2.2 6z"/><use href="#en-blade" transform="rotate(120 12 12)"/><use href="#en-blade" transform="rotate(240 12 12)"/></svg></span>
-        <h3>Fans</h3>
-        <p>Dusted gently.</p>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-      <li class="en-zone rv" style="--d:5">
-        <span class="en-zi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3h6v1.5"/><path d="m9 13 2.2 2.2L15.5 11"/></svg></span>
-        <h3>Exterior and findings</h3>
-        <p>Wiped down, and anything wearing out is noted for you.</p>
-        <i class="en-shine" aria-hidden="true"></i>
-      </li>
-    </ul>
-  </div>
-</section>
-
-<!-- ======================= COMMENT ÇA SE PASSE ======================= -->
-<section class="sec sec-wash" id="etapes" aria-labelledby="en-etapes-t">
-  <div class="wrap">
-    <header class="sec-head is-center rv">
-      <div>
-        <p class="eyebrow">How it works</p>
-        <h2 id="en-etapes-t">Three steps.</h2>
+      <div class="et-nous">
+        <p class="et-who">Us</p>
+        <ul class="et-rows">
+          <li><b>On site, every month.</b><span>We come to you, nothing to move.</span></li>
+          <li><b>The right product in the right place.</b><span>Carbon rods: alcohol only. Z-axis screws: white lithium grease.</span></li>
+          <li><b>Wear parts, noted for you.</b><span>Nothing is replaced or billed without your approval.</span></li>
+          <li><b>Products included.</b><span>Nothing to buy on your end.</span></li>
+        </ul>
       </div>
-    </header>
-    <ol class="steps en-steps">
-      <li class="step" style="--d:0">
-        <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 5.5h16v10.5H9l-5 3.5z"/><path d="M8 9.5h8M8 12.5h5"/></svg></span>
-        <span class="step-n">1</span>
-        <h3>You write to us</h3>
-        <p>Your city and your machine models. That's it.</p>
-      </li>
-      <li class="step" style="--d:1">
-        <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
-        <span class="step-n">2</span>
-        <h3>We confirm</h3>
-        <p>The price, the travel and the date of the first visit.</p>
-      </li>
-      <li class="step" style="--d:2">
-        <span class="step-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></span>
-        <span class="step-n">3</span>
-        <h3>We visit every month</h3>
-        <p>Cleaning, lubrication, findings. Your machines stay ready.</p>
-      </li>
-    </ol>
+    </div>
   </div>
 </section>
 
 <!-- ======================= GALERIE : masquée tant qu'il n'y a pas de photos =======================
      Pour l'activer : retirer l'attribut hidden de la section et ajouter des <li><img src="assets/entretien/galerie/xxx.webp" alt="…"></li> dans la liste. -->
-<section class="sec" id="galerie" aria-labelledby="en-galerie-t" hidden>
+<section class="et-sec" id="galerie" aria-labelledby="et-galerie-t" hidden>
   <div class="wrap">
-    <header class="sec-head is-center rv">
-      <div>
-        <p class="eyebrow">In the field</p>
-        <h2 id="en-galerie-t">A visit in pictures.</h2>
+    <p class="eyebrow">In the field</p>
+    <h2 class="et-h2" id="et-galerie-t">A visit in pictures.</h2>
+    <ul class="et-gal"></ul>
+  </div>
+</section>
+
+<!-- ======================= TARIFS + DEMANDE : un seul bloc ======================= -->
+<section class="et-dark" id="tarifs" aria-labelledby="et-tarifs-t">
+  <div class="wrap et-order">
+    <div class="rv">
+      <p class="eyebrow">Prices</p>
+      <h2 id="et-tarifs-t">One price per machine, per month.</h2>
+      <p class="et-dark-sub">Same price whether you have one machine or a hundred. No tax added.</p>
+      <p class="et-next-t">What happens next</p>
+      <ol class="et-next">
+        <li><i>1</i><div><b>We confirm</b><span>The price, the travel and the date of the first visit.</span></div></li>
+        <li><i>2</i><div><b>We visit every month</b><span>Cleaning, lubrication, findings. Your machines stay ready.</span></div></li>
+      </ol>
+      <div class="et-notes">
+        <p>Service area: Québec City, its surroundings and the South Shore. Travel is confirmed based on your address.</p>
+        <p>Parts and troubleshooting are extra, with prior approval. <a href="conditions.html#entretien">Details</a></p>
       </div>
-    </header>
-    <ul class="en-gal"></ul>
+    </div>
+
+    <form class="et-form rv" style="--d:1" id="demande" novalidate aria-label="Request maintenance">
+      <ul class="et-models" id="et-models">
+        <li class="et-model" data-model="a1" data-price="25" data-qty="1">
+          <span class="et-th"><img src="../assets/entretien/a1.webp" alt="" width="56" height="56" loading="lazy" decoding="async"></span>
+          <span class="et-pm"><b>Bambu Lab A1</b><small><b class="et-unit" data-price="25">25 $</b> per machine</small></span>
+          <span class="et-stepper" role="group" aria-label="Number of machines">
+            <button type="button" class="et-minus" aria-label="Fewer">−</button><output class="et-qty">1</output><button type="button" class="et-plus" aria-label="More">+</button>
+          </span>
+        </li>
+        <li class="et-model" data-model="xp" data-qty="0">
+          <span class="et-th"><img src="../assets/entretien/p2s.webp" alt="" width="56" height="56" loading="lazy" decoding="async"></span>
+          <span class="et-pm"><b>Bambu Lab X / P series</b><small>X1C, P1S, P2S, X2D · after assessment</small></span>
+          <span class="et-stepper" role="group" aria-label="Number of machines">
+            <button type="button" class="et-minus" aria-label="Fewer">−</button><output class="et-qty">0</output><button type="button" class="et-plus" aria-label="More">+</button>
+          </span>
+        </li>
+        <li class="et-model" data-model="snap" data-qty="0">
+          <span class="et-th"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M4 8h16M9.5 8v3.5h5V8M7 16.5h10"/></svg></span>
+          <span class="et-pm"><b>Snapmaker U1</b><small>After assessment</small></span>
+          <span class="et-stepper" role="group" aria-label="Number of machines">
+            <button type="button" class="et-minus" aria-label="Fewer">−</button><output class="et-qty">0</output><button type="button" class="et-plus" aria-label="More">+</button>
+          </span>
+        </li>
+      </ul>
+      <div class="et-total" aria-live="polite">
+        <span class="et-total-l">Total per month</span>
+        <b class="et-total-v" id="et-total">25 $</b>
+        <p class="et-extra" id="et-extra" hidden></p>
+      </div>
+      <div class="et-fields">
+        <label class="et-field"><span>City or area</span>
+          <input name="city" id="et-city" required maxlength="120" autocomplete="address-level2" placeholder="e.g. Lévis"></label>
+        <label class="et-field"><span>Other model or details</span>
+          <input name="other" id="et-other" maxlength="300" placeholder="e.g. 1 Prusa MK4"></label>
+      </div>
+      <button class="btn btn-ember btn-lg et-send" type="submit" id="et-submit">Send my request
+        <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+      <p class="et-status" id="et-status" role="status" aria-live="polite"></p>
+      <a id="et-ask" class="sr-only" href="/en/compte.html#/messages" data-msg="Printer maintenance" tabindex="-1">Messages</a>
+    </form>
   </div>
 </section>
 
 <!-- ======================= QUESTIONS ======================= -->
-<section class="sec" id="faq" aria-labelledby="en-faq-t">
-  <div class="wrap en-faq-wrap">
-    <header class="sec-head is-center rv">
-      <div>
-        <p class="eyebrow">Questions</p>
-        <h2 id="en-faq-t">What people often ask us.</h2>
-      </div>
-    </header>
-    <div class="en-faq">
-      <details class="en-fq rv" style="--d:0">
-        <summary>How long does a visit take?</summary>
-        <p>It depends on the number of machines. When we confirm, we give you an estimated duration.</p>
-      </details>
-      <details class="en-fq rv" style="--d:1">
+<section class="et-sec" id="faq" aria-labelledby="et-faq-t">
+  <div class="wrap et-faq-grid">
+    <div class="rv">
+      <p class="eyebrow">Questions</p>
+      <h2 class="et-h2" id="et-faq-t">What people often ask us.</h2>
+      <p class="et-faq-q">A question? <a class="ask" href="/en/compte.html#/messages" data-msg="Printer maintenance">Write to us</a><span class="ask-alt"> or by <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:contact@creationaudio.ca?subject=Entretien%20d'imprimantes">email</a></span></p>
+    </div>
+    <div class="et-faq rv" style="--d:1">
+      <details class="et-fq" open>
         <summary>What is included in the price?</summary>
         <p>Cleaning, lubrication, supplies and a note of what is wearing out. Troubleshooting and parts are extra, with your prior approval.</p>
       </details>
-      <details class="en-fq rv" style="--d:2">
+      <details class="et-fq">
+        <summary>How long does a visit take?</summary>
+        <p>It depends on the number of machines. When we confirm, we give you an estimated duration.</p>
+      </details>
+      <details class="et-fq">
         <summary>What if a part is worn out?</summary>
         <p>We let you know. Nothing is replaced or billed without your approval.</p>
       </details>
-      <details class="en-fq rv" style="--d:3">
+      <details class="et-fq">
         <summary>Which area do you cover?</summary>
         <p>Québec City, the surrounding area and the South Shore. Travel is confirmed based on your address.</p>
       </details>
-      <details class="en-fq rv" style="--d:4">
+      <details class="et-fq">
         <summary>My model is not on the list.</summary>
-        <p>Write to us: we'll look together at what we can do for your machine.</p>
+        <p><a class="ask" href="/en/compte.html#/messages" data-msg="Printer maintenance">Write to us</a> : we'll look together at what we can do for your machine.</p>
       </details>
     </div>
-  </div>
-</section>
-
-<!-- ======================= DEMANDE ======================= -->
-<section class="sec sec-wash" id="demande" aria-labelledby="en-demande-t">
-  <div class="wrap en-join">
-    <div class="en-join-tx rv">
-      <p class="eyebrow">Request maintenance</p>
-      <h2 id="en-demande-t">Tell us what you have.</h2>
-      <p class="sec-sub">Service area: Québec City, its surroundings and the South Shore. Travel is confirmed based on your address.</p>
-      <p class="en-q">A question? <a class="ask" href="/en/compte.html#/messages" data-msg="Printer maintenance">Write to us</a></p>
-    </div>
-    <form class="en-form rv" style="--d:1" id="en-form" novalidate>
-      <label class="en-field"><span>City or area</span>
-        <input name="city" id="en-city" required maxlength="120" autocomplete="address-level2" placeholder="e.g. Lévis"></label>
-      <label class="en-field"><span>Your machines</span>
-        <textarea name="machines" id="en-machines" required maxlength="500" rows="3" placeholder="e.g. 3 Bambu A1, 1 X1C"></textarea></label>
-      <button class="btn btn-ember btn-lg" type="submit" id="en-submit">Send my request</button>
-      <p class="en-status" id="en-status" role="status" aria-live="polite"></p>
-      <a id="en-ask" class="sr-only" href="/en/compte.html#/messages" data-msg="Printer maintenance" tabindex="-1">Messages</a>
-    </form>
   </div>
 </section>
 
@@ -410,6 +348,6 @@
 <script src="../assets/supabase-client.js?v=1"></script>
 <script src="../assets/nav.js?v=17"></script>
 <script src="../assets/promo.js?v=1"></script>
-<script src="../assets/entretien.js?v=3"></script>
+<script src="../assets/entretien.js?v=4"></script>
 </body>
 </html>
