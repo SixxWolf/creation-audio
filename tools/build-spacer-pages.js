@@ -57,7 +57,8 @@ async function fetchSpacers(c) {
   if (!res.ok) throw new Error('Supabase ' + res.status + ' : ' + (await res.text()).slice(0, 300));
   const data = await res.json();
   if (!Array.isArray(data)) throw new Error('Supabase : réponse inattendue');
-  return data;
+  // pages statiques = prix NORMAL (une promo en cours est temporaire : elle s'affiche côté navigateur seulement)
+  return data.map(function (r) { return r.promo_on ? Object.assign({}, r, { sell_price: r.reg_price, promo_on: false, promo_id: null, reg_price: null }) : r; });
 }
 
 /* ---------- rendu : on exécute spacer-catalog.js tel quel ---------- */

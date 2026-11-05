@@ -32,6 +32,10 @@
   var CA0 = window.CA || {}, EN = CA0.lang === 'en';
   var _t = CA0.t || function (s, v) { return v ? String(s).replace(/\{(\w+)\}/g, function (m, k) { return v[k] == null ? m : v[k]; }) : s; };
   var money = CA0.money || function (n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; };
+  // promotions (promo.js) : le prix promo est déjà dans sell_price ; reg_price = prix normal à barrer
+  var PR = CA0.promo || { pct: function () { return 0; }, ribbon: function () { return ''; }, banner: function () { return ''; } };
+  function spPromo(p) { return !!(p && p.promo_id && p.promo_on); }
+  function spPct(p) { return spPromo(p) ? PR.pct(p.reg_price, p.sell_price) : 0; }
   var tr = CA0.tr || function (r, f) { return (r.attrs || {})[f] || ''; };
   var trs = CA0.trs || function (r, s) { return s; };
   function plural(n, one, many) { return n + ' ' + _t((EN ? n !== 1 : n > 1) ? many : one); }
@@ -354,7 +358,7 @@
       var base = +p.sell_price || 0, tiers = tiersFor(p);
       var pctOf = function (t) { return base > 0 && t.price < base ? Math.round((1 - t.price / base) * 100) : 0; };
       var max = tiers.reduce(function (m, t) { return Math.max(m, pctOf(t)); }, 0);
-      var html = '<div class="sp-pr base">' + (isDealer ? _t('1 paire') + ' : ' : '') + money(base) +
+      var html = '<div class="sp-pr base' + (spPromo(p) ? ' is-promo' : '') + '">' + (isDealer ? _t('1 paire') + ' : ' : '') + (spPromo(p) ? '<s>' + money(p.reg_price) + '</s> ' : '') + money(base) +
         (isDealer ? '' : _t(' <small>/ paire</small>')) + '</div>';
       if (!max) return html;
       // badge « jusqu'à −X % » : les paliers s'ouvrent en bulle (survol sur ordi, toucher sur mobile)
@@ -390,10 +394,11 @@
       var tags = (sz ? '<span class="sp-tag">' + esc(sz) + '</span>' : '') +
         (fit.length ? '<span class="sp-tag is-fit">' + IC.car + plural(fit.length, 'véhicule', 'véhicules') + '</span>' : '') +
         (spk.length ? '<span class="sp-tag is-fit">' + IC.spk + plural(spk.length, 'haut-parleur', 'haut-parleurs') + '</span>' : '');
-      return '<article class="sp-card" data-id="' + esc(p.id) + '">' +
+      return '<article class="sp-card' + (spPromo(p) ? ' is-promo' : '') + '" data-id="' + esc(p.id) + '">' +
         '<a class="sp-card-link" href="' + esc(hrefOf(p)) + '">' +
           '<div class="mat-media">' +
             (url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="sp-noimg">' + IC.photo + '</span>') +
+            (spPromo(p) ? PR.ribbon(spPct(p)) : '') +
           '</div>' +
           '<div class="sp-body">' +
             (tags ? '<div class="sp-tags">' + tags + '</div>' : '') +
@@ -673,9 +678,11 @@
           '<div class="pdp-panel">' +
             _t('<p class="pdp-eyebrow">Spacer') + (sz ? ' · ' + esc(sz) : '') + _t(' · vendu par paire</p>') +
             '<h1 class="pdp-name">' + esc(p.name) + '</h1>' +
+            (spPromo(p) ? PR.banner(p, spPct(p)) : '') +
             replHtml(p) +
             (desc ? '<p class="sp-summary">' + esc(desc) + '</p>' : '') +
             '<div class="pdp-priceline">' +
+              (spPromo(p) ? '<s class="pdp-was">' + money(p.reg_price) + '</s>' : '') +
               '<span class="pdp-price">' + money(p.sell_price) + _t('<small>/ paire</small></span>') +
               '<span class="pill ' + (b.cls === 'ok' ? 'ok' : b.cls === 'order' ? 'order' : 'bad') + '">' + esc(b.text) + '</span>' +
             '</div>' +

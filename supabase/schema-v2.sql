@@ -224,6 +224,111 @@ grant execute on function public._held_stock() to anon, authenticated;   -- appe
 -- traduction anglaise (site /en/), écrite en coulisse par la fonction « translate » (section LANGUE ANGLAISE)
 alter table public.products  add column if not exists i18n jsonb;
 alter table public.materials add column if not exists i18n jsonb;
+
+-- ------------------------------------------------------------
+-- PROMOTIONS (2026-11-05) — onglet admin « Promotions » (cms-promotions.js)
+-- Une promo = nom + dates + audience (public et/ou dealer) + seuil de stock + couleurs/items visés.
+-- mode 'price'   : prix fixes par item (promotion_items.price / price_2 / tiers / tiers_2 ; dealer_price / dealer_tiers)
+-- mode 'percent' : pct % retiré du prix normal ET de chaque palier normal.
+-- Plusieurs promos sur un même item : la plus forte remise l'emporte (_promo_best).
+-- Seuil de stock : l'item (ou le format bobine / recharge) sort de la promo dès que son stock < stock_min.
+-- Les VUES products_public / products_dealer renvoient déjà le prix promo dans sell_price / tiers :
+-- boutique, panier et serveur (_customer_fill_lines, _dealer_fill_lines) suivent sans autre règle.
+-- reg_price / reg_price_2 = prix normal (barré) ; promo_* = bandeau.
+-- ------------------------------------------------------------
+alter table public.products add column if not exists dealer_price numeric(10,2);
+create table if not exists public.promotions (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null default '',
+  name_en    text,
+  mode       text not null default 'price' check (mode in ('price', 'percent')),
+  pct        numeric(5,2),
+  starts_at  timestamptz not null default now(),
+  ends_at    timestamptz,
+  stock_min  integer not null default 0,
+  for_public boolean not null default true,
+  for_dealer boolean not null default false,
+  enabled    boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create table if not exists public.promotion_items (
+  promo_id     uuid not null references public.promotions(id) on delete cascade,
+  product_id   uuid not null references public.products(id) on delete cascade,
+  price        numeric(10,2),
+  price_2      numeric(10,2),
+  tiers        jsonb not null default '[]'::jsonb,
+  tiers_2      jsonb not null default '[]'::jsonb,
+  dealer_price numeric(10,2),
+  dealer_tiers jsonb not null default '[]'::jsonb,
+  primary key (promo_id, product_id)
+);
+create index if not exists promotion_items_product_idx on public.promotion_items (product_id);
+alter table public.promotions      enable row level security;
+alter table public.promotion_items enable row level security;
+drop policy if exists promotions_admin_all on public.promotions;
+create policy promotions_admin_all on public.promotions for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists promotion_items_admin_all on public.promotion_items;
+create policy promotion_items_admin_all on public.promotion_items for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.promotions, public.promotion_items from anon;
+
+-- Palier(s) réduits de p_pct % (mode « percent »)
+create or replace function public._promo_cut_tiers(p_tiers jsonb, p_pct numeric)
+returns jsonb language sql immutable set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('min', t -> 'min', 'price', round((t ->> 'price')::numeric * (1 - p_pct / 100.0), 2)) order by ord), '[]'::jsonb)
+    from jsonb_array_elements(case when jsonb_typeof(p_tiers) = 'array' then p_tiers else '[]'::jsonb end) with ordinality as x(t, ord)
+   where (t ->> 'price') ~ '^[0-9]{1,7}(\.[0-9]+)?$' and (t ->> 'min') ~ '^[0-9]{1,6}$';
+$$;
+-- les fonctions appelées par une vue sont vérifiées contre le rôle appelant (pas le propriétaire de la vue) : fonction pure, donc exécutable par tous
+revoke all on function public._promo_cut_tiers(jsonb, numeric) from public;
+grant execute on function public._promo_cut_tiers(jsonb, numeric) to anon, authenticated, service_role;
+
+-- Meilleure promo en cours par item et par audience ('public' | 'dealer'). Jamais exposée directement.
+drop view if exists public._promo_best;
+create view public._promo_best with (security_invoker = off) as
+with c as (
+  select a.aud, pr.id as promo_id, pr.name, pr.name_en, pr.ends_at, pr.mode, pr.pct, pr.stock_min,
+         pi.product_id, pi.price, pi.price_2, pi.tiers, pi.tiers_2, pi.dealer_price, pi.dealer_tiers,
+         p.type, p.qty, p.qty_2,
+         case when a.aud = 'dealer' then coalesce(p.dealer_price, p.sell_price)
+              when p.type = 'filament' then (case when not p.offer_spool then null when m.name is not null then m.sell_spool else p.sell_price end)
+              else p.sell_price end as reg1,
+         case when a.aud = 'dealer' or p.type <> 'filament' then null
+              else (case when not p.offer_refill then null when m.name is not null then m.sell_refill else p.sell_price_2 end) end as reg2,
+         case when a.aud = 'dealer' then p.tiers when p.type = 'spacer' then '[]'::jsonb
+              when m.name is not null then m.tiers_spool else p.tiers end as rt1,
+         case when a.aud = 'dealer' then '[]'::jsonb when m.name is not null then m.tiers_refill else p.tiers_2 end as rt2
+    from public.promotions pr
+    join public.promotion_items pi on pi.promo_id = pr.id
+    join public.products p on p.id = pi.product_id and p.active = true
+    left join public.materials m on m.name = p.material and m.brand = p.brand
+    cross join lateral (values ('public', pr.for_public), ('dealer', pr.for_dealer)) as a(aud, ok)
+   where pr.enabled and pr.starts_at <= now() and (pr.ends_at is null or pr.ends_at > now())
+     and a.ok and (a.aud = 'public' or p.type = 'spacer')
+), n as (
+  select c.*,
+         case when mode = 'percent' then round(reg1 * (1 - coalesce(pct, 0) / 100.0), 2) when aud = 'dealer' then dealer_price else price end as p1,
+         case when mode = 'percent' then round(reg2 * (1 - coalesce(pct, 0) / 100.0), 2) when aud = 'dealer' then null else price_2 end as p2,
+         case when mode = 'percent' then public._promo_cut_tiers(rt1, pct) when aud = 'dealer' then dealer_tiers
+              when type = 'spacer' then '[]'::jsonb else tiers end as t1,
+         case when mode = 'percent' then public._promo_cut_tiers(rt2, pct) when aud = 'dealer' then '[]'::jsonb else tiers_2 end as t2
+    from c
+), f as (
+  select n.*,
+         (p1 is not null and reg1 is not null and p1 < reg1 and (stock_min <= 0 or qty   is null or qty   >= stock_min)) as on1,
+         (p2 is not null and reg2 is not null and p2 < reg2 and (stock_min <= 0 or qty_2 is null or qty_2 >= stock_min)) as on2
+    from n
+)
+select distinct on (aud, product_id) aud, product_id, promo_id, name, name_en, ends_at, on1, on2, p1, p2, t1, t2, reg1, reg2
+  from f
+ where on1 or on2
+ order by aud, product_id,
+          greatest(case when on1 then 1 - p1 / reg1 else 0 end, case when on2 then 1 - p2 / reg2 else 0 end) desc,
+          ends_at nulls last, promo_id;
+revoke all on public._promo_best from public, anon, authenticated;
+
 drop view if exists public.products_public;
 create view public.products_public
 with (security_invoker = off) as
@@ -259,11 +364,14 @@ with (security_invoker = off) as
     -- prix null = format non vendu (bobine ou recharge) quand le matériau existe ;
     -- repli sur le prix porté par le produit uniquement s'il n'a pas de matériau.
     -- respecte aussi les formats désactivés manuellement sur la couleur (offer_spool / offer_refill)
-    case when not p.offer_spool  then null when m.name is not null then m.sell_spool  else p.sell_price   end as sell_price,
-    case when not p.offer_refill then null when m.name is not null then m.sell_refill else p.sell_price_2 end as sell_price_2,
+    -- promo en cours (_promo_best) : son prix et ses paliers remplacent les normaux
+    case when pb.on1 then pb.p1
+         when not p.offer_spool  then null when m.name is not null then m.sell_spool  else p.sell_price   end as sell_price,
+    case when pb.on2 then pb.p2
+         when not p.offer_refill then null when m.name is not null then m.sell_refill else p.sell_price_2 end as sell_price_2,
     -- Spacers : les rabais quantité sont RÉSERVÉS AU DEALER -> jamais exposés au public.
-    case when p.type = 'spacer' then '[]'::jsonb when m.name is not null then m.tiers_spool  else p.tiers   end as tiers,
-    case when m.name is not null then m.tiers_refill else p.tiers_2 end as tiers_2,
+    case when p.type = 'spacer' then '[]'::jsonb when pb.on1 then pb.t1 when m.name is not null then m.tiers_spool  else p.tiers   end as tiers,
+    case when pb.on2 then pb.t2 when m.name is not null then m.tiers_refill else p.tiers_2 end as tiers_2,
     m.description as material_desc,
     m.image_path  as material_image,   -- image vitrine choisie à la main pour le matériau (E4)
     m.long_desc   as material_long_desc, -- fiche : description longue
@@ -274,10 +382,15 @@ with (security_invoker = off) as
     -- stock offert = stock réel − réservations en cours (null = non suivi, reste null)
     case when p.qty   is null then null else greatest(0, p.qty   - coalesce(h.held_main, 0))   end as qty,
     case when p.qty_2 is null then null else greatest(0, p.qty_2 - coalesce(h.held_refill, 0)) end as qty_2,
-    p.size, p.sort_order
+    p.size, p.sort_order,
+    -- promo : id / noms / fin, format(s) en promo, prix normal (à barrer)
+    pb.promo_id, pb.name as promo_name, pb.name_en as promo_name_en, pb.ends_at as promo_ends,
+    coalesce(pb.on1, false) as promo_on, coalesce(pb.on2, false) as promo_on_2,
+    case when pb.on1 then pb.reg1 end as reg_price, case when pb.on2 then pb.reg2 end as reg_price_2
   from public.products p
   left join public.materials m on m.name = p.material and m.brand = p.brand
   left join public._held_stock() h on h.product_id = p.id
+  left join public._promo_best pb on pb.product_id = p.id and pb.aud = 'public'
   where p.active = true;
 
 grant select on public.products_public to anon, authenticated;
@@ -610,10 +723,15 @@ create view public.products_dealer with (security_invoker = off) as
            'aliases',      p.attrs -> 'aliases'
          )) as attrs,
          p.image_path,
-         coalesce(p.dealer_price, p.sell_price) as sell_price,
-         p.tiers, p.qty, p.sort_order,
-         p.slug                          -- adresse de la fiche (dealer.html#/s/<slug>) ; null = auto
+         case when pb.on1 then pb.p1 else coalesce(p.dealer_price, p.sell_price) end as sell_price,
+         case when pb.on1 then pb.t1 else p.tiers end as tiers,
+         p.qty, p.sort_order,
+         p.slug,                         -- adresse de la fiche (dealer.html#/s/<slug>) ; null = auto
+         -- promo dealer en cours : bandeau + prix normal à barrer
+         pb.promo_id, pb.name as promo_name, pb.name_en as promo_name_en, pb.ends_at as promo_ends,
+         coalesce(pb.on1, false) as promo_on, case when pb.on1 then pb.reg1 end as reg_price
   from public.products p
+  left join public._promo_best pb on pb.product_id = p.id and pb.aud = 'dealer'
   where p.active = true and p.type = 'spacer'
     and ( (select auth.jwt() ->> 'email') in (select email from public.dealers)
           or (select public.is_admin()) );   -- admin (2FA validée) : aperçu du portail
@@ -1058,9 +1176,11 @@ begin
      group by 1
   ), priced as (
     select c.pid, c.qty, c.ord, p.name,
-           public._dealer_unit_price(coalesce(p.dealer_price, p.sell_price, 0), p.tiers, c.qty) as unit
+           public._dealer_unit_price(case when pb.on1 then pb.p1 else coalesce(p.dealer_price, p.sell_price, 0) end,
+                                     case when pb.on1 then pb.t1 else p.tiers end, c.qty) as unit
       from clean c
       join public.products p on p.id = c.pid and p.type = 'spacer' and p.active = true
+      left join public._promo_best pb on pb.product_id = p.id and pb.aud = 'dealer'
      where c.qty > 0
   )
   insert into public.dealer_order_lines (order_id, product_id, name, qty, unit_price, line_total, sort_order)
@@ -1806,7 +1926,10 @@ begin
            case when pp.type = 'filament' and l.kind = 'refill' then pp.sell_price_2 else pp.sell_price end as base,
            case when pp.type = 'filament' and l.kind = 'refill' then pp.tiers_2
                 when pp.type = 'spacer' then '[]'::jsonb else pp.tiers end as tiers,
-           case when pp.type = 'filament' then 'fil|' || coalesce(nullif(pp.brand, ''), nullif(pp.material, ''), '')
+           -- article en promo : le palier se compte sur le total de la même promo (pas sur la marque)
+           case when pp.promo_id is not null and ((l.kind = 'refill' and pp.promo_on_2) or (l.kind <> 'refill' and pp.promo_on))
+                  then 'promo|' || pp.promo_id::text
+                when pp.type = 'filament' then 'fil|' || coalesce(nullif(pp.brand, ''), nullif(pp.material, ''), '')
                 when pp.type = 'accessory' and coalesce(btrim(pp.attrs ->> 'category'), '') <> ''
                   then 'acc|' || lower(btrim(pp.attrs ->> 'category'))
                 else 'one|' || l.pid::text || '|' || l.kind end as gkey,
@@ -4079,3 +4202,16 @@ grant execute on function public.site_stats_summary(date, date) to authenticated
 select count(*) as produits_v2 from public.products;
 select count(*) as factures_v2 from public.invoices;
 select count(*) as dealers_v2  from public.dealers;
+
+-- Promos en cours (public + dealer) pour la caisse et l'aperçu de commande dealer de l'admin.
+create or replace function public.admin_promo_prices()
+returns table (aud text, product_id uuid, promo_id uuid, promo_name text, on1 boolean, on2 boolean,
+               p1 numeric, p2 numeric, t1 jsonb, t2 jsonb, reg1 numeric, reg2 numeric)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not (select public.is_admin()) then raise exception 'forbidden'; end if;
+  return query select b.aud, b.product_id, b.promo_id, b.name, b.on1, b.on2, b.p1, b.p2, b.t1, b.t2, b.reg1, b.reg2
+                 from public._promo_best b;
+end $$;
+revoke all on function public.admin_promo_prices() from public, anon;
+grant execute on function public.admin_promo_prices() to authenticated;

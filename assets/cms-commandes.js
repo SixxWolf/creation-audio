@@ -110,9 +110,10 @@
     if (!loaded) listEl.innerHTML = '<p class="muted">Chargement…</p>';
     pending = Promise.all([
       sb.from('dealer_orders').select('*, dealer_order_lines(*)').order('created_at', { ascending: false }).limit(200),
-      sb.from('products').select('id,name,qty,image_path,active,sort_order,slug,dealer_price,sell_price,tiers,fitment:attrs->fitment,replaces:attrs->replaces,speakers:attrs->speakers,aliases:attrs->aliases').eq('type', 'spacer')
+      sb.from('products').select('id,name,qty,image_path,active,sort_order,slug,dealer_price,sell_price,tiers,fitment:attrs->fitment,replaces:attrs->replaces,speakers:attrs->speakers,aliases:attrs->aliases').eq('type', 'spacer'),
+      sb.rpc('admin_promo_prices')
     ]).then(function (r) {
-      var ro = r[0], rp = r[1];
+      var ro = r[0], rp = r[1], rpr = r[2];
       if (ro.error) {
         listEl.innerHTML = '<p class="empty">Impossible de charger les commandes.<br>' +
           (/relation|does not exist|schema cache/i.test(ro.error.message || '') ? 'Relance <strong>schema-v2.sql</strong> (section « Commandes dealer »).' : esc(ro.error.message)) + '</p>';
@@ -121,6 +122,11 @@
       orders = ro.data || [];
       stock = {};
       ((rp && rp.data) || []).forEach(function (p) { stock[p.id] = p; });
+      // promo dealer en cours (même prix que le portail) : prix + paliers remplacés, nom gardé pour l'étiquette
+      ((rpr && !rpr.error && rpr.data) || []).forEach(function (x) {
+        var p = x.aud === 'dealer' && x.on1 && stock[x.product_id];
+        if (p) { p.dealer_price = x.p1; p.tiers = x.t1 || []; p.promo = x.promo_name; }
+      });
       loaded = true;
       setBadge(orders.filter(function (o) { return o.status === 'new'; }).length);
       render();

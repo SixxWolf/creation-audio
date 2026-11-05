@@ -31,7 +31,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=12">
-<link rel="stylesheet" href="assets/accueil.css?v=21">
+<link rel="stylesheet" href="assets/accueil.css?v=22">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
@@ -220,6 +220,23 @@
       </div>
       <p class="sr-only" id="sw-live" aria-live="polite"></p>
     </div>
+  </div>
+</section>
+
+<!-- ======================= PROMOTIONS ======================= -->
+<!-- Rempli par accueil.js (colonnes promo_* de products_public) ; cache sans promo -->
+<section class="sec promo-sec" id="promotions" hidden>
+  <div class="wrap">
+    <header class="sec-head">
+      <div>
+        <p class="eyebrow">Promotions</p>
+        <h2>En promotion</h2>
+      </div>
+      <a class="sec-link" href="boutique.html?promo=1">Voir les promos
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </header>
+    <div class="pop-grid" id="promo-grid"></div>
   </div>
 </section>
 
@@ -484,6 +501,7 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=16"></script>
-<script src="assets/accueil.js?v=19"></script>
+<script src="assets/promo.js?v=1"></script>
+<script src="assets/accueil.js?v=20"></script>
 </body>
 </html>

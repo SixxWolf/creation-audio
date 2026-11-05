@@ -259,6 +259,22 @@
     if (kind === 'refill') return !!p.offer_refill && (m ? m.sell_refill != null : p.sell_price_2 != null);
     return !!p.offer_spool && (m ? m.sell_spool != null : p.sell_price != null);
   }
+  /* ---------- promotions en cours (RPC admin_promo_prices = vue _promo_best, comme la boutique) ---------- */
+  var promoMap = {};
+  function loadPromos() {
+    return Promise.resolve(sb.rpc('admin_promo_prices')).then(function (res) {
+      promoMap = {};
+      ((res && !res.error && res.data) || []).forEach(function (x) { promoMap[x.aud + '|' + x.product_id] = x; });
+    }, function () {});
+  }
+  // promo applicable à ce produit : kind 'refill' = 2e format ; null sans promo (ou format hors promo)
+  function promoOf(p, kind, aud) {
+    var x = p && promoMap[(aud || 'public') + '|' + p.id];
+    if (!x) return null;
+    var on = kind === 'refill' ? x.on2 : x.on1;
+    if (!on) return null;
+    return { id: x.promo_id, name: x.promo_name, base: +(kind === 'refill' ? x.p2 : x.p1), tiers: (kind === 'refill' ? x.t2 : x.t1) || [] };
+  }
   function filBase(p, kind) { var m = matOf(p); if (m) return kind === 'refill' ? m.sell_refill : m.sell_spool; return kind === 'refill' ? p.sell_price_2 : p.sell_price; }
   function filCost(p, kind) {
     // coût réel : CMP de ses réceptions, sinon moyenne de la même matière (cms-costing.js)
@@ -331,6 +347,8 @@
     return sb.from('products').select('*').eq('type', which)
       .order('sort_order', { ascending: true }).order('name', { ascending: true })
       .then(function (res) {
+        return loadPromos().then(function () { return res; });
+      }).then(function (res) {
         if (res.error) { if (shown) elCatalog.innerHTML = '<p class="empty">Impossible de charger le catalogue.</p>'; return; }
         catalog[which] = res.data || [];
         catalogLoaded[which] = true;
@@ -642,7 +660,11 @@
   function isDealer() { return clientType === 'dealer'; }
   function isInternal() { return clientType === 'internal'; }
   // spacer : prix client (à plat) OU prix dealer (+ rabais quantité) selon le type de client
-  function spacerDual(p) { return { client: +p.sell_price || 0, dealer: +(p.dealer_price != null ? p.dealer_price : p.sell_price) || 0, tiers: p.tiers || [] }; }
+  function spacerDual(p) {
+    var pc = promoOf(p, 'spool', 'public'), pd = promoOf(p, 'spool', 'dealer');
+    return { client: pc ? pc.base : (+p.sell_price || 0), dealer: pd ? pd.base : (+(p.dealer_price != null ? p.dealer_price : p.sell_price) || 0),
+      tiers: pd ? pd.tiers : (p.tiers || []), promo: (isDealer() ? pd : pc) ? (isDealer() ? pd : pc).name : '' };
+  }
   // coût d'un accessoire ou d'un spacer : coût moyen (réceptions / productions) prioritaire sur le coût saisi ;
   // bobine vide : bobine − recharge aux prix du jour (cms-costing.js), figé sur la ligne à l'enregistrement
   function itemCost(p) {
@@ -663,19 +685,23 @@
       base = filBase(p, kind); cost = filCost(p, kind); tiers = filTiers(p, kind);
       label = p.name; hex = p.hex;
       tierKey = filTierKey(p);   // rabais quantité cumulé par marque+format
-      meta = [p.brand, p.material, (kind === 'refill' ? 'Recharge' : 'Avec bobine')].filter(Boolean).join(' · ');
+      var pr = promoOf(p, kind);
+      if (pr) { base = pr.base; tiers = pr.tiers; tierKey = 'promo|' + pr.id; }   // palier cumulé sur la promo (comme le serveur)
+      meta = [p.brand, p.material, (kind === 'refill' ? 'Recharge' : 'Avec bobine'), pr ? 'Promo' : ''].filter(Boolean).join(' · ');
     } else if (c === 'accessory') {
       kind = 'unit';
       base = p.sell_price; tiers = p.tiers || [];
       tierKey = accTierKey(p);   // rabais quantité cumulé par catégorie
+      var pa = promoOf(p, 'spool');
+      if (pa) { base = pa.base; tiers = pa.tiers; tierKey = 'promo|' + pa.id; }
       cost = itemCost(p);
-      label = p.name; meta = 'Accessoire';
+      label = p.name; meta = pa ? 'Accessoire · Promo' : 'Accessoire';
     } else { // spacer : deux tarifs (client / dealer)
       kind = 'unit';
       sp = spacerDual(p);
       base = isDealer() ? sp.dealer : sp.client;
       tiers = isDealer() ? sp.tiers : [];
-      cost = itemCost(p); label = p.name; meta = 'Spacer · paire';
+      cost = itemCost(p); label = p.name; meta = sp.promo ? 'Spacer · paire · Promo' : 'Spacer · paire';
     }
     // fusion si même produit + même format et prix non modifié à la main
     var ex = lines.filter(function (l) { return l.productId === String(id) && l.kind === kind && !l.manual; })[0];
@@ -1592,14 +1618,16 @@
 
   // ajoute (ou incrémente) une ligne filament pour un format donné — indépendant du gabarit courant
   function scanAddFilament(p, kind) {
-    var base = filBase(p, kind), cost = filCost(p, kind), tiers = filTiers(p, kind);
-    var meta = [p.brand, p.material, (kind === 'refill' ? 'Recharge' : 'Avec bobine')].filter(Boolean).join(' · ');
+    var base = filBase(p, kind), cost = filCost(p, kind), tiers = filTiers(p, kind), tkey = filTierKey(p);
+    var pr = promoOf(p, kind);
+    if (pr) { base = pr.base; tiers = pr.tiers; tkey = 'promo|' + pr.id; }
+    var meta = [p.brand, p.material, (kind === 'refill' ? 'Recharge' : 'Avec bobine'), pr ? 'Promo' : ''].filter(Boolean).join(' · ');
     var ex = lines.filter(function (l) { return l.productId === String(p.id) && l.kind === kind && !l.manual; })[0];
     if (ex) { ex.qty += 1; ex.price = tierPrice(ex.base, ex.tiers, ex.qty); }
     else {
       lines.push({ id: uid(), productId: String(p.id), ptype: 'filament', kind: kind, label: p.name,
         meta: meta, hex: p.hex, qty: 1, base: +base || 0, tiers: tiers || [], cost: +cost || 0,
-        tierKey: filTierKey(p),
+        tierKey: tkey,
         price: tierPrice(base, tiers, 1), manual: false, sp: null });
     }
     afterChange();

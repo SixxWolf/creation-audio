@@ -452,3 +452,19 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
 .cp-list p { margin:0; font-size:.9rem; line-height:1.5; color:var(--muted); }
 @media (max-width:900px) { .cp-box { grid-template-columns:1fr; padding:26px 20px; gap:26px; } }
 @media (max-width:560px) { .cp-list { grid-template-columns:1fr; } }
+
+/* ---- En promotion ---- */
+:root { --promo:#d6232f; --promo-2:#ff4b3e; --on-promo:#fff; }
+.promo-sec .pop-grid { grid-template-columns:repeat(4, minmax(0, 1fr)); }
+.promo-card { border-color:color-mix(in srgb, var(--promo) 45%, var(--line)); }
+.promo-rib { position:absolute; top:12px; left:-6px; z-index:3; padding:6px 14px 6px 12px; color:var(--on-promo); background:linear-gradient(135deg, var(--promo-2), var(--promo));
+  border-radius:0 8px 8px 0; box-shadow:0 6px 14px -4px rgba(214,35,47,.55); font-family:var(--display); font-weight:800; font-size:1.05rem; line-height:1; white-space:nowrap; }
+.promo-rib::before { content:""; position:absolute; left:0; bottom:-6px; border-style:solid; border-width:6px 6px 0 0; border-color:#8e1119 transparent transparent transparent; }
+.promo-card .pop-foot b { color:var(--promo); }
+.promo-was { margin-left:4px; font-size:.82rem; color:var(--muted); }
+@media (max-width:1024px) { .promo-sec .pop-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+@media (max-width:760px) {
+  .promo-sec .pop-grid { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; gap:12px; padding-bottom:6px; }
+  .promo-sec .pop-card { flex:0 0 clamp(190px, 60vw, 240px); scroll-snap-align:start; }
+  .promo-rib { top:8px; padding:5px 11px 5px 9px; font-size:.95rem; }
+}

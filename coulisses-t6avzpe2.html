@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=132">
+<link rel="stylesheet" href="assets/admin.css?v=133">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=37">
@@ -108,6 +108,7 @@
       <nav class="mat-nav" id="mat-nav" aria-label="Aller au matériau"></nav>
       <button class="tab" type="button" data-tab="spacers" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5.5"/><path d="M12 2.5v1.5M12 20v1.5M2.5 12H4M20 12h1.5"/></svg><span>Spacers</span></button>
       <button class="tab" type="button" data-tab="accessoires" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.3V4.5a1 1 0 0 1 1-1h7.8l8.2 8.2a1 1 0 0 1 0 1.4l-6.9 6.9a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.5"/></svg><span>Accessoires</span></button>
+      <button class="tab" type="button" data-tab="promotions" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5L5 19"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg><span>Promotions</span></button>
 
       <p class="side-group" aria-hidden="true">Stock</p>
       <button class="tab" type="button" data-tab="inventaire" data-group="Stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg><span>Inventaire</span></button>
@@ -269,6 +270,85 @@
       </form>
 
       <div class="nw-list" id="nw-list"><p class="muted">Chargement…</p></div>
+     </div><!-- /.dock-main -->
+     <aside class="dock" data-dock aria-label="Éditeur"></aside>
+    </section>
+
+    <!-- ---------------- PROMOTIONS (cms-promotions.js, tables promotions + promotion_items) ----------------
+         Le prix promo est appliqué par les vues products_public / products_dealer (schema-v2.sql § PROMOTIONS). -->
+    <section class="tabpanel" data-panel="promotions" role="tabpanel" hidden>
+     <div class="dock-main">
+      <div class="panel-head">
+        <div>
+          <h1>Promotions</h1>
+          <p class="muted">Prix spéciaux sur des couleurs, spacers et accessoires.</p>
+        </div>
+        <span class="grow"></span>
+        <a class="btn btn-ghost btn-sm" href="./boutique.html" target="_blank" rel="noopener" data-ic="link">Voir la boutique</a>
+        <button class="btn btn-ghost btn-sm" id="pm-refresh" type="button" data-ic="refresh">Rafraîchir</button>
+        <button class="btn btn-accent" id="pm-new" type="button" data-ic="plus">Promotion</button>
+      </div>
+
+      <form class="editor" id="pm-editor" hidden>
+        <h2 id="pm-editor-title">Promotion</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="pm-name">Nom</label>
+            <input type="text" id="pm-name" maxlength="60" placeholder="Ex. Liquidation ABS" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pm-name-en">Nom en anglais</label>
+            <input type="text" id="pm-name-en" maxlength="60" placeholder="Ex. ABS clearance" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pm-start">Début</label>
+            <input type="date" id="pm-start">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pm-end">Fin</label>
+            <input type="date" id="pm-end">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pm-stock">S'arrête sous (en stock)</label>
+            <input type="number" id="pm-stock" min="0" step="1" value="0" inputmode="numeric">
+          </div>
+          <div class="field">
+            <span class="lbl">Pour</span>
+            <div class="ac-show">
+              <label class="inline"><input type="checkbox" id="pm-pub" checked> Public</label>
+              <label class="inline"><input type="checkbox" id="pm-dealer"> Dealers</label>
+            </div>
+          </div>
+          <div class="field col-2">
+            <span class="lbl" id="pm-mode-l">Rabais</span>
+            <div class="pm-mode">
+              <div class="fx-seg pr-seg" id="pm-mode" role="radiogroup" aria-labelledby="pm-mode-l">
+                <button type="button" class="fx-seg-btn" data-mode="price" role="radio" aria-checked="true">Prix fixes</button>
+                <button type="button" class="fx-seg-btn" data-mode="percent" role="radio" aria-checked="false">% de rabais</button>
+              </div>
+              <label class="pm-pct" id="pm-pct-w" hidden><input type="number" id="pm-pct" min="1" max="95" step="0.5" placeholder="20" inputmode="decimal"> %</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="pm-sec">
+          <h3>Articles</h3>
+          <input type="search" id="pm-q" class="pm-q" placeholder="Chercher" autocomplete="off">
+          <div class="pm-pick" id="pm-pick"></div>
+        </div>
+        <div class="pm-sec" id="pm-prices-w" hidden>
+          <h3>Prix</h3>
+          <div class="pm-prices" id="pm-prices"></div>
+        </div>
+
+        <div class="editor-actions">
+          <button class="btn btn-accent" type="submit" id="pm-save" data-ic="save">Enregistrer</button>
+          <button class="btn btn-ghost" type="button" id="pm-cancel">Annuler</button>
+          <span class="status" id="pm-status"></span>
+        </div>
+      </form>
+
+      <div class="pm-list" id="pm-list"><p class="muted">Chargement…</p></div>
      </div><!-- /.dock-main -->
      <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
@@ -2843,14 +2923,14 @@
 <script src="assets/cms-dealers.js?v=9"></script>
 <script src="assets/cms-clients.js?v=10"></script>
 <script src="assets/cms-messages.js?v=7"></script>
-<script src="assets/cms-facturation.js?v=56"></script>
+<script src="assets/cms-facturation.js?v=57"></script>
 <script src="assets/cms-historique.js?v=21"></script>
 <script src="assets/commande-client.js?v=1"></script>
 <script src="assets/cms-commandes-clients.js?v=24"></script>
 <script src="assets/cms-reservations.js?v=9"></script>
 <script src="assets/cms-cueillettes.js?v=7"></script>
 <script src="assets/doc-print.js?v=2"></script>
-<script src="assets/cms-commandes.js?v=12"></script>
+<script src="assets/cms-commandes.js?v=13"></script>
 <script src="assets/cms-statistiques.js?v=12"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
@@ -2866,6 +2946,7 @@
 <script src="assets/cms-imprimantes.js?v=8"></script>
 <script src="assets/cms-aujourdhui.js?v=2"></script>
 <script src="assets/cms-nouvelles.js?v=5"></script>
+<script src="assets/cms-promotions.js?v=2"></script>
 <script src="assets/cms-recherche.js?v=2"></script>
 <script src="assets/aide.js?v=3"></script>
 <script src="assets/cms-aide.js?v=8"></script>

@@ -125,6 +125,26 @@
   function stockOf(p, type) { return type === 'refill' ? (p.qty_2 | 0) : (p.qty | 0); }
   function baseOf(p, type) { return type === 'refill' ? p.sell_price_2 : p.sell_price; }
   function tiersOf(p, type) { return type === 'refill' ? p.tiers_2 : p.tiers; }
+  /* ---------- promotions (vues products_public : sell_price = prix promo, reg_price = prix normal) ---------- */
+  var PR = window.CA.promo;
+  function promoOn(p, type) { return !!(p && p.promo_id && (type === 'refill' ? p.promo_on_2 : p.promo_on)); }
+  function regOf(p, type) { return type === 'refill' ? p.reg_price_2 : p.reg_price; }
+  function pctOf(p, type) { return promoOn(p, type) ? PR.pct(regOf(p, type), baseOf(p, type)) : 0; }
+  // promo d'un matériau : { n couleurs, pct max, row (pour la fin / le nom) }
+  function matPromo(m) {
+    var o = null;
+    m.items.forEach(function (p) {
+      ['spool', 'refill'].forEach(function (t) {
+        if (!promoOn(p, t)) return;
+        var pc = pctOf(p, t);
+        if (!o) o = { ids: {}, n: 0, pct: 0, row: p };
+        if (!o.ids[p.id]) { o.ids[p.id] = 1; o.n++; }
+        if (pc > o.pct) { o.pct = pc; o.row = p; }
+      });
+    });
+    return o;
+  }
+  function accPromoPct(a) { return a.promoOn ? PR.pct(a.regPrice, a.price) : 0; }
   function inStockAs(p, type) { return offered(p, type) && stockOf(p, type) > 0; }
   function anyStock(p) { return inStockAs(p, 'spool') || inStockAs(p, 'refill'); }
   function fmtName(type) { return type === 'refill' ? _t('recharge') : _t('avec bobine'); }
@@ -146,6 +166,7 @@
     var CA = window.CA;
     return { id: p.id, name: CA.tr(p, 'name'), desc: CA.tr(p, 'description'),
              price: +p.sell_price || 0, img: imgs[0] || '', imgs: imgs,
+             promoOn: !!(p.promo_id && p.promo_on), promoId: p.promo_id || null, regPrice: +p.reg_price || 0, promoRow: p,
              qty: (p.qty == null ? null : (p.qty | 0)),
              tiers: normalizeTiers(p.tiers).filter(function (t) { return t.min > 1; }),
              cat: String(CA.tr(p, 'category') || '').trim(),
@@ -340,6 +361,7 @@
       buildCatalog();
       dataReady = true;
       applyRoute();          // honore l'URL courante (lien direct / retour navigateur)
+      if (/[?&]promo=1/.test(location.search)) { var ps = $('#promos'); if (ps) setTimeout(function () { ps.scrollIntoView({ block: 'start' }); }, 60); }
       renderCart();
       if (canBackorder() && window.CA.custOrder.editing()) openCart();
     }, function () { failCatalog(_t('Erreur réseau — recharge la page.')); });
@@ -468,7 +490,7 @@
     if (brands.length < 2) catChips.innerHTML = '';
 
     var list = catBrand ? brands.filter(function (B) { return B.name === catBrand; }) : brands;
-    var html = list.map(function (B) {
+    var html = promoSectionHtml(list) + list.map(function (B) {
       var mats = B.materials.filter(function (m) { return !onlyStock || m.items.some(anyStock); });
       if (!mats.length) return '';
       var nStock = B.items.filter(anyStock).length, id = 'g-' + slugify(B.name);
@@ -494,6 +516,31 @@
     if (sa) sa.addEventListener('click', function () { setOnlyStock(false); });
   }
 
+  // Section « En promotion » en tête de boutique : matériaux ayant des couleurs en promo + accessoires en promo
+  function promoSectionHtml(list) {
+    var mats = [];
+    list.forEach(function (B) {
+      B.materials.forEach(function (m) {
+        if (!matPromo(m)) return;
+        if (onlyStock && !m.items.some(function (p) { return anyStock(p) && (promoOn(p, 'spool') || promoOn(p, 'refill')); })) return;
+        mats.push(m);
+      });
+    });
+    mats.sort(function (a, b) { return matPromo(b).pct - matPromo(a).pct; });
+    var accs = catBrand ? [] : accessories.filter(function (a) { return a.promoOn && !(onlyStock && accOut(a)); });
+    if (!mats.length && !accs.length) return '';
+    var ends = null;
+    mats.forEach(function (m) { var e = matPromo(m).row.promo_ends; if (e && (!ends || e < ends)) ends = e; });
+    return '<section class="cat-group promo-sec" id="promos" aria-labelledby="g-promos">' +
+      '<header class="cat-ghead">' +
+        '<h2 class="cat-gtitle" id="g-promos">' + _t('En promotion') + '</h2>' +
+        (ends ? '<span class="cat-gmeta">' + esc(PR.endText(ends)) + '</span>' : '') +
+        '<span class="cat-grule" aria-hidden="true"></span>' +
+      '</header>' +
+      '<div class="cat-grid">' + mats.map(matCard).join('') + accs.map(accCard).join('') + '</div>' +
+    '</section>';
+  }
+
   function matCard(m) {
     var stock = m.items.filter(anyStock).sort(hueSort);
     var src = stock.length ? stock : m.items.slice().sort(hueSort);
@@ -504,11 +551,13 @@
     if (tag.length > 90) tag = tag.slice(0, 88).replace(/\s+\S*$/, '') + '…';
     var media = m.repImg ? '<img src="' + esc(m.repImg) + '" alt="" loading="lazy">'
                          : '<span class="mcard-sw" style="background:' + esc(swatchBg(m.rep)) + '"></span>';
-    return '<a class="mcard' + (out ? ' is-out' : '') + '" href="' + esc(routeFor(m.brand, m.name)) + '">' +
-      '<span class="mcard-media">' + media + '</span>' +
+    var pm = matPromo(m);
+    return '<a class="mcard' + (out ? ' is-out' : '') + (pm ? ' is-promo' : '') + '" href="' + esc(routeFor(m.brand, m.name)) + '">' +
+      '<span class="mcard-media">' + media + (pm ? PR.ribbon(pm.pct) : '') + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(m.name) + '</span>' +
-        (tag ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +
+        (pm ? '<span class="mcard-promo">' + plural(pm.n, 'couleur en promo', 'couleurs en promo') + '</span>' : '') +
+        (tag && !pm ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +
         '<span class="mcard-dots" aria-hidden="true">' + dots + (extra > 0 ? '<em>+' + extra + '</em>' : '') + '</span>' +
         '<span class="mcard-foot">' +
           '<span class="mcard-price">' + (min != null ? _t('dès <b>') + money(min) + '</b>' : '') +
@@ -680,7 +729,7 @@
     });
     var swatches = items.map(function (it) {
       var on = it === p, o = !inStockAs(it, curType);
-      return '<button type="button" class="sw' + (on ? ' is-active' : '') + (o ? ' is-out' : '') + '" data-id="' + esc(it.id) + '"' +
+      return '<button type="button" class="sw' + (on ? ' is-active' : '') + (o ? ' is-out' : '') + (promoOn(it, curType) ? ' is-promo' : '') + '" data-id="' + esc(it.id) + '"' +
         ' style="--c:' + esc(swatchBg(it)) + '" aria-label="' + esc(it.name + ' — ' + swStockText(it)) + '" aria-pressed="' + on + '"' +
         ' tabindex="' + (on ? '0' : '-1') + '"></button>';
     }).join('');
@@ -718,7 +767,9 @@
           '<p class="pdp-eyebrow">' + esc(m.brand) + ' · ' + esc(m.name) + '</p>' +
           '<h1 class="pdp-name">' + esc(p.name) + '</h1>' +
           (p.code ? _t('<p class="pdp-ref">Réf. ') + esc(p.code) + '</p>' : '') +
+          (promoOn(p, curType) ? PR.banner(p, pctOf(p, curType)) : '') +
           '<div class="pdp-priceline">' +
+            (promoOn(p, curType) ? '<s class="pdp-was">' + money(regOf(p, curType)) + '</s>' : '') +
             '<span class="pdp-price">' + money(price) + '<small>/ ' + fmtShort(curType) + '</small></span>' +
             '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? _t('Rupture') : stock + _t(' en stock')) + '</span>' +
           '</div>' +
@@ -1048,14 +1099,14 @@
     var out = accOut(a), best = accBestTier(a);
     var tag = String(a.desc || '').split(/\r?\n/)[0].trim();
     if (tag.length > 90) tag = tag.slice(0, 88).replace(/\s+\S*$/, '') + '…';
-    return '<a class="mcard acard' + (out ? ' is-out' : '') + '" href="' + esc(accHref(a)) + '">' +
+    return '<a class="mcard acard' + (out ? ' is-out' : '') + (a.promoOn ? ' is-promo' : '') + '" href="' + esc(accHref(a)) + '">' +
       '<span class="mcard-media">' + (a.img ? '<img src="' + esc(a.img) + '" alt="" loading="lazy">'
-        : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') + '</span>' +
+        : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') + (a.promoOn ? PR.ribbon(accPromoPct(a)) : '') + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(a.name) + '</span>' +
         (tag ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +
         '<span class="mcard-foot">' +
-          '<span class="mcard-price"><b>' + money(a.price) + '</b>' +
+          '<span class="mcard-price">' + (a.promoOn ? '<s>' + money(a.regPrice) + '</s> ' : '') + '<b>' + money(a.price) + '</b>' +
             (best ? '<small>' + money(best.price) + _t(' dès ') + best.min + '</small>' : '') + '</span>' +
           (out ? _t('<span class="pill out">Rupture</span>')
             : a.qty != null ? '<span class="pill ok">' + a.qty + _t(' en stock') + '</span>' : '') +
@@ -1136,7 +1187,9 @@
         '<div class="pdp-panel">' +
           '<p class="pdp-eyebrow">' + esc(accCatName(a)) + '</p>' +
           '<h1 class="pdp-name">' + esc(a.name) + '</h1>' +
+          (a.promoOn ? PR.banner(a.promoRow, accPromoPct(a)) : '') +
           '<div class="pdp-priceline">' +
+            (a.promoOn ? '<s class="pdp-was">' + money(a.regPrice) + '</s>' : '') +
             '<span class="pdp-price">' + money(a.price) + _t('<small>/ unité</small></span>') +
             (a.qty != null ? '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? _t('Rupture') : a.qty + _t(' en stock')) + '</span>' : '') +
           '</div>' +
@@ -1311,20 +1364,31 @@
   // Rabais quantité : palier calculé sur le TOTAL de la même marque dans le panier
   // (couleurs, matériaux et formats mélangés : 1 bobine + 3 recharges Bambu = palier 4+), comme en facturation
   function groupKey(p) { return p.brand || p.material || ''; }
-  function groupQty(p) {
+  // Article en promo : son palier se compte sur le TOTAL de la même promo (filaments + accessoires),
+  // les autres lignes ne comptent pas dedans — comme le serveur (_customer_fill_lines, clé « promo| »).
+  function cartPromoId(it) {
+    if (it.type === 'accessory') { var a = accById[it.id]; return a && a.promoOn ? a.promoId : null; }
+    var p = byId[it.id]; return promoOn(p, it.type) ? p.promo_id : null;
+  }
+  function promoQty(id) {
+    return Object.keys(cart).reduce(function (s, k) { return s + (cartPromoId(cart[k]) === id ? cart[k].qty : 0); }, 0);
+  }
+  function groupQty(p, type) {
+    if (promoOn(p, type)) return promoQty(p.promo_id);
     var g = groupKey(p);
     return Object.keys(cart).reduce(function (s, k) {
       var it = cart[k], q = it.type !== 'accessory' && byId[it.id];
-      return s + (q && groupKey(q) === g ? it.qty : 0);
+      return s + (q && !cartPromoId(it) && groupKey(q) === g ? it.qty : 0);
     }, 0);
   }
   // Accessoires : palier calculé sur le TOTAL de la même catégorie dans le panier
   // (ex. bobines Bambu 70 °C + Sunlu = une seule quantité), chaque modèle garde sa grille
   function accGroupQty(a) {
+    if (a.promoOn) return promoQty(a.promoId);
     var k = accCatKey(a);
     return Object.keys(cart).reduce(function (s, key) {
       var it = cart[key], b = it.type === 'accessory' && accById[it.id];
-      return s + (b && (b === a || (k && accCatKey(b) === k)) ? it.qty : 0);
+      return s + (b && !cartPromoId(it) && (b === a || (k && accCatKey(b) === k)) ? it.qty : 0);
     }, 0);
   }
   function unitOf(it) {
