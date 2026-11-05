@@ -139,14 +139,13 @@
     }
     var empty = $('.fm-empty', gridEl); if (empty) empty.remove();
     var counts = { run: 0, idle: 0, off: 0, other: 0 };
-    rows.forEach(function (p) {
+    rows.forEach(function (p, i) {
       var el = cards[p.id];
       if (!el) { el = cards[p.id] = makeCard(p); gridEl.appendChild(el); }
+      el.style.order = i;   // l'ordre se règle en CSS : déplacer une carte dans le DOM recharge sa caméra (iframe/img)
       var k = fill(el, p);
       if (k === 'run') counts.run++; else if (k === 'idle' || k === 'good') counts.idle++; else if (k === 'off') counts.off++; else counts.other++;
     });
-    // ordre = colonne sort puis nom
-    rows.forEach(function (p) { gridEl.appendChild(cards[p.id]); });
     Object.keys(cards).forEach(function (id) {
       if (!rows.some(function (p) { return p.id === id; })) { cards[id].remove(); delete cards[id]; }
     });
