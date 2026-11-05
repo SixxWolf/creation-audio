@@ -1684,6 +1684,13 @@ button.co-link:hover { background:color-mix(in srgb, var(--ember) 24%, transpare
 .ms-b-photos { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 6px; }
 .ms-b-photos a, .ms-b-ph { display:block; width:140px; height:140px; border-radius:10px; overflow:hidden; background:var(--wash-2); }
 .ms-b-photos img { width:100%; height:100%; object-fit:cover; display:block; }
+.ms-b-files { display:flex; flex-direction:column; gap:6px; margin:0 0 6px; }
+.ms-b-file { display:flex; align-items:center; gap:9px; min-width:0; padding:8px 11px; border-radius:10px; border:1px solid var(--line);
+  background:rgba(255,255,255,.55); color:var(--ink); text-decoration:none; font-size:.86rem; font-weight:600; }
+.ms-b-file span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ms-b-file em { flex:none; font-style:normal; font-size:.76rem; color:var(--muted); }
+a.ms-b-file:hover { border-color:var(--ink); }
+.ms-b-file.is-off { opacity:.55; }
 
 .ms-reply { flex:none; display:flex; flex-direction:column; gap:6px; padding:12px 14px; border-top:1px solid var(--line); }
 .ms-reply-row { display:flex; align-items:flex-end; gap:8px; }

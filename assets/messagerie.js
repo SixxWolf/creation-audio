@@ -7,13 +7,15 @@
      client (clé « ca-compte-auth », la même que compte.html) -> envoi.
      Le brouillon (photos comprises) survit au passage par l'appli courriel.
    - Connecté : envoi direct ; liste de ses conversations ; fil + réponse.
+   - Fichiers 3D (page Impression 3D) : STL/3MF/STEP/OBJ, 3 max, 50 Mo chacun, bucket privé
+     « print-files » (<uid>/<uuid>.<ext>) ; gardés en IndexedDB le temps du code par courriel.
    - Photos : 4 max, réduites à 1600 px (JPEG) dans le navigateur, téléversées
      dans le bucket privé « messages » (<uid>/<uuid>.jpg), lues par URL signée.
    - Courriels différés (tick pg_cron + Edge Function message-notify) : rien
      n'est appelé à l'envoi ; un message resté non lu 5 min déclenche l'avis.
    - Fil ouvert : actualisé toutes les 10 s (page visible) — vaut lecture et
      présence ; l'en-tête montre « En ligne » quand l'admin est dans le fil.
-   API : CA.msg.open({ topic, ref, body, conv, list }) · CA.msg.close()
+   API : CA.msg.open({ topic, ref, body, conv, list, files, allow3d }) · CA.msg.close()
    Événement « ca:msg-change » sur document après un envoi (compte.html s'y abonne).
    Démo : CA.compte (faux client Supabase) / CA.compteFn (fausse Edge Function).
    RPC : msg_start, msg_send, me_conversations, me_messages, me_account, me_update
@@ -29,6 +31,7 @@
   var FB = 'https://m.me/61591945465745', EMAIL = 'contact@creationaudio.ca';
   var CODE_TTL = 10 * 60 * 1000, RESEND_MS = 60 * 1000, POLL_MS = 10000;
   var MAX_PHOTOS = 4, MAX_SIDE = 1600;
+  var MAX_FILES = 3, MAX_FILE_BYTES = 50 * 1024 * 1024, FILE_EXT = /\.(stl|3mf|step|stp|obj)$/i;
   var TOPICS = [['filaments', _t('Filaments')], ['spacers', _t('Spacers')], ['compte', _t('Mon compte')], ['autre', _t('Autre')]];
   var TOPIC_NAME = {}; TOPICS.forEach(function (t) { TOPIC_NAME[t[0]] = t[1]; });
   var HINT = {
@@ -112,8 +115,8 @@
   function markSignedIn(on) { $$('.home-account').forEach(function (a) { a.classList.toggle('is-in', !!on); }); }
 
   /* ---------- état ---------- */
-  var st = { view: null, signed: false, uid: '', acct: null, convs: [], conv: null, msgs: [], ctx: {}, photos: [], busy: false };
-  var urlCache = {}, pollT = null, resendT = null, opener = null;
+  var st = { view: null, signed: false, uid: '', acct: null, convs: [], conv: null, msgs: [], ctx: {}, photos: [], files: [], allow3d: false, busy: false };
+  var urlCache = {}, fileUrlCache = {}, pollT = null, resendT = null, opener = null;
 
   /* ---------- photos : réduction + vignettes ---------- */
   function shrink(file) {
@@ -175,6 +178,80 @@
     return c.storage.from('messages').createSignedUrls(need, 3600).then(function (r) {
       (r.data || []).forEach(function (x) { if (x.signedUrl) urlCache[x.path] = x.signedUrl; });
     }, function () {});
+  }
+
+  /* ---------- fichiers 3D (page Impression 3D) : STL/3MF/STEP/OBJ, 3 max, 50 Mo chacun ---------- */
+  function fmtSize(b) {
+    return b >= 1048576 ? (b / 1048576).toLocaleString(CA.locale, { maximumFractionDigits: 1 }) + _t(' Mo') : Math.max(1, Math.round(b / 1024)) + _t(' Ko');
+  }
+  function addFiles3d(files, statusEl) {
+    var bad = '';
+    Array.prototype.slice.call(files || []).forEach(function (f) {
+      if (!FILE_EXT.test(f.name)) { bad = _t('Formats acceptés : STL, 3MF, STEP, OBJ.'); return; }
+      if (f.size > MAX_FILE_BYTES) { bad = _t('Fichier trop lourd (50 Mo maximum).'); return; }
+      if (st.files.length >= MAX_FILES) { bad = _t('Au plus 3 fichiers 3D par message.'); return; }
+      st.files.push({ name: f.name, blob: f });
+    });
+    say(statusEl, bad, bad ? 'bad' : '');
+    paintFiles(); saveFiles();
+  }
+  function paintFiles() {
+    if (!panel) return;
+    $$('.msg-flist', panel).forEach(function (ul) {
+      ul.innerHTML = st.files.map(function (f, i) {
+        return '<li class="msg-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>' +
+          '<span class="msg-file-n">' + esc(f.name) + '</span><em>' + esc(fmtSize(f.blob.size)) + '</em>' +
+          '<button type="button" class="msg-file-x" data-i="' + i + _t('" aria-label="Retirer le fichier ') + esc(f.name) + '">×</button></li>';
+      }).join('');
+      ul.hidden = !st.files.length;
+    });
+    $$('.msg-attach3d', panel).forEach(function (l) { l.classList.toggle('is-full', st.files.length >= MAX_FILES); });
+  }
+  function clearFiles() { st.files = []; paintFiles(); idb('readwrite', function (s) { s.clear(); }); }
+  function upload3d() {
+    var c = sb();
+    if (!st.files.length) return Promise.resolve([]);
+    return Promise.all(st.files.map(function (f) {
+      var path = st.uid + '/' + uuid() + '.' + f.name.split('.').pop().toLowerCase();
+      return c.storage.from('print-files').upload(path, f.blob, { contentType: 'application/octet-stream', upsert: false }).then(function (r) {
+        if (r.error) throw new Error(_t('Un fichier 3D n\'a pas pu être envoyé. Réessaie.'));
+        return { p: path, n: f.name };
+      });
+    }));
+  }
+  function fileUrls(list) {
+    var c = sb(), need = [];
+    list.forEach(function (f) { if (!fileUrlCache[f.p]) need.push(f.p); });
+    if (!need.length || !c || !c.storage) return Promise.resolve();
+    return c.storage.from('print-files').createSignedUrls(need, 3600).then(function (r) {
+      (r.data || []).forEach(function (x) { if (x.signedUrl) fileUrlCache[x.path] = x.signedUrl; });
+    }, function () {});
+  }
+  // les fichiers survivent au passage par l'appli courriel (rechargement de l'onglet) : IndexedDB
+  function idb(mode, fn) {
+    return new Promise(function (res) {
+      try {
+        var rq = indexedDB.open('ca-msg', 1);
+        rq.onupgradeneeded = function () { rq.result.createObjectStore('files'); };
+        rq.onerror = function () { res(null); };
+        rq.onsuccess = function () {
+          var db = rq.result, tx, out;
+          try { tx = db.transaction('files', mode); out = fn(tx.objectStore('files')); } catch (e) { db.close(); res(null); return; }
+          tx.oncomplete = function () { db.close(); res(out && out.result !== undefined ? out.result : null); };
+          tx.onerror = tx.onabort = function () { db.close(); res(null); };
+        };
+      } catch (e) { res(null); }
+    });
+  }
+  function saveFiles() {
+    if (!st.files.length) return idb('readwrite', function (s) { s.clear(); });
+    return idb('readwrite', function (s) { s.clear(); st.files.forEach(function (f, i) { s.put({ name: f.name, blob: f.blob }, 'f' + i); }); });
+  }
+  function restoreFiles() {
+    return idb('readonly', function (s) { return s.getAll(); }).then(function (rows) {
+      (rows || []).forEach(function (r) { if (r && r.blob && r.name && st.files.length < MAX_FILES) st.files.push({ name: r.name, blob: r.blob }); });
+      if (st.files.length) st.allow3d = true;
+    });
   }
 
   /* ---------- brouillon en attente du code (survit au rechargement) ---------- */
@@ -253,6 +330,14 @@
     opts = opts || {};
     build();
     opener = document.activeElement;
+    if (opts.files && opts.files.length) {                    // fichiers 3D choisis sur la page Impression 3D
+      st.files = [];
+      Array.prototype.slice.call(opts.files).forEach(function (f) {
+        if (FILE_EXT.test(f.name) && f.size <= MAX_FILE_BYTES && st.files.length < MAX_FILES) st.files.push({ name: f.name, blob: f });
+      });
+      saveFiles();
+    }
+    st.allow3d = !!(opts.files || opts.allow3d || st.files.length);
     var draft = readDraft();
     var sameRef = draft && (opts.ref == null || draft.ref === opts.ref);
     st.ctx = {
@@ -338,6 +423,10 @@
           '<label class="msg-attach"><input type="file" accept="image/*" multiple hidden>' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>' +
             _t('<span>Ajouter des photos</span></label></div>') +
+        (st.allow3d ? '<div class="msg-photos msg-files"><ul class="msg-flist" hidden></ul>' +
+          '<label class="msg-attach msg-attach3d"><input type="file" multiple hidden>' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>' +
+            _t('<span>Ajouter un fichier 3D</span></label></div>') : '') +
         (needName ? '<div class="msg-grid' + (st.signed ? ' one' : '') + '">' +
           _t('<div class="msg-field"><label for="msg-name">Nom</label><input type="text" id="msg-name" autocomplete="name" maxlength="80"></div>') +
           (st.signed ? '' : _t('<div class="msg-field"><label for="msg-email">Courriel</label><input type="email" id="msg-email" inputmode="email" ') +
@@ -358,6 +447,15 @@
     var cv = $('.msg-convs', form); if (cv) cv.addEventListener('click', showList);
     ta.addEventListener('input', function () { st.ctx.body = ta.value; saveDraft(); });
     wirePhotos(form, status);
+    if (st.allow3d) {
+      var fin = $('.msg-attach3d input', form);
+      fin.addEventListener('change', function () { addFiles3d(fin.files, status); fin.value = ''; });
+      $('.msg-flist', form).addEventListener('click', function (e) {
+        var b = e.target.closest('.msg-file-x'); if (!b) return;
+        st.files.splice(+b.getAttribute('data-i'), 1); paintFiles(); saveFiles();
+      });
+      paintFiles();
+    }
     form.addEventListener('submit', function (e) { e.preventDefault(); photoJob.then(function () { submitCompose(form, status); }); });
     focusFirst(st.ctx.topic ? '#msg-body' : 'input[name="msg-topic"]');
   }
@@ -377,7 +475,7 @@
     var nameIn = $('#msg-name', form), emailIn = $('#msg-email', form);
     var name = nameIn ? nameIn.value.trim() : '', email = emailIn ? emailIn.value.trim().toLowerCase() : '';
     if (!topic) { say(status, 'Choisis un sujet.', 'bad'); var r = $('input[name="msg-topic"]', form); if (r) r.focus(); return; }
-    if (!body && !st.photos.length) { say(status, _t('Écris ton message.'), 'bad'); $('#msg-body', form).focus(); return; }
+    if (!body && !st.photos.length && !st.files.length) { say(status, _t('Écris ton message.'), 'bad'); $('#msg-body', form).focus(); return; }
     if (nameIn && !name) { say(status, _t('Entre ton nom.'), 'bad'); nameIn.focus(); return; }
     if (emailIn && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { say(status, _t('Entre un courriel valide.'), 'bad'); emailIn.focus(); return; }
     var draft = { topic: topic, ref: st.ctx.ref || '', body: body, name: name };
@@ -412,11 +510,16 @@
       : Promise.resolve();
     // langue des courriels de réponse = celle de cette page (customers.lang)
     var langStep = function () { return rpc('me_set_lang', { p_lang: CA.lang || 'fr' }).then(null, function () {}); };
-    return nameStep.then(langStep).then(upload).then(function (paths) {
-      return rpc('msg_start', { p_topic: d.topic, p_ref: d.ref || null, p_page: location.pathname, p_body: d.body, p_photos: paths });
+    return nameStep.then(langStep).then(function () {
+      if (st.files.length) say(status, _t('Envoi des fichiers…'));
+      return upload();
+    }).then(function (paths) {
+      return upload3d().then(function (files) {
+        return rpc('msg_start', { p_topic: d.topic, p_ref: d.ref || null, p_page: location.pathname, p_body: d.body, p_photos: paths, p_files: files });
+      });
     }).then(function (r) {
       st.busy = false; if (btn) btn.disabled = false;
-      clearPhotos(); clearDraft(); st.ctx = { topic: '', ref: '', body: '' };
+      clearPhotos(); clearFiles(); clearDraft(); st.ctx = { topic: '', ref: '', body: '' }; st.allow3d = false;
       changed();
       return loadConvs().then(function () { showThread(r.conversation_id, _t('Envoyé. On te répond ici et par courriel.')); });
     }).catch(function (err) {
@@ -431,7 +534,7 @@
   function restorePending(p) {
     st.ctx = { topic: p.topic, ref: p.ref, body: p.body };
     clearPhotos();
-    restoreShots(p.shots).then(function () { showCode(p); });
+    Promise.all([restoreShots(p.shots), st.files.length ? null : restoreFiles()]).then(function () { showCode(p); });
   }
   function showCode(p) {
     st.view = 'code'; stopPoll();
@@ -587,8 +690,9 @@
       var same = msgs.length === st.msgs.length && (!msgs.length || msgs[msgs.length - 1].id === st.msgs[st.msgs.length - 1].id);
       if (same && !scroll) return;
       st.msgs = msgs;
-      var paths = []; msgs.forEach(function (m) { (m.photos || []).forEach(function (p) { paths.push(p); }); });
-      return signedUrls(paths).then(function () { paintThread(scroll, conv); });
+      var paths = [], fls = [];
+      msgs.forEach(function (m) { (m.photos || []).forEach(function (p) { paths.push(p); }); (m.files || []).forEach(function (f) { fls.push(f); }); });
+      return Promise.all([signedUrls(paths), fileUrls(fls)]).then(function () { paintThread(scroll, conv); });
     }, function (err) {
       if (isAuthError(err)) return lostSession();
       var box = $('#msg-thread', main);
@@ -608,6 +712,12 @@
           var u = urlCache[p];
           return u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + _t('" alt="Photo ') + (i + 1) + '" loading="lazy"></a>'
                    : _t('<span class="msg-b-ph" title="Photo indisponible"></span>');
+        }).join('') + '</div>' : '') +
+        ((m.files || []).length ? '<div class="msg-b-files">' + m.files.map(function (f) {
+          var u = fileUrlCache[f.p], inner = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>' +
+            '<span>' + esc(f.n) + '</span><em>' + esc(fmtSize(+f.s || 0)) + '</em>';
+          return u ? '<a class="msg-b-file" href="' + esc(u) + '" download="' + esc(f.n) + '" target="_blank" rel="noopener">' + inner + '</a>'
+                   : '<span class="msg-b-file is-off">' + inner + '</span>';
         }).join('') + '</div>' : '') +
         (m.body ? '<p>' + esc(m.body) + '</p>' : '') +
         '<time>' + (me ? '' : _t('Création Audio · ')) + esc(hour(m.created_at)) + '</time></div>';

@@ -873,11 +873,14 @@
     return sb.auth.getSession().then(function (r) {
       var uid = r && r.data && r.data.session && r.data.session.user && r.data.session.user.id;
       if (!uid) return;
-      var bucket = sb.storage.from('messages');
-      return bucket.list(uid, { limit: 1000 }).then(function (l) {
-        var paths = ((l && l.data) || []).map(function (f) { return uid + '/' + f.name; });
-        return paths.length ? bucket.remove(paths) : null;
-      });
+      // photos (« messages ») et fichiers 3D (« print-files ») : même dossier <uid>/
+      return Promise.all(['messages', 'print-files'].map(function (name) {
+        var bucket = sb.storage.from(name);
+        return bucket.list(uid, { limit: 1000 }).then(function (l) {
+          var paths = ((l && l.data) || []).map(function (f) { return uid + '/' + f.name; });
+          return paths.length ? bucket.remove(paths) : null;
+        }).then(null, function () {});
+      }));
     }).then(null, function () {});
   }
   $('#acct-delete').addEventListener('click', function () {

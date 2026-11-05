@@ -401,7 +401,7 @@
       if (same && !scroll) return;
       msgs = list;
       var paths = []; msgs.forEach(function (m) { (m.photos || []).forEach(function (p) { paths.push(p); }); });
-      return signedUrls(paths).then(function () { paintThread(scroll); });
+      return Promise.all([signedUrls(paths), fileUrls(filesOf(msgs))]).then(function () { paintThread(scroll); });
     });
   }
   function markRead(c) {   // en base : admin_msg_seen (seen) met admin_unread à 0
@@ -421,11 +421,31 @@
           return u ? '<a href="' + esc(u) + '" target="_blank" rel="noopener"><img src="' + esc(u) + '" alt="Photo ' + (i + 1) + '" loading="lazy"></a>'
                    : '<span class="ms-b-ph" title="Photo indisponible"></span>';
         }).join('') + '</div>' : '') +
+        ((m.files || []).length ? '<div class="ms-b-files">' + m.files.map(function (f) {
+          var u = fileUrlCache[f.p], inner = '<span>' + esc(f.n) + '</span><em>' + esc(fmtSize(+f.s || 0)) + '</em>';
+          return u ? '<a class="ms-b-file" href="' + esc(u) + '" download="' + esc(f.n) + '" target="_blank" rel="noopener">' + inner + '</a>'
+                   : '<span class="ms-b-file is-off">' + inner + '</span>';
+        }).join('') + '</div>' : '') +
         (m.body ? '<p>' + esc(m.body) + '</p>' : '') +
         '<time>' + esc(hour(m.created_at)) + '</time></div>';
     });
     box.innerHTML = html || '<p class="muted">Aucun message.</p>';
     if (scroll || near) box.scrollTop = box.scrollHeight;
+  }
+  // fichiers 3D des clients (bucket privé « print-files »)
+  var fileUrlCache = {};
+  function filesOf(list) {
+    var out = []; (list || []).forEach(function (m) { (m.files || []).forEach(function (f) { out.push(f); }); }); return out;
+  }
+  function fmtSize(b) {
+    return b >= 1048576 ? (b / 1048576).toLocaleString('fr-CA', { maximumFractionDigits: 1 }) + ' Mo' : Math.max(1, Math.round(b / 1024)) + ' Ko';
+  }
+  function fileUrls(files) {
+    var need = files.map(function (f) { return f.p; }).filter(function (p) { return !fileUrlCache[p]; });
+    if (!need.length) return Promise.resolve();
+    return sb.storage.from('print-files').createSignedUrls(need, 3600).then(function (r) {
+      (r.data || []).forEach(function (x) { if (x.signedUrl) fileUrlCache[x.path] = x.signedUrl; });
+    }, function () {});
   }
   function signedUrls(paths) {
     var need = paths.filter(function (p) { return !urlCache[p]; });
@@ -727,10 +747,10 @@
   }
   function removeConv() {
     var c = conv(); if (!c) return;
-    caDialog.confirm({ title: 'Supprimer la conversation avec ' + who(c) + ' ?', message: 'Messages et photos effacés. Action définitive.',
+    caDialog.confirm({ title: 'Supprimer la conversation avec ' + who(c) + ' ?', message: 'Messages, photos et fichiers effacés. Action définitive.',
       ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
       if (!ok) return;
-      erase([c.id], photosOf(msgs)).then(function (err) {
+      erase([c.id], photosOf(msgs), filesOf(msgs).map(function (f) { return f.p; })).then(function (err) {
         if (err) { caDialog.error(err); return; }
         convs = convs.filter(function (x) { return x.id !== c.id; });
         go('');
@@ -738,20 +758,24 @@
     });
   }
   // photos par l'API Storage (jamais par SQL), puis les lignes
-  function erase(ids, paths) {
+  function erase(ids, paths, files) {
     var rm = paths.length ? sb.storage.from('messages').remove(paths).then(null, function () {}) : Promise.resolve();
-    return rm.then(function () { return sb.from('conversations').delete().in('id', ids); })
+    var rf = files && files.length ? sb.storage.from('print-files').remove(files).then(null, function () {}) : Promise.resolve();
+    return Promise.all([rm, rf]).then(function () { return sb.from('conversations').delete().in('id', ids); })
       .then(function (res) { return res && res.error ? res.error.message : null; });
   }
   // Loi 25 : 12 mois sans message -> effacée (une fois par session admin)
   function purge() {
     if (purged) return; purged = true;
     var cutoff = new Date(Date.now() - KEEP_DAYS * 86400000).toISOString();
-    sb.from('conversations').select('id, messages(photos)').lt('updated_at', cutoff).limit(200).then(function (res) {
+    sb.from('conversations').select('id, messages(photos, files)').lt('updated_at', cutoff).limit(200).then(function (res) {
       var rows = (!res.error && res.data) || [];
       if (!rows.length) return;
-      var paths = []; rows.forEach(function (r) { paths = paths.concat(photosOf(r.messages)); });
-      return erase(rows.map(function (r) { return r.id; }), paths).then(function () { load(); });
+      var paths = [], files = []; rows.forEach(function (r) {
+        paths = paths.concat(photosOf(r.messages));
+        files = files.concat(filesOf(r.messages).map(function (f) { return f.p; }));
+      });
+      return erase(rows.map(function (r) { return r.id; }), paths, files).then(function () { load(); });
     }, function () {});
   }
 })();

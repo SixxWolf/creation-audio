@@ -2940,6 +2940,8 @@ create table if not exists public.messages (
   created_at      timestamptz not null default now()
 );
 create index if not exists messages_conv_idx on public.messages (conversation_id, created_at);
+-- Fichiers 3D joints (page « Impression 3D ») : [{p: chemin, n: nom d'origine, s: octets}], bucket privé « print-files »
+alter table public.messages add column if not exists files jsonb not null default '[]'::jsonb;
 alter table public.conversations enable row level security;
 alter table public.messages      enable row level security;
 drop policy if exists conversations_admin_all on public.conversations;
@@ -2958,7 +2960,9 @@ begin
     updated_at          = new.created_at,
     last_from           = new.sender,
     last_preview        = left(coalesce(nullif(regexp_replace(btrim(new.body), '\s+', ' ', 'g'), ''),
-                               case when jsonb_array_length(new.photos) > 1 then 'Photos' else 'Photo' end), 140),
+                               case when jsonb_array_length(new.files) > 1 then 'Fichiers 3D'
+                                    when jsonb_array_length(new.files) = 1 then 'Fichier 3D'
+                                    when jsonb_array_length(new.photos) > 1 then 'Photos' else 'Photo' end), 140),
     admin_unread        = case when new.sender = 'client' then admin_unread + 1 else 0 end,
     client_unread       = case when new.sender = 'admin' then client_unread + 1 else client_unread end,
     admin_unread_since  = case when new.sender = 'client' then coalesce(admin_unread_since, new.created_at) end,
@@ -3037,15 +3041,40 @@ begin
 end $$;
 revoke all on function public._msg_photos(jsonb, uuid) from public, anon, authenticated;
 
+-- Fichiers 3D joints (STL, 3MF, STEP, OBJ) : chemins du dossier du compte dans le bucket « print-files »,
+-- déjà téléversés, 3 max. -> [{p, n, s}] (n = nom d'origine, s = taille lue dans Storage).
+create or replace function public._msg_files(p_files jsonb, p_owner uuid)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare v jsonb := '[]'::jsonb; x jsonb; v_p text; v_size bigint;
+begin
+  if p_files is null or jsonb_typeof(p_files) <> 'array' then return v; end if;
+  if jsonb_array_length(p_files) > 3 then raise exception 'Au plus 3 fichiers 3D par message.'; end if;
+  for x in select jsonb_array_elements(p_files) loop
+    v_p := x ->> 'p';
+    if v_p is null or v_p !~ ('^' || p_owner::text || '/[0-9a-f-]{36}\.(stl|3mf|step|stp|obj)$') then
+      raise exception 'Fichier invalide.';
+    end if;
+    select (o.metadata ->> 'size')::bigint into v_size from storage.objects o where o.bucket_id = 'print-files' and o.name = v_p;
+    if not found then raise exception 'Un fichier n''a pas été reçu. Réessaie.'; end if;
+    v := v || jsonb_build_object('p', v_p,
+                                 'n', left(regexp_replace(btrim(coalesce(x ->> 'n', 'fichier')), '[\x01-\x1f]', '', 'g'), 120),
+                                 's', coalesce(v_size, 0));
+  end loop;
+  return v;
+end $$;
+revoke all on function public._msg_files(jsonb, uuid) from public, anon, authenticated;
+
 -- Garde-fous communs aux envois du client (compte présent, rythme, contenu).
-create or replace function public._msg_guard(p_uid uuid, p_body text, p_photos jsonb)
+drop function if exists public._msg_guard(uuid, text, jsonb);
+create or replace function public._msg_guard(p_uid uuid, p_body text, p_photos jsonb, p_files jsonb default '[]'::jsonb)
 returns void language plpgsql security definer set search_path = '' as $$
 begin
   if p_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
   if not exists (select 1 from public.customers where id = p_uid) then
     raise exception 'Compte introuvable. Reconnecte-toi.' using errcode = '42501';
   end if;
-  if btrim(coalesce(p_body, '')) = '' and coalesce(jsonb_array_length(p_photos), 0) = 0 then
+  if btrim(coalesce(p_body, '')) = '' and coalesce(jsonb_array_length(p_photos), 0) = 0
+     and coalesce(jsonb_array_length(p_files), 0) = 0 then
     raise exception 'Écris ton message.';
   end if;
   if length(btrim(coalesce(p_body, ''))) > 4000 then raise exception 'Message trop long (4000 caractères max).'; end if;
@@ -3055,39 +3084,45 @@ begin
   end if;
   update public.customers set last_seen_at = now() where id = p_uid;   -- compte actif (ménage des 3 ans)
 end $$;
-revoke all on function public._msg_guard(uuid, text, jsonb) from public, anon, authenticated;
+revoke all on function public._msg_guard(uuid, text, jsonb, jsonb) from public, anon, authenticated;
 
 -- Nouvelle conversation. -> { conversation_id, message_id }
-create or replace function public.msg_start(p_topic text, p_ref text, p_page text, p_body text, p_photos jsonb default '[]'::jsonb)
+drop function if exists public.msg_start(text, text, text, text, jsonb);
+create or replace function public.msg_start(p_topic text, p_ref text, p_page text, p_body text, p_photos jsonb default '[]'::jsonb,
+                                            p_files jsonb default '[]'::jsonb)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_uid uuid := (select auth.uid()); v_ph jsonb; v_conv uuid; v_msg uuid;
+declare v_uid uuid := (select auth.uid()); v_ph jsonb; v_fl jsonb; v_conv uuid; v_msg uuid;
 begin
-  perform public._msg_guard(v_uid, p_body, p_photos);
+  perform public._msg_guard(v_uid, p_body, p_photos, p_files);
   if (select count(*) from public.conversations where customer_id = v_uid and created_at > now() - interval '1 day') >= 10 then
     raise exception 'Trop de nouvelles conversations aujourd''hui. Réponds dans une conversation existante.';
   end if;
   v_ph := public._msg_photos(p_photos, v_uid);
+  v_fl := public._msg_files(p_files, v_uid);
   insert into public.conversations (customer_id, topic, ref, page)
   values (v_uid, case when p_topic in ('filaments','spacers','compte','autre') then p_topic else 'autre' end,
           nullif(left(btrim(coalesce(p_ref, '')), 120), ''), nullif(left(btrim(coalesce(p_page, '')), 200), ''))
   returning id into v_conv;
-  insert into public.messages (conversation_id, sender, body, photos)
-  values (v_conv, 'client', btrim(coalesce(p_body, '')), v_ph) returning id into v_msg;
+  insert into public.messages (conversation_id, sender, body, photos, files)
+  values (v_conv, 'client', btrim(coalesce(p_body, '')), v_ph, v_fl) returning id into v_msg;
   return jsonb_build_object('conversation_id', v_conv, 'message_id', v_msg);
 end $$;
 
 -- Réponse du client dans une de ses conversations (une conversation fermée se rouvre). -> { message_id }
-create or replace function public.msg_send(p_conv uuid, p_body text, p_photos jsonb default '[]'::jsonb)
+drop function if exists public.msg_send(uuid, text, jsonb);
+create or replace function public.msg_send(p_conv uuid, p_body text, p_photos jsonb default '[]'::jsonb,
+                                           p_files jsonb default '[]'::jsonb)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_uid uuid := (select auth.uid()); v_ph jsonb; v_msg uuid;
+declare v_uid uuid := (select auth.uid()); v_ph jsonb; v_fl jsonb; v_msg uuid;
 begin
-  perform public._msg_guard(v_uid, p_body, p_photos);
+  perform public._msg_guard(v_uid, p_body, p_photos, p_files);
   if not exists (select 1 from public.conversations where id = p_conv and customer_id = v_uid) then
     raise exception 'Conversation introuvable.';
   end if;
   v_ph := public._msg_photos(p_photos, v_uid);
-  insert into public.messages (conversation_id, sender, body, photos)
-  values (p_conv, 'client', btrim(coalesce(p_body, '')), v_ph) returning id into v_msg;
+  v_fl := public._msg_files(p_files, v_uid);
+  insert into public.messages (conversation_id, sender, body, photos, files)
+  values (p_conv, 'client', btrim(coalesce(p_body, '')), v_ph, v_fl) returning id into v_msg;
   return jsonb_build_object('message_id', v_msg);
 end $$;
 
@@ -3116,16 +3151,16 @@ begin
                                        'created_at', c.created_at, 'updated_at', c.updated_at,
                                        'admin_online', coalesce(c.admin_seen_at > now() - interval '40 seconds', false)),
     'messages', coalesce((select jsonb_agg(jsonb_build_object('id', m.id, 'sender', m.sender, 'body', m.body,
-                            'photos', m.photos, 'created_at', m.created_at) order by m.created_at, m.id)
+                            'photos', m.photos, 'files', m.files, 'created_at', m.created_at) order by m.created_at, m.id)
                           from public.messages m where m.conversation_id = c.id), '[]'::jsonb));
 end $$;
 
-revoke all on function public.msg_start(text, text, text, text, jsonb) from public, anon;
-revoke all on function public.msg_send(uuid, text, jsonb)              from public, anon;
+revoke all on function public.msg_start(text, text, text, text, jsonb, jsonb) from public, anon;
+revoke all on function public.msg_send(uuid, text, jsonb, jsonb)              from public, anon;
 revoke all on function public.me_conversations()                       from public, anon;
 revoke all on function public.me_messages(uuid)                        from public, anon;
-grant execute on function public.msg_start(text, text, text, text, jsonb) to authenticated;
-grant execute on function public.msg_send(uuid, text, jsonb)              to authenticated;
+grant execute on function public.msg_start(text, text, text, text, jsonb, jsonb) to authenticated;
+grant execute on function public.msg_send(uuid, text, jsonb, jsonb)              to authenticated;
 grant execute on function public.me_conversations()                       to authenticated;
 grant execute on function public.me_messages(uuid)                        to authenticated;
 
@@ -3159,6 +3194,35 @@ drop policy if exists messages_photos_delete on storage.objects;
 create policy messages_photos_delete on storage.objects for delete to authenticated
   using ( bucket_id = 'messages' and ( (storage.foldername(name))[1] = (select auth.uid())::text
                                        or (select public.is_admin()) ) );
+
+-- ---- fichiers 3D (page « Impression 3D ») : bucket privé « print-files », un dossier par compte ----
+-- 50 Mo par fichier (maximum Supabase sans plan payant), 30 fichiers max par compte, extensions limitées
+-- (.stl .3mf .step .stp .obj). Le navigateur téléverse en application/octet-stream ; lecture par URL signée.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('print-files', 'print-files', false, 52428800, array['application/octet-stream'])
+on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit,
+                               allowed_mime_types = excluded.allowed_mime_types;
+
+create or replace function public._pf_quota_ok()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select (select count(*) from storage.objects o
+           where o.bucket_id = 'print-files' and (storage.foldername(o.name))[1] = (select auth.uid())::text) < 30;
+$$;
+revoke all on function public._pf_quota_ok() from public, anon;
+grant execute on function public._pf_quota_ok() to authenticated;
+
+drop policy if exists print_files_read on storage.objects;
+create policy print_files_read on storage.objects for select to authenticated
+  using ( bucket_id = 'print-files' and ( (storage.foldername(name))[1] = (select auth.uid())::text
+                                          or (select public.is_admin()) ) );
+drop policy if exists print_files_insert on storage.objects;
+create policy print_files_insert on storage.objects for insert to authenticated
+  with check ( bucket_id = 'print-files' and (storage.foldername(name))[1] = (select auth.uid())::text
+               and name ~* '\.(stl|3mf|step|stp|obj)$' and (select public._pf_quota_ok()) );
+drop policy if exists print_files_delete on storage.objects;
+create policy print_files_delete on storage.objects for delete to authenticated
+  using ( bucket_id = 'print-files' and ( (storage.foldername(name))[1] = (select auth.uid())::text
+                                          or (select public.is_admin()) ) );
 
 -- ------------------------------------------------------------
 -- COMMANDES FOURNISSEUR « EN ROUTE » (Inventaire › À commander)
