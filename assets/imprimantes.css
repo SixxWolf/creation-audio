@@ -1,6 +1,14 @@
 /* Atelier › Imprimantes — tableau de bord de la ferme (cms-imprimantes.js) */
 .fm-summary { margin:4px 0 0; font-size:.9rem; color:var(--muted); }
-.fm-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:var(--gap); align-items:start; }
+/* Pleine largeur à toutes les tailles d'écran : les cartes se partagent toute la place (auto-fit = pas de colonne vide à droite) */
+body[data-tab="imprimantes"] main { max-width:none; }
+.fm-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap:var(--gap); align-items:start; }
+@media (min-width:2200px) { .fm-grid { grid-template-columns:repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap:22px; } }
+@media (min-width:3000px) { .fm-grid { grid-template-columns:repeat(auto-fit, minmax(min(100%, 600px), 1fr)); gap:26px; } }
+@media (max-width:640px) {
+  body[data-tab="imprimantes"] main { padding-left:10px; padding-right:10px; }
+  .fm-grid { gap:12px; }
+}
 .fm-empty { grid-column:1 / -1; }
 
 .fm-card { display:flex; flex-direction:column; min-width:0; overflow:hidden; background:var(--paper);
@@ -22,6 +30,8 @@
 .fm-cam.is-on .fm-cam-off { display:none; }
 .fm-frame { position:absolute; inset:0; width:100%; height:100%; border:0; background:#000; }
 img.fm-frame { object-fit:contain; }
+/* Flux en direct : aucune interaction (la pause/lecture du lecteur go2rtc déphase le direct et saccade) */
+iframe.fm-frame { pointer-events:none; }
 
 .fm-body { display:flex; flex-direction:column; gap:10px; padding:12px 14px 14px; }
 .fm-file { margin:0; min-height:1.3em; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
