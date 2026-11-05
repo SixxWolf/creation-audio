@@ -2,7 +2,9 @@
    Création Audio — page IMPRESSION 3D (v2).
    - Aperçu 3D (WebGL) : lit un STL ou un OBJ DANS le navigateur (rien n'est envoyé avant la demande) :
      dimensions, poids estimé, couleur choisie ; la pièce tourne au toucher, ne boucle jamais.
-     Sans fichier : un adaptateur d'exemple, construit par calcul. 3MF et STEP : simplement joints.
+     Sans fichier : un adaptateur d'exemple, construit par calcul. STEP : simplement joint.
+   - 3MF : lu par le Worker impression-3mf.js. Plateaux en vignettes à cocher, couleurs du fichier, vrai plateau
+     sous les pièces ; tranché sans pièce : image du plateau + vrais chiffres ; téléphone : version allégée.
    - Formulaire : se déplie sous la zone de dépôt. Fichiers STL/3MF/STEP/OBJ, 3 max, 50 Mo chacun.
      L'envoi compose le message puis ouvre la Messagerie avec les fichiers
      (CA.msg.open({ topic, ref, body, files }) : messagerie.js les téléverse dans le bucket « print-files »).
@@ -12,6 +14,7 @@
    ========================================================= */
 (function () {
   'use strict';
+  var WORKER = document.currentScript ? document.currentScript.src.replace(/impression\.js.*$/, 'impression-3mf.js?v=1') : 'assets/impression-3mf.js?v=1';
   var CA0 = window.CA || {};
   var _t = CA0.t || function (s) { return s; };
   var tn = CA0.tn || function (n, one, many) { return (n >= 2 ? many : one).replace('{n}', n); };
@@ -179,9 +182,13 @@
   function fmtDim(mesh) {
     return mesh.size.map(function (v) { return num(v, v < 10 ? 1 : 0); }).join(' × ') + ' mm';
   }
-  function fmtGrams(g) {
-    if (g == null) return '—';
-    return '≈ ' + (g >= 1000 ? num(g / 1000, 1) + ' kg' : num(Math.max(1, g), g < 10 ? 1 : 0) + ' g');
+  function fmtWeight(g) { return g >= 1000 ? num(g / 1000, 1) + ' kg' : num(Math.max(1, g), g < 10 ? 1 : 0) + ' g'; }
+  function fmtGrams(g) { return g == null ? '—' : '≈ ' + fmtWeight(g); }
+  function fmtTime(s) {
+    var m = Math.max(1, Math.round(s / 60)), h = Math.floor(m / 60);
+    m -= h * 60;
+    if (!h) return m + ' min';
+    return EN ? h + ' h ' + m + ' min' : h + ' h ' + (m < 10 ? '0' : '') + m;
   }
 
   /* =========================================================
@@ -201,13 +208,16 @@
     'float t=vW.z/uLayer;float aa=clamp(1.-fwidth(t)*1.5,0.,1.);c*=1.+(1.-abs(w.z))*aa*.075*sin(t*6.2832);' +
     'if(uClip<uTop){if(!gl_FrontFacing)c*=.5;float e=clamp(1.-(uClip-vW.z)/(uLayer*1.6),0.,1.);c=mix(c,vec3(1.,.93,.72),e*.6);}' +
     'gl_FragColor=vec4(c,1.);}';
-  var VS_P = 'attribute vec2 aP;uniform mat4 uVP;uniform float uR;varying vec2 vP;' +
-    'void main(){vP=aP*uR;gl_Position=uVP*vec4(vP,0.,1.);}';
+  var VS_P = 'attribute vec2 aP;uniform mat4 uVP;uniform float uQ;varying vec2 vP;' +
+    'void main(){vP=aP*uQ;gl_Position=uVP*vec4(vP,0.,1.);}';
+  // uRect : centre x,y et demi-largeurs du vrai plateau (3MF) ; z = 0 : pas de plateau, la grille s'estompe seule
   var FS_P = '#extension GL_OES_standard_derivatives : enable\nprecision highp float;' +
-    'uniform float uR;uniform float uFoot;uniform float uGrid;varying vec2 vP;' +
-    'void main(){float d=length(vP)/uR;float fade=1.-smoothstep(.5,1.,d);' +
-    'vec2 g=abs(fract(vP/uGrid-.5)-.5)/fwidth(vP/uGrid);float l=1.-min(min(g.x,g.y),1.);' +
-    'float sh=exp(-pow(length(vP)/uFoot,4.))*.2;float a=(.035+l*.085)*fade;a=a+sh*(1.-a);' +
+    'uniform float uR;uniform float uFoot;uniform float uGrid;uniform vec4 uRect;varying vec2 vP;' +
+    'void main(){float d=length(vP)/uR;float fade=1.-smoothstep(.5,1.,d);vec2 q=uRect.z>0.?vP-uRect.xy+uRect.zw:vP;' +
+    'vec2 g=abs(fract(q/uGrid-.5)-.5)/fwidth(q/uGrid);float l=1.-min(min(g.x,g.y),1.);' +
+    'float a;if(uRect.z>0.){vec2 e=abs(vP-uRect.xy)-uRect.zw;float s=max(e.x,e.y);float w=fwidth(s);' +
+    'a=(.055+l*.085*fade)*(1.-smoothstep(-w,w,s))+.42*(1.-smoothstep(w*.7,w*1.7,abs(s)));}' +
+    'else{float sh=exp(-pow(length(vP)/uFoot,4.))*.2;a=(.035+l*.085)*fade;a=a+sh*(1.-a);}' +
     'gl_FragColor=vec4(vec3(.09,.1,.12)*a,a);}';
 
   var canvas = $('ip-gl'), viewEl = $('ip-view'), mini = $('ip-mini');
@@ -240,7 +250,7 @@
       prog = compile(VS, FS); progP = compile(VS_P, FS_P);
     } catch (e) { gl = null; return false; }
     ['uVP', 'uV', 'uC', 'uClip', 'uTop', 'uLayer'].forEach(function (u) { U[u] = gl.getUniformLocation(prog, u); });
-    ['uVP', 'uR', 'uFoot', 'uGrid'].forEach(function (u) { UP[u] = gl.getUniformLocation(progP, u); });
+    ['uVP', 'uR', 'uQ', 'uFoot', 'uGrid', 'uRect'].forEach(function (u) { UP[u] = gl.getUniformLocation(progP, u); });
     bufMesh = gl.createBuffer(); bufPlate = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, bufPlate);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
@@ -284,7 +294,9 @@
     var up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
     function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
     var V = [right[0], up[0], -fwd[0], 0, right[1], up[1], -fwd[1], 0, right[2], up[2], -fwd[2], 0, -dot(right, eye), -dot(up, eye), dot(fwd, eye), 1];
-    var VP = mul(persp(fovy, asp, Math.max(0.1, dist - R * 4), dist + R * 6), V);
+    var rc = mesh.rect || [0, 0, 0, 0];                 // le vrai plateau, à sa place sous les pièces
+    var reach = rc[2] ? Math.sqrt(Math.pow(Math.abs(rc[0]) + rc[2], 2) + Math.pow(Math.abs(rc[1]) + rc[3], 2)) : 0;
+    var VP = mul(persp(fovy, asp, Math.max(0.1, dist - R * 4), dist + Math.max(R * 6, reach * 2)), V);
 
     // le plateau : grille de 10 mm qui s'estompe, ombre de contact
     var plateR = Math.max(R * 2.4, 8);
@@ -294,7 +306,8 @@
     var aPp = gl.getAttribLocation(progP, 'aP');
     gl.enableVertexAttribArray(aPp); gl.vertexAttribPointer(aPp, 2, gl.FLOAT, false, 0, 0);
     gl.uniformMatrix4fv(UP.uVP, false, new Float32Array(VP));
-    gl.uniform1f(UP.uR, plateR); gl.uniform1f(UP.uGrid, grid);
+    gl.uniform1f(UP.uR, plateR); gl.uniform1f(UP.uQ, Math.max(plateR, reach)); gl.uniform1f(UP.uGrid, grid);
+    gl.uniform4f(UP.uRect, rc[0], rc[1], rc[2], rc[3]);
     gl.uniform1f(UP.uFoot, Math.max(s[0], s[1]) * 0.56 + 0.5);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -307,11 +320,18 @@
     gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 3, gl.FLOAT, false, 0, 0);
     gl.uniformMatrix4fv(U.uVP, false, new Float32Array(VP));
     gl.uniformMatrix4fv(U.uV, false, new Float32Array(V));
-    gl.uniform3fv(U.uC, color);
     gl.uniform1f(U.uTop, h + 1);
     gl.uniform1f(U.uClip, clipT >= 1 ? h + 1 : h * clipT);
     gl.uniform1f(U.uLayer, Math.max(R / 70, 0.02));
-    gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+    if (mesh.groups && !state.color) {                  // couleurs du fichier ; une pastille choisie recolore tout
+      mesh.groups.forEach(function (g) {
+        gl.uniform3fv(U.uC, g.c || color);
+        gl.drawArrays(gl.TRIANGLES, g.first, g.count);
+      });
+    } else {
+      gl.uniform3fv(U.uC, color);
+      gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+    }
 
     if (miniCtx) {
       var mw = mini.width, mh = mini.height, k = Math.min(mw / W, mh / H) * 1.02, dw = W * k, dh = H * k;
@@ -393,10 +413,11 @@
   var desc = $('ip-desc'), qty = $('ip-qty'), status = $('ip-status'), submit = $('ip-submit');
   var drop = $('ip-drop'), fileIn = $('ip-file'), list = $('ip-flist');
   var fname = $('ip-fname'), fsize = $('ip-fsize'), noPrev = $('ip-nopreview'), warnEl = $('ip-warn');
-  var rDim = $('ip-r-dim'), rG = $('ip-r-g'), rMat = $('ip-r-mat');
-  var DEF = { name: fname.textContent, size: fsize.textContent, mat: rMat.textContent };
+  var rDim = $('ip-r-dim'), rDim2 = $('ip-r-dim2'), rG = $('ip-r-g'), rMat = $('ip-r-mat');
+  var lDim = $('ip-l-dim'), lG = $('ip-l-g'), totalEl = $('ip-total'), shot = $('ip-shot'), strip = $('ip-plates');
+  var DEF = { name: fname.textContent, size: fsize.textContent, mat: rMat.textContent, lDim: lDim.textContent, lG: lG.textContent };
   var DEF_RGB = color.slice();
-  var MAX_FILES = 3, MAX_BYTES = 50 * 1048576, EXT = /\.(stl|3mf|step|stp|obj)$/i, READ = /\.(stl|obj)$/i;
+  var MAX_FILES = 3, MAX_BYTES = 50 * 1048576, EXT = /\.(stl|3mf|step|stp|obj)$/i, READ = /\.(stl|obj)$/i, READ3 = /\.3mf$/i;
   var FAM_OF = { pla: 'PLA', petg: 'PETG', abs: 'ABS', tpu: 'TPU' };
   var example = exampleMesh();
   var files = [], current = -1, handed = false;
@@ -410,20 +431,57 @@
   function rgb(hex) { return [1, 3, 5].map(function (i) { return parseInt(hex.substr(i, 2), 16) / 255; }); }
   function matCalc() { return state.mat !== 'any' ? state.mat : (current >= 0 ? 'pla' : 'abs'); }
 
+  function sizeText(f) {
+    if (f.reading) return _t('Lecture du fichier…') + (f.pct ? ' ' + f.pct + ' %' : '');
+    return fmtSize(f.file.size) + (f.three && f.three.lightened ? ' · ' + _t('aperçu allégé') : '');
+  }
+  /* Plateaux cochés : poids réel si le fichier est tranché, sinon estimé ; temps seulement si tous l'ont. */
+  function checkedTotal(t, mat) {
+    var out = { n: 0, g: 0, est: false, time: 0 }, allTimes = true;
+    t.plates.forEach(function (p) {
+      if (!p.on) return;
+      out.n++;
+      var g = p.weight > 0 ? p.weight : grams(p, mat);
+      if (!(p.weight > 0)) out.est = true;
+      if (g) out.g += g;
+      if (p.time > 0) out.time += p.time; else allTimes = false;
+    });
+    if (!allTimes) out.time = 0;
+    return out;
+  }
   function readout() {
     var f = current >= 0 ? files[current] : null;
-    var m = f ? f.mesh : example;
+    var t = f && f.three, pl = t ? t.plates[t.pi] : null;
+    var m = pl ? (pl.hasMesh ? pl : null) : (f ? f.mesh : example);
     if (f) {
       fname.textContent = f.file.name;
-      fsize.textContent = f.reading ? _t('Lecture du fichier…') : fmtSize(f.file.size);
+      fsize.textContent = sizeText(f);
     } else {
       fname.textContent = DEF.name;
       fsize.textContent = DEF.size;
     }
-    noPrev.hidden = !(f && !f.reading && !f.mesh);
-    canvas.style.visibility = noPrev.hidden ? '' : 'hidden';
-    rDim.textContent = m ? fmtDim(m) : '—';
-    rG.textContent = m ? fmtGrams(grams(m, matCalc())) : '—';
+    // image du plateau : tranché sans pièce, ou navigateur sans WebGL
+    var img = pl && pl.url && (!pl.hasMesh || !glOK);
+    shot.hidden = !img;
+    if (img && shot.getAttribute('src') !== pl.url) { shot.src = pl.url; shot.alt = _t('Plateau') + ' ' + pl.id; }
+    noPrev.hidden = !(f && !f.reading && !m && !img);
+    canvas.style.visibility = noPrev.hidden && !img ? '' : 'hidden';
+
+    // sans pièce, le temps réel remplace les dimensions ; poids réel : plus de « estimé »
+    var noMeshTime = pl && !pl.hasMesh && pl.time > 0;
+    lDim.textContent = noMeshTime ? _t('Temps d\'impression') : DEF.lDim;
+    rDim.textContent = noMeshTime ? fmtTime(pl.time) : (m ? fmtDim(m) : '—');
+    rDim2.hidden = !(pl && pl.hasMesh && pl.time > 0);
+    rDim2.textContent = rDim2.hidden ? '' : _t('{t} d\'impression').replace('{t}', fmtTime(pl.time));
+    var real = pl && pl.weight > 0;
+    lG.textContent = real ? _t('Poids') : DEF.lG;
+    rG.textContent = real ? fmtWeight(pl.weight) : (m ? fmtGrams(grams(m, matCalc())) : '—');
+    var sum = t && t.plates.length > 1 ? checkedTotal(t, matCalc()) : null;
+    totalEl.hidden = !sum;
+    if (sum) {
+      totalEl.innerHTML = '<span>' + esc(tn(sum.n, '{n} plateau', '{n} plateaux')) + '</span>' +
+        '<b>' + esc(sum.g ? (sum.est ? fmtGrams(sum.g) : fmtWeight(sum.g)) : '—') + (sum.time ? ' · ' + esc(fmtTime(sum.time)) : '') + '</b>';
+    }
     var label = state.mat === 'any'
       ? (f ? _t('À conseiller') : DEF.mat)
       : FAM_OF[state.mat];
@@ -440,15 +498,133 @@
     warnEl.hidden = !w;
   }
 
-  function show(i) {
+  function show(i, still) {
     current = i;
     var f = i >= 0 ? files[i] : null;
     var m = f ? f.mesh : example;
     var changed = m !== mesh;
-    if (m) { mesh = m; if (changed) { uploadMesh(); build(!!f || !booted); } else draw(); }
+    if (m) { mesh = m; if (changed) { uploadMesh(); build(!still && (!!f || !booted)); } else draw(); }
     readout();
     paintList();
+    paintPlates();
   }
+
+  /* ---------- 3MF : le Worker lit le fichier, la page ne garde que le plateau affiché ---------- */
+  var stripFor = null;
+  function paintPlates() {
+    var f = current >= 0 ? files[current] : null, t = f && f.three, many = t && t.plates.length > 1;
+    strip.hidden = !many;
+    if (!many) { stripFor = null; strip.innerHTML = ''; return; }
+    if (stripFor !== f) {
+      stripFor = f;
+      strip.innerHTML = t.plates.map(function (p, i) {
+        return '<li class="ip-plate' + (p.url ? '' : ' no-img') + '" data-i="' + i + '">' +
+          '<button type="button" class="ip-plate-b" aria-label="' + esc(_t('Voir le plateau') + ' ' + p.id) + '">' +
+          (p.url ? '<img src="' + esc(p.url) + '" alt="" width="78" height="78">' : '') + '<span>' + p.id + '</span></button>' +
+          '<label class="ip-plate-c"><input type="checkbox" aria-label="' + esc(_t('Imprimer le plateau') + ' ' + p.id) + '"' + (p.on ? ' checked' : '') + '>' +
+          '<i aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg></i></label></li>';
+      }).join('');
+      strip.scrollLeft = 0;
+    }
+    all('.ip-plate', strip).forEach(function (li, i) {
+      var on = i === t.pi;
+      li.classList.toggle('is-on', on);
+      li.classList.toggle('is-off', !t.plates[i].on);
+      li.querySelector('.ip-plate-b').setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  function askPlate(f, i) {
+    var t = f.three, p = t.plates[i];
+    t.pi = i;
+    t.req++;
+    if (!glOK) return false;
+    if (!p.hasMesh) { f.mesh = null; return false; }
+    t.w.postMessage({ t: 'plate', i: i, req: t.req });
+    return true;
+  }
+  function read3mf(f) {
+    return new Promise(function (resolve) {
+      var w, timer = 0;
+      function end() { clearTimeout(timer); f.reading = false; resolve(); }
+      function fail() {
+        var late = !f.reading;
+        try { w.terminate(); } catch (e) { /* déjà fini */ }
+        dropFile(f);
+        f.mesh = null;
+        end();
+        if (late && files[current] === f) { mesh = null; show(current, true); }   // plateau suivant impossible à lire
+      }
+      function alive() { clearTimeout(timer); timer = setTimeout(fail, 90000); }
+      if (!window.Worker || !window.DecompressionStream) { f.reading = false; resolve(); return; }
+      try { w = new Worker(WORKER); } catch (e) { f.reading = false; resolve(); return; }
+      f.stop = function () { clearTimeout(timer); w.terminate(); };
+      w.onerror = fail;
+      w.onmessage = function (e) {
+        var m = e.data, cur = files[current] === f;
+        if (m.t === 'progress') {
+          alive();
+          f.pct = Math.round(m.p * 100);
+          if (cur) fsize.textContent = sizeText(f);
+        } else if (m.t === 'fail') {
+          fail();
+        } else if (m.t === 'meta') {
+          alive();
+          m.plates.forEach(function (p) {
+            p.on = true;
+            p.url = p.thumb ? URL.createObjectURL(p.thumb) : '';
+          });
+          f.three = { w: w, plates: m.plates, pi: 0, req: 0, lightened: m.lightened };
+          if (!askPlate(f, 0)) end();
+        } else if (m.t === 'plate') {
+          var t = f.three;
+          if (!t || m.req !== t.req) return;      // un autre plateau a été choisi entre-temps
+          var p = t.plates[m.i];
+          f.mesh = m.pos ? { pos: m.pos, count: m.pos.length / 3, size: p.size, volume: p.volume, area: p.area, groups: m.groups, rect: m.rect } : null;
+          if (f.reading) end();
+          else if (cur) { mesh = null; show(current, true); }
+        }
+      };
+      alive();
+      var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      w.postMessage({ t: 'open', file: f.file, budget: coarse ? 6e5 : 8e6, maxTris: coarse ? 12e6 : 3e7 });
+    });
+  }
+  function dropFile(f) {
+    if (f.stop) f.stop();
+    if (f.three) f.three.plates.forEach(function (p) { if (p.url) URL.revokeObjectURL(p.url); });
+    f.three = null;
+    if (stripFor === f) stripFor = null;
+  }
+  strip.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('.ip-plate-b') : null, f = files[current];
+    if (!b || !f || !f.three) return;
+    var i = +b.parentNode.getAttribute('data-i');
+    if (i === f.three.pi) return;
+    if (!askPlate(f, i)) { mesh = null; show(current, true); } else { readout(); paintPlates(); }
+    var li = b.parentNode, l = li.offsetLeft, r = l + li.offsetWidth;
+    if (l < strip.scrollLeft + 12) strip.scrollLeft = Math.max(0, l - 12);
+    else if (r > strip.scrollLeft + strip.clientWidth - 12) strip.scrollLeft = r - strip.clientWidth + 12;
+  });
+  strip.addEventListener('change', function (e) {
+    var f = files[current], li = e.target.closest ? e.target.closest('.ip-plate') : null;
+    if (!li || !f || !f.three) return;
+    var plates = f.three.plates, p = plates[+li.getAttribute('data-i')];
+    if (!e.target.checked && plates.filter(function (x) { return x.on; }).length === 1) {
+      e.target.checked = true;
+      say(_t('Garde au moins un plateau.'), 'is-err');
+      return;
+    }
+    p.on = e.target.checked;
+    say('');
+    readout();
+    paintPlates();
+  });
+  shot.addEventListener('load', function () {        // la pièce de la section Matériaux suit
+    if (!miniCtx || shot.hidden) return;
+    var mw = mini.width, mh = mini.height, k = Math.min(mw / shot.naturalWidth, mh / shot.naturalHeight);
+    miniCtx.clearRect(0, 0, mw, mh);
+    miniCtx.drawImage(shot, (mw - shot.naturalWidth * k) / 2, (mh - shot.naturalHeight * k) / 2, shot.naturalWidth * k, shot.naturalHeight * k);
+  });
 
   function paintList() {
     list.innerHTML = files.map(function (f, i) {
@@ -463,6 +639,7 @@
   }
 
   function readFile(f) {
+    if (READ3.test(f.file.name)) return read3mf(f);
     if (!READ.test(f.file.name)) { f.reading = false; return Promise.resolve(); }
     f.reading = true;
     return f.file.arrayBuffer().then(function (buf) {
@@ -509,6 +686,7 @@
     var x = e.target.closest ? e.target.closest('.ip-file-x') : null;
     if (x) {
       var i = +x.getAttribute('data-i');
+      dropFile(files[i]);
       files.splice(i, 1);
       say('');
       var next = files.length ? Math.min(i, files.length - 1) : -1;
@@ -720,6 +898,22 @@
     var r = form.querySelector('input[name="' + name + '"]:checked');
     return r ? r.parentNode.querySelector('span').textContent.trim() : '';
   }
+  function fileLines(f) {
+    var mat = state.mat !== 'any' ? state.mat : 'pla', t = f.three;
+    if (!t) return [_t('Fichier :') + ' ' + f.file.name + (f.mesh ? ', ' + fmtDim(f.mesh) + ', ' + fmtGrams(grams(f.mesh, mat)) : '')];
+    var sum = checkedTotal(t, mat), bits = [f.file.name], n = t.plates.length;
+    if (n === 1 && t.plates[0].hasMesh) bits.push(fmtDim(t.plates[0]));
+    if (sum.g) bits.push(sum.est ? fmtGrams(sum.g) : fmtWeight(sum.g));
+    if (sum.time) bits.push(fmtTime(sum.time));
+    var out = [_t('Fichier :') + ' ' + bits.join(', ')];
+    if (n > 1) {
+      var on = t.plates.filter(function (p) { return p.on; });
+      out.push(_t('Plateaux :') + ' ' + (on.length === n
+        ? _t('tous') + ' (' + n + ')'
+        : on.map(function (p) { return p.id; }).join(', ') + ' ' + _t('sur') + ' ' + n));
+    }
+    return out;
+  }
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var d = desc.value.trim();
@@ -734,9 +928,7 @@
     ];
     if (state.color) lines.push(_t('Couleur :') + ' ' + state.color.name + ' (' + state.color.material + ')');
     lines.push(_t('Quantité :') + ' ' + q);
-    files.forEach(function (f) {
-      lines.push(_t('Fichier :') + ' ' + f.file.name + (f.mesh ? ', ' + fmtDim(f.mesh) + ', ' + fmtGrams(grams(f.mesh, state.mat !== 'any' ? state.mat : 'pla')) : ''));
-    });
+    files.forEach(function (f) { lines = lines.concat(fileLines(f)); });
     if (d) lines.push(_t('Détails :') + ' ' + d);
     var body = lines.join('\n');
     var CA = window.CA || {};
@@ -755,6 +947,7 @@
   document.addEventListener('ca:msg-change', function () {
     if (!handed) return;
     handed = false;
+    files.forEach(dropFile);
     files = []; mesh = null;
     desc.value = ''; qty.value = 1;
     checkSvc('file');

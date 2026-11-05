@@ -167,6 +167,8 @@ html:not(.ip-gl) .ip-view {
 .ip-fallback { position:absolute; inset:0; margin:auto; width:72%; height:72%; }
 .ip-gl .ip-fallback { display:none; }
 html:not(.ip-gl) .ip-view canvas, html:not(.ip-gl) #ip-mini { display:none; }
+.ip-shot { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; background:var(--thumb-bg); }
+.ip-shot[hidden] { display:none; }
 .ip-nopreview {
   position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
   padding:20px; text-align:center; color:#6C727C;
@@ -180,6 +182,44 @@ html:not(.ip-gl) .ip-view canvas, html:not(.ip-gl) #ip-mini { display:none; }
 .ip-read dt { font-size:.86rem; color:#A7ADB8; }
 .ip-read dd { margin:1px 0 0; font-family:var(--display); font-size:1.08rem; font-weight:700; line-height:1.25; color:#fff; }
 #ip-r-dim, #ip-r-g { white-space:nowrap; }
+.ip-read .ip-r-sub { font-family:inherit; font-size:.92rem; font-weight:500; color:#C6CBD3; }
+.ip-read .ip-r-sub[hidden] { display:none; }
+.ip-total {
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:0 8px; margin:0; padding:9px 18px 10px;
+  background:#181A1F; border-top:1px solid rgba(255,255,255,.12); color:#A7ADB8; font-size:.94rem;
+}
+.ip-total[hidden] { display:none; }
+.ip-total b { font-family:var(--display); font-size:1.02rem; font-weight:700; color:#fff; }
+/* plateaux d'un 3MF : l'image montre, la case dit si on l'imprime */
+.ip-plates {
+  position:relative; list-style:none; display:flex; gap:8px; margin:0; padding:10px 12px; overflow-x:auto; overscroll-behavior-x:contain;
+  scrollbar-width:thin; background:var(--thumb-bg); border-top:1px solid rgba(24,26,31,.1);
+}
+.ip-plates[hidden] { display:none; }
+.ip-plate { position:relative; flex:none; width:78px; height:78px; }
+.ip-plate-b {
+  position:relative; display:block; width:100%; height:100%; padding:0; overflow:hidden; cursor:pointer;
+  background:#fff; border:1px solid rgba(24,26,31,.18); border-radius:10px; font:inherit; color:#181A1F; transition:border-color .15s;
+}
+.ip-plate-b:hover { border-color:var(--ember); }
+.ip-plate-b:focus-visible { outline:2px solid var(--ember); outline-offset:2px; }
+.ip-plate-b img { display:block; width:100%; height:100%; object-fit:contain; transition:opacity .15s; }
+.ip-plate-b span {
+  position:absolute; left:4px; bottom:4px; min-width:20px; padding:0 5px; border-radius:6px; text-align:center;
+  background:rgba(24,26,31,.84); color:#fff; font:700 .84rem/1.45 var(--display);
+}
+.ip-plate.no-img .ip-plate-b span { inset:0; display:grid; place-items:center; padding:0; border-radius:0; background:none; color:#181A1F; font-size:1.3rem; }
+.ip-plate.is-on .ip-plate-b { border-color:var(--ember); box-shadow:0 0 0 2px var(--ember); }
+.ip-plate.is-off .ip-plate-b img, .ip-plate.is-off.no-img .ip-plate-b span { opacity:.32; }
+.ip-plate-c { position:absolute; top:0; right:0; width:34px; height:34px; display:grid; place-items:start end; padding:4px; cursor:pointer; }   /* le centre de l'image reste à la vignette */
+.ip-plate-c input { position:absolute; inset:0; width:100%; height:100%; margin:0; opacity:0; cursor:pointer; }
+.ip-plate-c i {
+  display:grid; place-items:center; width:20px; height:20px; border-radius:6px; pointer-events:none;
+  background:#fff; border:1.5px solid rgba(24,26,31,.5); color:transparent; transition:background .15s, border-color .15s;
+}
+.ip-plate-c svg { width:14px; height:14px; }
+.ip-plate-c input:checked + i { background:var(--ember); border-color:var(--ember); color:var(--on-ember); }
+.ip-plate-c input:focus-visible + i { outline:2px solid var(--ember); outline-offset:2px; }
 .ip-warn { margin:0; padding:10px 18px; background:#26221C; color:#F0C48A; font-size:.95rem; line-height:1.4; border-top:1px solid rgba(255,255,255,.12); }
 .ip-warn[hidden] { display:none; }
 
@@ -361,6 +401,6 @@ html:not(.ip-gl) .ip-view canvas, html:not(.ip-gl) #ip-mini { display:none; }
   .ip-in, .ip-file { animation:none; }
   .ip-anim .rv { opacity:1; translate:none; transition:none; }
   .ip-ready .ip-more, .ip-ready .ip-more.is-open { transition:none; }
-  .ip-drop-ic, .ip-dot, .ip-row svg, .ip-part, .ip-more-link svg, .ip-fq summary::after { transition:none; }
+  .ip-drop-ic, .ip-dot, .ip-row svg, .ip-part, .ip-more-link svg, .ip-fq summary::after, .ip-plate-b, .ip-plate-b img, .ip-plate-c i { transition:none; }
   .ip-drop:hover .ip-drop-ic, .ip-dragging .ip-drop-ic, .ip-dot:hover, .ip-row:hover svg, .ip-part:hover, .ip-more-link:hover svg { transform:none; }
 }

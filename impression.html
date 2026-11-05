@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=19">
 <link rel="stylesheet" href="assets/accueil.css?v=23">
-<link rel="stylesheet" href="assets/impression.css?v=2">
+<link rel="stylesheet" href="assets/impression.css?v=3">
 <link rel="stylesheet" href="assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
 <script>document.documentElement.classList.add('ip-ready')</script>
@@ -135,17 +135,20 @@
       <div class="ip-view" id="ip-view">
         <svg class="ip-fallback" viewBox="0 0 400 300" aria-hidden="true"><ellipse cx="200" cy="186" rx="146" ry="74" fill="#3A3E46"/><ellipse cx="200" cy="150" rx="146" ry="74" fill="#6C727C"/><ellipse cx="200" cy="150" rx="88" ry="44" fill="#ECEDEA"/></svg>
         <canvas id="ip-gl" tabindex="0" role="img" aria-label="Aperçu 3D de la pièce. Les flèches du clavier la font tourner."></canvas>
+        <img class="ip-shot" id="ip-shot" alt="" hidden>
         <div class="ip-nopreview" id="ip-nopreview" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="m12 11 3 1.7v3.4L12 17.8l-3-1.7v-3.4z"/></svg>
           <b>Fichier ajouté</b>
-          <span id="ip-nopreview-t">Pas d'aperçu pour ce format. Il part quand même avec ta demande.</span>
+          <span id="ip-nopreview-t">Pas d'aperçu pour ce fichier. Il part quand même avec ta demande.</span>
         </div>
       </div>
+      <ul class="ip-plates" id="ip-plates" aria-label="Plateaux du fichier" hidden></ul>
       <dl class="ip-read">
-        <div><dt>Dimensions</dt><dd id="ip-r-dim">—</dd></div>
-        <div><dt>Poids estimé</dt><dd id="ip-r-g">—</dd></div>
+        <div><dt id="ip-l-dim">Dimensions</dt><dd id="ip-r-dim">—</dd><dd class="ip-r-sub" id="ip-r-dim2" hidden></dd></div>
+        <div><dt id="ip-l-g">Poids estimé</dt><dd id="ip-r-g">—</dd></div>
         <div><dt>Matériau</dt><dd id="ip-r-mat">ABS</dd></div>
       </dl>
+      <p class="ip-total" id="ip-total" hidden></p>
       <p class="ip-warn" id="ip-warn" hidden></p>
     </div>
   </div>
@@ -270,11 +273,11 @@
     <div class="ip-faq rv" style="--d:1">
       <details class="ip-fq">
         <summary>Quels fichiers acceptez-vous ?</summary>
-        <p>STL, 3MF, STEP et OBJ, jusqu'à 50 Mo chacun et 3 fichiers par demande. L'aperçu fonctionne avec les STL et les OBJ. Pas de fichier ? Décris ta pièce, on s'en occupe.</p>
+        <p>STL, 3MF, STEP et OBJ, jusqu'à 50 Mo chacun et 3 fichiers par demande. L'aperçu fonctionne avec les STL, les OBJ et les 3MF. Pas de fichier ? Décris ta pièce, on s'en occupe.</p>
       </details>
       <details class="ip-fq">
         <summary>Combien ça coûte ?</summary>
-        <p>Ça dépend du poids, du temps d'impression, du matériau et de la quantité. Tu reçois le prix avant qu'on commence. Le poids affiché dans l'aperçu est une estimation.</p>
+        <p>Ça dépend du poids, du temps d'impression, du matériau et de la quantité. Tu reçois le prix avant qu'on commence. Le poids affiché dans l'aperçu est une estimation, sauf si ton fichier est déjà tranché.</p>
       </details>
       <details class="ip-fq">
         <summary>Et si la date change ?</summary>
@@ -390,6 +393,6 @@
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=18"></script>
 <script src="assets/promo.js?v=1"></script>
-<script src="assets/impression.js?v=2"></script>
+<script src="assets/impression.js?v=3"></script>
 </body>
 </html>

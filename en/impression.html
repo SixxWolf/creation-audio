@@ -31,13 +31,13 @@
 <link rel="stylesheet" href="../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../assets/site.css?v=19">
 <link rel="stylesheet" href="../assets/accueil.css?v=23">
-<link rel="stylesheet" href="../assets/impression.css?v=2">
+<link rel="stylesheet" href="../assets/impression.css?v=3">
 <link rel="stylesheet" href="../assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
 <script>document.documentElement.classList.add('ip-ready')</script>
 <script src="../assets/look.js?v=5"></script>
 <script src="../assets/i18n.js?v=1"></script>
-<script src="../assets/i18n-en.js?v=19"></script>
+<script src="../assets/i18n-en.js?v=20"></script>
 </head>
 <body class="home-page">
 <a class="skip" href="#main">Skip to content</a>
@@ -136,17 +136,20 @@
       <div class="ip-view" id="ip-view">
         <svg class="ip-fallback" viewBox="0 0 400 300" aria-hidden="true"><ellipse cx="200" cy="186" rx="146" ry="74" fill="#3A3E46"/><ellipse cx="200" cy="150" rx="146" ry="74" fill="#6C727C"/><ellipse cx="200" cy="150" rx="88" ry="44" fill="#ECEDEA"/></svg>
         <canvas id="ip-gl" tabindex="0" role="img" aria-label="3D preview of the part. The arrow keys rotate it."></canvas>
+        <img class="ip-shot" id="ip-shot" alt="" hidden>
         <div class="ip-nopreview" id="ip-nopreview" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="m12 11 3 1.7v3.4L12 17.8l-3-1.7v-3.4z"/></svg>
           <b>File added</b>
-          <span id="ip-nopreview-t">No preview for this format. It still goes with your request.</span>
+          <span id="ip-nopreview-t">No preview for this file. It still goes with your request.</span>
         </div>
       </div>
+      <ul class="ip-plates" id="ip-plates" aria-label="Plates in the file" hidden></ul>
       <dl class="ip-read">
-        <div><dt>Dimensions</dt><dd id="ip-r-dim">—</dd></div>
-        <div><dt>Estimated weight</dt><dd id="ip-r-g">—</dd></div>
+        <div><dt id="ip-l-dim">Dimensions</dt><dd id="ip-r-dim">—</dd><dd class="ip-r-sub" id="ip-r-dim2" hidden></dd></div>
+        <div><dt id="ip-l-g">Estimated weight</dt><dd id="ip-r-g">—</dd></div>
         <div><dt>Material</dt><dd id="ip-r-mat">ABS</dd></div>
       </dl>
+      <p class="ip-total" id="ip-total" hidden></p>
       <p class="ip-warn" id="ip-warn" hidden></p>
     </div>
   </div>
@@ -271,11 +274,11 @@
     <div class="ip-faq rv" style="--d:1">
       <details class="ip-fq">
         <summary>Which files do you accept?</summary>
-        <p>STL, 3MF, STEP and OBJ, up to 50 MB each and 3 files per request. The preview works with STL and OBJ files. No file? Describe your part and we'll take care of it.</p>
+        <p>STL, 3MF, STEP and OBJ, up to 50 MB each and 3 files per request. The preview works with STL, OBJ and 3MF files. No file? Describe your part and we'll take care of it.</p>
       </details>
       <details class="ip-fq">
         <summary>How much does it cost?</summary>
-        <p>It depends on weight, print time, material and quantity. You get the price before we start. The weight shown in the preview is an estimate.</p>
+        <p>It depends on weight, print time, material and quantity. You get the price before we start. The weight shown in the preview is an estimate, unless your file is already sliced.</p>
       </details>
       <details class="ip-fq">
         <summary>What if the date changes?</summary>
@@ -391,6 +394,6 @@
 <script src="../assets/supabase-client.js?v=1"></script>
 <script src="../assets/nav.js?v=18"></script>
 <script src="../assets/promo.js?v=1"></script>
-<script src="../assets/impression.js?v=2"></script>
+<script src="../assets/impression.js?v=3"></script>
 </body>
 </html>

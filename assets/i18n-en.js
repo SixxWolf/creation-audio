@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 19;
+window.CA_EN_V = 20;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -945,5 +945,18 @@ window.CA_EN = (function (pairs) {
   [`Conception maison`, `Designed in-house`],
   [`Adaptateur`, `Adapter`],
   [`Couleur :`, `Colour:`],
-  [`Fichier :`, `File:`]
+  [`Fichier :`, `File:`],
+  [`aperçu allégé`, `light preview`],
+  [`Plateau`, `Plate`],
+  [`Voir le plateau`, `Show plate`],
+  [`Imprimer le plateau`, `Print plate`],
+  [`Garde au moins un plateau.`, `Keep at least one plate.`],
+  [`Temps d'impression`, `Print time`],
+  [`{t} d'impression`, `{t} to print`],
+  [`Poids`, `Weight`],
+  [`{n} plateau`, `{n} plate`],
+  [`{n} plateaux`, `{n} plates`],
+  [`Plateaux :`, `Plates:`],
+  [`tous`, `all`],
+  [`sur`, `of`]
 ]);
