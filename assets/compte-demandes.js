@@ -102,7 +102,7 @@ window.CA = window.CA || {};
     var id = det.getAttribute('data-id'), box = det.querySelector('.dq-fil'), r = list.filter(function (x) { return x.id === id; })[0];
     if (!box || !r || threads[id]) return;
     threads[id] = CA.demandeFil.mount(box, {
-      id: id, sb: sb, owner: CA.compteDemandes.uid, btn: 'acct-btn acct-btn-go', root: CA.lang === 'en' ? '../' : '',
+      id: id, sb: sb, noFiles: r.kind === 'maintenance', owner: CA.compteDemandes.uid, btn: 'acct-btn acct-btn-go', root: CA.lang === 'en' ? '../' : '',
       onRead: function () { if (r.unread) { r.unread = 0; badge(); var b = det.querySelector('summary .acct-n'); if (b) b.remove(); } }
     });
   }

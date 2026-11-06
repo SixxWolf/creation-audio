@@ -80,7 +80,7 @@ window.CA = window.CA || {};
         '<textarea class="df-in" id="df-in-' + esc(o.id) + '" rows="2" maxlength="4000"></textarea>' +
         '<div class="df-row">' +
           '<label class="df-att">' + esc(_t('Photo')) + '<input type="file" class="df-ph" accept="image/*" multiple hidden></label>' +
-          '<label class="df-att">' + esc(_t('Fichier 3D')) + '<input type="file" class="df-3df" multiple hidden></label>' +
+          (o.noFiles ? '' : '<label class="df-att">' + esc(_t('Fichier 3D')) + '<input type="file" class="df-3df" multiple hidden></label>') +
           '<button type="submit" class="df-send ' + esc(o.btn || '') + '">' + esc(_t('Envoyer')) + '</button>' +
         '</div>' +
         '<p class="df-status" role="status" aria-live="polite"></p>' +
@@ -185,7 +185,8 @@ window.CA = window.CA || {};
           function () { say(_t('Format de photo non pris en charge : envoie une photo JPEG ou PNG.'), true); });
       }))).then(paintAtt);
     });
-    el.querySelector('.df-3df').addEventListener('change', function (e) {
+    var f3d = el.querySelector('.df-3df');
+    if (f3d) f3d.addEventListener('change', function (e) {
       var pick = [].slice.call(e.target.files || []), bad = '';
       e.target.value = '';
       pick.forEach(function (f) {

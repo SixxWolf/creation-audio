@@ -208,7 +208,7 @@
     } else {
       pane.innerHTML = '<div id="dm-fil"></div>';
       fil = CA.demandeFil.mount($('#dm-fil'), {
-        id: r.id, admin: true, sb: sb, owner: r.customer_id, readOnly: !r.customer_id, btn: 'btn btn-accent btn-sm', root: '',
+        id: r.id, admin: true, sb: sb, noFiles: r.kind === 'maintenance', owner: r.customer_id, readOnly: !r.customer_id, btn: 'btn btn-accent btn-sm', root: '',
         onRead: function () { if (r.admin_unread) { r.admin_unread = 0; paintBadge(); paintList(); } }
       });
     }
