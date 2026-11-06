@@ -1434,7 +1434,13 @@
         ? { name: d.name || d.email, email: d.email || '', phone: d.phone || '', address: d.address || '', city: d.city || '' }
         : { name: order.dealer_name || order.dealer_email || '', email: order.dealer_email || '' });
       lines = (olines || []).filter(function (l) { return (l.qty | 0) > 0; }).map(lineFromOrder);
-      elNote.value = 'Commande dealer ' + order.number + (order.note ? ' — ' + order.note : '');
+      if (order.delivery === 'ship') {   // ligne libre de la livraison ; coût = forfait figé, pour une marge juste même quand c'est gratuit
+        var fee = +order.ship_fee || 0, en = d && d.lang === 'en';
+        lines.push({ id: uid(), productId: null, ptype: 'divers', kind: 'free',
+          label: fee ? (en ? 'Shipping' : 'Livraison') : (en ? 'Free shipping' : 'Livraison gratuite'), meta: '', hex: null,
+          qty: 1, base: 0, tiers: [], cost: +order.ship_rate || 0, tierKey: null, price: fee, manual: true, sp: null });
+      }
+      elNote.value = 'Commande dealer ' + order.number + (order.delivery === 'ship' ? ' — Livraison : ' + (order.ship_address || '') : '') + (order.note ? ' — ' + order.note : '');
       setCat('spacer');
       unlock();
       elStatus.textContent = '';

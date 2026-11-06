@@ -238,6 +238,7 @@
           '<div class="co-who">' + (window.CA.avatar ? window.CA.avatar(who) : '') +
             '<span><b>' + esc(who) + '</b><small>' + esc(fmtDate(o.created_at)) + ' · ' + esc(ago(o.created_at)) + '</small></span></div>' +
         '</header>' +
+        (o.delivery === 'ship' ? '<p class="co-note"><b>Livraison :</b> ' + esc(o.ship_address || '') + ' · ' + (+o.ship_fee > 0 ? money(o.ship_fee) : 'gratuite') + '</p>' : '') +
         (o.note ? '<p class="co-note"><b>Note :</b> ' + esc(o.note) + '</p>' : '') +
         '<div class="co-table-wrap"><table class="co-table">' +
           '<thead><tr><th class="l">Spacer</th><th class="n">Qté</th><th class="n">Stock</th><th class="n">À imprimer</th><th class="n">Prix</th><th class="n">Total</th></tr></thead>' +
@@ -447,9 +448,52 @@
       var p = stock[it.id]; if (!p) return;
       pairs += it.qty; total += round2(unitOf(p, it.qty) * it.qty);
     });
+    var fee = shipFeeOf(total);
     var sum = $('.cof-sum', fLines);
-    if (sum) sum.innerHTML = '<span class="co-total">' + plural(pairs, 'paire', 'paires') + ' · <b>' + money(total) + '</b></span>';
+    if (sum) sum.innerHTML = '<span class="co-total">' + plural(pairs, 'paire', 'paires') +
+      (delivery() === 'ship' ? ' · livraison ' + (fee ? money(fee) : 'gratuite') : '') + ' · <b>' + money(total + fee) + '</b></span>';
   }
+  /* réception : aperçu (le serveur recalcule) ; commande existante = seuil et forfait figés à son envoi */
+  var fShipCfg = null, fAddr = $('#cof-addr'), AD_KEYS = ['name', 'address', 'city', 'province', 'postal', 'phone'], fA = {};
+  AD_KEYS.forEach(function (k) { fA[k] = $('#cof-a-' + k); });
+  var fProvPk = window.CA.pick ? window.CA.pick(fA.province) : null;
+  function setAddr(a) {
+    AD_KEYS.forEach(function (k) { fA[k].value = (a && a[k]) || ''; });
+    if (fProvPk) fProvPk.refresh();
+  }
+  function getAddr() {
+    var a = {};
+    AD_KEYS.forEach(function (k) { a[k] = fA[k].value.trim(); });
+    return a;
+  }
+  function fillFromDealer(email) {
+    if (!email) return;
+    sb.rpc('dealer_ship_address', { p_email: email }).then(function (res) {
+      if (!res.error && res.data && delivery() === 'ship' && !fA.address.value) setAddr(res.data);
+    }, function () {});
+  }
+  function delivery() { var r = $('input[name="cof-del"]:checked'); return r ? r.value : 'pickup'; }
+  function setDelivery(d) { var r = $('input[name="cof-del"][value="' + d + '"]'); if (r) r.checked = true; fAddr.hidden = d !== 'ship'; }
+  function shipFeeOf(sub) {
+    if (delivery() !== 'ship') return 0;
+    var rate, thr = null;
+    if (fOrder && fOrder.ship_rate != null) { rate = +fOrder.ship_rate; thr = fOrder.ship_threshold == null ? null : +fOrder.ship_threshold; }
+    else if (fShipCfg) {
+      var today = new Date().toLocaleDateString('en-CA');
+      rate = +fShipCfg.fee || 0;
+      if (fShipCfg.enabled !== false && (!fShipCfg.ends || today <= fShipCfg.ends)) thr = +fShipCfg.threshold;
+    } else return 0;
+    return thr != null && sub >= thr ? 0 : rate;
+  }
+  $$('input[name="cof-del"]').forEach(function (r) {
+    r.addEventListener('change', function () {
+      fDirty = true; fStatus.textContent = '';
+      setDelivery(delivery());
+      if (delivery() === 'ship' && !fA.address.value) fillFromDealer(fOrder ? fOrder.dealer_email : fDealer.value);
+      renderSum();
+    });
+  });
+  fAddr.addEventListener('input', function () { fDirty = true; });
   function renderLines() {
     fItems = fItems.filter(function (it) { return stock[it.id]; });
     if (!fItems.length) { fLines.innerHTML = '<p class="cof-empty">Aucun spacer.</p>'; return; }
@@ -520,6 +564,12 @@
     fTitle.textContent = o ? 'Modifier ' + o.number : 'Nouvelle commande';
     fSave.textContent = o ? 'Enregistrer les changements' : 'Enregistrer la commande';
     fNote.value = o && o.note ? o.note : '';
+    setAddr(o && o.ship_parts);
+    setDelivery(o && o.delivery === 'ship' ? 'ship' : 'pickup');
+    sb.from('admin_settings').select('value').eq('key', 'dealer_shipping').maybeSingle().then(function (res) {
+      fShipCfg = (res && res.data && res.data.value) || null;
+      renderSum();
+    }, function () {});
     fSearch.value = ''; hideResults();
     fStatus.textContent = '';
     fLines.innerHTML = '<p class="muted">Chargement…</p>';
@@ -562,12 +612,17 @@
     var email = fOrder ? fOrder.dealer_email : fDealer.value;
     if (!email) { fStatus.textContent = 'Choisis un dealer.'; fDealer.focus(); return; }
     if (!fItems.length) { fStatus.textContent = 'Ajoute au moins un spacer.'; fSearch.focus(); return; }
+    var del = delivery(), addr = del === 'ship' ? getAddr() : null;
+    if (addr && (!addr.address || !addr.city || !addr.province)) { fStatus.textContent = 'Complète l\'adresse de livraison.'; return; }
+    if (addr && !/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/.test(addr.postal)) { fStatus.textContent = 'Code postal invalide.'; fA.postal.focus(); return; }
     fSave.disabled = true; fStatus.textContent = 'Enregistrement…';
     sb.rpc('admin_save_dealer_order', {
       p_id: fOrder ? fOrder.id : null,
       p_email: email,
       p_lines: fItems.map(function (it) { return { product_id: it.id, qty: it.qty }; }),
-      p_note: fNote.value.trim() || null
+      p_note: fNote.value.trim() || null,
+      p_delivery: del,
+      p_address: addr
     }).then(function (res) {
       if (res.error) throw res.error;
       var saved = Array.isArray(res.data) ? res.data[0] : res.data;

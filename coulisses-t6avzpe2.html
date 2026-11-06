@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=134">
+<link rel="stylesheet" href="assets/admin.css?v=136">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=1">
 <link rel="stylesheet" href="assets/facture.css?v=37">
@@ -345,6 +345,31 @@
           <button class="btn btn-accent" type="submit" id="pm-save" data-ic="save">Enregistrer</button>
           <button class="btn btn-ghost" type="button" id="pm-cancel">Annuler</button>
           <span class="status" id="pm-status"></span>
+        </div>
+      </form>
+
+      <form class="pm-ship" id="pm-ship">
+        <div class="pm-ship-head">
+          <b>Livraison gratuite revendeurs</b>
+          <label class="inline"><input type="checkbox" id="pm-ship-on"> Actif</label>
+        </div>
+        <div class="pm-ship-grid">
+          <div class="field">
+            <label class="lbl" for="pm-ship-min">Gratuit dès ($)</label>
+            <input type="number" id="pm-ship-min" min="0" step="0.01" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pm-ship-fee">Livraison sous ce montant ($)</label>
+            <input type="number" id="pm-ship-fee" min="0" step="0.01" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pm-ship-end">Fin</label>
+            <input type="date" id="pm-ship-end">
+          </div>
+          <div class="pm-ship-act">
+            <button class="btn btn-accent" type="submit" id="pm-ship-save" data-ic="save">Enregistrer</button>
+            <span class="status" id="pm-ship-status"></span>
+          </div>
         </div>
       </form>
 
@@ -1467,6 +1492,21 @@
           </div>
         </div>
         <div class="cof-lines" id="cof-lines"></div>
+        <div class="field cof-ship">
+          <span class="lbl">Réception</span>
+          <div class="ac-show">
+            <label class="inline"><input type="radio" name="cof-del" value="pickup" checked> Cueillette</label>
+            <label class="inline"><input type="radio" name="cof-del" value="ship"> Livraison</label>
+          </div>
+          <div class="cof-addr" id="cof-addr" hidden>
+            <div class="field cof-addr-w"><label class="lbl" for="cof-a-name">Destinataire</label><input type="text" id="cof-a-name" maxlength="120" autocomplete="off"></div>
+            <div class="field cof-addr-w"><label class="lbl" for="cof-a-address">Adresse</label><input type="text" id="cof-a-address" maxlength="200" autocomplete="off"></div>
+            <div class="field"><label class="lbl" for="cof-a-city">Ville</label><input type="text" id="cof-a-city" maxlength="120" autocomplete="off"></div>
+            <div class="field"><span class="lbl">Province</span><select id="cof-a-province" data-nosearch aria-label="Province"><option value="">Choisir</option><option value="QC">Québec</option><option value="ON">Ontario</option><option value="NB">Nouveau-Brunswick</option><option value="NS">Nouvelle-Écosse</option><option value="PE">Île-du-Prince-Édouard</option><option value="NL">Terre-Neuve-et-Labrador</option><option value="MB">Manitoba</option><option value="SK">Saskatchewan</option><option value="AB">Alberta</option><option value="BC">Colombie-Britannique</option><option value="YT">Yukon</option><option value="NT">Territoires du Nord-Ouest</option><option value="NU">Nunavut</option></select></div>
+            <div class="field"><label class="lbl" for="cof-a-postal">Code postal</label><input type="text" id="cof-a-postal" maxlength="7" autocomplete="off"></div>
+            <div class="field"><label class="lbl" for="cof-a-phone">Téléphone</label><input type="text" id="cof-a-phone" maxlength="40" autocomplete="off"></div>
+          </div>
+        </div>
         <div class="field cof-note">
           <label class="lbl" for="cof-note">Note</label>
           <textarea id="cof-note" class="fx-oneline" rows="1" maxlength="1000" placeholder="Ex. demandé par Messenger" autocomplete="off"></textarea>
@@ -2915,7 +2955,7 @@
 <script src="assets/cms-linkbuilder.js?v=3"></script>
 <script src="assets/cms-spacers.js?v=19"></script>
 <script src="assets/cms-accessories.js?v=12"></script>
-<script src="assets/ca-pick.js?v=1"></script>
+<script src="assets/ca-pick.js?v=2"></script>
 <script src="assets/cms-inventory.js?v=43"></script>
 <script src="assets/cms-attente.js?v=6"></script>
 <script src="assets/cms-reserves.js?v=3"></script>
@@ -2923,14 +2963,14 @@
 <script src="assets/cms-dealers.js?v=9"></script>
 <script src="assets/cms-clients.js?v=10"></script>
 <script src="assets/cms-messages.js?v=8"></script>
-<script src="assets/cms-facturation.js?v=57"></script>
+<script src="assets/cms-facturation.js?v=59"></script>
 <script src="assets/cms-historique.js?v=21"></script>
 <script src="assets/commande-client.js?v=11"></script>
 <script src="assets/cms-commandes-clients.js?v=24"></script>
 <script src="assets/cms-reservations.js?v=9"></script>
 <script src="assets/cms-cueillettes.js?v=7"></script>
 <script src="assets/doc-print.js?v=2"></script>
-<script src="assets/cms-commandes.js?v=14"></script>
+<script src="assets/cms-commandes.js?v=16"></script>
 <script src="assets/cms-statistiques.js?v=12"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
@@ -2946,7 +2986,7 @@
 <script src="assets/cms-imprimantes.js?v=8"></script>
 <script src="assets/cms-aujourdhui.js?v=2"></script>
 <script src="assets/cms-nouvelles.js?v=5"></script>
-<script src="assets/cms-promotions.js?v=2"></script>
+<script src="assets/cms-promotions.js?v=4"></script>
 <script src="assets/cms-recherche.js?v=2"></script>
 <script src="assets/aide.js?v=3"></script>
 <script src="assets/cms-aide.js?v=8"></script>

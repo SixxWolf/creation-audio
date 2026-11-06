@@ -62,7 +62,7 @@
     onTitle: function (p) { document.title = p ? p.name + _t(' — Portail dealer · Création Audio') : TITLE; },
     assureHtml: '<li>' + ICON.bolt + _t('Commande enregistrée directement — Création Audio est avisé</li>') +
       '<li>' + ICON.print + _t('Hors stock ? On l\'imprime sur commande</li>') +
-      '<li>' + ICON.pin + _t('Ramassage région de Québec · facturé à la préparation</li>'),
+      '<li>' + ICON.pin + _t('Cueillette à Québec ou livraison au Canada · facturé à la préparation</li>'),
     emptyHint: _t('Un véhicule manque ? Écris-le dans la note de ta commande, on s\'en occupe.')
   });
 
@@ -108,7 +108,7 @@
   function checkDealer(email) {
     sb.rpc('is_dealer').then(function (res) {
       if (res.error) { show('gate'); return; }
-      if (res.data === true) { show('app', email); syncLook(); load(); loadOrders(); }
+      if (res.data === true) { show('app', email); syncLook(); load(); loadOrders(); loadShip(); }
       else show('gate');
     }, function () { show('gate'); });
   }
@@ -386,6 +386,95 @@
   try { noteI.value = localStorage.getItem(NOTE_KEY) || ''; } catch (e) {}
   noteI.addEventListener('input', function () { try { localStorage.setItem(NOTE_KEY, noteI.value); } catch (e) {} });
 
+  /* ---------- réception : cueillette ou livraison (réglage dans admin › Promotions) ----------
+     Aperçu seulement : le serveur recalcule le port (_dealer_apply_ship). Une commande en
+     modification garde le seuil et le forfait figés à son envoi. */
+  var SHIP_KEY = 'ca_v2_dealer_ship';
+  var shipCfg = null, shipPref = loadJSON(SHIP_KEY) || {};
+  var shipMode = editing ? (editing.delivery || 'pickup') : (shipPref.d === 'ship' ? 'ship' : 'pickup');
+  var shipAddr = editing ? copyAddr(editing.addr) : {};
+  var addrBox = $('#cart-addr'), SA_KEYS = ['name', 'address', 'city', 'province', 'postal', 'phone'], SA_NEEDED = ['address', 'city', 'province', 'postal'], saI = {};
+  SA_KEYS.forEach(function (k) { saI[k] = $('#sa-' + k); });
+  var provPk = window.CA.pick(saI.province);
+  function copyAddr(a) { return Object.assign({}, a || {}); }
+  function missingField() {
+    return SA_NEEDED.filter(function (k) { return !String(shipAddr[k] || '').trim(); })[0] || null;
+  }
+  function focusField(k) { if (k === 'province') provPk.focus(); else saI[k].focus(); }
+
+  function shipRule() {
+    if (editing && editing.rate != null) return { fee: +editing.rate, threshold: editing.threshold == null ? null : +editing.threshold, ends: null };
+    if (!shipCfg) return null;
+    return { fee: +shipCfg.fee || 0, threshold: shipCfg.free_active ? +shipCfg.threshold : null, ends: shipCfg.ends || null };
+  }
+  function shipFee() {
+    var r = shipRule();
+    if (!r || shipMode !== 'ship') return 0;
+    return r.threshold != null && total() >= r.threshold ? 0 : r.fee;
+  }
+  function grandTotal() { return total() + shipFee(); }
+  function saveShipPref() {
+    if (editing) return;
+    shipPref = { d: shipMode };
+    saveJSON(SHIP_KEY, shipPref);
+  }
+  function loadShip() {
+    if (!sb) return;
+    sb.rpc('dealer_shipping').then(function (res) {
+      if (res.error || !res.data) return;
+      shipCfg = res.data;
+      if (!editing && !shipAddr.address) shipAddr = copyAddr(shipCfg.addr);
+      if (!focusedIn(cartPanel)) renderCart(); else renderShip(count());
+    }, function () {});
+  }
+  function renderShip(n) {
+    var r = shipRule(), box = $('#cart-ship'), bar = $('#ship-bar');
+    box.hidden = !r || !n;
+    var isShip = !box.hidden && shipMode === 'ship', sub = total();
+    $$('.ship-seg button', box).forEach(function (b) {
+      var on = b.getAttribute('data-d') === shipMode;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    addrBox.hidden = !isShip;
+    cartPanel.classList.toggle('is-ship', isShip);
+    SA_KEYS.forEach(function (k) {
+      if (document.activeElement !== saI[k]) saI[k].value = shipAddr[k] || '';
+    });
+    provPk.refresh();
+    var offer = !box.hidden && r.threshold != null;
+    bar.hidden = !offer;
+    if (offer) {
+      var left = r.threshold - sub, got = left <= 0;
+      bar.classList.toggle('is-got', got);
+      $('#ship-bar-txt').textContent = got ? _t('Livraison gratuite atteinte !') : _t('Plus que ') + money(left) + _t(' pour la livraison gratuite');
+      $('#ship-fill').style.width = (got ? 100 : Math.max(2, sub / r.threshold * 100)) + '%';
+      $('#ship-terms').textContent = (r.ends ? _t('Jusqu\'au ') + fmtDay(r.ends + 'T12:00:00') + ' · ' : '') + _t('Offre à durée limitée, modifiable ou retirable à tout moment.');
+    }
+    $('#cart-sub-line').hidden = $('#cart-fee-line').hidden = !isShip;
+    if (isShip) {
+      var fee = shipFee();
+      $('#cart-sub').textContent = money(sub);
+      $('#cart-fee').textContent = fee ? money(fee) : _t('Gratuit');
+    }
+    cartTotal.textContent = money(grandTotal());
+  }
+  $$('.ship-seg button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      shipMode = b.getAttribute('data-d');
+      saveShipPref();
+      cartMsg.textContent = '';
+      renderCart();
+      if (shipMode === 'ship' && !shipAddr.address) focusField('address');
+    });
+  });
+  SA_KEYS.forEach(function (k) {
+    saI[k].addEventListener(k === 'province' ? 'change' : 'input', function () {
+      shipAddr[k] = saI[k].value;
+      if (cartMsg.classList.contains('is-bad')) { cartMsg.className = 'cart-msg'; cartMsg.textContent = ''; }
+    });
+  });
+
   function renderCart() {
     var n = count(); cartCount.textContent = n; cartBtn.classList.toggle('has-items', n > 0);
     editBar.hidden = !editing;
@@ -430,7 +519,7 @@
       });
     }
     animateTiers();
-    cartTotal.textContent = money(total());
+    renderShip(n);
     sendBtn.textContent = editing ? _t('Enregistrer les modifications') : _t('Envoyer ma commande');
     sendBtn.classList.toggle('is-disabled', n === 0 || sending);
     renderMbar(n);
@@ -498,7 +587,7 @@
     });
     $('#dl-mbar-n').textContent = plural(n, 'paire', 'paires');
     $('#dl-mbar-hint').textContent = best ? best.name + ' : +' + best.left + ' → −' + best.pct + ' %' : '';
-    $('#dl-mbar-total').textContent = money(total());
+    $('#dl-mbar-total').textContent = money(grandTotal());
   }
 
   var mbar = $('#dl-mbar');
@@ -521,7 +610,11 @@
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && cartPanel.classList.contains('is-open')) closeCart(); });
 
-  function stopEditing() { editing = null; saveJSON(EDIT_KEY, null); }
+  function stopEditing() {
+    editing = null; saveJSON(EDIT_KEY, null);
+    shipMode = shipPref.d === 'ship' ? 'ship' : 'pickup';
+    shipAddr = copyAddr(shipCfg && shipCfg.addr);
+  }
   function resetNote() { noteI.value = ''; saveJSON(NOTE_KEY, null); }
   $('#cart-edit-cancel').addEventListener('click', function () {
     caDialog.confirm({ title: _t('Abandonner la modification ?'), message: _t('La commande ') + (editing ? editing.number : '') + _t(' reste telle qu\'envoyée.'),
@@ -544,11 +637,21 @@
     var lines = entries().map(function (it) { return { product_id: it.id, qty: it.qty }; });
     var note = (noteI.value || '').trim();
     var wasEditing = editing;
+    var delivery = shipRule() ? shipMode : 'pickup', address = delivery === 'ship' ? copyAddr(shipAddr) : null;
+    if (address) {
+      var miss = missingField(), badPost = !/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/.test(String(address.postal || '').trim());
+      if (miss || badPost) {
+        cartMsg.className = 'cart-msg is-bad';
+        cartMsg.textContent = miss ? _t('Complète l\'adresse de livraison.') : _t('Code postal invalide.');
+        focusField(miss || 'postal');
+        return;
+      }
+    }
     sending = true; renderCart();
     cartMsg.className = 'cart-msg'; cartMsg.textContent = wasEditing ? _t('Enregistrement…') : _t('Envoi de la commande…');
     var call = wasEditing
-      ? sb.rpc('dealer_update_order', { p_id: wasEditing.id, p_lines: lines, p_note: note || null })
-      : sb.rpc('dealer_submit_order', { p_lines: lines, p_note: note || null });
+      ? sb.rpc('dealer_update_order', { p_id: wasEditing.id, p_lines: lines, p_note: note || null, p_delivery: delivery, p_address: address })
+      : sb.rpc('dealer_submit_order', { p_lines: lines, p_note: note || null, p_delivery: delivery, p_address: address });
     call.then(function (res) {
       if (res.error) throw res.error;
       var o = Array.isArray(res.data) ? res.data[0] : res.data;
@@ -639,7 +742,9 @@
   }
   // carte d'une commande ; past = ligne compacte dépliable (Historique)
   function orderHtml(o, past) {
-      var st = o.status === 'invoiced' && o.paid_at ? { label: _t('Payée') } : (STATUS[o.status] || { label: o.status });
+      var st = o.status === 'invoiced' && o.paid_at ? { label: _t('Payée') }
+        : o.status === 'ready' && o.delivery === 'ship' ? { label: _t('Prête à envoyer') }
+        : (STATUS[o.status] || { label: o.status });
       var lines = (o.dealer_order_lines || []).slice().sort(function (a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
       var pairs = lines.reduce(function (s, l) { return s + (l.qty | 0); }, 0);
       var isNew = o.status === 'new';
@@ -666,6 +771,7 @@
             '<span class="dl-ol-u">' + money(l.unit_price) + '</span>' +
             '<span class="dl-ol-t">' + money(l.line_total) + '</span></div>';
         }).join('') + '</div>' +
+        (o.delivery === 'ship' ? '<p class="dl-order-note"><b>' + _t('Livraison :') + '</b> ' + esc(o.ship_address || '') + ' · ' + (+o.ship_fee > 0 ? money(o.ship_fee) : _t('gratuite')) + '</p>' : '') +
         (o.note ? '<p class="dl-order-note"><b>' + (o.created_by === 'admin' ? _t('Note') : _t('Ta note')) + ' :</b> ' + esc(o.note) + '</p>' : '') +
         (past && meta ? '<p class="dl-order-meta">' + esc(fmtDate(o.created_at)) + meta + '</p>' : '') +
         (!past && !isNew ? '' : '<footer class="dl-order-foot">' +
@@ -694,7 +800,10 @@
         if (l.product_id && byId[l.product_id]) cart[l.product_id] = { id: l.product_id, qty: (cart[l.product_id] ? cart[l.product_id].qty : 0) + (l.qty | 0) };
         else missing.push(l.name);
       });
-      editing = { id: o.id, number: o.number };
+      editing = { id: o.id, number: o.number, delivery: o.delivery || 'pickup', addr: o.ship_parts || null,
+        rate: o.ship_rate == null ? null : +o.ship_rate, threshold: o.ship_threshold == null ? null : +o.ship_threshold };
+      shipMode = editing.delivery;
+      shipAddr = copyAddr(editing.addr || (shipCfg && shipCfg.addr));
       saveJSON(EDIT_KEY, editing); saveCart();
       noteI.value = o.note || ''; try { localStorage.setItem(NOTE_KEY, noteI.value); } catch (e) {}
       cartMsg.className = 'cart-msg';
@@ -735,6 +844,7 @@
       if (!focusedIn(cartItems)) renderCart();
     }, function () { refreshing = false; });
     if (view === 'orders') loadOrders();
+    loadShip();
   }
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 5000) refresh();

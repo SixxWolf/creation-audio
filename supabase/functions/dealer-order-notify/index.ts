@@ -109,7 +109,11 @@ Deno.serve(async (req) => {
     label + " " + order.number + "\n" +
     "Dealer : " + who + "\n\n" +
     (event === "cancelled" ? "Le dealer a annulé cette commande.\n\n" : "") +
-    rowsTxt + "\n\nTotal dealer : " + money(order.total) + "\n" +
+    rowsTxt + "\n\n" +
+    (order.delivery === "ship"
+      ? "Livraison : " + (Number(order.ship_fee) > 0 ? money(order.ship_fee) : "gratuite") + "\nAdresse de livraison : " + (order.ship_address || "") + "\n"
+      : "Cueillette\n") +
+    "Total dealer : " + money(order.total) + "\n" +
     (order.note ? "\nNote du dealer : " + order.note + "\n" : "") +
     "\nOuvrir dans l'admin : " + adminUrl + "\n";
 
@@ -135,6 +139,10 @@ Deno.serve(async (req) => {
       '<th style="padding:8px 10px;text-align:right">Stock</th><th style="padding:8px 10px;text-align:right">Total</th></tr>' +
       rowsHtml +
     '</table>' +
+    (order.delivery === "ship"
+      ? '<p style="margin:14px 0 0;text-align:right;font-size:14px">Livraison : ' + (Number(order.ship_fee) > 0 ? money(order.ship_fee) : "gratuite") + '</p>' +
+        '<p style="margin:4px 0 0;text-align:right;font-size:14px">' + esc(order.ship_address) + '</p>'
+      : '<p style="margin:14px 0 0;text-align:right;font-size:14px">Cueillette</p>') +
     '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total dealer : ' + money(order.total) + '</strong></p>' +
     (order.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Note :</strong> ' + esc(order.note) + '</p>' : "") +
     '<p style="margin:22px 0"><a href="' + adminUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">Ouvrir dans l\'admin</a></p>' +

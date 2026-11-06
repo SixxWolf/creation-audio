@@ -99,7 +99,7 @@
       openPk = api;
       pop = document.createElement('div');
       pop.className = 'cpk-pop';
-      pop.innerHTML = (sel.options.length > 10 ? '<input type="search" class="cpk-search" placeholder="Rechercher…" autocomplete="off" spellcheck="false" aria-label="Rechercher">' : '') +
+      pop.innerHTML = (sel.options.length > 10 && !sel.hasAttribute('data-nosearch') ? '<input type="search" class="cpk-search" placeholder="Rechercher…" autocomplete="off" spellcheck="false" aria-label="Rechercher">' : '') +
         '<div class="cpk-list" role="listbox"></div>';
       document.body.appendChild(pop);
       list = pop.querySelector('.cpk-list');

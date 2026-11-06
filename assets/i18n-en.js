@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 23;
+window.CA_EN_V = 25;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -389,7 +389,19 @@ window.CA_EN = (function (pairs) {
   [` — Portail dealer · Création Audio`, ` — Dealer portal · Création Audio`],
   [`Commande enregistrée directement — Création Audio est avisé</li>`, `Order saved directly — Création Audio is notified</li>`],
   [`Hors stock ? On l'imprime sur commande</li>`, `Out of stock? We print it to order</li>`],
-  [`Ramassage région de Québec · facturé à la préparation</li>`, `Pickup in the Québec City area or shipping across Canada on request · invoiced when prepared</li>`],
+  [`Cueillette à Québec ou livraison au Canada · facturé à la préparation</li>`, `Pickup in Québec City or shipping across Canada · invoiced when prepared</li>`],
+  [`Livraison gratuite atteinte !`, `Free shipping unlocked!`],
+  [`Plus que `, `Only `],
+  [` pour la livraison gratuite`, ` more for free shipping`],
+  [`Jusqu'au `, `Until `],
+  [`Offre à durée limitée, modifiable ou retirable à tout moment.`, `Limited-time offer, may be changed or withdrawn at any time.`],
+  [`Gratuit`, `Free`],
+  [`gratuit`, `free`],
+  [`gratuite`, `free`],
+  [`Livraison :`, `Shipping:`],
+  [`Complète l'adresse de livraison.`, `Complete the shipping address.`],
+  [`Code postal invalide.`, `Invalid postal code.`],
+  [`Prête à envoyer`, `Ready to ship`],
   [`Un véhicule manque ? Écris-le dans la note de ta commande, on s'en occupe.`, `A vehicle is missing? Write it in your order note and we'll take care of it.`],
   [`Connecté : <b>`, `Signed in: <b>`],
   [`<span class="dl-badge is-admin">Admin · aperçu</span><span class="dl-admin-note">Tes commandes de test arrivent dans l'onglet Commandes de l'admin — annule-les ensuite.</span>`, `<span class="dl-badge is-admin">Admin · preview</span><span class="dl-admin-note">Your test orders land in the admin Orders tab — cancel them afterwards.</span>`],
@@ -950,6 +962,7 @@ window.CA_EN = (function (pairs) {
   [` Mo`, ` MB`],
   [` Ko`, ` KB`],
   [`Formats acceptés : STL, 3MF, STEP, OBJ.`, `Accepted formats: STL, 3MF, STEP, OBJ.`],
+  [`Temps`, `Time`],
   [`Fichier trop lourd (50 Mo maximum).`, `File too large (50 MB maximum).`],
   [`Au plus 3 fichiers 3D par message.`, `At most 3 3D files per message.`],
   [`" aria-label="Retirer le fichier `, `" aria-label="Remove file `],

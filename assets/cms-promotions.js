@@ -57,9 +57,40 @@
   var gp = {};             // clé de groupe -> { price, price2, tiers, tiers2, dprice, dtiers }
   var openG = {};          // groupes dépliés
 
+  /* ---------- livraison des revendeurs (admin_settings « dealer_shipping ») ----------
+     Lu par le portail via la RPC dealer_shipping ; chaque commande fige le seuil et le forfait à son envoi. */
+  var shipForm = $('#pm-ship'), shipOn = $('#pm-ship-on'), shipMin = $('#pm-ship-min'), shipFee = $('#pm-ship-fee'),
+      shipEnd = $('#pm-ship-end'), shipSave = $('#pm-ship-save'), shipStatus = $('#pm-ship-status');
+  function loadShip() {
+    sb.from('admin_settings').select('value').eq('key', 'dealer_shipping').maybeSingle().then(function (res) {
+      if (res.error) { shipStatus.textContent = 'Erreur : ' + res.error.message; return; }
+      var v = (res.data && res.data.value) || {};
+      shipOn.checked = v.enabled !== false;
+      shipMin.value = v.threshold != null ? v.threshold : 150;
+      shipFee.value = v.fee != null ? v.fee : 25;
+      shipEnd.value = v.ends || '';
+    });
+  }
+  shipForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var min = num(shipMin.value), fee = num(shipFee.value);
+    if (min == null || min < 0) { shipStatus.textContent = 'Indique le montant de la livraison gratuite.'; shipMin.focus(); return; }
+    if (fee == null || fee < 0) { shipStatus.textContent = 'Indique le prix de la livraison.'; shipFee.focus(); return; }
+    shipSave.disabled = true; shipStatus.textContent = 'Enregistrement…';
+    sb.from('admin_settings').upsert({
+      key: 'dealer_shipping',
+      value: { enabled: shipOn.checked, threshold: r2(min), fee: r2(fee), ends: shipEnd.value || null },
+      updated_at: new Date().toISOString()
+    }).then(function (res) {
+      shipSave.disabled = false;
+      shipStatus.textContent = res.error ? 'Erreur : ' + res.error.message : 'Enregistré ✓';
+    }, function (err) { shipSave.disabled = false; shipStatus.textContent = 'Erreur : ' + (err && err.message || err); });
+  });
+
   /* ---------- données ---------- */
   function load() {
     listEl.innerHTML = '<p class="muted">Chargement…</p>';
+    loadShip();
     return Promise.all([
       sb.from('promotions').select('*').order('starts_at', { ascending: false }),
       sb.from('promotion_items').select('*'),

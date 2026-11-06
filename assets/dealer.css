@@ -66,6 +66,54 @@
 .cart-edit button { flex:none; padding:5px 10px; font:inherit; font-weight:700; font-size:.82rem; color:var(--ink); cursor:pointer;
   background:var(--paper); border:1px solid var(--line-2); border-radius:8px; }
 .cart-edit button:hover { border-color:var(--ink); }
+/* Panier : cueillette ou livraison, barre de la livraison gratuite */
+.cart-ship { display:flex; flex-direction:column; gap:8px; }
+.cart-ship[hidden], .ship-addr[hidden], .ship-bar[hidden], .cart-line-sub[hidden] { display:none; }
+.ship-seg { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.ship-seg button { min-height:40px; padding:6px 8px; font:inherit; font-size:.84rem; font-weight:600; line-height:1.2; color:var(--ink-2); cursor:pointer;
+  background:var(--paper); border:1px solid var(--line-2); border-radius:10px; }
+.ship-seg button:hover { border-color:var(--ink); }
+.ship-seg button.is-on { font-weight:700; color:var(--ember-ink); background:var(--tint); border-color:var(--ember); }
+.ship-seg button:focus-visible { outline:3px solid var(--ember-dim); outline-offset:2px; }
+.ship-addr { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ship-f { display:block; min-width:0; }
+.ship-f-w { grid-column:1 / -1; }
+.ship-f > span { display:block; margin:0 0 3px; font-size:.8rem; font-weight:700; color:var(--ink-2); }
+.ship-f input { width:100%; min-width:0; padding:8px 11px; font:inherit; font-size:.9rem; color:var(--ink); background:var(--paper); border:1px solid var(--line-2); border-radius:10px; }
+.ship-f input:focus { outline:none; border-color:var(--ink); box-shadow:0 0 0 3px color-mix(in srgb, var(--ink) 12%, transparent); }
+#sa-postal { text-transform:uppercase; }
+/* menu maison (ca-pick.js) */
+.cpk { position:relative; min-width:0; }
+.cpk-btn { display:flex; align-items:center; width:100%; min-width:0; padding:8px 28px 8px 11px; font:inherit; font-size:.9rem; color:var(--ink); text-align:left; cursor:pointer;
+  background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right 8px center / 15px no-repeat;
+  border:1px solid var(--line-2); border-radius:10px; }
+.cpk-btn:hover, .cpk-btn[aria-expanded="true"], .cpk-btn:focus-visible { outline:none; border-color:var(--ink); }
+.cpk-txt { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cpk-txt.is-ph { color:var(--muted); }
+.cpk-pop { position:fixed; z-index:200; display:flex; flex-direction:column; padding:6px; background:var(--paper); border:1px solid var(--line-2); border-radius:12px; box-shadow:0 22px 44px -22px rgba(20,22,26,.5); }
+.cpk-list { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.cpk-item { display:flex; width:100%; padding:9px 10px; font:inherit; font-size:.9rem; color:var(--ink); text-align:left; cursor:pointer; background:none; border:0; border-radius:9px; }
+.cpk-item:hover, .cpk-item.is-active { background:var(--wash); }
+.cpk-item.is-sel { font-weight:700; color:var(--ember-ink); }
+.cpk-item.is-ph { color:var(--muted); }
+/* livraison choisie : tout le panneau défile, sinon les champs écrasent la liste */
+.dealer-page .cart-panel.is-ship { overflow-y:auto; overscroll-behavior:contain; }
+.dealer-page .cart-panel.is-ship .cart-items, .dealer-page .cart-panel.is-ship .cart-foot { flex:none; overflow:visible; }
+/* iPhone : sous 16 px, le champ zoome la page au toucher */
+@media (max-width:767px) { .ship-f input, .cpk-btn { font-size:16px; } }
+.ship-bar-txt { margin:0 0 5px; font-size:.84rem; font-weight:700; color:var(--ink-2); }
+.ship-bar.is-got .ship-bar-txt { color:var(--good-ink); }
+.ship-track { height:6px; overflow:hidden; background:var(--wash-2); border-radius:100px; }
+.ship-fill { display:block; width:0; height:100%; background:var(--ember); border-radius:inherit; transition:width .35s ease; }
+.ship-bar.is-got .ship-fill { background:var(--good-ink); }
+.ship-terms { margin:5px 0 0; font-size:.74rem; line-height:1.35; color:var(--muted); }
+.cart-line-sub { font-size:.88rem; color:var(--ink-2); font-variant-numeric:tabular-nums; }
+/* téléphone / tablette : tout le panneau défile, sinon le bas du panier écrase la liste */
+@media (max-width:1199px) {
+  .dealer-page .cart-panel { overflow-y:auto; overscroll-behavior:contain; }
+  .dealer-page .cart-items { flex:none; overflow:visible; }
+  .dealer-page .cart-foot { flex:none; }
+}
 .cart-line-total small { font-family:var(--font); font-size:.78rem; font-weight:500; color:var(--muted); }
 .cart-note-lbl { font-size:.8rem; font-weight:700; color:var(--ink-2); }
 .cart-note-lbl span { font-weight:500; color:var(--muted); }
@@ -323,5 +371,5 @@ body.dealer-page { background:var(--dl-bg); }
 
 @media (prefers-reduced-motion:reduce) {
   .tb-mark.is-pop, .tb-lbl.is-pop, .citem-unit.is-pop, .cart-phead.pulse, .dl-mbar.pulse { animation:none; }
-  .tb-fill { transition:none; }
+  .tb-fill, .ship-fill { transition:none; }
 }

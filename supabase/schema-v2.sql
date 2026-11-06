@@ -4279,3 +4279,230 @@ begin
 end $$;
 revoke all on function public.admin_promo_prices() from public, anon;
 grant execute on function public.admin_promo_prices() to authenticated;
+
+-- ------------------------------------------------------------
+-- LIVRAISON DEALER (2026-11-05) — réglé dans Promotions (admin_settings « dealer_shipping »)
+-- { enabled, threshold, fee, ends } : livraison gratuite dès threshold $, sinon forfait fee $.
+-- Chaque commande fige le seuil et le forfait à sa création (ship_threshold, ship_rate) :
+-- modifier le réglage ne change jamais une commande déjà envoyée.
+-- total = lignes + ship_fee. Le serveur recalcule tout ; le navigateur n'affiche qu'un aperçu.
+-- ------------------------------------------------------------
+alter table public.dealer_orders add column if not exists delivery text not null default 'pickup';
+alter table public.dealer_orders add column if not exists ship_address text;              -- texte complet affiché
+alter table public.dealer_orders add column if not exists ship_parts jsonb;                -- { name, address, city, province, postal, phone }
+alter table public.dealer_orders add column if not exists ship_fee numeric(10,2) not null default 0;
+alter table public.dealer_orders add column if not exists ship_rate numeric(10,2);        -- forfait figé
+alter table public.dealer_orders add column if not exists ship_threshold numeric(10,2);   -- seuil figé (null = pas d'offre)
+do $$ begin
+  if not exists (select 1 from pg_constraint
+                  where conname = 'dealer_orders_delivery_check' and conrelid = 'public.dealer_orders'::regclass) then
+    alter table public.dealer_orders add constraint dealer_orders_delivery_check check (delivery in ('pickup', 'ship'));
+  end if;
+end $$;
+insert into public.admin_settings (key, value)
+values ('dealer_shipping', '{"enabled":true,"threshold":150,"fee":25,"ends":null}'::jsonb)
+on conflict (key) do nothing;
+
+create or replace function public._dealer_ship_cfg()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  v jsonb; v_t numeric; v_f numeric; v_e date;
+begin
+  select value into v from public.admin_settings where key = 'dealer_shipping';
+  v := coalesce(v, '{}'::jsonb);
+  v_t := case when (v ->> 'threshold') ~ '^[0-9]{1,7}(\.[0-9]+)?$' then (v ->> 'threshold')::numeric else 150 end;
+  v_f := case when (v ->> 'fee') ~ '^[0-9]{1,7}(\.[0-9]+)?$' then (v ->> 'fee')::numeric else 25 end;
+  v_e := case when (v ->> 'ends') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then (v ->> 'ends')::date end;
+  return jsonb_build_object(
+    'free_active', coalesce(v ->> 'enabled', 'true') = 'true'
+                   and (v_e is null or (now() at time zone 'America/Toronto')::date <= v_e),
+    'threshold', v_t, 'fee', v_f, 'ends', v_e);
+end $$;
+revoke all on function public._dealer_ship_cfg() from public, anon, authenticated;
+
+-- Découpe la fiche (dealers.address + dealers.city « Ville, QC G1A 1A1 ») en champs de livraison.
+create or replace function public.dealer_ship_address(p_email text default null)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare
+  v_email text := lower((select auth.jwt()) ->> 'email');
+  d public.dealers; v_city text; v_post text; v_prov text;
+begin
+  if public.is_admin() and p_email is not null then v_email := lower(btrim(p_email));
+  elsif not (public.is_dealer() or public.is_admin()) then
+    raise exception 'Réservé aux comptes dealer.' using errcode = '42501';
+  end if;
+  select * into d from public.dealers where lower(email) = v_email;
+  if not found then return '{}'::jsonb; end if;
+  v_city := btrim(coalesce(d.city, ''));
+  v_post := upper(replace(replace(substring(v_city from '[A-Za-z][0-9][A-Za-z][ -]?[0-9][A-Za-z][0-9]'), ' ', ''), '-', ''));
+  v_city := regexp_replace(v_city, '[A-Za-z][0-9][A-Za-z][ -]?[0-9][A-Za-z][0-9]', '');
+  v_city := regexp_replace(v_city, '[\s,]+$', '');
+  v_prov := upper(substring(v_city from '(?i),\s*(QC|ON|NB|NS|PE|NL|MB|SK|AB|BC|YT|NT|NU)$'));
+  if v_prov is null and v_city ~* ',\s*qu[ée]bec$' then v_prov := 'QC'; end if;
+  v_city := btrim(regexp_replace(v_city, ',[^,]*$', ''), ' ,');
+  if v_prov is null then v_city := btrim(coalesce(regexp_replace(btrim(coalesce(d.city, '')), '[A-Za-z][0-9][A-Za-z][ -]?[0-9][A-Za-z][0-9]', ''), ''), ' ,'); end if;
+  return jsonb_build_object(
+    'name', coalesce(d.name, ''), 'address', coalesce(btrim(d.address), ''), 'city', v_city,
+    'province', coalesce(v_prov, ''),
+    'postal', case when v_post is not null then left(v_post, 3) || ' ' || right(v_post, 3) else '' end,
+    'phone', coalesce(btrim(d.phone), ''));
+end $$;
+revoke all on function public.dealer_ship_address(text) from public, anon;
+grant execute on function public.dealer_ship_address(text) to authenticated;
+
+-- Pour le panier du portail : le réglage + l'adresse de la fiche du dealer, en champs.
+create or replace function public.dealer_shipping()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  if not (public.is_dealer() or public.is_admin()) then
+    raise exception 'Réservé aux comptes dealer.' using errcode = '42501';
+  end if;
+  return public._dealer_ship_cfg() || jsonb_build_object('addr', public.dealer_ship_address());
+end $$;
+revoke all on function public.dealer_shipping() from public, anon;
+grant execute on function public.dealer_shipping() to authenticated;
+
+-- Après _dealer_fill_lines : mode de réception, port et total. p_delivery null = on garde celui de la commande.
+-- p_address = { name, address, city, province, postal, phone } ; null = on garde celle de la commande.
+-- ship_parts garde les champs (pour modifier) ; ship_address = le texte complet affiché partout.
+-- Fiche sans adresse : la première livraison la complète (la facture s'en sert aussi).
+drop function if exists public._dealer_apply_ship(uuid, text, text);
+create or replace function public._dealer_apply_ship(p_order uuid, p_delivery text, p_address jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  o public.dealer_orders; v_cfg jsonb; v_sub numeric; v_del text; v_fee numeric := 0;
+  v_rate numeric; v_thr numeric; v_p jsonb; v_parts jsonb; v_text text;
+  v_name text; v_addr text; v_city text; v_prov text; v_post text; v_phone text;
+begin
+  select * into o from public.dealer_orders where id = p_order for update;
+  select coalesce(sum(line_total), 0) into v_sub from public.dealer_order_lines where order_id = p_order;
+  v_del := coalesce(p_delivery, o.delivery, 'pickup');
+  if v_del not in ('pickup', 'ship') then raise exception 'Mode de réception invalide.' using errcode = 'P0001'; end if;
+  v_rate := o.ship_rate; v_thr := o.ship_threshold;
+  if v_rate is null then      -- première fois : on fige le réglage du moment
+    v_cfg := public._dealer_ship_cfg();
+    v_rate := (v_cfg ->> 'fee')::numeric;
+    v_thr := case when (v_cfg ->> 'free_active')::boolean then (v_cfg ->> 'threshold')::numeric end;
+  end if;
+  if v_del = 'ship' then
+    v_p := coalesce(p_address, o.ship_parts, '{}'::jsonb);
+    v_name  := coalesce(nullif(left(btrim(coalesce(v_p ->> 'name', '')), 120), ''), o.dealer_name, '');
+    v_addr  := left(btrim(coalesce(v_p ->> 'address', '')), 200);
+    v_city  := left(btrim(coalesce(v_p ->> 'city', '')), 120);
+    v_prov  := upper(btrim(coalesce(v_p ->> 'province', '')));
+    v_post  := upper(regexp_replace(coalesce(v_p ->> 'postal', ''), '[^A-Za-z0-9]', '', 'g'));
+    v_phone := left(btrim(coalesce(v_p ->> 'phone', '')), 40);
+    if v_addr = '' or v_city = '' or v_prov not in ('QC','ON','NB','NS','PE','NL','MB','SK','AB','BC','YT','NT','NU') then
+      raise exception 'Complète l''adresse de livraison.' using errcode = 'P0001';
+    end if;
+    if v_post !~ '^[A-Z][0-9][A-Z][0-9][A-Z][0-9]$' then raise exception 'Code postal invalide.' using errcode = 'P0001'; end if;
+    v_post := left(v_post, 3) || ' ' || right(v_post, 3);
+    v_parts := jsonb_build_object('name', v_name, 'address', v_addr, 'city', v_city, 'province', v_prov, 'postal', v_post, 'phone', v_phone);
+    v_text := concat_ws(', ', nullif(v_name, ''), v_addr, v_city, v_prov || ' ' || v_post) || case when v_phone <> '' then ' · ' || v_phone else '' end;
+    v_fee := case when v_thr is not null and v_sub >= v_thr then 0 else v_rate end;
+    update public.dealers
+       set address = v_addr, city = v_city || ', ' || v_prov || ' ' || v_post, phone = coalesce(nullif(btrim(phone), ''), nullif(v_phone, ''))
+     where lower(email) = lower(o.dealer_email) and coalesce(btrim(address), '') = '';
+  end if;
+  update public.dealer_orders
+     set delivery = v_del, ship_address = v_text, ship_parts = v_parts,
+         ship_fee = v_fee, ship_rate = v_rate, ship_threshold = v_thr,
+         total = round(v_sub + v_fee, 2), updated_at = now()
+   where id = p_order;
+end $$;
+revoke all on function public._dealer_apply_ship(uuid, text, jsonb) from public, anon, authenticated;
+
+drop function if exists public.dealer_submit_order(jsonb, text);
+drop function if exists public.dealer_submit_order(jsonb, text, text, text);
+create or replace function public.dealer_submit_order(p_lines jsonb, p_note text default null, p_delivery text default null, p_address jsonb default null)
+returns public.dealer_orders language plpgsql security definer set search_path = public as $$
+declare
+  v_email  text := lower((select auth.jwt()) ->> 'email');
+  v_dealer public.dealers;
+  v_order  public.dealer_orders;
+begin
+  select * into v_dealer from public.dealers where lower(email) = v_email;
+  if not found then
+    -- l'admin peut passer une commande de test depuis le portail (visible dans l'onglet Commandes)
+    if public.is_admin() then
+      v_dealer.email := v_email; v_dealer.name := 'Création Audio (test admin)';
+    else
+      raise exception 'Réservé aux comptes dealer.' using errcode = '42501';
+    end if;
+  end if;
+  -- garde-fou anti-rafale : 20 commandes max par heure
+  if (select count(*) from public.dealer_orders
+       where lower(dealer_email) = v_email and created_at > now() - interval '1 hour') >= 20 then
+    raise exception 'Trop de commandes envoyées en peu de temps. Réessaie plus tard.';
+  end if;
+  insert into public.dealer_orders (number, dealer_email, dealer_name, note, status)
+  values ('D-' || lpad(nextval('public.dealer_order_seq')::text, 4, '0'),
+          v_dealer.email, v_dealer.name, nullif(left(btrim(coalesce(p_note, '')), 1000), ''), 'new')
+  returning * into v_order;
+  perform public._dealer_fill_lines(v_order.id, p_lines);
+  perform public._dealer_apply_ship(v_order.id, p_delivery, p_address);
+  select * into v_order from public.dealer_orders where id = v_order.id;
+  return v_order;
+end $$;
+
+drop function if exists public.dealer_update_order(uuid, jsonb, text);
+drop function if exists public.dealer_update_order(uuid, jsonb, text, text, text);
+create or replace function public.dealer_update_order(p_id uuid, p_lines jsonb, p_note text default null, p_delivery text default null, p_address jsonb default null)
+returns public.dealer_orders language plpgsql security definer set search_path = public as $$
+declare
+  v_email text := lower((select auth.jwt()) ->> 'email');
+  v_order public.dealer_orders;
+begin
+  if not public.is_dealer() then raise exception 'Accès dealer retiré.' using errcode = '42501'; end if;
+  select * into v_order from public.dealer_orders where id = p_id for update;
+  if not found or lower(v_order.dealer_email) <> v_email then raise exception 'Commande introuvable.' using errcode = '42501'; end if;
+  if v_order.status = 'cancelled' then raise exception 'Cette commande est annulée.' using errcode = 'P0001'; end if;
+  if v_order.status <> 'new' then
+    raise exception 'Cette commande est déjà en préparation : écris-nous pour la modifier.' using errcode = 'P0001';
+  end if;
+  update public.dealer_orders
+     set note = nullif(left(btrim(coalesce(p_note, '')), 1000), ''), edited_at = now(), updated_at = now()
+   where id = p_id;
+  perform public._dealer_fill_lines(p_id, p_lines);
+  perform public._dealer_apply_ship(p_id, p_delivery, p_address);
+  select * into v_order from public.dealer_orders where id = p_id;
+  return v_order;
+end $$;
+
+drop function if exists public.admin_save_dealer_order(uuid, text, jsonb, text);
+drop function if exists public.admin_save_dealer_order(uuid, text, jsonb, text, text, text);
+create or replace function public.admin_save_dealer_order(p_id uuid, p_email text, p_lines jsonb, p_note text default null, p_delivery text default null, p_address jsonb default null)
+returns public.dealer_orders language plpgsql security definer set search_path = public as $$
+declare
+  v_dealer public.dealers;
+  v_order  public.dealer_orders;
+  v_note   text := nullif(left(btrim(coalesce(p_note, '')), 1000), '');
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''admin.' using errcode = '42501'; end if;
+  if p_id is null then
+    select * into v_dealer from public.dealers where lower(email) = lower(btrim(coalesce(p_email, '')));
+    if not found then raise exception 'Dealer introuvable.' using errcode = 'P0001'; end if;
+    insert into public.dealer_orders (number, dealer_email, dealer_name, note, status, created_by)
+    values ('D-' || lpad(nextval('public.dealer_order_seq')::text, 4, '0'),
+            v_dealer.email, v_dealer.name, v_note, 'new', 'admin')
+    returning * into v_order;
+  else
+    select * into v_order from public.dealer_orders where id = p_id for update;
+    if not found then raise exception 'Commande introuvable.' using errcode = 'P0001'; end if;
+    if v_order.status not in ('new', 'preparing', 'ready') then
+      raise exception 'Commande facturée ou annulée : plus modifiable.' using errcode = 'P0001';
+    end if;
+    update public.dealer_orders set note = v_note, updated_at = now() where id = p_id;
+  end if;
+  perform public._dealer_fill_lines(v_order.id, p_lines);
+  perform public._dealer_apply_ship(v_order.id, p_delivery, p_address);
+  select * into v_order from public.dealer_orders where id = v_order.id;
+  return v_order;
+end $$;
+
+revoke all on function public.dealer_submit_order(jsonb, text, text, jsonb)            from public, anon;
+revoke all on function public.dealer_update_order(uuid, jsonb, text, text, jsonb)      from public, anon;
+revoke all on function public.admin_save_dealer_order(uuid, text, jsonb, text, text, jsonb) from public, anon;
+grant execute on function public.dealer_submit_order(jsonb, text, text, jsonb)         to authenticated;
+grant execute on function public.dealer_update_order(uuid, jsonb, text, text, jsonb)   to authenticated;
+grant execute on function public.admin_save_dealer_order(uuid, text, jsonb, text, text, jsonb) to authenticated;
