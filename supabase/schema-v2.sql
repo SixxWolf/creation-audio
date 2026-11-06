@@ -4520,3 +4520,158 @@ revoke all on function public.admin_save_dealer_order(uuid, text, jsonb, text, t
 grant execute on function public.dealer_submit_order(jsonb, text, text, jsonb)         to authenticated;
 grant execute on function public.dealer_update_order(uuid, jsonb, text, text, jsonb)   to authenticated;
 grant execute on function public.admin_save_dealer_order(uuid, text, jsonb, text, text, jsonb) to authenticated;
+
+-- =========================================================
+-- COMMANDE DÉCOUVERTE (dealers) : sur la 1re commande d'un nouveau compte, les paliers
+-- se comptent sur le total des paires de tous les modèles. Réglage : admin_settings
+-- « dealer_discovery » (carte de l'onglet Promotions). Nouveau compte = dealers.created_at >= since.
+-- Le drapeau dealer_orders.discovery est figé à la création de la commande.
+-- =========================================================
+alter table public.dealer_orders add column if not exists discovery boolean not null default false;
+
+insert into public.admin_settings (key, value)
+values ('dealer_discovery', '{"enabled": false, "ends": null, "since": null}'::jsonb)
+on conflict (key) do nothing;
+
+create or replace function public._dealer_discovery_ok(p_email text)
+returns boolean language plpgsql stable security definer set search_path = 'public' as $$
+declare
+  v jsonb; v_e date; v_since timestamptz; v_created timestamptz;
+begin
+  select value into v from public.admin_settings where key = 'dealer_discovery';
+  if coalesce(v ->> 'enabled', 'false') <> 'true' then return false; end if;
+  v_since := case when coalesce(v ->> 'since', '') <> '' then (v ->> 'since')::timestamptz end;
+  if v_since is null then return false; end if;
+  v_e := case when (v ->> 'ends') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then (v ->> 'ends')::date end;
+  if v_e is not null and (now() at time zone 'America/Toronto')::date > v_e then return false; end if;
+  select created_at into v_created from public.dealers where lower(email) = lower(btrim(coalesce(p_email, '')));
+  if v_created is null or v_created < v_since then return false; end if;
+  return not exists (select 1 from public.dealer_orders
+                      where lower(dealer_email) = lower(btrim(p_email)) and status <> 'cancelled');
+end $$;
+
+-- portail : p_email ignoré (le dealer connecté) ; admin : le dealer choisi dans l'éditeur
+create or replace function public.dealer_discovery(p_email text default null)
+returns jsonb language plpgsql stable security definer set search_path = 'public' as $$
+declare
+  v_email text;
+begin
+  if public.is_admin() then
+    v_email := coalesce(p_email, (select auth.jwt()) ->> 'email');
+  elsif public.is_dealer() then
+    v_email := (select auth.jwt()) ->> 'email';
+  else
+    raise exception 'Réservé aux comptes dealer.' using errcode = '42501';
+  end if;
+  return jsonb_build_object('eligible', public._dealer_discovery_ok(v_email),
+    'ends', (select value ->> 'ends' from public.admin_settings where key = 'dealer_discovery'));
+end $$;
+
+create or replace function public._dealer_fill_lines(p_order uuid, p_lines jsonb)
+returns numeric language plpgsql set search_path = 'public' as $$
+declare v_n integer; v_total numeric; v_mix boolean;
+begin
+  if jsonb_typeof(p_lines) is distinct from 'array' then raise exception 'Commande vide.'; end if;
+  if jsonb_array_length(p_lines) > 200 then raise exception 'Trop de lignes dans la commande.'; end if;
+  select coalesce(discovery, false) into v_mix from public.dealer_orders where id = p_order;
+  delete from public.dealer_order_lines where order_id = p_order;
+  with raw as (
+    select e ->> 'product_id' as pid_txt, e ->> 'qty' as qty_txt, ord
+      from jsonb_array_elements(p_lines) with ordinality as x(e, ord)
+  ), clean as (
+    select pid_txt::uuid as pid, least(sum(qty_txt::integer), 999)::integer as qty, min(ord) as ord
+      from raw
+     where pid_txt ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+       and qty_txt ~ '^[0-9]{1,4}$'
+     group by 1
+  ), valid as (
+    select c.pid, c.qty, c.ord, p.name, p.dealer_price, p.sell_price, p.tiers
+      from clean c
+      join public.products p on p.id = c.pid and p.type = 'spacer' and p.active = true
+     where c.qty > 0
+  ), priced as (
+    select v.pid, v.qty, v.ord, v.name,
+           public._dealer_unit_price(case when pb.on1 then pb.p1 else coalesce(v.dealer_price, v.sell_price, 0) end,
+                                     case when pb.on1 then pb.t1 else v.tiers end,
+                                     case when v_mix then (select sum(qty)::integer from valid) else v.qty end) as unit
+      from valid v
+      left join public._promo_best pb on pb.product_id = v.pid and pb.aud = 'dealer'
+  )
+  insert into public.dealer_order_lines (order_id, product_id, name, qty, unit_price, line_total, sort_order)
+  select p_order, pid, name, qty, round(unit, 2), round(round(unit, 2) * qty, 2),
+         (row_number() over (order by ord))::integer - 1
+    from priced;
+  get diagnostics v_n = row_count;
+  if v_n = 0 then raise exception 'Aucun spacer valide dans la commande.'; end if;
+  select coalesce(sum(line_total), 0) into v_total from public.dealer_order_lines where order_id = p_order;
+  update public.dealer_orders set total = v_total, updated_at = now() where id = p_order;
+  return v_total;
+end $$;
+
+create or replace function public.dealer_submit_order(p_lines jsonb, p_note text default null, p_delivery text default null, p_address jsonb default null)
+returns public.dealer_orders language plpgsql security definer set search_path = 'public' as $$
+declare
+  v_email  text := lower((select auth.jwt()) ->> 'email');
+  v_dealer public.dealers;
+  v_order  public.dealer_orders;
+begin
+  select * into v_dealer from public.dealers where lower(email) = v_email for update;
+  if not found then
+    if public.is_admin() then
+      v_dealer.email := v_email; v_dealer.name := 'Création Audio (test admin)';
+    else
+      raise exception 'Réservé aux comptes dealer.' using errcode = '42501';
+    end if;
+  end if;
+  if (select count(*) from public.dealer_orders
+       where lower(dealer_email) = v_email and created_at > now() - interval '1 hour') >= 20 then
+    raise exception 'Trop de commandes envoyées en peu de temps. Réessaie plus tard.';
+  end if;
+  insert into public.dealer_orders (number, dealer_email, dealer_name, note, status, discovery)
+  values ('D-' || lpad(nextval('public.dealer_order_seq')::text, 4, '0'),
+          v_dealer.email, v_dealer.name, nullif(left(btrim(coalesce(p_note, '')), 1000), ''), 'new',
+          public._dealer_discovery_ok(v_email))
+  returning * into v_order;
+  perform public._dealer_fill_lines(v_order.id, p_lines);
+  perform public._dealer_apply_ship(v_order.id, p_delivery, p_address);
+  select * into v_order from public.dealer_orders where id = v_order.id;
+  return v_order;
+end $$;
+
+create or replace function public.admin_save_dealer_order(p_id uuid, p_email text, p_lines jsonb, p_note text default null, p_delivery text default null, p_address jsonb default null)
+returns public.dealer_orders language plpgsql security definer set search_path = 'public' as $$
+declare
+  v_dealer public.dealers;
+  v_order  public.dealer_orders;
+  v_note   text := nullif(left(btrim(coalesce(p_note, '')), 1000), '');
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''admin.' using errcode = '42501'; end if;
+  if p_id is null then
+    select * into v_dealer from public.dealers where lower(email) = lower(btrim(coalesce(p_email, ''))) for update;
+    if not found then raise exception 'Dealer introuvable.' using errcode = 'P0001'; end if;
+    insert into public.dealer_orders (number, dealer_email, dealer_name, note, status, created_by, discovery)
+    values ('D-' || lpad(nextval('public.dealer_order_seq')::text, 4, '0'),
+            v_dealer.email, v_dealer.name, v_note, 'new', 'admin', public._dealer_discovery_ok(v_dealer.email))
+    returning * into v_order;
+  else
+    select * into v_order from public.dealer_orders where id = p_id for update;
+    if not found then raise exception 'Commande introuvable.' using errcode = 'P0001'; end if;
+    if v_order.status not in ('new', 'preparing', 'ready') then
+      raise exception 'Commande facturée ou annulée : plus modifiable.' using errcode = 'P0001';
+    end if;
+    update public.dealer_orders set note = v_note, updated_at = now() where id = p_id;
+  end if;
+  perform public._dealer_fill_lines(v_order.id, p_lines);
+  perform public._dealer_apply_ship(v_order.id, p_delivery, p_address);
+  select * into v_order from public.dealer_orders where id = v_order.id;
+  return v_order;
+end $$;
+
+revoke all on function public._dealer_discovery_ok(text) from public, anon, authenticated;
+revoke all on function public._dealer_fill_lines(uuid, jsonb) from public, anon, authenticated;
+revoke all on function public.dealer_discovery(text) from public, anon;
+revoke all on function public.dealer_submit_order(jsonb, text, text, jsonb) from public, anon;
+revoke all on function public.admin_save_dealer_order(uuid, text, jsonb, text, text, jsonb) from public, anon;
+grant execute on function public.dealer_discovery(text) to authenticated;
+grant execute on function public.dealer_submit_order(jsonb, text, text, jsonb) to authenticated;
+grant execute on function public.admin_save_dealer_order(uuid, text, jsonb, text, text, jsonb) to authenticated;

@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../assets/site.css?v=19">
 <link rel="stylesheet" href="../assets/boutique.css?v=51">
-<link rel="stylesheet" href="../assets/dealer.css?v=20">
+<link rel="stylesheet" href="../assets/dealer.css?v=21">
 <link rel="stylesheet" href="../assets/dialog.css?v=2">
 <script src="../assets/look.js?v=5"></script>
 <script src="../assets/i18n.js?v=1"></script>
@@ -124,6 +124,10 @@
       <h1>Spacers &amp; adapters</h1>
       <p class="muted">Your dealer prices with volume discounts, sold in pairs. <b>Everything can be ordered</b>, even out of stock: we print to order. Open a product for fitment and photos.</p>
     </div>
+    <div class="dl-disc" id="dl-disc" hidden>
+      <b>Discovery order</b>
+      <span>Mix the models: all your pairs count together toward the volume discount. First order only. <span id="dl-disc-ends" hidden></span></span>
+    </div>
     <div id="dl-list"><p class="muted">Loading…</p></div>
   </div>
 
@@ -162,6 +166,7 @@
     <span>Editing order <b id="cart-edit-num"></b></span>
     <button type="button" id="cart-edit-cancel">Discard</button>
   </div>
+  <p class="cart-disc" id="cart-disc" hidden><b>Discovery order</b> All your pairs count together.</p>
   <div class="cart-items" id="cart-items"></div>
   <div class="cart-foot">
     <div class="cart-ship" id="cart-ship" hidden>
@@ -176,6 +181,7 @@
         <div class="ship-f"><span>Province</span><select id="sa-province" data-nosearch aria-label="Province"><option value="">Choose</option><option value="QC">Quebec</option><option value="ON">Ontario</option><option value="NB">New Brunswick</option><option value="NS">Nova Scotia</option><option value="PE">Prince Edward Island</option><option value="NL">Newfoundland and Labrador</option><option value="MB">Manitoba</option><option value="SK">Saskatchewan</option><option value="AB">Alberta</option><option value="BC">British Columbia</option><option value="YT">Yukon</option><option value="NT">Northwest Territories</option><option value="NU">Nunavut</option></select></div>
         <label class="ship-f"><span>Postal code</span><input type="text" id="sa-postal" maxlength="7" autocomplete="postal-code"></label>
         <label class="ship-f"><span>Phone</span><input type="tel" id="sa-phone" maxlength="40" autocomplete="tel"></label>
+        <p class="ship-terms ship-pay">Payment by Interac e-Transfer before shipping.</p>
       </div>
       <div class="ship-bar" id="ship-bar" hidden>
         <p class="ship-bar-txt" id="ship-bar-txt"></p>
@@ -211,9 +217,9 @@
 <script src="../assets/supabase-config.js?v=1"></script>
 <script src="../assets/supabase-client.js?v=1"></script>
 <script src="../assets/promo.js?v=1"></script>
-<script src="../assets/spacer-catalog.js?v=17"></script>
+<script src="../assets/spacer-catalog.js?v=18"></script>
 <script src="../assets/auth-gate.js?v=3"></script>
 <script src="../assets/ca-pick.js?v=2"></script>
-<script src="../assets/dealer.js?v=21"></script>
+<script src="../assets/dealer.js?v=22"></script>
 </body>
 </html>

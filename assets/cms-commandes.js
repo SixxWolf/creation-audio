@@ -238,6 +238,7 @@
           '<div class="co-who">' + (window.CA.avatar ? window.CA.avatar(who) : '') +
             '<span><b>' + esc(who) + '</b><small>' + esc(fmtDate(o.created_at)) + ' · ' + esc(ago(o.created_at)) + '</small></span></div>' +
         '</header>' +
+        (o.discovery ? '<p class="co-note"><b>Commande découverte</b> : paliers sur le total des paires</p>' : '') +
         (o.delivery === 'ship' ? '<p class="co-note"><b>Livraison :</b> ' + esc(o.ship_address || '') + ' · ' + (+o.ship_fee > 0 ? money(o.ship_fee) : 'gratuite') + '</p>' : '') +
         (o.note ? '<p class="co-note"><b>Note :</b> ' + esc(o.note) + '</p>' : '') +
         '<div class="co-table-wrap"><table class="co-table">' +
@@ -342,7 +343,7 @@
       fResults = $('#cof-results'), fLines = $('#cof-lines'), fNote = $('#cof-note'), fSave = $('#cof-save'),
       fStatus = $('#cof-status'), newBtn = $('#co-new');
   if (!fEd) return;
-  var fOrder = null, fItems = [], fMatches = [], fActive = -1, fDirty = false, fToken = null;
+  var fMix = false, fOrder = null, fItems = [], fMatches = [], fActive = -1, fDirty = false, fToken = null;
 
   function norm(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function round2(n) { return Math.round((+n || 0) * 100) / 100; }
@@ -354,6 +355,11 @@
       if (isFinite(m) && m >= 1 && m <= qty && m > best && isFinite(pr) && pr >= 0) { best = m; u = pr; }
     });
     return round2(u);
+  }
+  // commande découverte : les paliers se comptent sur toutes les paires de la commande
+  function tierQtyOf(it) {
+    if (!fMix) return it.qty;
+    return fItems.reduce(function (s, x) { return s + (stock[x.id] ? x.qty : 0); }, 0);
   }
   function fitOf(p) { return Array.isArray(p.fitment) ? p.fitment.filter(function (r) { return r && (r.make || r.model); }) : []; }
   function fitSummary(p) {
@@ -446,11 +452,17 @@
     var pairs = 0, total = 0;
     fItems.forEach(function (it) {
       var p = stock[it.id]; if (!p) return;
-      pairs += it.qty; total += round2(unitOf(p, it.qty) * it.qty);
+      pairs += it.qty; total += round2(unitOf(p, tierQtyOf(it)) * it.qty);
+    });
+    if (fMix) $$('tbody tr', fLines).forEach(function (tr) {
+      var it = fItems.filter(function (x) { return x.id === tr.getAttribute('data-id'); })[0]; if (!it) return;
+      var u = unitOf(stock[it.id], tierQtyOf(it));
+      $('.cof-unit', tr).textContent = money(u);
+      $('.cof-line', tr).textContent = money(round2(u * it.qty));
     });
     var fee = shipFeeOf(total);
     var sum = $('.cof-sum', fLines);
-    if (sum) sum.innerHTML = '<span class="co-total">' + plural(pairs, 'paire', 'paires') +
+    if (sum) sum.innerHTML = '<span class="co-total">' + (fMix ? 'Commande découverte · ' : '') + plural(pairs, 'paire', 'paires') +
       (delivery() === 'ship' ? ' · livraison ' + (fee ? money(fee) : 'gratuite') : '') + ' · <b>' + money(total + fee) + '</b></span>';
   }
   /* réception : aperçu (le serveur recalcule) ; commande existante = seuil et forfait figés à son envoi */
@@ -500,7 +512,7 @@
     fLines.innerHTML = '<div class="co-table-wrap"><table class="co-table cof-table">' +
       '<thead><tr><th class="l">Spacer</th><th class="n">Qté</th><th class="n cof-opt">Stock</th><th class="n cof-opt">Prix</th><th class="n">Total</th><th class="n" aria-label="Retirer"></th></tr></thead>' +
       '<tbody>' + fItems.map(function (it) {
-        var p = stock[it.id], u = unitOf(p, it.qty), url = publicUrl(p.image_path);
+        var p = stock[it.id], u = unitOf(p, tierQtyOf(it)), url = publicUrl(p.image_path);
         return '<tr data-id="' + esc(it.id) + '">' +
           '<td class="l"><span class="co-prod">' + (url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="co-noimg"></span>') +
             '<b>' + esc(p.name) + '</b></span></td>' +
@@ -520,7 +532,7 @@
         var n = parseInt(q.value, 10);
         if (!(n >= 1)) return;   // champ vidé en cours de frappe : on attend
         it.qty = Math.min(999, n); fDirty = true;
-        var u = unitOf(stock[id], it.qty);
+        var u = unitOf(stock[id], tierQtyOf(it));
         $('.cof-unit', tr).textContent = money(u);
         $('.cof-line', tr).textContent = money(round2(u * it.qty));
         renderSum();
@@ -560,6 +572,7 @@
   function openEditor(o) {
     if (!fEd.hidden && fDirty) { askDiscard().then(function (ok) { if (ok) { fDirty = false; openEditor(o); } }); return; }
     fOrder = o || null;
+    fMix = !!(o && o.discovery);
     fItems = []; fDirty = false;
     fTitle.textContent = o ? 'Modifier ' + o.number : 'Nouvelle commande';
     fSave.textContent = o ? 'Enregistrer les changements' : 'Enregistrer la commande';
@@ -593,6 +606,7 @@
       buildDealerSelect();
       renderLines();
       fSave.disabled = false;
+      if (!o) checkMix();
       (o || fDealer.value ? fSearch : fDealer).focus({ preventScroll: true });
     });
   }
@@ -605,7 +619,18 @@
   if (newBtn) newBtn.addEventListener('click', function () { openEditor(null); });
   $('#cof-cancel').addEventListener('click', closeEditor);
   fNote.addEventListener('input', function () { fDirty = true; });
-  fDealer.addEventListener('change', function () { fDirty = true; fStatus.textContent = ''; });
+  function checkMix() {
+    if (fOrder) return;
+    fMix = false; renderLines();
+    if (!fDealer.value) return;
+    var email = fDealer.value;
+    sb.rpc('dealer_discovery', { p_email: email }).then(function (res) {
+      if (fOrder || fDealer.value !== email || fEd.hidden) return;
+      fMix = !!(res && !res.error && res.data && res.data.eligible);
+      renderLines();
+    }, function () {});
+  }
+  fDealer.addEventListener('change', function () { fDirty = true; fStatus.textContent = ''; checkMix(); });
 
   fEd.addEventListener('submit', function (e) {
     e.preventDefault();

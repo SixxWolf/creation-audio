@@ -87,10 +87,35 @@
     }, function (err) { shipSave.disabled = false; shipStatus.textContent = 'Erreur : ' + (err && err.message || err); });
   });
 
+  /* ---------- commande découverte (admin_settings « dealer_discovery ») ----------
+     since = date de la 1re activation : seuls les comptes créés depuis y ont droit. */
+  var discForm = $('#pm-disc'), discOn = $('#pm-disc-on'), discEnd = $('#pm-disc-end'), discSave = $('#pm-disc-save'), discStatus = $('#pm-disc-status'), discSince = null;
+  function loadDisc() {
+    sb.from('admin_settings').select('value').eq('key', 'dealer_discovery').maybeSingle().then(function (res) {
+      if (res.error) { discStatus.textContent = 'Erreur : ' + res.error.message; return; }
+      var v = (res.data && res.data.value) || {};
+      discOn.checked = v.enabled === true;
+      discEnd.value = v.ends || '';
+      discSince = v.since || null;
+    }, function () {});
+  }
+  discForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (discOn.checked && !discSince) discSince = new Date().toISOString();
+    discSave.disabled = true; discStatus.textContent = 'Enregistrement…';
+    sb.from('admin_settings').upsert({
+      key: 'dealer_discovery',
+      value: { enabled: discOn.checked, ends: discEnd.value || null, since: discSince },
+    }, { onConflict: 'key' }).then(function (res) {
+      discSave.disabled = false;
+      discStatus.textContent = res.error ? 'Erreur : ' + res.error.message : 'Enregistré ✓';
+    }, function (err) { discSave.disabled = false; discStatus.textContent = 'Erreur : ' + (err && err.message || err); });
+  });
+
   /* ---------- données ---------- */
   function load() {
     listEl.innerHTML = '<p class="muted">Chargement…</p>';
-    loadShip();
+    loadShip(); loadDisc();
     return Promise.all([
       sb.from('promotions').select('*').order('starts_at', { ascending: false }),
       sb.from('promotion_items').select('*'),

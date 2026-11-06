@@ -192,6 +192,7 @@
     // public + client connecté (o.backorder) : rupture commandable, comme le portail dealer
     function bo() { return !isDealer && !!(o.backorder && o.backorder()); }
     function unit(p, qty) { return isDealer ? tierPrice(p.sell_price, p.tiers, qty) : (+p.sell_price || 0); }
+    function tierExtra() { return isDealer && o.tierExtra ? o.tierExtra() : 0; }   // commande découverte : paires déjà au panier
     function tiersFor(p) { return isDealer ? normalizeTiers(p.tiers).filter(function (t) { return t.min > 1; }) : []; }
 
     // pastille de stock : dealer = tout commandable (« Sur commande ») ; public = rupture
@@ -562,7 +563,7 @@
       var base = +p.sell_price || 0;
       var rows = [{ min: 1, price: base }].concat(tiers);
       var active = 0;
-      rows.forEach(function (t, i) { if (curQty >= t.min) active = i; });
+      rows.forEach(function (t, i) { if (curQty + tierExtra() >= t.min) active = i; });
       return _t('<div class="sp-tiertable" role="table" aria-label="Prix selon la quantité">') +
         rows.map(function (t, i) {
           var next = rows[i + 1];
@@ -574,7 +575,7 @@
         }).join('') + '</div>';
     }
     function buySumText(p) {
-      var u = unit(p, curQty), base = +p.sell_price || 0;
+      var u = unit(p, curQty + tierExtra()), base = +p.sell_price || 0;
       if (curQty < 2) return '';
       return curQty + ' × ' + money(u) + ' = <b>' + money(u * curQty) + '</b>' + (u < base ? _t(' <em>· rabais quantité</em>') : '');
     }

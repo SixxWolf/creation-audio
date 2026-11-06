@@ -59,6 +59,7 @@
     addLabel: _t('Ajouter à ma commande'),
     maxQty: function () { return MAX_QTY; },
     onAdd: function (p, qty, src) { addToCart(p.id, qty, src); },
+    tierExtra: function () { return mixOn() ? count() : 0; },
     onTitle: function (p) { document.title = p ? p.name + _t(' — Portail dealer · Création Audio') : TITLE; },
     assureHtml: '<li>' + ICON.bolt + _t('Commande enregistrée directement — Création Audio est avisé</li>') +
       '<li>' + ICON.print + _t('Hors stock ? On l\'imprime sur commande</li>') +
@@ -108,7 +109,7 @@
   function checkDealer(email) {
     sb.rpc('is_dealer').then(function (res) {
       if (res.error) { show('gate'); return; }
-      if (res.data === true) { show('app', email); syncLook(); load(); loadOrders(); loadShip(); }
+      if (res.data === true) { show('app', email); syncLook(); load(); loadOrders(); loadShip(); loadDisc(); }
       else show('gate');
     }, function () { show('gate'); });
   }
@@ -368,7 +369,12 @@
 
   function entries() { return Object.keys(cart).map(function (k) { return cart[k]; }).filter(function (it) { return byId[it.id]; }); }
   function count() { return entries().reduce(function (s, it) { return s + it.qty; }, 0); }
-  function unitOf(it) { var p = byId[it.id]; return p ? tierPrice(p.sell_price, p.tiers, it.qty) : 0; }
+  /* Commande découverte : sur la 1re commande d'un nouveau compte, les paliers se comptent sur toutes les paires
+     (aperçu seulement : le serveur recalcule, _dealer_fill_lines). */
+  var disc = null;
+  function mixOn() { return editing ? !!editing.mix : !!(disc && disc.eligible); }
+  function tierQty(it) { return mixOn() ? count() : it.qty; }
+  function unitOf(it) { var p = byId[it.id]; return p ? tierPrice(p.sell_price, p.tiers, tierQty(it)) : 0; }
   function lineTotal(it) { return it.qty * unitOf(it); }
   function total() { return entries().reduce(function (s, it) { return s + lineTotal(it); }, 0); }
   function stockLine(it) {
@@ -417,6 +423,21 @@
     if (editing) return;
     shipPref = { d: shipMode };
     saveJSON(SHIP_KEY, shipPref);
+  }
+  function renderDisc() {
+    var on = mixOn(), ban = $('#dl-disc'), ends = $('#dl-disc-ends');
+    ban.hidden = !on; $('#cart-disc').hidden = !on;
+    var end = on && !editing && disc && disc.ends;
+    ends.hidden = !end;
+    ends.textContent = end ? _t('Jusqu\'au ') + fmtDay(end + 'T12:00:00') : '';
+  }
+  function loadDisc() {
+    if (!sb) return;
+    sb.rpc('dealer_discovery').then(function (res) {
+      if (res.error || !res.data) return;
+      disc = res.data;
+      if (!focusedIn(cartPanel)) renderCart(); else renderDisc();
+    }, function () {});
   }
   function loadShip() {
     if (!sb) return;
@@ -504,7 +525,7 @@
           '<div class="citem-right">' +
             _t('<button type="button" class="citem-del" aria-label="Retirer ') + esc(p.name) + '">&times;</button>' +
             '<div class="citem-line">' + money(lineTotal(it)) + '</div>' +
-          '</div>' + tierBarHtml(p, it.qty);
+          '</div>' + tierBarHtml(p, tierQty(it));
         row.setAttribute('data-id', it.id);
         var up = $('.tb-up', row);
         if (up) up.addEventListener('click', function () { changeQty(it.id, +up.getAttribute('data-add')); });
@@ -519,6 +540,7 @@
       });
     }
     animateTiers();
+    renderDisc();
     renderShip(n);
     sendBtn.textContent = editing ? _t('Enregistrer les modifications') : _t('Envoyer ma commande');
     sendBtn.classList.toggle('is-disabled', n === 0 || sending);
@@ -582,11 +604,11 @@
     if (!n) return;
     var best = null;
     entries().forEach(function (it) {
-      var ti = tierInfo(byId[it.id], it.qty);
-      if (ti && ti.next && (!best || ti.next.min - it.qty < best.left)) best = { name: byId[it.id].name, left: ti.next.min - it.qty, pct: ti.pct(ti.next) };
+      var q = tierQty(it), ti = tierInfo(byId[it.id], q);
+      if (ti && ti.next && (!best || ti.next.min - q < best.left)) best = { name: byId[it.id].name, left: ti.next.min - q, pct: ti.pct(ti.next) };
     });
     $('#dl-mbar-n').textContent = plural(n, 'paire', 'paires');
-    $('#dl-mbar-hint').textContent = best ? best.name + ' : +' + best.left + ' → −' + best.pct + ' %' : '';
+    $('#dl-mbar-hint').textContent = best ? (mixOn() ? '' : best.name + ' : ') + '+' + best.left + ' → −' + best.pct + ' %' : '';
     $('#dl-mbar-total').textContent = money(grandTotal());
   }
 
@@ -694,6 +716,7 @@
   function loadOrders() {
     if (ordersLoading) return;
     ordersLoading = true;
+    loadDisc();
     sb.from('dealer_orders').select('*, dealer_order_lines(*)').eq('dealer_email', me).order('created_at', { ascending: false }).limit(60)
       .then(function (res) {
         ordersLoading = false;
@@ -800,7 +823,7 @@
         if (l.product_id && byId[l.product_id]) cart[l.product_id] = { id: l.product_id, qty: (cart[l.product_id] ? cart[l.product_id].qty : 0) + (l.qty | 0) };
         else missing.push(l.name);
       });
-      editing = { id: o.id, number: o.number, delivery: o.delivery || 'pickup', addr: o.ship_parts || null,
+      editing = { id: o.id, number: o.number, mix: !!o.discovery, delivery: o.delivery || 'pickup', addr: o.ship_parts || null,
         rate: o.ship_rate == null ? null : +o.ship_rate, threshold: o.ship_threshold == null ? null : +o.ship_threshold };
       shipMode = editing.delivery;
       shipAddr = copyAddr(editing.addr || (shipCfg && shipCfg.addr));
@@ -845,6 +868,7 @@
     }, function () { refreshing = false; });
     if (view === 'orders') loadOrders();
     loadShip();
+    loadDisc();
   }
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 5000) refresh();

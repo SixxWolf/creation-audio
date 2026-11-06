@@ -893,5 +893,17 @@
  ", que nous pouvons modifier ou retirer à tout moment. Une commande déjà envoyée conserve le coût de livraison affiché à son envoi.": ", which we may change or withdraw at any time. An order already sent keeps the delivery cost shown when it was sent.",
  "Une commande livrée se paie par": "A delivered order is paid by",
  "virement Interac": "Interac e-Transfer",
- ", à la réception de la facture.": ", upon receipt of the invoice."
+ ", à la réception de la facture.": ", upon receipt of the invoice.",
+ ", avant l'envoi.": ", before shipping.",
+ "Commande découverte (revendeurs).": "Discovery order (dealers).",
+ "Sur sa première commande, un nouveau compte revendeur peut additionner les paires de tous les modèles pour atteindre les paliers de rabais quantité. Cette offre d'une durée limitée peut être modifiée ou retirée à tout moment ; une commande déjà envoyée conserve ses prix.": "On its first order, a new dealer account can add up the pairs of all models to reach the volume discount tiers. This limited-time offer may be changed or withdrawn at any time; an order already sent keeps its prices.",
+ "Dernière mise à jour : 6 novembre 2026": "Last updated: November 6, 2026 · This is a translation; in case of discrepancy, the French version prevails.",
+ ": nom du commerce, personne-ressource, courriel, téléphone, adresse complète (adresse, ville, province, code postal) et, si tu les fournis, site web et page Facebook (voir ci-dessous).": ": business name, contact person, email, phone, full address (street address, city, province, postal code) and, if you provide them, website and Facebook page (see below).",
+ ", elle est effacée après 90 jours ;": ", it is deleted after 90 days;",
+ "si tu choisis la livraison sur le portail, on conserve l'adresse de livraison avec ta commande et on la communique au transporteur pour acheminer ta commande.": "if you choose delivery on the portal, we keep the delivery address with your order and share it with the carrier to deliver your order.",
+ "tes renseignements personnels. On les partage uniquement avec les prestataires nécessaires au fonctionnement (par ex. l'hébergement ou, pour une commande livrée, le transporteur), ou si la loi l'exige.": "your personal information. We only share it with the providers needed to run the service (e.g. hosting or, for a delivered order, the carrier), or if the law requires it.",
+ "Commande découverte": "Discovery order",
+ "Mélange les modèles : toutes tes paires comptent ensemble pour le rabais quantité. Première commande seulement.": "Mix the models: all your pairs count together toward the volume discount. First order only.",
+ "Toutes tes paires comptent ensemble.": "All your pairs count together.",
+ "Paiement par virement Interac avant l'envoi.": "Payment by Interac e-Transfer before shipping."
 }
