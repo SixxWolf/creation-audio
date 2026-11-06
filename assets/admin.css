@@ -2182,3 +2182,20 @@ a.ms-b-file:hover { border-color:var(--ink); }
   .en-acts { grid-column:1 / -1; }
 }
 .dm-dl dd { white-space:pre-line; }
+
+/* Entretien › calculateur de prix */
+.en-calc { margin-top:26px; padding:18px; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
+.en-h { margin:0 0 14px; font-size:1.15rem; }
+.en-h3 { margin:20px 0 10px; font-size:.95rem; }
+.en-cfg { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; }
+.en-mats { display:grid; gap:8px; margin-bottom:10px; }
+.en-mat { display:grid; grid-template-columns:minmax(0,1fr) 120px 110px auto; gap:8px; align-items:end; }
+.en-res { margin-top:20px; overflow-x:auto; }
+.en-res table { width:100%; border-collapse:collapse; font-size:.9rem; }
+.en-res th, .en-res td { padding:8px 10px; text-align:right; border-bottom:1px solid var(--line); white-space:nowrap; }
+.en-res th:first-child, .en-res td:first-child { text-align:left; }
+.en-res td input { width:70px; text-align:right; }
+.en-res .is-good { color:#2e8b57; font-weight:600; }
+.en-res .is-bad { color:#c0392b; font-weight:600; }
+.en-res .en-note { margin:10px 0 0; }
+@media (max-width:640px) { .en-mat { grid-template-columns:1fr 1fr; } .en-mat .field:first-child { grid-column:1/-1; } }

@@ -5161,3 +5161,44 @@ returns jsonb language sql stable security definer set search_path = '' as $$
   from (select * from public.service_requests where customer_id = (select auth.uid())
         order by created_at desc limit 100) r;
 $$;
+
+-- ------------------------------------------------------------
+-- ENTRETIEN — calculateur de prix (admin seulement, rien de public) — 2026-11-06
+-- maintenance_calc : réglages du calcul (déplacement, machines par visite, marge visée).
+-- maintenance_materials : consommables (coût + quantité utilisée par machine et par entretien).
+-- ------------------------------------------------------------
+create table if not exists public.maintenance_calc (
+  id               smallint primary key default 1 check (id = 1),
+  travel_minutes   integer not null default 60 check (travel_minutes between 0 and 600),
+  travel_cost      numeric(8,2) not null default 10 check (travel_cost >= 0),
+  machines_per_visit integer not null default 1 check (machines_per_visit between 1 and 100),
+  margin_pct       numeric(5,2) not null default 40 check (margin_pct >= 0 and margin_pct < 95)
+);
+insert into public.maintenance_calc (id) values (1) on conflict (id) do nothing;
+create table if not exists public.maintenance_materials (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null check (length(btrim(name)) between 1 and 80),
+  cost       numeric(8,2) not null default 0 check (cost >= 0),
+  qty        numeric(8,3) not null default 1 check (qty >= 0),
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table public.maintenance_calc enable row level security;
+alter table public.maintenance_materials enable row level security;
+drop policy if exists maintenance_calc_admin on public.maintenance_calc;
+create policy maintenance_calc_admin on public.maintenance_calc for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists maintenance_materials_admin on public.maintenance_materials;
+create policy maintenance_materials_admin on public.maintenance_materials for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.maintenance_calc from anon, authenticated;
+revoke all on public.maintenance_materials from anon, authenticated;
+grant select, update on public.maintenance_calc to authenticated;
+grant select, insert, update, delete on public.maintenance_materials to authenticated;
+insert into public.maintenance_materials (name, cost, qty, sort_order)
+select v.n, v.c, v.q, v.o from (values
+  ('Alcool isopropylique (IPA)', 0.50::numeric, 1::numeric, 1),
+  ('Lubrifiant (graisse / huile)', 1.00, 1, 2),
+  ('Chiffons et cotons-tiges', 0.50, 1, 3)
+) as v(n, c, q, o)
+where not exists (select 1 from public.maintenance_materials);

@@ -16,6 +16,9 @@
 
   var BUCKET = 'products', DIR = 'entretien';
   var rows = [], rate = 60, loaded = false;
+  var calc = { travel_minutes: 60, travel_cost: 10, machines_per_visit: 1, margin_pct: 40 }, mats = [];
+  var matsEl = document.getElementById('ec-mats'), resEl = document.getElementById('ec-res');
+  var CFG = { 'ec-tmin': 'travel_minutes', 'ec-tcost': 'travel_cost', 'ec-mpv': 'machines_per_visit', 'ec-margin': 'margin_pct' };
   var rateEl = document.getElementById('en-rate'), fileEl = document.getElementById('en-file');
   var uploadFor = null;
 
@@ -55,18 +58,67 @@
   function paint() {
     listEl.innerHTML = rows.length ? rows.map(card).join('') : '<p class="muted">Aucune imprimante. Ajoutes-en une.</p>';
     if (rateEl) rateEl.value = rate;
+    paintRes();
+  }
+
+  /* ---- calculateur de prix : temps × taux + matériaux + part du déplacement, puis marge visée ---- */
+  function money(n) { return CA.money ? CA.money(n) : (Math.round(n * 100) / 100).toFixed(2) + ' $'; }
+  function matCost() { return mats.reduce(function (t, m) { return t + (+m.cost || 0) * (+m.qty || 0); }, 0); }
+  function travelShare() { return (rate * calc.travel_minutes / 60 + calc.travel_cost) / Math.max(1, calc.machines_per_visit); }
+  function figures(r) {
+    var min = r.minutes || 0, labor = rate * min / 60, mat = matCost(), trav = travelShare(), cost = labor + mat + trav;
+    var sug = min ? Math.ceil(cost / (1 - calc.margin_pct / 100)) : null;
+    var cur = r.price_month == null ? null : +r.price_month;
+    return { labor: labor, mat: mat, trav: trav, cost: cost, sug: sug, cur: cur, profit: cur == null ? null : cur - cost, pct: cur ? (cur - cost) / cur * 100 : null };
+  }
+  function paintCfg() {
+    Object.keys(CFG).forEach(function (id) { var el = document.getElementById(id); if (el) el.value = calc[CFG[id]]; });
+  }
+  function paintMats() {
+    if (!matsEl) return;
+    matsEl.innerHTML = mats.length ? mats.map(function (m) {
+      return '<div class="en-mat" data-id="' + esc(m.id) + '">' +
+        '<label class="field"><span class="lbl">Matériau</span><input type="text" data-m="name" value="' + esc(m.name) + '" maxlength="80" autocomplete="off"></label>' +
+        '<label class="field"><span class="lbl">Coût</span><span class="unit" data-unit="$"><input type="number" data-m="cost" min="0" step="0.01" inputmode="decimal" value="' + esc(m.cost) + '"></span></label>' +
+        '<label class="field"><span class="lbl">Quantité</span><input type="number" data-m="qty" min="0" step="0.1" inputmode="decimal" value="' + esc(m.qty) + '"></label>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-mdel data-ic="trash" aria-label="Supprimer"></button></div>';
+    }).join('') : '<p class="muted">Aucun matériau.</p>';
+  }
+  function paintRes() {
+    if (!resEl) return;
+    if (!rows.length) { resEl.innerHTML = ''; return; }
+    var miss = false;
+    var body = rows.map(function (r) {
+      var x = figures(r);
+      if (!x.sug) miss = true;
+      return '<tr data-id="' + esc(r.id) + '"><td>' + esc([r.brand, r.name].filter(Boolean).join(' ')) + '</td>' +
+        '<td><input type="number" data-cm min="1" max="600" step="1" inputmode="numeric" value="' + esc(r.minutes == null ? '' : r.minutes) + '" aria-label="Minutes"></td>' +
+        '<td>' + money(x.labor) + '</td><td>' + money(x.mat) + '</td><td>' + money(x.trav) + '</td><td>' + money(x.cost) + '</td>' +
+        '<td><b>' + (x.sug ? money(x.sug) : '—') + '</b></td>' +
+        '<td>' + (x.cur == null ? 'Sur évaluation' : money(x.cur)) + '</td>' +
+        '<td class="' + (x.pct == null ? '' : x.pct >= calc.margin_pct ? 'is-good' : x.pct >= 0 ? '' : 'is-bad') + '">' + (x.pct == null ? '—' : money(x.profit) + ' (' + Math.round(x.pct) + ' %)') + '</td>' +
+        '<td>' + (x.sug && x.sug !== x.cur ? '<button type="button" class="btn btn-ghost btn-sm" data-apply>Appliquer</button>' : '') + '</td></tr>';
+    }).join('');
+    resEl.innerHTML = '<table><thead><tr><th>Machine</th><th>Minutes</th><th>Main-d’œuvre</th><th>Matériaux</th><th>Déplacement</th><th>Coût</th><th>Prix suggéré</th><th>Prix actuel</th><th>Profit</th><th></th></tr></thead><tbody>' + body + '</tbody></table>' +
+      (miss ? '<p class="muted en-note">Entre les minutes d’une machine pour obtenir son prix suggéré.</p>' : '');
   }
 
   /* ---- données ---- */
   function load() {
     return Promise.all([
       sb.from('maintenance_printers').select('*').order('sort_order').order('created_at'),
-      sb.from('maintenance_settings').select('hourly_rate').eq('id', 1).maybeSingle()
+      sb.from('maintenance_settings').select('hourly_rate').eq('id', 1).maybeSingle(),
+      sb.from('maintenance_calc').select('*').eq('id', 1).maybeSingle(),
+      sb.from('maintenance_materials').select('*').order('sort_order').order('created_at')
     ]).then(function (out) {
       if (out[0].error) throw out[0].error;
       rows = out[0].data || [];
       rate = out[1].data ? +out[1].data.hourly_rate : 60;
+      if (out[2] && out[2].data) calc = out[2].data;
+      mats = (out[3] && out[3].data) || [];
       loaded = true;
+      paintCfg();
+      paintMats();
       paint();
       if (CA.entretienChanged) CA.entretienChanged();
     }, function (err) {
@@ -107,7 +159,7 @@
       patch.minutes = el.value.trim() ? Math.round(m) : null;
     }
     save(r, patch).then(function (ok) {
-      if (ok) { if (f === 'visible') paint(); if (CA.entretienChanged) CA.entretienChanged(); }
+      if (ok) { if (f === 'visible') paint(); else paintRes(); if (CA.entretienChanged) CA.entretienChanged(); }
     });
   });
 
@@ -183,9 +235,78 @@
     sb.from('maintenance_settings').update({ hourly_rate: v }).eq('id', 1).then(function (res) {
       if (res.error) { window.caDialog.error(res.error); rateEl.value = rate; return; }
       rate = v;
+      paintRes();
       window.caDialog.toast('Taux horaire enregistré');
     }, function (er) { window.caDialog.error(er); rateEl.value = rate; });
   });
+
+  /* ---- calculateur : réglages, matériaux, minutes, appliquer ---- */
+  var cfgEl = document.getElementById('en-calc');
+  if (cfgEl) {
+    cfgEl.addEventListener('change', function (e) {
+      var el = e.target, id = el.id;
+      if (CFG[id]) {
+        var k = CFG[id], v = num(el.value), max = k === 'margin_pct' ? 94 : k === 'travel_minutes' ? 600 : 100;
+        if (v == null || v < 0 || (k === 'machines_per_visit' && v < 1) || (k !== 'travel_cost' && v > max)) { el.value = calc[k]; return; }
+        v = k === 'travel_cost' || k === 'margin_pct' ? Math.round(v * 100) / 100 : Math.round(v);
+        var patch = {}; patch[k] = v;
+        sb.from('maintenance_calc').update(patch).eq('id', 1).then(function (res) {
+          if (res.error) { window.caDialog.error(res.error); el.value = calc[k]; return; }
+          calc[k] = v; el.value = v; paintRes();
+        }, function (er) { window.caDialog.error(er); el.value = calc[k]; });
+        return;
+      }
+      var mrow = el.closest('.en-mat'), f = el.getAttribute('data-m');
+      if (mrow && f) {
+        var m = mats.filter(function (x) { return x.id === mrow.getAttribute('data-id'); })[0];
+        if (!m) return;
+        var val = f === 'name' ? el.value.trim() : num(el.value);
+        if (f === 'name' ? !val : (val == null || val < 0)) { el.value = m[f]; return; }
+        var p = {}; p[f] = f === 'name' ? val : f === 'cost' ? Math.round(val * 100) / 100 : Math.round(val * 1000) / 1000;
+        sb.from('maintenance_materials').update(p).eq('id', m.id).then(function (res) {
+          if (res.error) { window.caDialog.error(res.error); el.value = m[f]; return; }
+          m[f] = p[f]; paintRes();
+        }, function (er) { window.caDialog.error(er); el.value = m[f]; });
+        return;
+      }
+      var tr = el.closest('tr[data-id]');
+      if (tr && el.hasAttribute('data-cm')) {
+        var r = byId(tr.getAttribute('data-id')), mn = num(el.value);
+        if (!r) return;
+        if (!(mn >= 1 && mn <= 600)) { el.value = r.minutes == null ? '' : r.minutes; return; }
+        save(r, { minutes: Math.round(mn) }).then(function (ok) { if (ok) { paint(); if (CA.entretienChanged) CA.entretienChanged(); } });
+      }
+    });
+    cfgEl.addEventListener('click', function (e) {
+      var d = e.target.closest('[data-mdel]');
+      if (d) {
+        var id = d.closest('.en-mat').getAttribute('data-id');
+        sb.from('maintenance_materials').delete().eq('id', id).then(function (res) {
+          if (res.error) { window.caDialog.error(res.error); return; }
+          mats = mats.filter(function (x) { return x.id !== id; }); paintMats(); paintRes();
+        }, function (er) { window.caDialog.error(er); });
+        return;
+      }
+      var ap = e.target.closest('[data-apply]');
+      if (ap) {
+        var r = byId(ap.closest('tr').getAttribute('data-id')), x = r && figures(r);
+        if (!r || !x.sug) return;
+        window.caDialog.confirm({ title: 'Fixer ' + money(x.sug) + ' par mois pour ' + [r.brand, r.name].filter(Boolean).join(' ') + ' ?', message: 'Le prix du catalogue change aussi sur le site.', ok: 'Appliquer', cancel: 'Annuler' }).then(function (ok) {
+          if (!ok) return;
+          save(r, { price_month: x.sug }).then(function (done) { if (done) { paint(); if (CA.entretienChanged) CA.entretienChanged(); } });
+        });
+      }
+    });
+    document.getElementById('ec-addmat').addEventListener('click', function () {
+      var order = mats.reduce(function (t, x) { return Math.max(t, x.sort_order || 0); }, 0) + 1;
+      sb.from('maintenance_materials').insert({ name: 'Nouveau matériau', cost: 0, qty: 1, sort_order: order }).select('*').maybeSingle().then(function (res) {
+        if (res.error) { window.caDialog.error(res.error); return; }
+        mats.push(res.data); paintMats(); paintRes();
+        var inp = matsEl.querySelector('.en-mat:last-child [data-m="name"]');
+        if (inp) { inp.focus(); inp.select(); }
+      }, function (er) { window.caDialog.error(er); });
+    });
+  }
 
   var prevOnTab = CA.onTab;
   CA.onTab = function (name) {
