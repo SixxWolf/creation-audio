@@ -1,6 +1,6 @@
 /* =========================================================
    Création Audio — CMS Commandes dealer
-   Commandes envoyées depuis le portail dealer (dealer.html) :
+   Commandes envoyées depuis le portail dealer (dealer) :
    tables dealer_orders + dealer_order_lines (schema-v2.sql).
    - Pastille « Commandes (n) » dans la barre latérale = commandes
      « Nouvelle » (rafraîchie toutes les 60 s + au retour sur la page).

@@ -4,7 +4,7 @@
    panneau qui glisse à droite (plein écran sur mobile).
    - Pas connecté : sujet + message + photos + nom + courriel -> code à 6
      chiffres (Edge Function compte-code, purpose 'message') -> session du compte
-     client (clé « ca-compte-auth », la même que compte.html) -> envoi.
+     client (clé « ca-compte-auth », la même que compte) -> envoi.
      Le brouillon (photos comprises) survit au passage par l'appli courriel.
    - Connecté : envoi direct ; liste de ses conversations ; fil + réponse.
    - Fichiers 3D (page Impression 3D) : STL/3MF/STEP/OBJ/G-code, 3 max, 50 Mo chacun, bucket privé
@@ -18,7 +18,7 @@
    - Fil ouvert : actualisé toutes les 10 s (page visible) — vaut lecture et
      présence ; l'en-tête montre « En ligne » quand l'admin est dans le fil.
    API : CA.msg.open({ topic, ref, body, conv, list, files, allow3d }) · CA.msg.close()
-   Événement « ca:msg-change » sur document après un envoi (compte.html s'y abonne).
+   Événement « ca:msg-change » sur document après un envoi (compte s'y abonne).
    Démo : CA.compte (faux client Supabase) / CA.compteFn (fausse Edge Function).
    RPC : msg_start, msg_send, me_conversations, me_messages, me_account, me_update
    (schema-v2.sql « MESSAGERIE »).
@@ -86,7 +86,7 @@
   }
   function errText(err) { return (err && err.message) || _t('Envoi impossible pour le moment. Réessaie.'); }
 
-  /* ---------- Supabase (session du compte client, partagée avec compte.html / commande-client.js) ---------- */
+  /* ---------- Supabase (session du compte client, partagée avec compte / commande-client.js) ---------- */
   function sb() {
     if (CA.compteSb) return CA.compteSb;
     if (CA.compte) return (CA.compteSb = CA.compte);        // démo
@@ -472,7 +472,7 @@
         '<input type="text" class="msg-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">' +
         _t('<button class="msg-send" type="submit">Envoyer</button>') +
         '<p class="msg-status" role="status" aria-live="polite"></p>' +
-        (st.signed ? '' : _t('<p class="msg-legal">Un code te sera envoyé pour confirmer ton courriel. <a href="') + ROOT + _t('confidentialite.html#messagerie">Confidentialité</a></p>')) +
+        (st.signed ? '' : _t('<p class="msg-legal">Un code te sera envoyé pour confirmer ton courriel. <a href="') + ROOT + _t('confidentialite#messagerie">Confidentialité</a></p>')) +
       '</form>';
     var form = $('#msg-compose', main), ta = $('#msg-body', main), status = $('.msg-status', form);
     paintThumbs();

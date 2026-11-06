@@ -13,7 +13,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
-const ADMIN_URL = SITE + "/coulisses-t6avzpe2.html#commandes/demandes/";
+const ADMIN_URL = SITE + "/coulisses-t6avzpe2#commandes/demandes/";
 const DELAY_MS = 5 * 60 * 1000;
 const MAX_AGE_MS = 2 * 86400 * 1000;
 const RETRY_MS = 3 * 60 * 1000;
@@ -60,7 +60,7 @@ const foot = (en: boolean) =>
   '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
   '<p style="font-size:12px;color:#6C727C"><a href="' + SITE + (en ? "/en/" : "") + '" style="color:#6C727C">creationaudio.ca</a></p>';
 
-const accountUrl = (r: Req) => SITE + (r.lang === "en" ? "/en" : "") + "/compte.html#/demandes/" + r.id;
+const accountUrl = (r: Req) => SITE + (r.lang === "en" ? "/en" : "") + "/compte#/demandes/" + r.id;
 const first = (r: Req) => String(r.name || "").trim().split(/\s+/)[0] || "";
 const kindFr = (r: Req) => r.kind === "maintenance" ? "Entretien d'imprimantes" : "Impression 3D";
 const kindEn = (r: Req) => r.kind === "maintenance" ? "Printer maintenance" : "3D printing";

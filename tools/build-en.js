@@ -152,7 +152,7 @@ function translatePage(html, rel) {
   if (last < html.length) out.push(tx(html.slice(last)));
   let res = out.join('');
   // lien de langue : sur la page anglaise, il ramène au français
-  const frHref = rel === '404.html' ? '/' : '../'.repeat(depth) + (rel === 'index.html' ? '' : rel);
+  const frHref = rel === '404.html' ? '/' : '../'.repeat(depth) + (rel === 'index.html' ? '' : rel === '404.html' ? rel : rel.replace(/.html$/, ''));
   res = res.replace(/<a\b([^>]*)\sdata-lang-switch="en"([^>]*)>([\s\S]*?)<\/a>/gi, (mm, a, b, inner) => {
     const at = (a + b).replace(/\shref="[^"]*"/, '').replace(/\shreflang="en"/, ' hreflang="fr"')
       .replace(/\slang="en"/, ' lang="fr"').replace(/\stitle="[^"]*"/, ' title="Version française"');

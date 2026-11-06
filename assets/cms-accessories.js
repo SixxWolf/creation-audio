@@ -5,7 +5,7 @@
    stock, photos (la 1re = principale), RABAIS QUANTITÉ (cumulé
    sur la catégorie en boutique et en facturation), catégorie,
    affichage sur la fiche filament (marques visées), fiche
-   détaillée (boutique.html#/a/<slug>) : description, specs.
+   détaillée (boutique#/a/<slug>) : description, specs.
    attrs : category · on_filament · fil_brands [noms ; vide = toutes]
            · description · long_desc · specs [{k, v}] · gallery
    (les autres clés d'attrs — avg_cost, barcodes… — sont conservées)
@@ -240,7 +240,7 @@
     if (!editingRow) { linksEl.innerHTML = ''; return; }
     var s = encodeURIComponent(editingRow.slug || slugify(editingRow.name));
     linksEl.innerHTML = activeI.checked
-      ? '<a class="btn btn-ghost btn-sm" href="' + SITE + 'boutique.html#/a/' + s + '" target="_blank" rel="noopener">Voir en boutique ↗</a>'
+      ? '<a class="btn btn-ghost btn-sm" href="' + SITE + 'boutique#/a/' + s + '" target="_blank" rel="noopener">Voir en boutique ↗</a>'
       : '<span class="hint">Masqué en boutique</span>';
   }
 

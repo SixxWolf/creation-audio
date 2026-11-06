@@ -53,11 +53,11 @@ type Product = { id: string; type: string; name: string; brand: string | null; m
 // en = avis demandé depuis la version anglaise (waitlist.lang) -> pages /en/
 function productUrl(p: Product, brandSlug: string | null, matSlug: string | null, en = false) {
   const base = SITE + (en ? "/en" : "");
-  if (p.type === "spacer") return base + "/spacers.html";
-  if (p.type !== "filament") return base + "/boutique.html";
+  if (p.type === "spacer") return base + "/spacers";
+  if (p.type !== "filament") return base + "/boutique";
   const b = brandSlug || slugify(p.brand || "Autres");
   const m = matSlug || slugify(p.material || "Autres");
-  return base + "/boutique.html#/m/" + b + "/" + m + "/" + (p.slug || slugify(p.name));
+  return base + "/boutique#/m/" + b + "/" + m + "/" + (p.slug || slugify(p.name));
 }
 
 function emailContent(p: Product, kind: string | null, url: string, en = false) {

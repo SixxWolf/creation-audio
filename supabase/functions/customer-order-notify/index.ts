@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
   const items = L.reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const toOrder = L.filter((l) => (Number(l.qty_to_order) || 0) > 0);
   const first = String(order.name || "").trim().split(/\s+/)[0] || "";
-  const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes/clients";
+  const adminUrl = SITE + "/coulisses-t6avzpe2#commandes/clients";
   const results: Record<string, string> = {};
   const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end);
 
@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
     const T = (fr: string, e: string) => (en ? e : fr);
     const m = (n: unknown) => money(n, en);
     const site = SITE + (en ? "/en" : "");
-    const accUrl = site + "/compte.html#/commandes", pkUrl = site + "/compte.html#/cueillette/c/" + order.id;
+    const accUrl = site + "/compte#/commandes", pkUrl = site + "/compte#/cueillette/c/" + order.id;
     const pkC = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end, en);
     const verb = event === "updated" ? T("modifiée", "updated") : T("reçue", "received");
     const subject = T("Commande ", "Order ") + order.number + " " + verb + " — Création Audio";
@@ -330,7 +330,7 @@ async function notifyReady(db: any, order: any, resendKey: string | undefined, f
   const m = (n: unknown) => money(n, en);
   const site = SITE + (en ? "/en" : "");
   const first = String(order.name || "").trim().split(/\s+/)[0] || "";
-  const accountUrl = site + "/compte.html#/cueillette/c/" + order.id;   // écran « Choisis ta cueillette »
+  const accountUrl = site + "/compte#/cueillette/c/" + order.id;   // écran « Choisis ta cueillette »
   const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end, en);
   const subject = T("Commande " + order.number + " prête", "Order " + order.number + " ready") + " — Création Audio";
   const status = pk
@@ -384,7 +384,7 @@ async function runCron(db: any, resendKey: string, from: string) {
     const en = await clientEn(db, o.customer_id);
     const T = (fr: string, e: string) => (en ? e : fr);
     const first = String(o.name || "").trim().split(/\s+/)[0] || "";
-    const url = SITE + (en ? "/en" : "") + "/compte.html#/cueillette/c/" + o.id;
+    const url = SITE + (en ? "/en" : "") + "/compte#/cueillette/c/" + o.id;
     const head = cancelled
       ? T("Commande " + o.number + " annulée", "Order " + o.number + " cancelled")
       : T("Choisis ta cueillette — commande " + o.number, "Choose your pickup — order " + o.number);
@@ -394,7 +394,7 @@ async function runCron(db: any, resendKey: string, from: string) {
       : T("Ton stock est gardé, mais il nous faut un jour et une heure de cueillette. Sans ça, ta commande sera annulée bientôt.",
           "Your stock is on hold, but we need a pickup day and time. Without it, your order will be cancelled soon.");
     const label = cancelled ? T("Voir mes commandes", "See my orders") : T("Choisir ma cueillette", "Choose my pickup");
-    const link = cancelled ? SITE + (en ? "/en" : "") + "/compte.html#/commandes" : url;
+    const link = cancelled ? SITE + (en ? "/en" : "") + "/compte#/commandes" : url;
     const html =
       '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
       '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
@@ -446,7 +446,7 @@ async function mailHour(db: any, resendKey: string, from: string, o: any) {
   const T = (fr: string, e: string) => (en ? e : fr);
   const first = String(o.name || "").trim().split(/\s+/)[0] || "";
   const when = fmtPickup(o.pickup_date, o.pickup_start, o.pickup_end, en);
-  const link = SITE + (en ? "/en" : "") + "/compte.html#/cueillette/c/" + o.id;
+  const link = SITE + (en ? "/en" : "") + "/compte#/cueillette/c/" + o.id;
   const head = T("Ta cueillette est dans environ 1 h — commande " + o.number, "Your pickup is in about 1 hour — order " + o.number);
   const msg = T("Petit rappel : ta commande " + o.number + " t'attend, cueillette prévue " + when + ".",
     "Friendly reminder: your order " + o.number + " is waiting for you, pickup scheduled " + when + ".");

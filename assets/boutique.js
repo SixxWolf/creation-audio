@@ -213,7 +213,7 @@
     var acc = name === 'accs' || name === 'acc';
     $$('.home-nav a, .drawer-links a').forEach(function (a) {
       var h = a.getAttribute('href') || '';
-      var on = acc ? /#\/accessoires$/.test(h) : /^boutique\.html(#\/)?$/.test(h);
+      var on = acc ? /#\/accessoires$/.test(h) : /^boutique(#\/)?$/.test(h);
       a.classList.toggle('is-active', on);
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -900,7 +900,7 @@
      anti-pourriel côté serveur). Champ piège « website » caché = honeypot.
      Loi 25 : usage annoncé au moment de la collecte + lien vers la politique. */
   var notifyDone = {};   // "id|format" -> message de confirmation (survit aux re-rendus)
-  // client connecté (compte.html, session « ca-compte-auth ») : son courriel est pré-rempli
+  // client connecté (compte, session « ca-compte-auth ») : son courriel est pré-rempli
   function acctEmail() {
     try { var s = JSON.parse(localStorage.getItem('ca-compte-auth') || 'null'); return (s && s.user && s.user.email) || ''; }
     catch (e) { return ''; }
@@ -925,7 +925,7 @@
       '<p class="cfg-notify-msg" aria-live="polite"></p>' +
       _t('<p class="cfg-notify-legal">On utilise ton courriel <strong>uniquement</strong> pour t\'aviser de l\'arrivée de ce produit (') +
         esc(o.what) + _t('), puis il est supprimé. ') +
-        _t('<a href="confidentialite.html#liste-attente">Politique de confidentialité</a></p>')) +
+        _t('<a href="confidentialite#liste-attente">Politique de confidentialité</a></p>')) +
     '</div>';
   }
   function wireNotify(root, o, rerender) {
@@ -1682,7 +1682,7 @@
       editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login'),
       resvBtn = $('#cart-resv'), resvWhy = $('#cart-resv-why'), resvInfo = null, infoBtn = $('#cart-info');
   // Cueillette : choisie APRÈS l'envoi, sur l'écran « Ma cueillette » de Mon compte (compte.js)
-  function goPickup(kind, id) { location.href = 'compte.html#/cueillette/' + kind + '/' + encodeURIComponent(id); }
+  function goPickup(kind, id) { location.href = 'compte#/cueillette/' + kind + '/' + encodeURIComponent(id); }
   // Réservation 72 h (client approuvé) : articles EN STOCK seulement -> lignes au-delà du stock listées
   function overStock() {
     return entries().filter(function (it) {

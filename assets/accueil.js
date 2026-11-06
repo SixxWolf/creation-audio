@@ -121,7 +121,7 @@
 
   var brandSlug = {}, brandOrder = {};
   function brandSeg(brand) { return brandSlug[brand] || slugify(brand || 'Autres'); }
-  function matUrl(p) { return 'boutique.html#/m/' + brandSeg(p.brand) + '/' + (p.material_slug || slugify(p.material || 'Autres')); }
+  function matUrl(p) { return 'boutique#/m/' + brandSeg(p.brand) + '/' + (p.material_slug || slugify(p.material || 'Autres')); }
   function filUrl(p) { return matUrl(p) + '/' + (p.slug || slugify(p.name)); }
 
   /* =========================================================
@@ -230,7 +230,7 @@
   var FALLBACK = [
     ['Rouge', '#C12E1F'], ['Orange', '#FF6A13'], ['Jaune', '#FCE300'], ['Vert', '#00AE42'], ['Turquoise', '#00B1B7'],
     ['Bleu', '#0056B8'], ['Violet', '#8671CB'], ['Rose', '#F5547C'], ['Blanc', '#FFFFFF'], ['Gris', '#8E9089'], ['Noir', '#1B1B1B']
-  ].map(function (c) { return { name: _t(c[0]), material: 'PLA', brand: '', hex: c[1], _cs: [c[1]], _url: 'boutique.html' }; });
+  ].map(function (c) { return { name: _t(c[0]), material: 'PLA', brand: '', hex: c[1], _cs: [c[1]], _url: 'boutique' }; });
 
   /* =========================================================
      Sections alimentées par la base
@@ -256,7 +256,7 @@
       var ba = brandOrder[a.brand] != null ? brandOrder[a.brand] : 99, bb = brandOrder[b.brand] != null ? brandOrder[b.brand] : 99;
       return (ba - bb) || ((a.first.material_sort || 0) - (b.first.material_sort || 0)) || a.material.localeCompare(b.material, 'fr');
     });
-    if (!mats.length) { emptyNote(matGrid, _t('Le stock se renouvelle — <a href="boutique.html">voir toute la boutique</a>.')); return 0; }
+    if (!mats.length) { emptyNote(matGrid, _t('Le stock se renouvelle — <a href="boutique">voir toute la boutique</a>.')); return 0; }
 
     // Un groupe par marque (ordre des marques de l'admin), chacun avec sa grille de matériaux.
     var brands = [], byBrand = {};
@@ -273,7 +273,7 @@
           '<span class="mat-brand-meta">' + tn(list.length, '{n} matériau', '{n} matériaux') + ' · ' +
             tn(nCol, '{n} couleur en stock', '{n} couleurs en stock') + '</span>' +
           '<span class="mat-brand-rule" aria-hidden="true"></span>' +
-          '<a class="mat-brand-link" href="boutique.html#/m/' + esc(brandSeg(b)) + '" aria-label="' + esc(_t('Voir tous les filaments {b}', { b: b })) + '">' +
+          '<a class="mat-brand-link" href="boutique#/m/' + esc(brandSeg(b)) + '" aria-label="' + esc(_t('Voir tous les filaments {b}', { b: b })) + '">' +
             _t('Voir la marque') + ' ' + ARROW + '</a>' +
         '</header>' +
         '<div class="mat-grid">' + list.map(matCard).join('') + '</div>' +
@@ -382,7 +382,7 @@
       var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
       var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
       var title = isF ? esc((p.brand ? p.brand + ' ' : '') + (p.material || _t('Filament'))) : esc(p.name);
-      var href = p.type === 'spacer' ? 'spacers.html' : 'boutique.html?promo=1';
+      var href = p.type === 'spacer' ? 'spacers' : 'boutique?promo=1';
       var sub = isF ? tn(g.n, '{n} couleur', '{n} couleurs') : esc(P.nameOf(p));
       var end = P.endText(p.promo_ends);
       return '<a class="pop-card promo-card" href="' + esc(href) + '">' + P.ribbon(g.pc) +
@@ -404,7 +404,7 @@
 
   function fail() {
     buildRail(FALLBACK, 1);
-    emptyNote(matGrid, _t('Catalogue momentanément indisponible — <a href="boutique.html">ouvrir la boutique</a> ou <a class="ask" href="/compte.html#/messages" data-msg="filaments">nous écrire</a>.'));
+    emptyNote(matGrid, _t('Catalogue momentanément indisponible — <a href="boutique">ouvrir la boutique</a> ou <a class="ask" href="/compte#/messages" data-msg="filaments">nous écrire</a>.'));
     emptyNote(popGrid, _t('Catalogue momentanément indisponible.'));
   }
 

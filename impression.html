@@ -2,18 +2,20 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
+<!-- Vieux liens « .html » : l'adresse affichée devient propre (sans recharger) -->
+<script>if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.pathname.slice(0,-5)+location.search+location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Impression 3D sur mesure — Création Audio · Québec</title>
 <meta name="description" content="Impression 3D sur mesure à Québec. Dépose ton fichier, on te dit combien et quand : une pièce, une série, un prototype ou une pièce à dessiner.">
 <meta name="theme-color" content="#0D0F12">
-<link rel="canonical" href="https://creationaudio.ca/impression.html">
-<link rel="alternate" hreflang="fr-CA" href="https://creationaudio.ca/impression.html">
-<link rel="alternate" hreflang="en-CA" href="https://creationaudio.ca/en/impression.html">
-<link rel="alternate" hreflang="x-default" href="https://creationaudio.ca/impression.html">
+<link rel="canonical" href="https://creationaudio.ca/impression">
+<link rel="alternate" hreflang="fr-CA" href="https://creationaudio.ca/impression">
+<link rel="alternate" hreflang="en-CA" href="https://creationaudio.ca/en/impression">
+<link rel="alternate" hreflang="x-default" href="https://creationaudio.ca/impression">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Création Audio">
 <meta property="og:locale" content="fr_CA">
-<meta property="og:url" content="https://creationaudio.ca/impression.html">
+<meta property="og:url" content="https://creationaudio.ca/impression">
 <meta property="og:title" content="Impression 3D sur mesure — Création Audio · Québec">
 <meta property="og:description" content="Dépose ton fichier, on te dit combien et quand. Une pièce, une série, un prototype ou une pièce à dessiner. Québec.">
 <meta property="og:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
@@ -49,23 +51,23 @@
     <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
   </a>
   <nav class="home-nav" aria-label="Navigation principale">
-    <a href="boutique.html">Filaments</a>
-    <a href="spacers.html">Spacers</a>
-    <a href="boutique.html#/accessoires">Accessoires</a>
-    <a href="impression.html" aria-current="page">Impression 3D</a>
-    <a href="entretien.html">Entretien</a>
+    <a href="boutique">Filaments</a>
+    <a href="spacers">Spacers</a>
+    <a href="boutique#/accessoires">Accessoires</a>
+    <a href="impression" aria-current="page">Impression 3D</a>
+    <a href="entretien">Entretien</a>
     <a href="./#contact">Contact</a>
   </nav>
   <span class="spacer"></span>
-  <a class="home-lang" href="en/impression.html" data-lang-switch="en" hreflang="en" lang="en" title="English version">EN</a>
-  <a class="home-dealer" href="dealer.html">
+  <a class="home-lang" href="en/impression" data-lang-switch="en" hreflang="en" lang="en" title="English version">EN</a>
+  <a class="home-dealer" href="dealer">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     Dealer
   </a>
-  <a class="home-account" href="compte.html" aria-label="Mon compte" title="Mon compte">
+  <a class="home-account" href="compte" aria-label="Mon compte" title="Mon compte">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
   </a>
-  <a class="home-cta" href="boutique.html">Magasiner
+  <a class="home-cta" href="boutique">Magasiner
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
   </a>
   <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-drawer">
@@ -258,7 +260,7 @@
       <p class="eyebrow">Déjà sur nos machines</p>
       <h2 class="ip-h2" id="ip-part-t">On imprime déjà nos propres pièces.</h2>
       <p class="ip-sub">Nos adaptateurs de haut-parleurs sortent du même atelier, à Québec.</p>
-      <a class="ip-more-link" href="spacers.html">Voir les spacers
+      <a class="ip-more-link" href="spacers">Voir les spacers
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
     <ul class="ip-parts rv" id="ip-parts" style="--d:1"></ul>
@@ -271,7 +273,7 @@
     <div class="rv">
       <p class="eyebrow">Questions</p>
       <h2 class="ip-h2" id="ip-faq-t">Ce qu'on nous demande souvent.</h2>
-      <p class="ip-faq-q">Une question ? <a class="ask" href="/compte.html#/messages" data-msg="autre" data-msg-ref="Impression 3D">Écris-nous</a><span class="ask-alt"> ou par <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:contact@creationaudio.ca?subject=Impression%203D">courriel</a></span></p>
+      <p class="ip-faq-q">Une question ? <a class="ask" href="/compte#/messages" data-msg="autre" data-msg-ref="Impression 3D">Écris-nous</a><span class="ask-alt"> ou par <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:contact@creationaudio.ca?subject=Impression%203D">courriel</a></span></p>
     </div>
     <div class="ip-faq rv" style="--d:1">
       <details class="ip-fq">
@@ -325,33 +327,33 @@
       </a>
       <p>Filaments d'impression 3D, spacers audio et entretien d'imprimantes, dans la région de Québec.</p>
       <div class="foot-contact">
-        <a class="foot-pill" href="/compte.html#/messages" data-msg="">Messagerie</a>
+        <a class="foot-pill" href="/compte#/messages" data-msg="">Messagerie</a>
         <a class="foot-pill" href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
         <a class="foot-pill" href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
       </div>
     </div>
     <nav class="foot-col" aria-label="Boutique">
       <h4>Boutique</h4>
-      <a href="boutique.html">Filaments</a>
-      <a href="spacers.html">Spacers &amp; adaptateurs</a>
-      <a href="boutique.html#/accessoires">Accessoires</a>
-      <a href="impression.html">Impression 3D sur mesure</a>
-      <a href="entretien.html">Entretien d'imprimantes</a>
+      <a href="boutique">Filaments</a>
+      <a href="spacers">Spacers &amp; adaptateurs</a>
+      <a href="boutique#/accessoires">Accessoires</a>
+      <a href="impression">Impression 3D sur mesure</a>
+      <a href="entretien">Entretien d'imprimantes</a>
     </nav>
     <nav class="foot-col" aria-label="Aide">
       <h4>Aide</h4>
-      <a href="aide.html">Centre d'aide</a>
+      <a href="aide">Centre d'aide</a>
       <a href="./#etapes">Comment commander</a>
       <a href="./#contact">Nous joindre</a>
-      <a href="compte.html">Mon compte</a>
-      <a href="dealer.html">Espace dealer</a>
-      <a href="revendeur.html">Devenir revendeur</a>
+      <a href="compte">Mon compte</a>
+      <a href="dealer">Espace dealer</a>
+      <a href="revendeur">Devenir revendeur</a>
     </nav>
     <nav class="foot-col" aria-label="Légal">
       <h4>Légal</h4>
-      <a href="confidentialite.html">Confidentialité</a>
-      <a href="conditions.html">Conditions d'utilisation</a>
-      <a href="retours.html">Retours &amp; remboursements</a>
+      <a href="confidentialite">Confidentialité</a>
+      <a href="conditions">Conditions d'utilisation</a>
+      <a href="retours">Retours &amp; remboursements</a>
     </nav>
   </div>
   <div class="foot-sign" aria-hidden="true">Création Audio</div>
@@ -371,21 +373,21 @@
   </div>
   <nav class="drawer-links" aria-label="Menu mobile">
     <a href="./">Accueil</a>
-    <a href="boutique.html">Filaments</a>
-    <a href="spacers.html">Spacers</a>
-    <a href="boutique.html#/accessoires">Accessoires</a>
-    <a href="impression.html" class="is-active">Impression 3D</a>
-    <a href="entretien.html">Entretien</a>
+    <a href="boutique">Filaments</a>
+    <a href="spacers">Spacers</a>
+    <a href="boutique#/accessoires">Accessoires</a>
+    <a href="impression" class="is-active">Impression 3D</a>
+    <a href="entretien">Entretien</a>
     <a href="./#contact">Contact</a>
-    <a href="en/impression.html" data-lang-switch="en" hreflang="en" lang="en">English</a>
+    <a href="en/impression" data-lang-switch="en" hreflang="en" lang="en">English</a>
   </nav>
   <div class="drawer-cta">
     <a class="primary" href="#demande">Demander une soumission</a>
-    <a class="secondary" href="compte.html">Mon compte</a>
-    <a class="secondary" href="dealer.html">Espace dealer</a>
+    <a class="secondary" href="compte">Mon compte</a>
+    <a class="secondary" href="dealer">Espace dealer</a>
   </div>
   <div class="drawer-foot">
-    <a href="/compte.html#/messages" data-msg="">Messagerie</a> ·
+    <a href="/compte#/messages" data-msg="">Messagerie</a> ·
     <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> ·
     <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
   </div>
@@ -394,12 +396,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
-<script src="assets/nav.js?v=19"></script>
+<script src="assets/nav.js?v=20"></script>
 <script src="assets/promo.js?v=1"></script>
 <script src="assets/apercu-3d.js?v=1"></script>
 <script src="assets/dialog.js?v=5"></script>
-<script src="assets/panier-compte.js?v=3"></script>
-<script src="assets/demande.js?v=2"></script>
-<script src="assets/impression.js?v=5"></script>
+<script src="assets/panier-compte.js?v=4"></script>
+<script src="assets/demande.js?v=3"></script>
+<script src="assets/impression.js?v=6"></script>
 </body>
 </html>

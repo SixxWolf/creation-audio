@@ -1,7 +1,7 @@
 // =========================================================
 // Création Audio — Edge Function « dealer-order-notify »
 // Avise Création Audio par courriel quand un dealer envoie, modifie ou
-// annule une commande sur le portail (dealer.html). L'admin la voit aussi
+// annule une commande sur le portail (dealer). L'admin la voit aussi
 // dans l'onglet Commandes (pastille) : le courriel n'est qu'un avis.
 //
 // Appel (dealer connecté, depuis dealer.js) : POST { order_id, event }
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
   const pairs = L.reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const label = EVENT_LABEL[event];
   const subject = label + " " + order.number + " — " + who + (event === "cancelled" ? "" : " (" + pairs + " paire" + (pairs > 1 ? "s" : "") + ")");
-  const adminUrl = SITE + "/coulisses-t6avzpe2.html#commandes";
+  const adminUrl = SITE + "/coulisses-t6avzpe2#commandes";
 
   const rowsTxt = L.map((l) => {
     const st = l.product_id ? (stock.get(l.product_id) ?? 0) : 0;

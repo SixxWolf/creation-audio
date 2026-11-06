@@ -3,7 +3,7 @@
 // Déployée avec verify_jwt = false (le formulaire public est anonyme).
 //
 //  POST { action: 'submit', business, contact, email, phone, city, website?, facebook?, lang?, hp }
-//     page revendeur.html (anonyme). hp = champ piège : rempli -> on fait semblant.
+//     page revendeur (anonyme). hp = champ piège : rempli -> on fait semblant.
 //     -> 200 { ok, status: 'new' | 'pending' | 'dealer' }   (new = courriel de réception envoyé)
 //        429 { error: 'wait' }   trop de demandes depuis cette adresse IP
 //        400 { error: 'bad_request' } · 503 { error: 'unavailable' }
@@ -63,7 +63,7 @@ function receivedMail(business: string, contact: string, en: boolean) {
 
 function welcomeBlock(en: boolean, name: string) {
   const L = (fr: string, eng: string) => (en ? eng : fr);
-  const portal = SITE + (en ? "/en/" : "/") + "dealer.html";
+  const portal = SITE + (en ? "/en/" : "/") + "dealer";
   const hello = L("Bonjour", "Hi") + (name ? " " + name : "") + ",";
   const p1 = L("Ton accès revendeur Création Audio est ouvert. Tu vois maintenant tes prix de gros et tes rabais quantité, et tu commandes directement en ligne.",
                "Your Création Audio dealer access is open. You can now see your wholesale prices and volume discounts, and order directly online.");

@@ -1,5 +1,5 @@
 /* =========================================================
-   Création Audio — centre d'aide (aide.html + onglet Aide de l'admin)
+   Création Audio — centre d'aide (aide + onglet Aide de l'admin)
    Couleurs = jetons (tokens.css + site.css / admin.css) : l'accent suit Réglages › Apparence.
    ========================================================= */
 .ah { --ah-accent: var(--ember); --ah-ink: var(--ember-ink, var(--ember)); }
@@ -95,7 +95,7 @@
   .ah-ui { white-space:normal; }
 }
 
-/* ---- page publique aide.html ---- */
+/* ---- page publique aide ---- */
 .legal-band .aide-inner { max-width:1180px; }
 .aide-page { max-width:1180px; margin:0 auto; padding:clamp(24px,4vw,40px) 24px 72px; }
 .aide-more { margin:28px 0 0; color:var(--muted); font-size:15px; }

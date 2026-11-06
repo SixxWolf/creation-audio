@@ -1,11 +1,11 @@
 /* =========================================================
    Création Audio — commande en ligne d'un client connecté
    Partagé par la boutique (boutique.js) et la page spacers (spacers.js).
-   La session du client vit sous « ca-compte-auth » (posée par compte.html) :
+   La session du client vit sous « ca-compte-auth » (posée par compte) :
    ce module crée, seulement au besoin, un client Supabase sur cette clé.
    CA.custOrder :
      signedIn() · email() · client()  (client Supabase de la session, aussi utilisé par panier-compte.js)
-     editing()    -> { id, number, at } | null  (commande en modification, posée par compte.html ;
+     editing()    -> { id, number, at } | null  (commande en modification, posée par compte ;
                      oubliée après 6 h pour ne jamais modifier une vieille commande par erreur)
      cancelEdit()
      send(lines, note, pickup) -> Promise({ id, number, has_backorder, total, updated })

@@ -586,9 +586,9 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 /* carnet de clients : 2 colonnes sur grand écran (l'éditeur ouvert prend toute la largeur) */
 #cl-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap:10px; }
 #cl-list > .empty, #cl-list > .muted { grid-column:1 / -1; }
-/* comptes en ligne (compte.html) au-dessus du carnet : même grille, « à relier » d'abord */
+/* comptes en ligne (compte) au-dessus du carnet : même grille, « à relier » d'abord */
 .cl-accounts { margin-bottom:24px; }
-/* Dealers : demandes d'accès (revendeur.html) au-dessus de la liste, approuvées / refusées ici */
+/* Dealers : demandes d'accès (revendeur) au-dessus de la liste, approuvées / refusées ici */
 .dl-reqs { margin-bottom:24px; }
 .dl-reqs .pm-link a { color:inherit; text-decoration:underline; text-underline-offset:2px; }
 .dl-reqs .pm-link a:hover { color:var(--ember-ink); }

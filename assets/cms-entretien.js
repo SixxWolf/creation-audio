@@ -2,7 +2,7 @@
    Création Audio — onglet Entretien (catalogue d'imprimantes du service d'entretien)
    Table maintenance_printers (nom, marque, photo, prix par mois, minutes estimées, ordre, visible)
    + maintenance_settings.hourly_rate (taux horaire de la 1re visite d'une machine sans prix).
-   Lu par entretien.html (formulaire et tarifs), sr_submit (instantané dans la demande) et la facturation d'une demande.
+   Lu par entretien (formulaire et tarifs), sr_submit (instantané dans la demande) et la facturation d'une demande.
    Photo : chemin du bucket « products » (dossier entretien/) ou chemin du site commençant par « / ».
    Chaque champ s'enregistre en le quittant.
    ========================================================= */

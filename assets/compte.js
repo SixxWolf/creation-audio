@@ -1,5 +1,5 @@
 /* =========================================================
-   Création Audio — Mon compte (compte.html)
+   Création Audio — Mon compte (compte)
    Connexion SANS mot de passe : code à 6 chiffres reçu par courriel
    (Edge Function « compte-code » : envoi, vérification, session).
    Espace client : factures de la fiche reliée par l'admin (RPC me_invoices,
@@ -410,7 +410,7 @@
         localStorage.setItem('ca_v2_order_edit', JSON.stringify({ id: o.id, number: o.number, at: Date.now(),
           pickup: o.pickup_date ? { d: o.pickup_date, s: o.pickup_start } : null }));
       } catch (e) {}
-      location.href = spacersOnly ? 'spacers.html' : 'boutique.html#/';
+      location.href = spacersOnly ? 'spacers' : 'boutique#/';
     }
   }
   /* ---- cueillette : date + plage (commande ouverte, réservation gardée) — CA.custOrder (commande-client.js) ---- */
@@ -810,9 +810,9 @@
   var alertsEl = $('#acct-alerts'), alertsN = $('#acct-n-alerts');
   var KIND = { spool: _t('avec bobine'), refill: 'recharge' };
   function productHref(a) {
-    if (a.type === 'spacer') return 'spacers.html';
-    if (a.type === 'accessory') return 'boutique.html#/a/' + encodeURIComponent(a.slug || slugify(a.name));
-    return 'boutique.html#/m/' + (a.brand_slug || slugify(a.brand || _t('Autres'))) + '/' +
+    if (a.type === 'spacer') return 'spacers';
+    if (a.type === 'accessory') return 'boutique#/a/' + encodeURIComponent(a.slug || slugify(a.name));
+    return 'boutique#/m/' + (a.brand_slug || slugify(a.brand || _t('Autres'))) + '/' +
       (a.material_slug || slugify(a.material || _t('Autres'))) + '/' + (a.slug || slugify(a.name));
   }
   function loadAlerts() {
@@ -827,7 +827,7 @@
     alertsN.hidden = !alerts.length; alertsN.textContent = alerts.length;
     if (!alerts.length) {
       alertsEl.innerHTML = _t('<p class="acct-empty">Aucune alerte. Sur une couleur en rupture, «&nbsp;M\'aviser&nbsp;» t\'ajoute ici. ') +
-        _t('<a href="boutique.html">Voir les filaments</a></p>');
+        _t('<a href="boutique">Voir les filaments</a></p>');
       return;
     }
     alertsEl.innerHTML = '<ul class="al-list">' + alerts.map(function (a) {

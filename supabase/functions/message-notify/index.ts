@@ -100,7 +100,7 @@ async function mailAdmin(db: SupabaseClient, m: Mailer, conv: Conv) {
   const { count } = await db.from("messages").select("id", { count: "exact", head: true }).eq("conversation_id", conv.id);
   const isNew = (count || 0) <= list.length;   // toute la conversation est dans la série
   const what = list.length > 1 ? list.length + " nouveaux messages" : isNew ? "Nouveau message" : "Nouvelle réponse";
-  const adminUrl = SITE + "/coulisses-t6avzpe2.html#messages/" + conv.id;
+  const adminUrl = SITE + "/coulisses-t6avzpe2#messages/" + conv.id;
   const who = cust.name || cust.email;
   const to = /@resend\.dev$/i.test(cust.email || "") ? "delivered@resend.dev" : m.adminTo;   // tests
   const text =
@@ -130,7 +130,7 @@ async function mailClient(db: SupabaseClient, m: Mailer, conv: Conv) {
   if (cust.lang === "en") return await mailClientEn(db, m, conv, cust, list);
   const about = (TOPIC[conv.topic] || "Question") + (conv.ref ? " · " + conv.ref : "");
   const photos = photosOf(list);
-  const threadUrl = SITE + "/compte.html#/messages/" + conv.id;
+  const threadUrl = SITE + "/compte#/messages/" + conv.id;
   const photoNote = photos.length
     ? '<p style="margin:8px 0 0;color:#6C727C;font-size:13px">' + nPhotos(photos.length) + " dans la conversation.</p>" : "";
   // conversation lancée par l'admin (aucun message du client) : « message », pas « réponse »
@@ -179,7 +179,7 @@ async function mailClientEn(db: SupabaseClient, m: Mailer, conv: Conv, cust: { e
     const about = (TOPIC_EN[conv.topic] || "Question") + (conv.ref ? " · " + conv.ref : "");
     const photos = photosOf(list);
     const nPh = (n: number) => n + " photo" + (n > 1 ? "s" : "");
-    const threadUrl = SITE + "/en/compte.html#/messages/" + conv.id;
+    const threadUrl = SITE + "/en/compte#/messages/" + conv.id;
     const photoNote = photos.length
       ? '<p style="margin:8px 0 0;color:#6C727C;font-size:13px">' + nPh(photos.length) + " in the conversation.</p>" : "";
     const foot = '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +

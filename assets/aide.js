@@ -1,6 +1,6 @@
 /* =========================================================
    Création Audio — centre d'aide (moteur partagé)
-   Utilisé par aide.html (clients) et l'onglet Aide de l'admin (cms-aide.js).
+   Utilisé par aide (clients) et l'onglet Aide de l'admin (cms-aide.js).
    CAAide.mount(root, {
      groups: ['Commander', …],          ordre des thèmes
      tutos:  [{ id, group, title, intro?, go?: { href, label }, steps: ['…'], tip?, keys? }],

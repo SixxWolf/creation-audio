@@ -1,10 +1,10 @@
 /* =========================================================
    Création Audio V2 — CMS Dealers
    Comptes autorisés au portail dealer (table « dealers »).
-   Le dealer se connecte sur dealer.html avec un code à 6 chiffres envoyé
+   Le dealer se connecte sur dealer avec un code à 6 chiffres envoyé
    par courriel (Edge Function compte-code, purpose 'dealer') : seul un
    courriel présent dans « dealers » reçoit un code.
-   - Demandes d'accès (table dealer_requests, formulaire public revendeur.html) :
+   - Demandes d'accès (table dealer_requests, formulaire public revendeur) :
      section au-dessus de la liste, Approuver (ajout à dealers + courriel de
      bienvenue) / Refuser (silencieux) -> Edge Function dealer-request (decide).
      Pastille #nav-dealers-n = demandes en attente (relue aux 60 s).
@@ -170,7 +170,7 @@
     });
   }
 
-  /* ---- demandes d'accès (revendeur.html) ---- */
+  /* ---- demandes d'accès (revendeur) ---- */
   function paintBadge(n) {
     if (!navN) return;
     navN.textContent = n; navN.hidden = !n;

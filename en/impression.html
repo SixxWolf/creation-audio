@@ -2,18 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Vieux liens « .html » : l'adresse affichée devient propre (sans recharger) -->
+<script>if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.pathname.slice(0,-5)+location.search+location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Custom 3D printing — Création Audio · Québec City</title>
 <meta name="description" content="Custom 3D printing in Québec City. Drop your file and we'll tell you how much and when: a single part, a batch, a prototype or a part to design.">
 <meta name="theme-color" content="#0D0F12">
-<link rel="canonical" href="https://creationaudio.ca/en/impression.html">
-<link rel="alternate" hreflang="fr-CA" href="https://creationaudio.ca/impression.html">
-<link rel="alternate" hreflang="en-CA" href="https://creationaudio.ca/en/impression.html">
-<link rel="alternate" hreflang="x-default" href="https://creationaudio.ca/impression.html">
+<link rel="canonical" href="https://creationaudio.ca/en/impression">
+<link rel="alternate" hreflang="fr-CA" href="https://creationaudio.ca/impression">
+<link rel="alternate" hreflang="en-CA" href="https://creationaudio.ca/en/impression">
+<link rel="alternate" hreflang="x-default" href="https://creationaudio.ca/impression">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Création Audio">
 <meta property="og:locale" content="en_CA">
-<meta property="og:url" content="https://creationaudio.ca/en/impression.html">
+<meta property="og:url" content="https://creationaudio.ca/en/impression">
 <meta property="og:title" content="Custom 3D printing — Création Audio · Québec City">
 <meta property="og:description" content="Drop your file and we'll tell you how much and when. A single part, a batch, a prototype or a part to design. Québec City.">
 <meta property="og:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
@@ -50,23 +52,23 @@
     <span class="brand-tx"><b>Création Audio</b><small>3D printing · Car audio</small></span>
   </a>
   <nav class="home-nav" aria-label="Main navigation">
-    <a href="boutique.html">Filament</a>
-    <a href="spacers.html">Spacers</a>
-    <a href="boutique.html#/accessoires">Accessories</a>
-    <a href="impression.html" aria-current="page">3D printing</a>
-    <a href="entretien.html">Maintenance</a>
+    <a href="boutique">Filament</a>
+    <a href="spacers">Spacers</a>
+    <a href="boutique#/accessoires">Accessories</a>
+    <a href="impression" aria-current="page">3D printing</a>
+    <a href="entretien">Maintenance</a>
     <a href="./#contact">Contact</a>
   </nav>
   <span class="spacer"></span>
-  <a href="../impression.html" class="home-lang" hreflang="fr" lang="fr" title="Version française" data-lang-switch="fr">FR</a>
-  <a class="home-dealer" href="dealer.html">
+  <a href="../impression" class="home-lang" hreflang="fr" lang="fr" title="Version française" data-lang-switch="fr">FR</a>
+  <a class="home-dealer" href="dealer">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     Dealer
   </a>
-  <a class="home-account" href="compte.html" aria-label="My account" title="My account">
+  <a class="home-account" href="compte" aria-label="My account" title="My account">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
   </a>
-  <a class="home-cta" href="boutique.html">Shop
+  <a class="home-cta" href="boutique">Shop
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
   </a>
   <button class="nav-burger" id="nav-burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
@@ -259,7 +261,7 @@
       <p class="eyebrow">Already on our machines</p>
       <h2 class="ip-h2" id="ip-part-t">We already print our own parts.</h2>
       <p class="ip-sub">Our speaker adapters come out of the same shop, in Québec City.</p>
-      <a class="ip-more-link" href="spacers.html">See the spacers
+      <a class="ip-more-link" href="spacers">See the spacers
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
     <ul class="ip-parts rv" id="ip-parts" style="--d:1"></ul>
@@ -272,7 +274,7 @@
     <div class="rv">
       <p class="eyebrow">Questions</p>
       <h2 class="ip-h2" id="ip-faq-t">What people often ask us.</h2>
-      <p class="ip-faq-q">A question? <a class="ask" href="/en/compte.html#/messages" data-msg="autre" data-msg-ref="3D printing">Write to us</a><span class="ask-alt"> or by <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:contact@creationaudio.ca?subject=Impression%203D">email</a></span></p>
+      <p class="ip-faq-q">A question? <a class="ask" href="/en/compte#/messages" data-msg="autre" data-msg-ref="3D printing">Write to us</a><span class="ask-alt"> or by <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:contact@creationaudio.ca?subject=Impression%203D">email</a></span></p>
     </div>
     <div class="ip-faq rv" style="--d:1">
       <details class="ip-fq">
@@ -326,33 +328,33 @@
       </a>
       <p>3D printing filament, audio spacers and printer maintenance, in the Québec City area.</p>
       <div class="foot-contact">
-        <a class="foot-pill" href="/en/compte.html#/messages" data-msg="">Messages</a>
+        <a class="foot-pill" href="/en/compte#/messages" data-msg="">Messages</a>
         <a class="foot-pill" href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
         <a class="foot-pill" href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
       </div>
     </div>
     <nav class="foot-col" aria-label="Shop">
       <h4>Shop</h4>
-      <a href="boutique.html">Filament</a>
-      <a href="spacers.html">Spacers &amp; adapters</a>
-      <a href="boutique.html#/accessoires">Accessories</a>
-      <a href="impression.html">Custom 3D printing</a>
-      <a href="entretien.html">Printer maintenance</a>
+      <a href="boutique">Filament</a>
+      <a href="spacers">Spacers &amp; adapters</a>
+      <a href="boutique#/accessoires">Accessories</a>
+      <a href="impression">Custom 3D printing</a>
+      <a href="entretien">Printer maintenance</a>
     </nav>
     <nav class="foot-col" aria-label="Help">
       <h4>Help</h4>
-      <a href="aide.html">Help centre</a>
+      <a href="aide">Help centre</a>
       <a href="./#etapes">How to order</a>
       <a href="./#contact">Contact us</a>
-      <a href="compte.html">My account</a>
-      <a href="dealer.html">Dealer portal</a>
-      <a href="revendeur.html">Become a dealer</a>
+      <a href="compte">My account</a>
+      <a href="dealer">Dealer portal</a>
+      <a href="revendeur">Become a dealer</a>
     </nav>
     <nav class="foot-col" aria-label="Legal">
       <h4>Legal</h4>
-      <a href="confidentialite.html">Privacy</a>
-      <a href="conditions.html">Terms of use</a>
-      <a href="retours.html">Returns &amp; refunds</a>
+      <a href="confidentialite">Privacy</a>
+      <a href="conditions">Terms of use</a>
+      <a href="retours">Returns &amp; refunds</a>
     </nav>
   </div>
   <div class="foot-sign" aria-hidden="true">Création Audio</div>
@@ -372,21 +374,21 @@
   </div>
   <nav class="drawer-links" aria-label="Mobile menu">
     <a href="./">Home</a>
-    <a href="boutique.html">Filament</a>
-    <a href="spacers.html">Spacers</a>
-    <a href="boutique.html#/accessoires">Accessories</a>
-    <a href="impression.html" class="is-active">3D printing</a>
-    <a href="entretien.html">Maintenance</a>
+    <a href="boutique">Filament</a>
+    <a href="spacers">Spacers</a>
+    <a href="boutique#/accessoires">Accessories</a>
+    <a href="impression" class="is-active">3D printing</a>
+    <a href="entretien">Maintenance</a>
     <a href="./#contact">Contact</a>
-    <a href="../impression.html" hreflang="fr" lang="fr" data-lang-switch="fr">Français</a>
+    <a href="../impression" hreflang="fr" lang="fr" data-lang-switch="fr">Français</a>
   </nav>
   <div class="drawer-cta">
     <a class="primary" href="#demande">Request a quote</a>
-    <a class="secondary" href="compte.html">My account</a>
-    <a class="secondary" href="dealer.html">Dealer portal</a>
+    <a class="secondary" href="compte">My account</a>
+    <a class="secondary" href="dealer">Dealer portal</a>
   </div>
   <div class="drawer-foot">
-    <a href="/en/compte.html#/messages" data-msg="">Messages</a> ·
+    <a href="/en/compte#/messages" data-msg="">Messages</a> ·
     <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> ·
     <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
   </div>
@@ -395,12 +397,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="../assets/supabase-config.js?v=1"></script>
 <script src="../assets/supabase-client.js?v=1"></script>
-<script src="../assets/nav.js?v=19"></script>
+<script src="../assets/nav.js?v=20"></script>
 <script src="../assets/promo.js?v=1"></script>
 <script src="../assets/apercu-3d.js?v=1"></script>
 <script src="../assets/dialog.js?v=5"></script>
-<script src="../assets/panier-compte.js?v=3"></script>
-<script src="../assets/demande.js?v=2"></script>
-<script src="../assets/impression.js?v=5"></script>
+<script src="../assets/panier-compte.js?v=4"></script>
+<script src="../assets/demande.js?v=3"></script>
+<script src="../assets/impression.js?v=6"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* =========================================================
    Création Audio — CMS Commandes › Clients en ligne
-   Commandes envoyées par les clients connectés (compte.html -> panier de la
+   Commandes envoyées par les clients connectés (compte -> panier de la
    boutique ou de la page spacers) : tables customer_orders + customer_order_lines.
    - Sous-onglets Dealers / Clients en ligne (#commandes/clients) / Réservations
      (#commandes/reservations — liste dans cms-reservations.js, CA.loadReservations).

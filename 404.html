@@ -11,7 +11,7 @@
     // adresse anglaise (/en/…) : même chose, en anglais
     var p = location.pathname, en = /^\/en\//.test(p);
     var m = /^(?:\/en)?\/spacer\/([a-z0-9][a-z0-9-]*?)(?:\.html)?\/?$/i.exec(p);
-    if (m) location.replace((en ? '/en' : '') + '/spacers.html#/s/' + m[1].toLowerCase());
+    if (m) location.replace((en ? '/en' : '') + '/spacers#/s/' + m[1].toLowerCase());
     else if (en && p !== '/en/404.html') location.replace('/en/404.html');
   })();
 </script>
@@ -59,21 +59,21 @@
     <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
   </a>
   <nav class="home-nav" aria-label="Navigation principale">
-    <a href="/boutique.html">Filaments</a>
-    <a href="/spacers.html">Spacers</a>
-    <a href="/boutique.html#/accessoires">Accessoires</a>
+    <a href="/boutique">Filaments</a>
+    <a href="/spacers">Spacers</a>
+    <a href="/boutique#/accessoires">Accessoires</a>
     <a href="/#contact">Contact</a>
   </nav>
   <span class="spacer"></span>
   <a class="home-lang" href="/en/" data-lang-switch="en" hreflang="en" lang="en" title="English version">EN</a>
-  <a class="home-dealer" href="/dealer.html">
+  <a class="home-dealer" href="/dealer">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     Dealer
   </a>
-  <a class="home-account" href="/compte.html" aria-label="Mon compte" title="Mon compte">
+  <a class="home-account" href="/compte" aria-label="Mon compte" title="Mon compte">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
   </a>
-  <a class="home-cta" href="/boutique.html">Voir les filaments</a>
+  <a class="home-cta" href="/boutique">Voir les filaments</a>
   <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-drawer">
     <span></span><span></span><span></span>
   </button>
@@ -90,11 +90,11 @@
       <a class="btn btn-primary" href="/">Retour à l'accueil
         <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </a>
-      <a class="btn btn-ghost" href="/boutique.html">Voir les filaments</a>
+      <a class="btn btn-ghost" href="/boutique">Voir les filaments</a>
     </div>
     <nav class="err-links" aria-label="Liens utiles">
-      <a href="/spacers.html">Spacers &amp; adaptateurs</a>
-      <a class="ask" href="/compte.html#/messages" data-msg="">Nous écrire</a>
+      <a href="/spacers">Spacers &amp; adaptateurs</a>
+      <a class="ask" href="/compte#/messages" data-msg="">Nous écrire</a>
     </nav>
   </div>
 </main>
@@ -108,25 +108,25 @@
   </div>
   <nav class="drawer-links" aria-label="Menu mobile">
     <a href="/">Accueil</a>
-    <a href="/boutique.html">Filaments</a>
-    <a href="/spacers.html">Spacers</a>
-    <a href="/boutique.html#/accessoires">Accessoires</a>
+    <a href="/boutique">Filaments</a>
+    <a href="/spacers">Spacers</a>
+    <a href="/boutique#/accessoires">Accessoires</a>
     <a href="/#contact">Contact</a>
     <a href="/en/" data-lang-switch="en" hreflang="en" lang="en">English</a>
   </nav>
   <div class="drawer-cta">
-    <a class="primary" href="/boutique.html">Magasiner les filaments</a>
-    <a class="secondary" href="/compte.html">Mon compte</a>
-    <a class="secondary" href="/dealer.html">Espace dealer</a>
+    <a class="primary" href="/boutique">Magasiner les filaments</a>
+    <a class="secondary" href="/compte">Mon compte</a>
+    <a class="secondary" href="/dealer">Espace dealer</a>
   </div>
   <div class="drawer-foot">
-    <a href="/compte.html#/messages" data-msg="">Messagerie</a> ·
+    <a href="/compte#/messages" data-msg="">Messagerie</a> ·
     <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> ·
     <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a><br>
     Ramassage local à Québec · Aucun paiement en ligne
   </div>
 </aside>
 
-<script src="/assets/nav.js?v=19"></script>
+<script src="/assets/nav.js?v=20"></script>
 </body>
 </html>

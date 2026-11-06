@@ -89,7 +89,7 @@ window.CA = window.CA || {};
     if (!cfg.status) return;
     var body = kindLabel() + (fileName ? ' : ' + fileName : '');
     cfg.status.className = cfg.statusBase + ' is-err';
-    cfg.status.innerHTML = esc(text) + ' <a class="ask" href="compte.html#/messages" data-msg="autre" data-msg-ref="' + esc(kindLabel()) +
+    cfg.status.innerHTML = esc(text) + ' <a class="ask" href="compte#/messages" data-msg="autre" data-msg-ref="' + esc(kindLabel()) +
       '" data-msg-body="' + esc(body) + '">' + esc(_t('Écris-nous')) + '</a><span class="ask-alt"> ' + esc(_t('ou par')) +
       ' <a href="mailto:' + EMAIL + '">' + EMAIL + '</a></span>';
   }
@@ -180,7 +180,7 @@ window.CA = window.CA || {};
       '<p class="dm-ok-m">' + esc(_t('On te revient dans les plus brefs délais.')) + '</p>' +
       '<p class="dm-ok-m">' + esc(_t('Une confirmation t\'est envoyée par courriel.')) + '</p>' +
       '<div class="dm-ok-acts">' +
-        '<a class="btn btn-ember btn-lg" href="compte.html#/demandes/' + esc(d.id) + '">' + esc(_t('Suivre ma demande')) + '</a>' +
+        '<a class="btn btn-ember btn-lg" href="compte#/demandes/' + esc(d.id) + '">' + esc(_t('Suivre ma demande')) + '</a>' +
         '<button type="button" class="btn btn-ghost btn-lg dm-ok-new">' + esc(_t('Nouvelle demande')) + '</button>' +
       '</div>';
     form.hidden = true;

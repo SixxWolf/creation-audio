@@ -1,12 +1,12 @@
 // =========================================================
 // Création Audio — Edge Function « compte-code » (comptes clients)
 // Connexion SANS mot de passe : un code à 6 chiffres envoyé par courriel.
-// Appelée par compte.html (assets/compte.js) — déployée avec verify_jwt = false.
+// Appelée par compte (assets/compte.js) — déployée avec verify_jwt = false.
 //
 //  POST { action: 'send', email, hp, purpose?, lang? }  purpose 'message' = code demandé par le panneau
 //                                                 « Écris-nous » (assets/messagerie.js) : texte adapté ;
 //                                                 lang 'en' = courriel en anglais (page /en/) ;
-//                                                 purpose 'dealer' = portail revendeur (dealer.html) :
+//                                                 purpose 'dealer' = portail revendeur (dealer) :
 //                                                 code envoyé SEULEMENT aux courriels de « dealers »
 //     -> 200 { ok }                         code envoyé (hp rempli = robot : rien n'est fait)
 //        429 { error: 'wait', retry_after } 1 envoi / 60 s, 5 / h par courriel, 20 / h par IP

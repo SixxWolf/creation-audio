@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
     const m = (n: unknown) => money(n, en);
     const dateStr = dateTxt(inv.invoice_date, en);
     const payTxt = inv.pay_method === "cash" ? T("Comptant", "Cash") : inv.pay_method === "interac" ? T("Virement Interac", "Interac e-Transfer") : "";
-    const accUrl = SITE + (en ? "/en" : "") + "/compte.html#/commandes";
+    const accUrl = SITE + (en ? "/en" : "") + "/compte#/commandes";
     const subject = T("Ta facture ", "Your invoice ") + inv.number + " — Création Audio";
     const text =
       T("Bonjour ", "Hello ") + first + ",\n\n" +

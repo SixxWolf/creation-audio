@@ -1,5 +1,5 @@
 /* =========================================================
-   Création Audio — page publique « Devenir revendeur » (revendeur.html)
+   Création Audio — page publique « Devenir revendeur » (revendeur)
    - Gamme : products_public (type spacer) -> cartes photo + nom + mention
      rabais quantité, AUCUN prix (ni $ ni %). La rangée défile seule,
      lentement vers la droite, en boucle sans couture (jeu de cartes

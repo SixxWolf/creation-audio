@@ -142,7 +142,7 @@ window.CA = window.CA || {};
         '<button type="submit" class="cart-order pc-go">' + esc(_t('Recevoir mon code')) + '</button>' +
         '<p class="pc-status" role="status" aria-live="polite"></p>' +
         (send ? '<p class="pc-note">' + esc(word('sendsAfter', 'Ta commande part dès que c\'est confirmé.')) + '</p>' : '') +
-        '<p class="pc-note"><a href="' + (document.body.getAttribute('data-spacer') ? '../' : '') + 'confidentialite.html#compte" target="_blank" rel="noopener">' + esc(_t('Confidentialité')) + '</a></p>' +
+        '<p class="pc-note"><a href="' + (document.body.getAttribute('data-spacer') ? '../' : '') + 'confidentialite#compte" target="_blank" rel="noopener">' + esc(_t('Confidentialité')) + '</a></p>' +
         (send && opts.onMessenger ? '<p class="pc-alt">' + esc(_t('Sans compte :')) + ' <button type="button" class="pc-link" data-alt="m">Messenger</button> · <button type="button" class="pc-link" data-alt="e">' + esc(_t('courriel')) + '</button></p>' : '') +
       '</form>');
     var form = d.querySelector('form'), input = d.querySelector('#pc-email'), btn = d.querySelector('.pc-go'), st = d.querySelector('.pc-status');

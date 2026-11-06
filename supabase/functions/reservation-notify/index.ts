@@ -19,8 +19,8 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
-const ACCOUNT_URL = SITE + "/compte.html#/commandes";
-const ADMIN_URL = SITE + "/coulisses-t6avzpe2.html#commandes/reservations";
+const ACCOUNT_URL = SITE + "/compte#/commandes";
+const ADMIN_URL = SITE + "/coulisses-t6avzpe2#commandes/reservations";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -131,7 +131,7 @@ const FOOT = '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 
   '<p style="font-size:12px;color:#6C727C">Une question&nbsp;? Réponds simplement à ce courriel.</p>';
 const FOOT_EN = '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
   '<p style="font-size:12px;color:#6C727C">A question? Just reply to this email.</p>';
-const ACCOUNT_URL_EN = SITE + "/en/compte.html#/commandes";
+const ACCOUNT_URL_EN = SITE + "/en/compte#/commandes";
 function first(r: Res) { return String(r.name || "").trim().split(/\s+/)[0] || ""; }
 
 async function linesOf(db: SupabaseClient, id: string) {

@@ -1,7 +1,7 @@
 /* =========================================================
    Création Audio — Mon compte, onglet Demandes (#/demandes, #/demandes/<id>).
    Lecture : RPC me_service_requests. Soumission : RPC sr_decide. Discussion : demande-fil.js.
-   L'onglet reste caché tant que le client n'a aucune demande. Chargé par compte.html AVANT compte.js.
+   L'onglet reste caché tant que le client n'a aucune demande. Chargé par compte AVANT compte.js.
    ========================================================= */
 window.CA = window.CA || {};
 (function () {

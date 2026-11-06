@@ -119,10 +119,10 @@ Deno.serve(async (req) => {
   const first = String(x.name || "").trim().split(/\s+/)[0] || "";
   const who = x.name || x.email;
   const slug = (kind === "reservation" ? "r/" : kind === "invoice" ? "f/" : "c/") + id;
-  const adminUrl = SITE + "/coulisses-t6avzpe2.html#" + (kind === "invoice" ? "historique" : "commandes/" + (kind === "reservation" ? "reservations" : "clients"));
+  const adminUrl = SITE + "/coulisses-t6avzpe2#" + (kind === "invoice" ? "historique" : "commandes/" + (kind === "reservation" ? "reservations" : "clients"));
   const { data: cust } = x.customer_id ? await db.from("customers").select("lang").eq("id", x.customer_id).maybeSingle() : { data: null };
   const en = cust?.lang === "en";
-  const accountUrl = SITE + (en ? "/en" : "") + "/compte.html#/cueillette/" + slug;
+  const accountUrl = SITE + (en ? "/en" : "") + "/compte#/cueillette/" + slug;
   const results: Record<string, string> = {};
 
   if (event === "request") {

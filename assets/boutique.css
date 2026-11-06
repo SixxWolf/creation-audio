@@ -4,7 +4,7 @@
    couleur (photo, format, pastilles, onglets) → panier → commande
    Messenger / courriel. Même langage que l'accueil : clair, titres
    Space Grotesk (--display), ember = action.
-   Aussi chargée par spacers.html et dealer.html : .shop-head,
+   Aussi chargée par spacers et dealer : .shop-head,
    .shop-grid, .sp-card, .add-btn, panier (.cart-*, .citem-*) et
    .toast y sont réutilisés — ne pas les renommer.
    Chrome (bandeau, en-tête, tiroir, pied) : voir site.css.
@@ -416,7 +416,7 @@ body.has-buybar .toast { bottom:92px; }
 .lb-count { position:absolute; bottom:18px; left:50%; transform:translateX(-50%); font-size:.86rem; font-weight:600; color:color-mix(in srgb, var(--paper) 80%, transparent); }
 
 /* =========================================================
-   CARTES SPACER (spacers.html, dealer.html)
+   CARTES SPACER (spacers, dealer)
    ========================================================= */
 .shop-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:16px; }
 .sp-card { position:relative; display:flex; flex-direction:column; min-width:0; overflow:hidden;
@@ -727,7 +727,7 @@ body.cart-lock { overflow:hidden; }
 .toast.show { opacity:1; transform:translate(-50%, 0); }
 
 /* =========================================================
-   Case « Vous êtes une entreprise ? » (spacers.html + fiches spacer)
+   Case « Vous êtes une entreprise ? » (spacers + fiches spacer)
    Bandeau par défaut ; dans la marge gauche, collante, dès qu'il y a la place
    ========================================================= */
 .biz-rail { margin:0 0 18px; }

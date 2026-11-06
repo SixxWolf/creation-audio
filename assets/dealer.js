@@ -6,7 +6,7 @@
      doit être listé dans « dealers » (vérifié via l'RPC is_dealer()).
      L'admin (aperçu) garde mot de passe + double authentification : le champ
      mot de passe n'apparaît que pour son courriel (CA.adminEmail).
-     Pas encore dealer -> revendeur.html (demande d'accès).
+     Pas encore dealer -> revendeur (demande d'accès).
    - Catalogue des spacers au PRIX DEALER + rabais quantité PAR MODÈLE,
      lu depuis la vue products_dealer (invisible aux non-dealers).
      Catalogue + fiche détaillée : spacer-catalog.js.
@@ -169,7 +169,7 @@
       if (b.error === 'not_dealer') {
         st.classList.add('is-bad');
         st.innerHTML = esc(_t('Ce courriel n\'a pas encore d\'accès revendeur.')) +
-          ' <a href="revendeur.html">' + esc(_t('Demande ton accès')) + '</a>';
+          ' <a href="revendeur">' + esc(_t('Demande ton accès')) + '</a>';
         return;
       }
       if (b.error === 'reserved') { passField.hidden = false; loginBtn.textContent = _t('Se connecter'); say(st, ''); passI.focus(); return; }

@@ -218,7 +218,7 @@ window.CA = window.CA || {};
   }
 
   /* =========================================================
-     COMPTES EN LIGNE (compte.html) — table customers.
+     COMPTES EN LIGNE (compte) — table customers.
      Un compte se crée seul (connexion par code courriel) ; l'admin le RELIE à
      une fiche : le client voit alors les factures de cette fiche
      (invoices.client_id, RPC me_invoices sans coûts). Les nouvelles factures

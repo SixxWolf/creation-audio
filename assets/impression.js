@@ -615,7 +615,7 @@
           var sub = makes.length ? makes.slice(0, 3).join(' · ') : _t('Conception maison');
           // la route marche toujours ; une page spacer/<slug>.html n'existe qu'après le passage du robot
           var slug = String(p.name).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-          return '<li><a class="ip-part" href="spacers.html#/s/' + esc(slug) + '"><img src="' + esc(CA0.newsImg(p.image_path)) + '" alt="' +
+          return '<li><a class="ip-part" href="spacers#/s/' + esc(slug) + '"><img src="' + esc(CA0.newsImg(p.image_path)) + '" alt="' +
             esc(_t('Adaptateur') + ' ' + size) + '" loading="lazy" width="480" height="360"><p><b>' + esc(_t('Adaptateur') + ' ' + size) + '</b><small>' + esc(sub) + '</small></p></a></li>';
         }).join('');
         sec.hidden = false;

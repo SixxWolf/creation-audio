@@ -571,7 +571,7 @@
   function proposeNews(pr, n) {
     var body = n + ' article' + (n > 1 ? 's' : '') + ' en promotion' + (pr.ends_at ? ', jusqu\'au ' + fmtDay(pr.ends_at) : '') + '.';
     return Promise.resolve(sb.from('news').insert({
-      kind: 'promo', title: pr.name, body: body, cta_label: 'Voir les promotions', cta_url: 'boutique.html?promo=1',
+      kind: 'promo', title: pr.name, body: body, cta_label: 'Voir les promotions', cta_url: 'boutique?promo=1',
       starts_at: pr.starts_at, ends_at: pr.ends_at, active: false, proposed: true, in_bar: true
     })).then(function () {}, function () {});
   }

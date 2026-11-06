@@ -2,11 +2,13 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
+<!-- Vieux liens « .html » : l'adresse affichée devient propre (sans recharger) -->
+<script>if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.pathname.slice(0,-5)+location.search+location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mon compte — Création Audio</title>
 <meta name="description" content="Ton compte Création Audio : tes factures, tes alertes de retour en stock et tes coordonnées.">
 <meta name="robots" content="noindex">
-<link rel="canonical" href="https://creationaudio.ca/compte.html">
+<link rel="canonical" href="https://creationaudio.ca/compte">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
@@ -17,7 +19,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=20">
-<link rel="stylesheet" href="assets/compte.css?v=15">
+<link rel="stylesheet" href="assets/compte.css?v=16">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
@@ -41,23 +43,23 @@
     <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
   </a>
   <nav class="home-nav" aria-label="Navigation principale">
-    <a href="boutique.html">Filaments</a>
-    <a href="spacers.html">Spacers</a>
-    <a href="boutique.html#/accessoires">Accessoires</a>
-    <a href="impression.html">Impression 3D</a>
-    <a href="entretien.html">Entretien</a>
+    <a href="boutique">Filaments</a>
+    <a href="spacers">Spacers</a>
+    <a href="boutique#/accessoires">Accessoires</a>
+    <a href="impression">Impression 3D</a>
+    <a href="entretien">Entretien</a>
     <a href="./#contact">Contact</a>
   </nav>
   <span class="spacer"></span>
-  <a class="home-lang" href="en/compte.html" data-lang-switch="en" hreflang="en" lang="en" title="English version">EN</a>
-  <a class="home-dealer" href="dealer.html">
+  <a class="home-lang" href="en/compte" data-lang-switch="en" hreflang="en" lang="en" title="English version">EN</a>
+  <a class="home-dealer" href="dealer">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     Dealer
   </a>
-  <a class="home-account is-active" href="compte.html" aria-label="Mon compte" title="Mon compte" aria-current="page">
+  <a class="home-account is-active" href="compte" aria-label="Mon compte" title="Mon compte" aria-current="page">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
   </a>
-  <a class="home-cta" href="boutique.html">Magasiner</a>
+  <a class="home-cta" href="boutique">Magasiner</a>
   <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-drawer">
     <span></span><span></span><span></span>
   </button>
@@ -80,7 +82,7 @@
       <input type="text" name="website" class="acct-hp" id="acct-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
       <button class="acct-submit" type="submit" id="acct-email-btn">Recevoir mon code</button>
       <p class="acct-status" id="acct-email-status" role="status" aria-live="polite"></p>
-      <p class="acct-legal">Ton compte sert à retrouver tes factures et tes alertes. <a href="confidentialite.html#compte">Confidentialité</a></p>
+      <p class="acct-legal">Ton compte sert à retrouver tes factures et tes alertes. <a href="confidentialite#compte">Confidentialité</a></p>
     </form>
   </section>
 
@@ -131,7 +133,7 @@
         <p class="acct-sub" id="acct-sub"></p>
       </div>
       <div class="acct-head-act">
-        <a class="acct-out acct-help" href="aide.html">Aide</a>
+        <a class="acct-out acct-help" href="aide">Aide</a>
         <button class="acct-out" id="acct-logout" type="button">Se déconnecter</button>
       </div>
     </header>
@@ -195,33 +197,33 @@
       </a>
       <p>Filaments d'impression 3D et spacers audio, dans la région de Québec.</p>
       <div class="foot-contact">
-        <a class="foot-pill" href="/compte.html#/messages" data-msg="">Messagerie</a>
+        <a class="foot-pill" href="/compte#/messages" data-msg="">Messagerie</a>
         <a class="foot-pill" href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
         <a class="foot-pill" href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
       </div>
     </div>
     <nav class="foot-col" aria-label="Boutique">
       <h4>Boutique</h4>
-      <a href="boutique.html">Filaments</a>
-      <a href="spacers.html">Spacers &amp; adaptateurs</a>
-      <a href="boutique.html#/accessoires">Accessoires</a>
-      <a href="impression.html">Impression 3D sur mesure</a>
-      <a href="entretien.html">Entretien d'imprimantes</a>
+      <a href="boutique">Filaments</a>
+      <a href="spacers">Spacers &amp; adaptateurs</a>
+      <a href="boutique#/accessoires">Accessoires</a>
+      <a href="impression">Impression 3D sur mesure</a>
+      <a href="entretien">Entretien d'imprimantes</a>
     </nav>
     <nav class="foot-col" aria-label="Aide">
       <h4>Aide</h4>
-      <a href="aide.html">Centre d'aide</a>
+      <a href="aide">Centre d'aide</a>
       <a href="./#etapes">Comment commander</a>
       <a href="./#contact">Nous joindre</a>
-      <a href="compte.html">Mon compte</a>
-      <a href="dealer.html">Espace dealer</a>
-      <a href="revendeur.html">Devenir revendeur</a>
+      <a href="compte">Mon compte</a>
+      <a href="dealer">Espace dealer</a>
+      <a href="revendeur">Devenir revendeur</a>
     </nav>
     <nav class="foot-col" aria-label="Légal">
       <h4>Légal</h4>
-      <a href="confidentialite.html">Confidentialité</a>
-      <a href="conditions.html">Conditions d'utilisation</a>
-      <a href="retours.html">Retours &amp; remboursements</a>
+      <a href="confidentialite">Confidentialité</a>
+      <a href="conditions">Conditions d'utilisation</a>
+      <a href="retours">Retours &amp; remboursements</a>
     </nav>
   </div>
   <div class="foot-sign" aria-hidden="true">Création Audio</div>
@@ -241,21 +243,21 @@
   </div>
   <nav class="drawer-links" aria-label="Menu mobile">
     <a href="./">Accueil</a>
-    <a href="boutique.html">Filaments</a>
-    <a href="spacers.html">Spacers</a>
-    <a href="boutique.html#/accessoires">Accessoires</a>
-    <a href="impression.html">Impression 3D</a>
-    <a href="entretien.html">Entretien</a>
+    <a href="boutique">Filaments</a>
+    <a href="spacers">Spacers</a>
+    <a href="boutique#/accessoires">Accessoires</a>
+    <a href="impression">Impression 3D</a>
+    <a href="entretien">Entretien</a>
     <a href="./#contact">Contact</a>
-    <a href="en/compte.html" data-lang-switch="en" hreflang="en" lang="en">English</a>
+    <a href="en/compte" data-lang-switch="en" hreflang="en" lang="en">English</a>
   </nav>
   <div class="drawer-cta">
-    <a class="primary" href="boutique.html">Magasiner les filaments</a>
-    <a class="secondary" href="compte.html">Mon compte</a>
-    <a class="secondary" href="dealer.html">Espace dealer</a>
+    <a class="primary" href="boutique">Magasiner les filaments</a>
+    <a class="secondary" href="compte">Mon compte</a>
+    <a class="secondary" href="dealer">Espace dealer</a>
   </div>
   <div class="drawer-foot">
-    <a href="/compte.html#/messages" data-msg="">Messagerie</a> ·
+    <a href="/compte#/messages" data-msg="">Messagerie</a> ·
     <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> ·
     <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a><br>
     Ramassage local à Québec · Aucun paiement en ligne
@@ -265,10 +267,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="assets/dialog.js?v=5"></script>
 <script src="assets/supabase-config.js?v=1"></script>
-<script src="assets/nav.js?v=19"></script>
-<script src="assets/commande-client.js?v=11"></script>
+<script src="assets/nav.js?v=20"></script>
+<script src="assets/commande-client.js?v=12"></script>
 <script src="assets/demande-fil.js?v=2"></script>
-<script src="assets/compte-demandes.js?v=3"></script>
-<script src="assets/compte.js?v=22"></script>
+<script src="assets/compte-demandes.js?v=4"></script>
+<script src="assets/compte.js?v=23"></script>
 </body>
 </html>

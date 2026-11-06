@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Vieux liens « .html » : l'adresse affichée devient propre (sans recharger) -->
+<script>if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.pathname.slice(0,-5)+location.search+location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Help centre — Création Audio</title>
 <meta name="description" content="Step-by-step tutorials: ordering filament, finding a spacer, creating your account, reserving, pickup and returns at Création Audio (Québec City).">
-<link rel="canonical" href="https://creationaudio.ca/en/aide.html">
-<link rel="alternate" hreflang="fr-CA" href="https://creationaudio.ca/aide.html">
-<link rel="alternate" hreflang="en-CA" href="https://creationaudio.ca/en/aide.html">
-<link rel="alternate" hreflang="x-default" href="https://creationaudio.ca/aide.html">
+<link rel="canonical" href="https://creationaudio.ca/en/aide">
+<link rel="alternate" hreflang="fr-CA" href="https://creationaudio.ca/aide">
+<link rel="alternate" hreflang="en-CA" href="https://creationaudio.ca/en/aide">
+<link rel="alternate" hreflang="x-default" href="https://creationaudio.ca/aide">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="../assets/img/favicon-32.png" sizes="32x32" type="image/png">
@@ -20,7 +22,7 @@
 <link rel="stylesheet" href="../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../assets/site.css?v=20">
 <link rel="stylesheet" href="../assets/legal.css?v=1">
-<link rel="stylesheet" href="../assets/aide.css?v=1">
+<link rel="stylesheet" href="../assets/aide.css?v=2">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="../assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
@@ -41,23 +43,23 @@
     <span class="brand-tx"><b>Création Audio</b><small>3D printing · Car audio</small></span>
   </a>
   <nav class="home-nav" aria-label="Main navigation">
-    <a href="boutique.html">Filament</a>
-    <a href="spacers.html">Spacers</a>
-    <a href="boutique.html#/accessoires">Accessories</a>
-    <a href="impression.html">3D printing</a>
-    <a href="entretien.html">Maintenance</a>
+    <a href="boutique">Filament</a>
+    <a href="spacers">Spacers</a>
+    <a href="boutique#/accessoires">Accessories</a>
+    <a href="impression">3D printing</a>
+    <a href="entretien">Maintenance</a>
     <a href="./#contact">Contact</a>
   </nav>
   <span class="spacer"></span>
-  <a href="../aide.html" class="home-lang" hreflang="fr" lang="fr" title="Version française" data-lang-switch="fr">FR</a>
-  <a class="home-dealer" href="dealer.html">
+  <a href="../aide" class="home-lang" hreflang="fr" lang="fr" title="Version française" data-lang-switch="fr">FR</a>
+  <a class="home-dealer" href="dealer">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     Dealer
   </a>
-  <a class="home-account" href="compte.html" aria-label="My account" title="My account">
+  <a class="home-account" href="compte" aria-label="My account" title="My account">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
   </a>
-  <a class="home-cta" href="boutique.html">Shop</a>
+  <a class="home-cta" href="boutique">Shop</a>
   <button class="nav-burger" id="nav-burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
     <span></span><span></span><span></span>
   </button>
@@ -73,7 +75,7 @@
 
 <main class="aide-page">
   <div id="aide"></div>
-  <p class="aide-more">Didn't find it? <a class="ask" href="/en/compte.html#/messages" data-msg="">Write to us</a><span class="ask-alt"> or by <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:contact@creationaudio.ca?subject=Question">email</a></span></p>
+  <p class="aide-more">Didn't find it? <a class="ask" href="/en/compte#/messages" data-msg="">Write to us</a><span class="ask-alt"> or by <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> · <a href="mailto:contact@creationaudio.ca?subject=Question">email</a></span></p>
 </main>
 
 <footer class="site-foot">
@@ -85,33 +87,33 @@
       </a>
       <p>3D printing filament and car audio speaker spacers, from the Québec City area.</p>
       <div class="foot-contact">
-        <a class="foot-pill" href="/en/compte.html#/messages" data-msg="">Messages</a>
+        <a class="foot-pill" href="/en/compte#/messages" data-msg="">Messages</a>
         <a class="foot-pill" href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a>
         <a class="foot-pill" href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a>
       </div>
     </div>
     <nav class="foot-col" aria-label="Shop">
       <h4>Shop</h4>
-      <a href="boutique.html">Filament</a>
-      <a href="spacers.html">Spacers &amp; adapters</a>
-      <a href="boutique.html#/accessoires">Accessories</a>
-      <a href="impression.html">Custom 3D printing</a>
-      <a href="entretien.html">Printer maintenance</a>
+      <a href="boutique">Filament</a>
+      <a href="spacers">Spacers &amp; adapters</a>
+      <a href="boutique#/accessoires">Accessories</a>
+      <a href="impression">Custom 3D printing</a>
+      <a href="entretien">Printer maintenance</a>
     </nav>
     <nav class="foot-col" aria-label="Help">
       <h4>Help</h4>
-      <a href="aide.html">Help centre</a>
+      <a href="aide">Help centre</a>
       <a href="./#etapes">How to order</a>
       <a href="./#contact">Contact us</a>
-      <a href="compte.html">My account</a>
-      <a href="dealer.html">Dealer portal</a>
-      <a href="revendeur.html">Become a dealer</a>
+      <a href="compte">My account</a>
+      <a href="dealer">Dealer portal</a>
+      <a href="revendeur">Become a dealer</a>
     </nav>
     <nav class="foot-col" aria-label="Legal">
       <h4>Legal</h4>
-      <a href="confidentialite.html">Privacy</a>
-      <a href="conditions.html">Terms of use</a>
-      <a href="retours.html">Returns &amp; refunds</a>
+      <a href="confidentialite">Privacy</a>
+      <a href="conditions">Terms of use</a>
+      <a href="retours">Returns &amp; refunds</a>
     </nav>
   </div>
   <div class="foot-sign" aria-hidden="true">Création Audio</div>
@@ -131,29 +133,29 @@
   </div>
   <nav class="drawer-links" aria-label="Mobile menu">
     <a href="./">Home</a>
-    <a href="boutique.html">Filament</a>
-    <a href="spacers.html">Spacers</a>
-    <a href="boutique.html#/accessoires">Accessories</a>
-    <a href="impression.html">3D printing</a>
-    <a href="entretien.html">Maintenance</a>
+    <a href="boutique">Filament</a>
+    <a href="spacers">Spacers</a>
+    <a href="boutique#/accessoires">Accessories</a>
+    <a href="impression">3D printing</a>
+    <a href="entretien">Maintenance</a>
     <a href="./#contact">Contact</a>
-    <a href="../aide.html" hreflang="fr" lang="fr" data-lang-switch="fr">Français</a>
+    <a href="../aide" hreflang="fr" lang="fr" data-lang-switch="fr">Français</a>
   </nav>
   <div class="drawer-cta">
-    <a class="primary" href="boutique.html">Shop filament</a>
-    <a class="secondary" href="compte.html">My account</a>
-    <a class="secondary" href="dealer.html">Dealer portal</a>
+    <a class="primary" href="boutique">Shop filament</a>
+    <a class="secondary" href="compte">My account</a>
+    <a class="secondary" href="dealer">Dealer portal</a>
   </div>
   <div class="drawer-foot">
-    <a href="/en/compte.html#/messages" data-msg="">Messages</a> ·
+    <a href="/en/compte#/messages" data-msg="">Messages</a> ·
     <a href="https://m.me/61591945465745" target="_blank" rel="noopener">Messenger</a> ·
     <a href="mailto:contact@creationaudio.ca">contact@creationaudio.ca</a><br>
     Local pickup in Québec City · Shipping on request · No online payment
   </div>
 </aside>
 
-<script src="../assets/aide.js?v=3"></script>
-<script src="../assets/aide-public.js?v=5"></script>
-<script src="../assets/nav.js?v=19"></script>
+<script src="../assets/aide.js?v=4"></script>
+<script src="../assets/aide-public.js?v=6"></script>
+<script src="../assets/nav.js?v=20"></script>
 </body>
 </html>

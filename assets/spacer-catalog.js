@@ -1,7 +1,7 @@
 /* =========================================================
    Création Audio — Catalogue + fiche SPACER (partagé)
-   Chargé par spacers.html (public : prix client, à plat) et
-   dealer.html (portail : prix dealer + rabais quantité, tout est
+   Chargé par spacers (public : prix client, à plat) et
+   dealer (portail : prix dealer + rabais quantité, tout est
    commandable même à stock 0). Rend :
      - le catalogue : recherche « véhicule ou code » + puces de taille + grille
      - la fiche : photos (vignettes + visionneuse), prix, quantité, spécifications,
@@ -157,13 +157,13 @@
       return '<a class="ask" href="' + esc(CONTACT.messenger) + '" target="_blank" rel="noopener">' + esc(label) + '</a>' +
         _t('<span class="ask-alt"> ou <a href="') + esc(mail) + _t('">par courriel</a></span>');
     }
-    return '<a class="ask" href="' + (EN ? '/en' : '') + '/compte.html#/messages" data-msg="spacers" data-msg-ref="' +
+    return '<a class="ask" href="' + (EN ? '/en' : '') + '/compte#/messages" data-msg="spacers" data-msg-ref="' +
         esc(ref || '') + '" data-msg-body="' + esc(body) + '">' + esc(label) + '</a>' +
       _t('<span class="ask-alt"> ou par <a href="') + esc(CONTACT.messenger) + _t('" target="_blank" rel="noopener">Messenger</a> · <a href="') +
         esc(mail) + _t('">courriel</a></span>');
   }
 
-  // options de la boutique publique : spacers.html ET pages générées (même rendu à l'octet près)
+  // options de la boutique publique : spacers ET pages générées (même rendu à l'octet près)
   var PUBLIC = {
     addLabel: _t('Ajouter au panier'),
     assureHtml: '<li>' + IC.pin + _t('Ramassage local à Québec, sur rendez-vous</li>') +
@@ -429,7 +429,7 @@
       });
     }
 
-    // coquille du catalogue (aussi écrite telle quelle dans spacers.html par le générateur de pages)
+    // coquille du catalogue (aussi écrite telle quelle dans spacers par le générateur de pages)
     function shellHtml(chips, count, grid, legal) {
       return '<div class="spc-bar">' +
           '<div class="spc-veh" hidden></div>' +
@@ -517,7 +517,7 @@
       }
       firstShow = false;
     }
-    // catalogue complet en HTML, sans câblage (spacers.html pré-rendu par le générateur de pages)
+    // catalogue complet en HTML, sans câblage (spacers pré-rendu par le générateur de pages)
     function staticCatalog() {
       q = ''; size = 'all';
       return shellHtml(chipsHtml(), countText(items.length), items.map(cardHtml).join(''), legalHtml(refBrands(items), hasSpeakers(items)));

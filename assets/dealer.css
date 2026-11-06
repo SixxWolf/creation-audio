@@ -32,7 +32,7 @@
 .dl-submit:disabled { opacity:.55; cursor:not-allowed; }
 .dl-status { color:var(--muted); font-size:.85rem; margin-top:12px; min-height:1.2em; }
 .dl-gate-actions { margin-top:18px; }
-/* connexion par code : lien vers revendeur.html, Renvoyer / Changer de courriel */
+/* connexion par code : lien vers revendeur, Renvoyer / Changer de courriel */
 .dl-card a:not(.dl-submit) { color:var(--ember-dim); font-weight:600; }
 .dl-card p b { color:var(--ink); word-break:break-all; }
 .dl-join { margin:14px 0 0 !important; font-size:.88rem !important; }

@@ -117,8 +117,8 @@ Deno.serve(async (req) => {
   const what = (kind === "reservation" ? "Réservation " : kind === "invoice" ? "Facture " : "Commande ") + x.number;
   const first = String(x.name || "").trim().split(/\s+/)[0] || "";
   const kslug = kind === "reservation" ? "r/" : kind === "invoice" ? "f/" : "c/";
-  const accountUrl = SITE + "/compte.html#/cueillette/" + kslug + id;
-  const adminUrl = SITE + "/coulisses-t6avzpe2.html#" + (kind === "invoice" ? "historique" : "commandes/" + (kind === "reservation" ? "reservations" : "clients"));
+  const accountUrl = SITE + "/compte#/cueillette/" + kslug + id;
+  const adminUrl = SITE + "/coulisses-t6avzpe2#" + (kind === "invoice" ? "historique" : "commandes/" + (kind === "reservation" ? "reservations" : "clients"));
   const results: Record<string, string> = {};
 
   // ---- au client, dans sa langue ----
@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
   if (en) {
     const pkE = fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end, true);
     const whatE = (kind === "reservation" ? "reservation " : kind === "invoice" ? "invoice " : "order ") + x.number;
-    const accE = SITE + "/en/compte.html#/cueillette/" + kslug + id;
+    const accE = SITE + "/en/compte#/cueillette/" + kslug + id;
     cSubject = "Pickup request " + pkE + " — Création Audio";
     cText = "Hello " + first + ",\n\n" +
       "Got it: you picked " + pkE + " for " + whatE + ". We'll confirm by email shortly.\n\n" +

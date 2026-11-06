@@ -6,27 +6,27 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/boutique.html</loc>
+    <loc>https://creationaudio.ca/boutique</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacers.html</loc>
+    <loc>https://creationaudio.ca/spacers</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/revendeur.html</loc>
+    <loc>https://creationaudio.ca/revendeur</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/entretien.html</loc>
+    <loc>https://creationaudio.ca/entretien</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/impression.html</loc>
+    <loc>https://creationaudio.ca/impression</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -36,153 +36,153 @@
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/boutique.html</loc>
+    <loc>https://creationaudio.ca/en/boutique</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/revendeur.html</loc>
+    <loc>https://creationaudio.ca/en/revendeur</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/entretien.html</loc>
+    <loc>https://creationaudio.ca/en/entretien</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/impression.html</loc>
+    <loc>https://creationaudio.ca/en/impression</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacers.html</loc>
+    <loc>https://creationaudio.ca/en/spacers</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <!-- spacers:urls — une page par spacer, généré par tools/build-spacer-pages.js -->
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-hykia-001.html</loc>
+    <loc>https://creationaudio.ca/spacer/ca-adp-hykia-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-hykia-001.html</loc>
+    <loc>https://creationaudio.ca/en/spacer/ca-adp-hykia-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-525-001.html</loc>
+    <loc>https://creationaudio.ca/spacer/ca-adp-525-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-525-001.html</loc>
+    <loc>https://creationaudio.ca/en/spacer/ca-adp-525-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-4-001.html</loc>
+    <loc>https://creationaudio.ca/spacer/ca-adp-4-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-4-001.html</loc>
+    <loc>https://creationaudio.ca/en/spacer/ca-adp-4-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-8-001.html</loc>
+    <loc>https://creationaudio.ca/spacer/ca-adp-8-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-8-001.html</loc>
+    <loc>https://creationaudio.ca/en/spacer/ca-adp-8-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-ford-001.html</loc>
+    <loc>https://creationaudio.ca/spacer/ca-adp-ford-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-ford-001.html</loc>
+    <loc>https://creationaudio.ca/en/spacer/ca-adp-ford-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-ford-002.html</loc>
+    <loc>https://creationaudio.ca/spacer/ca-adp-ford-002</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-ford-002.html</loc>
+    <loc>https://creationaudio.ca/en/spacer/ca-adp-ford-002</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-toyota-001.html</loc>
+    <loc>https://creationaudio.ca/spacer/ca-adp-toyota-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-toyota-001.html</loc>
+    <loc>https://creationaudio.ca/en/spacer/ca-adp-toyota-001</loc>
     <lastmod>2026-11-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <!-- /spacers:urls -->
   <url>
-    <loc>https://creationaudio.ca/aide.html</loc>
+    <loc>https://creationaudio.ca/aide</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/confidentialite.html</loc>
+    <loc>https://creationaudio.ca/confidentialite</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/conditions.html</loc>
+    <loc>https://creationaudio.ca/conditions</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/retours.html</loc>
+    <loc>https://creationaudio.ca/retours</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/aide.html</loc>
+    <loc>https://creationaudio.ca/en/aide</loc>
     <changefreq>weekly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/confidentialite.html</loc>
+    <loc>https://creationaudio.ca/en/confidentialite</loc>
     <changefreq>weekly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/conditions.html</loc>
+    <loc>https://creationaudio.ca/en/conditions</loc>
     <changefreq>weekly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/retours.html</loc>
+    <loc>https://creationaudio.ca/en/retours</loc>
     <changefreq>weekly</changefreq>
     <priority>0.3</priority>
   </url>

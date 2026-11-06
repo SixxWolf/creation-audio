@@ -72,7 +72,7 @@
     onScroll();
   }
 
-  /* ---- client connecté (compte.html range sa session sous « ca-compte-auth ») : point sur « Mon compte » ---- */
+  /* ---- client connecté (compte range sa session sous « ca-compte-auth ») : point sur « Mon compte » ---- */
   var signedIn = false;
   try { signedIn = !!localStorage.getItem('ca-compte-auth'); } catch (e) {}
   Array.prototype.forEach.call(document.querySelectorAll('.home-account'), function (a) { a.classList.toggle('is-in', signedIn); });
@@ -241,7 +241,7 @@
   var CA = window.CA = window.CA || {};
   var FETES_V = 2, KEY = 'ca-fetes', PREV = 'ca-fetes-voir', OFF = 'ca-fetes-off', SEEN = 'ca-fetes-vu', root = document.documentElement;
   var _t = CA.t || function (x) { return x; };
-  if (root.hasAttribute('data-fetes-off')) return;   // page à ambiance propre (revendeur.html) : jamais de thème des fêtes
+  if (root.hasAttribute('data-fetes-off')) return;   // page à ambiance propre (revendeur) : jamais de thème des fêtes
   var q = /[?&]fetes=([01])/.exec(location.search), preview = q ? q[1] : null;
   try {
     if (q) sessionStorage.setItem(PREV, q[1]);

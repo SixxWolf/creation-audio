@@ -86,8 +86,8 @@ function renderer(CAS, c, items, pages, onPage) {
     // le stock exact bouge à chaque vente : la page statique n'en dépend pas (le JS remet le vrai)
     maxQty: (p) => ((p.qty | 0) > 0 ? 1 : 0),
     // même règle que pageHref() dans spacers.js
-    pageHref: (s) => (pages.has(s) ? (onPage ? '' : DIR + '/') + s + '.html' : (onPage ? '../spacers.html#/s/' + encodeURIComponent(s) : null)),
-    rootHref: onPage ? '../spacers.html' : '#/'
+    pageHref: (s) => (pages.has(s) ? (onPage ? '' : DIR + '/') + s : (onPage ? '../spacers#/s/' + encodeURIComponent(s) : null)),
+    rootHref: onPage ? '../spacers' : '#/'
   });
   sc.setItems(items);
   return sc;
@@ -189,7 +189,7 @@ function blankMeta(html, names) {
 
 function pageHtml(tpl, CAS, c, sc, p, slug, pagesList, en) {
   const t = en ? seoTextsEn(CAS, p) : seoTexts(CAS, p);
-  const frUrl = SITE + DIR + '/' + slug + '.html', enUrl = SITE + 'en/' + DIR + '/' + slug + '.html';
+  const frUrl = SITE + DIR + '/' + slug, enUrl = SITE + 'en/' + DIR + '/' + slug;
   const url = en ? enUrl : frUrl, home = en ? SITE + 'en/' : SITE;
   const imgs = [p.image_path].concat(p.attrs && Array.isArray(p.attrs.gallery) ? p.attrs.gallery : [])
     .filter((x) => typeof x === 'string' && x).map((x) => fakeSb(c).storage.from('products').getPublicUrl(x).data.publicUrl);
@@ -213,7 +213,7 @@ function pageHtml(tpl, CAS, c, sc, p, slug, pagesList, en) {
   const crumbs = {
     '@type': 'BreadcrumbList', itemListElement: [
       { '@type': 'ListItem', position: 1, name: en ? 'Home' : 'Accueil', item: home },
-      { '@type': 'ListItem', position: 2, name: 'Spacers', item: home + 'spacers.html' },
+      { '@type': 'ListItem', position: 2, name: 'Spacers', item: home + 'spacers' },
       { '@type': 'ListItem', position: 3, name: p.name, item: url }
     ]
   };
@@ -227,7 +227,7 @@ function pageHtml(tpl, CAS, c, sc, p, slug, pagesList, en) {
       .replace(/<main class="shop" id="main">[\s\S]*?<\/main>/, (m) => '<main class="shop" id="main">' + bizOf(m) + '</main>');
     h = EN.translatePage(h, DIR + '/' + slug + '.html');
   } else {
-    h = h.replace(/href="\.\.\/en\/spacers\.html"/g, 'href="../en/' + DIR + '/' + slug + '.html"');   // lien EN : la même fiche
+    h = h.replace(/href="\.\.\/en\/spacers"/g, 'href="../en/' + DIR + '/' + slug + '"');   // lien EN : la même fiche
   }
   h = h.replace(/<title>[\s\S]*?<\/title>/, '<title>' + esc(t.title) + '</title>');
   h = setAttrOf(h, 'name="description"', 'content', t.desc);
@@ -258,7 +258,7 @@ function catalogHead(CAS, items, slugOf, pagesList, en) {
     '@context': 'https://schema.org', '@type': 'ItemList',
     name: en ? 'Speaker spacers and adapters — Création Audio' : 'Spacers et adaptateurs de haut-parleurs — Création Audio',
     itemListElement: items.filter((p) => pagesList.indexOf(slugOf(p)) !== -1).map((p, i) => ({
-      '@type': 'ListItem', position: i + 1, url: SITE + (en ? 'en/' : '') + DIR + '/' + slugOf(p) + '.html', name: p.name
+      '@type': 'ListItem', position: i + 1, url: SITE + (en ? 'en/' : '') + DIR + '/' + slugOf(p), name: p.name
     }))
   };
   return '<script>window.CA_SPACER_PAGES=' + JSON.stringify(pagesList) + ';</script>\n' + jsonLd(list);
@@ -366,8 +366,8 @@ async function main() {
   const sm = read('sitemap.xml');
   const locs = [];
   pagesList.forEach((s) => {
-    locs.push({ loc: SITE + DIR + '/' + s + '.html', changed: changedFr.has(s) });
-    locs.push({ loc: SITE + 'en/' + DIR + '/' + s + '.html', changed: changedEn.has(s) });
+    locs.push({ loc: SITE + DIR + '/' + s, changed: changedFr.has(s) });
+    locs.push({ loc: SITE + 'en/' + DIR + '/' + s, changed: changedEn.has(s) });
   });
   writeIfChanged('sitemap.xml', block(sm, 'spacers:urls', sitemapUrls(sm, locs, today)));
 
