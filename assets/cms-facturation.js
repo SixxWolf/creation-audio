@@ -1331,7 +1331,7 @@
   function setFromOrder(o) {
     fromOrder = o ? { id: o.id, number: o.number, kind: o.kind || 'dealer', also: o.also || [] } : null;
     if (elOrderBanner) elOrderBanner.hidden = !fromOrder;
-    if (elOrderNum) elOrderNum.textContent = fromOrder ? (fromOrder.kind === 'reservation' ? 'de la réservation ' : fromOrder.also.length ? 'des commandes ' : 'de la commande ') + orderNums(fromOrder) : '';
+    if (elOrderNum) elOrderNum.textContent = fromOrder ? (fromOrder.kind === 'reservation' ? 'de la réservation ' : fromOrder.kind === 'service' ? 'de la demande ' : fromOrder.also.length ? 'des commandes ' : 'de la commande ') + orderNums(fromOrder) : '';
   }
   if (elOrderDetach) elOrderDetach.addEventListener('click', function () {
     // garde la facture en cours, mais ne la relie plus à la commande (qui reste à facturer)
@@ -1352,6 +1352,15 @@
     return ln;
   }
   function linkOrder(order, inv) {
+    if (order.kind === 'service') {   // demande de service (cms-demandes.js) : Facturée + compte relié à sa fiche
+      sb.rpc('admin_sr_invoice', { p_id: order.id, p_invoice: inv.id }).then(function (res) {
+        if (res.error) { elStatus.appendChild(document.createTextNode(' ⚠ Demande ' + order.number + ' non marquée « Facturée » — fais-le dans Commandes › Demandes. ')); return; }
+        elStatus.insertBefore(document.createTextNode('Demande ' + order.number + ' → Facturée. '), elStatus.firstChild ? elStatus.firstChild.nextSibling : null);
+        if (window.CA.reloadDemandes) window.CA.reloadDemandes();
+        if (window.CA.loadAccounts) window.CA.loadAccounts().then(null, function () {});
+      }, function () {});
+      return;
+    }
     if (order.kind === 'reservation') {   // réservation 72 h : Facturée (pénalité retirée si expirée) + compte relié à sa fiche
       sb.rpc('admin_invoice_reservation', { p_res: order.id, p_invoice: inv.id }).then(function (res) {
         if (res.error) { elStatus.appendChild(document.createTextNode(' ⚠ Réservation ' + order.number + ' non marquée « Facturée » — fais-le dans l\'onglet Commandes. ')); return; }
@@ -1393,6 +1402,19 @@
     var token = {}; editToken = token;
     elInvoice.innerHTML = '<p class="inv-empty">Chargement de la commande ' + esc(order.number) + '…</p>';
     elSave.disabled = true;   // réactivé une fois la facture remplie
+    if (order.kind === 'service') {   // demande de service : une ligne libre au prix de la soumission
+      editToken = null;
+      setClientType('client');
+      setClientFields({ name: order.name || order.email || '', email: order.email || '', phone: order.phone || '' });
+      lines = [{ id: uid(), productId: null, ptype: 'divers', kind: 'free', label: order.label || order.number, meta: '', hex: null,
+        qty: 1, base: 0, tiers: [], cost: 0, tierKey: null, price: +order.price || 0, manual: true, sp: null }];
+      elNote.value = 'Demande ' + order.number;
+      setCat('filament');
+      unlock();
+      elStatus.textContent = '';
+      render();
+      return true;
+    }
     if (order.kind === 'client' || order.kind === 'reservation') {   // commande en ligne / réservation d'un client (cms-commandes-clients.js, cms-reservations.js)
       Promise.all([loadCatalog('filament', true), loadCatalog('accessory', true), loadCatalog('spacer', true)])
         .then(null, function () {}).then(function () {

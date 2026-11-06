@@ -7,8 +7,8 @@
      sous les pièces ; tranché : trajets en cordons, curseur de couches, Lecture ; téléphone : version allégée.
      Sans dessin possible (pas d'instanciation WebGL) : image du plateau + vrais chiffres.
    - Formulaire : se déplie sous la zone de dépôt. Fichiers STL/3MF/STEP/OBJ/G-code, 3 max, 50 Mo chacun.
-     L'envoi compose le message puis ouvre la Messagerie avec les fichiers
-     (CA.msg.open({ topic, ref, body, files }) : messagerie.js les téléverse dans le bucket « print-files »).
+     L'envoi crée une fiche de demande D-0001 (CA.demande, demande.js : connexion si besoin, fichiers
+     dans le bucket « print-files », confirmation qui remplace le formulaire). Plus rien ne passe par la Messagerie.
    - Couleurs : stock réel lu dans products_public (qty ou qty_2 > 0). Toucher une pastille recolore la pièce
      et remplit la demande.
    - Vraies pièces : adaptateurs lus dans products_public ; la section reste masquée sans données.
@@ -143,7 +143,7 @@
   var MAX_FILES = 3, MAX_BYTES = 50 * 1048576, EXT = /\.(stl|3mf|step|stp|obj|gcode)$/i, READ = /\.(stl|obj)$/i, READ3 = /\.(3mf|gcode)$/i;
   var FAM_OF = { pla: 'PLA', petg: 'PETG', abs: 'ABS', tpu: 'TPU' };
   var example = exampleMesh();
-  var files = [], current = -1, handed = false;
+  var files = [], current = -1;
   var state = { mat: 'any', color: null };
 
   function say(text, cls) { status.textContent = text || ''; status.className = 'ip-status' + (cls ? ' ' + cls : ''); }
@@ -627,7 +627,7 @@
      ========================================================= */
   function chosen(name) {
     var r = form.querySelector('input[name="' + name + '"]:checked');
-    return r ? r.parentNode.querySelector('span').textContent.trim() : '';
+    return r ? r.value : '';
   }
   function fileLines(f) {
     var mat = state.mat !== 'any' ? state.mat : 'pla', t = f.three;
@@ -652,32 +652,20 @@
     flag(desc, bad);
     if (bad) { say(_t('Ajoute un fichier ou décris ta pièce.'), 'is-err'); desc.focus(); return; }
     var q = Math.max(1, Math.min(10000, parseInt(qty.value, 10) || 1));
-    var lines = [
-      _t('Bonjour, je veux une soumission pour de l\'impression 3D.'),
-      _t('Service :') + ' ' + chosen('ip-svc'),
-      _t('Matériau :') + ' ' + chosen('ip-mat')
-    ];
-    if (state.color) lines.push(_t('Couleur :') + ' ' + state.color.name + ' (' + state.color.material + ')');
-    lines.push(_t('Quantité :') + ' ' + q);
-    files.forEach(function (f) { lines = lines.concat(fileLines(f)); });
-    if (d) lines.push(_t('Détails :') + ' ' + d);
-    var body = lines.join('\n');
-    var CA = window.CA || {};
-    if (!CA.loadMsg) { say(_t('La messagerie est indisponible. Écris-nous à contact@creationaudio.ca.'), 'is-err'); return; }
-    say(''); submit.disabled = true;
-    CA.loadMsg().then(function (m) {
-      handed = true;
-      m.open({ topic: 'autre', ref: _t('Impression 3D'), body: body, files: files.map(function (f) { return f.file; }) });
-    }, function () {
-      say(_t('La messagerie est indisponible. Écris-nous à contact@creationaudio.ca.'), 'is-err');
-    }).then(function () { submit.disabled = false; });
+    var notes = [];
+    files.forEach(function (f) { notes = notes.concat(fileLines(f)); });
+    say('');
+    window.CA.demande.submit({
+      details: {
+        service: chosen('ip-svc'), material: chosen('ip-mat'), qty: q, desc: d, notes: notes.join('\n'),
+        color: state.color ? { name: state.color.name, material: state.color.material } : null
+      },
+      files: files.map(function (f) { return f.file; })
+    });
   });
   desc.addEventListener('input', function () { flag(desc, false); });
 
-  // la demande est partie (Messagerie) : on repart à zéro
-  document.addEventListener('ca:msg-change', function () {
-    if (!handed) return;
-    handed = false;
+  function resetForm() {
     files.forEach(dropFile);
     files = []; mesh = null;
     desc.value = ''; qty.value = 1;
@@ -687,7 +675,23 @@
     state.mat = 'any'; state.color = null; color = DEF_RGB.slice();
     paintColors();
     show(-1);
-    say(_t('Demande envoyée.'), 'is-ok');
+    say('');
+  }
+  window.CA.demande.init({
+    kind: 'print', form: form, status: status,
+    onBusy: function (on) { submit.disabled = on; },
+    onDone: function () { files.forEach(dropFile); },
+    onReset: resetForm,
+    // retour de l'appli courriel pendant la connexion : tout revient, sauf la couleur si le stock n'est pas encore lu
+    onRestore: function (d, saved) {
+      checkSvc(d.service || 'file');
+      var m = form.querySelector('input[name="ip-mat"][value="' + (d.material || 'any') + '"]');
+      if (m) { m.checked = true; m.dispatchEvent(new Event('change', { bubbles: true })); }
+      qty.value = d.qty || 1;
+      desc.value = d.desc || '';
+      openForm(true);
+      if (saved && saved.length) add(saved);
+    }
   });
 
   /* ---------- départ : l'exemple se construit une fois, quand il entre à l'écran ---------- */

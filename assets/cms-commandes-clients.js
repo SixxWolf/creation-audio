@@ -149,12 +149,13 @@
   CA.ordersCount = CA.ordersCount || {};
   CA.paintOrdersBadge = function () {
     var navN = $('#nav-orders-n'); if (!navN) return;
-    var c = CA.ordersCount, n = (c.dealer || 0) + (c.client || 0) + (c.resv || 0);
+    var c = CA.ordersCount, n = (c.dealer || 0) + (c.client || 0) + (c.resv || 0) + (c.req || 0);
     navN.textContent = n; navN.hidden = !n;
     var tab = navN.closest('.tab');
     if (tab) tab.setAttribute('aria-label', 'Commandes' + (n ? ' (' + plural(n, 'nouvelle', 'nouvelles') + ')' : ''));
     var cn = $('#cc-new-n'); if (cn) { cn.textContent = c.client || 0; cn.hidden = !c.client; }
     var rn = $('#cr-n'); if (rn) { rn.textContent = c.resv || 0; rn.hidden = !c.resv; }
+    var dn = $('#dm-n'); if (dn) { dn.textContent = c.req || 0; dn.hidden = !c.req; }   // demandes de service (cms-demandes.js)
   };
   function setClientBadge(n) { CA.ordersCount.client = n; CA.paintOrdersBadge(); }
 
@@ -173,21 +174,23 @@
 
   /* ---- sous-onglets Dealers / Clients en ligne / Réservations / Cueillettes (#commandes/clients, …/reservations,
      …/cueillettes — cms-cueillettes.js, CA.loadPickups). Grand écran : [Commandes] (les 3 colonnes) | [Cueillettes] ---- */
-  var colsEl = $('.co-cols'), topEl = $('.co-top'), cqEl = $('#cq-wrap');
+  var colsEl = $('.co-cols'), topEl = $('.co-top'), cqEl = $('#cq-wrap'), dmEl = $('#dm-wrap');
   function showSub(s) {
-    sub = s === 'dealers' || s === 'reservations' || s === 'cueillettes' ? s : 'clients';
-    var all = isWide(), cq = sub === 'cueillettes';
+    sub = s === 'dealers' || s === 'reservations' || s === 'cueillettes' || s === 'demandes' ? s : 'clients';
+    var all = isWide(), cq = sub === 'cueillettes', dm = sub === 'demandes', full = cq || dm;   // vues pleines, aussi en grand écran
     $$('[data-cosub]').forEach(function (b) {
-      var k = b.getAttribute('data-cosub'), on = k === 'all' ? !cq : k === sub;
+      var k = b.getAttribute('data-cosub'), on = k === 'all' ? !full : k === sub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on);
     });
-    if (colsEl) colsEl.hidden = cq;
-    if (topEl) topEl.hidden = cq;
+    if (colsEl) colsEl.hidden = full;
+    if (topEl) topEl.hidden = full;
     if (cqEl) cqEl.hidden = !cq;
+    if (dmEl) dmEl.hidden = !dm;
     if (dealersEl) dealersEl.hidden = !all && sub !== 'dealers';
     wrap.hidden = !all && sub !== 'clients';
     if (resvEl) resvEl.hidden = !all && sub !== 'reservations';
-    $$('[data-co-dealer]').forEach(function (el) { el.hidden = cq || (!all && sub !== 'dealers'); });
+    $$('[data-co-dealer]').forEach(function (el) { el.hidden = full || (!all && sub !== 'dealers'); });
+    if (dm) { if (tabOpen && CA.loadDemandes) CA.loadDemandes(); return; }
     if (cq) { if (tabOpen && CA.loadPickups) CA.loadPickups(); return; }
     if (all) { if (tabOpen) loadAll(); return; }
     if (sub === 'clients' && tabOpen) load();
@@ -206,8 +209,9 @@
     if (typeof prevOnTab === 'function') prevOnTab(name);
     tabOpen = name === 'commandes';
     if (!tabOpen) return;
-    var m = /^#commandes\/(dealers|reservations|cueillettes)\b/.exec(location.hash), want = m ? m[1] : 'clients';   // lien direct
-    if (want !== sub) showSub(want); else if (sub === 'cueillettes') { if (CA.loadPickups) CA.loadPickups(); }
+    var m = /^#commandes\/(dealers|reservations|cueillettes|demandes)\b/.exec(location.hash), want = m ? m[1] : 'clients';   // lien direct
+    if (want !== sub) showSub(want); else if (sub === 'demandes') { if (CA.loadDemandes) CA.loadDemandes(); }
+    else if (sub === 'cueillettes') { if (CA.loadPickups) CA.loadPickups(); }
     else if (isWide()) loadAll(); else if (sub === 'clients') load();
     else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
   };
@@ -220,7 +224,8 @@
   });
   var refreshBtn = $('#co-refresh');
   if (refreshBtn) refreshBtn.addEventListener('click', function () {
-    if (sub === 'cueillettes') { if (CA.loadPickups) CA.loadPickups(); }
+    if (sub === 'demandes') { if (CA.loadDemandes) CA.loadDemandes(); }
+    else if (sub === 'cueillettes') { if (CA.loadPickups) CA.loadPickups(); }
     else if (isWide()) loadAll();
     else if (sub === 'clients') load(); else if (sub === 'reservations' && CA.loadReservations) CA.loadReservations();
   });

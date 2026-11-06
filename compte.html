@@ -17,9 +17,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=19">
-<link rel="stylesheet" href="assets/compte.css?v=13">
+<link rel="stylesheet" href="assets/compte.css?v=14">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
+<link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="assets/fetes.css?v=3">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
@@ -137,6 +138,7 @@
 
     <nav class="acct-tabs" aria-label="Mon compte">
       <a href="#/commandes" data-tab="commandes">Commandes</a>
+      <a href="#/demandes" data-tab="demandes" hidden>Demandes<b class="acct-n" id="acct-n-dem" hidden></b></a>
       <a href="#/messages" data-tab="messages">Messages<b class="acct-n" id="acct-n-msgs" hidden></b></a>
       <a href="#/alertes" data-tab="alertes">Alertes<b class="acct-n" id="acct-n-alerts" hidden></b></a>
       <a href="#/infos" data-tab="infos">Profil</a>
@@ -144,6 +146,7 @@
     </nav>
 
     <div class="acct-panel" data-panel="commandes" id="acct-orders"></div>
+    <div class="acct-panel" data-panel="demandes" id="acct-dem" hidden></div>
     <div class="acct-panel" data-panel="messages" id="acct-msgs" hidden></div>
     <div class="acct-panel" data-panel="alertes" id="acct-alerts" hidden></div>
     <div class="acct-panel" data-panel="cueillette" id="acct-pkv" hidden></div>
@@ -172,7 +175,7 @@
       </form>
       <div class="acct-card acct-wide acct-danger">
         <h2>Supprimer mon compte</h2>
-        <p>Ton compte, tes alertes et tes messages sont effacés. Tes factures restent dans nos dossiers (obligation fiscale).</p>
+        <p>Ton compte, tes alertes, tes messages et tes demandes sont effacés. Tes factures restent dans nos dossiers (obligation fiscale).</p>
         <button class="acct-del" id="acct-delete" type="button">Supprimer mon compte</button>
         <p class="acct-status" id="acct-del-status" role="status" aria-live="polite"></p>
       </div>
@@ -264,6 +267,8 @@
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/nav.js?v=19"></script>
 <script src="assets/commande-client.js?v=11"></script>
-<script src="assets/compte.js?v=21"></script>
+<script src="assets/demande-fil.js?v=1"></script>
+<script src="assets/compte-demandes.js?v=1"></script>
+<script src="assets/compte.js?v=22"></script>
 </body>
 </html>

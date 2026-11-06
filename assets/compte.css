@@ -136,6 +136,30 @@
   color:var(--ink); cursor:pointer; background:var(--paper); border:1px solid var(--line-2); border-radius:12px; }
 .acct-btn:hover { border-color:var(--ink); }
 
+/* Demandes de service (#/demandes, compte-demandes.js) */
+.dq > summary { display:flex; align-items:center; gap:10px; }
+.dq-body { display:flex; flex-direction:column; gap:6px; }
+.dq-h { margin:14px 0 4px; font-family:var(--display); font-size:1rem; }
+.dq-quote { margin-top:12px; padding:4px 16px 16px; background:var(--wash); border-radius:var(--radius-sm); }
+.dq-quote .acct-btn { margin-top:10px; }
+.dq-price { margin:0; font-size:1.35rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.dq-price small { font-size:.88rem; font-weight:600; color:var(--muted); }
+.dq-date, .dq-note { margin:4px 0 0; color:var(--ink-2); overflow-wrap:anywhere; white-space:pre-wrap; }
+.dq-dl { margin:0; }
+.dq-l { display:grid; grid-template-columns:minmax(110px, 170px) minmax(0, 1fr); gap:10px; padding:6px 0; border-bottom:1px solid var(--line); }
+.dq-l dt { color:var(--muted); }
+.dq-l dd { margin:0; overflow-wrap:anywhere; white-space:pre-wrap; }
+.dq-files { display:flex; flex-direction:column; gap:6px; }
+.dq-ev { display:flex; flex-direction:column; gap:6px; margin:0; padding:0; list-style:none; }
+.dq-ev li { display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 12px; }
+.dq-ev time { color:var(--muted); font-size:.88rem; }
+.acct-btn-go { color:var(--on-ember, #fff); background:var(--ember-ink); border-color:var(--ember-ink); }
+.acct-btn-go:hover { background:color-mix(in srgb, var(--ember-ink) 85%, #000); border-color:color-mix(in srgb, var(--ember-ink) 85%, #000); }
+.df-send.acct-btn { margin-top:0; }
+@media (max-width:560px) {
+  .dq-l { grid-template-columns:minmax(0, 1fr); gap:0; }
+}
+
 /* Ma cueillette (#/cueillette/c|r/<id>) : la commande à gauche, le calendrier à droite */
 .pkv { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.15fr); gap:18px; align-items:start; }
 .pkv > section { min-width:0; padding:24px 26px; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius-lg); }

@@ -263,6 +263,7 @@
     loadOrders();
     loadMsgs();
     loadAlerts();
+    if (CA.compteDemandes) CA.compteDemandes.start(sb);
   }
 
   /* ---- Apparence (onglet #/apparence, assets/look.js) ---- */
@@ -286,7 +287,8 @@
   }
   // #/messages/<id> (lien du courriel « On t'a répondu ») : onglet Messages + fil ouvert dans le panneau
   // #/cueillette/c|r/<id> : écran « Ma cueillette » (après l'envoi du panier, courriel « Prête »)
-  var ROUTE = /^#\/(commandes|alertes|messages|infos|apparence|cueillette)(?:\/(?:([crf])\/)?([0-9a-f-]{36}))?$/;
+  // #/demandes/<id> (courriels de demande de service) : onglet Demandes, fiche ouverte (compte-demandes.js)
+  var ROUTE = /^#\/(commandes|alertes|messages|infos|apparence|cueillette|demandes)(?:\/(?:([crf])\/)?([0-9a-f-]{36}))?$/;
   function route() {
     if ($('#acct-home').hidden) return;
     var m = ROUTE.exec(location.hash), tab = m ? m[1] : 'commandes';
@@ -304,6 +306,7 @@
     });
     $$('.acct-panel').forEach(function (p) { p.hidden = p.getAttribute('data-panel') !== tab; });
     if (tab === 'apparence' && !lookMounted && window.caLook) mountLook();
+    if (tab === 'demandes' && CA.compteDemandes) CA.compteDemandes.open(m && m[3]);
   }
   window.addEventListener('hashchange', route);
 
@@ -884,7 +887,7 @@
     }).then(null, function () {});
   }
   $('#acct-delete').addEventListener('click', function () {
-    caDialog.confirm({ title: _t('Supprimer ton compte ?'), message: _t('Ton compte, tes alertes et tes messages seront effacés. Cette action est définitive.'),
+    caDialog.confirm({ title: _t('Supprimer ton compte ?'), message: _t('Ton compte, tes alertes, tes messages et tes demandes seront effacés. Cette action est définitive.'),
       ok: _t('Supprimer mon compte'), danger: true, icon: 'trash' }).then(function (ok) { if (ok) deleteAccount(); });
   });
   function deleteAccount() {

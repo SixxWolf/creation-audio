@@ -3,9 +3,12 @@
    Partagé par la boutique (boutique.js) et la page spacers (spacers.js).
    Charger APRÈS dialog.js et commande-client.js.
    CA.panierCompte :
-     setup({ onSignedIn(send), onMessenger(), onEmail() })   branche le (i) + le lien « Déjà un compte ? »
+     setup({ onSignedIn(send), onMessenger(), onEmail(), client(), words, onCancel() })   branche le (i) + le lien « Déjà un compte ? »
+                       Demandes de service (demande.js) : client = leur client Supabase, words = leurs textes (panier : aucun des deux) ;
+                       sans onMessenger, pas de « Sans compte » ; onCancel = fenêtre fermée sans connexion.
      open(send)        fenêtre courriel -> code -> nom (nouveau compte) ; même Edge Function que Mon compte
                        (compte-code). send = true : le client veut envoyer sa commande (onSignedIn(true) enchaîne).
+     askName(c, acct)  seulement l'étape du nom (compte déjà connecté, sans nom), puis onSignedIn(true).
      resume()          rouvre l'étape du code après un rechargement (passage par l'appli courriel sur mobile)
      messenger(url, text)  copie la liste, puis avis + vrai lien vers Messenger (jamais bloqué comme un popup) ;
                        copie impossible : liste affichée à copier à la main. Promesse : true si copiée.
@@ -29,6 +32,7 @@ window.CA = window.CA || {};
     });
   }
   function plural(n, one, many) { return n + ' ' + _t((EN ? n !== 1 : n > 1) ? many : one); }
+  function word(k, def) { return (opts.words && opts.words[k]) || _t(def); }
   function callFn(body) {
     return fetch(cfg.url + '/functions/v1/compte-code', {
       method: 'POST',
@@ -102,6 +106,7 @@ window.CA = window.CA || {};
     var fn = onDismiss;
     setPending(null); closeDlg();
     if (fn) fn();
+    else if (opts.onCancel) opts.onCancel();
   }
   // contenu d'une étape : pastille + titre + message + corps + croix
   function paint(icon, title, message, bodyHtml) {
@@ -127,7 +132,7 @@ window.CA = window.CA || {};
   function stepEmail(send, email) {
     var saved = window.CA.custOrder && window.CA.custOrder.email ? window.CA.custOrder.email() : '';
     var d = paint('user',
-      send ? _t('Il te faut un compte client') : _t('Connecte-toi'),
+      send ? word('needAccount', 'Il te faut un compte client') : _t('Connecte-toi'),
       esc(send ? _t('Rapide : ton courriel suffit, aucun mot de passe. Déjà client ? Entre le même courriel.')
                : _t('Ton courriel suffit, aucun mot de passe. On t\'envoie un code.')),
       '<form class="pc-form" novalidate>' +
@@ -136,9 +141,9 @@ window.CA = window.CA || {};
         '<input type="text" class="pc-hp" tabindex="-1" autocomplete="off" aria-hidden="true">' +
         '<button type="submit" class="cart-order pc-go">' + esc(_t('Recevoir mon code')) + '</button>' +
         '<p class="pc-status" role="status" aria-live="polite"></p>' +
-        (send ? '<p class="pc-note">' + esc(_t('Ta commande part dès que c\'est confirmé.')) + '</p>' : '') +
+        (send ? '<p class="pc-note">' + esc(word('sendsAfter', 'Ta commande part dès que c\'est confirmé.')) + '</p>' : '') +
         '<p class="pc-note"><a href="' + (document.body.getAttribute('data-spacer') ? '../' : '') + 'confidentialite.html#compte" target="_blank" rel="noopener">' + esc(_t('Confidentialité')) + '</a></p>' +
-        (send ? '<p class="pc-alt">' + esc(_t('Sans compte :')) + ' <button type="button" class="pc-link" data-alt="m">Messenger</button> · <button type="button" class="pc-link" data-alt="e">' + esc(_t('courriel')) + '</button></p>' : '') +
+        (send && opts.onMessenger ? '<p class="pc-alt">' + esc(_t('Sans compte :')) + ' <button type="button" class="pc-link" data-alt="m">Messenger</button> · <button type="button" class="pc-link" data-alt="e">' + esc(_t('courriel')) + '</button></p>' : '') +
       '</form>');
     var form = d.querySelector('form'), input = d.querySelector('#pc-email'), btn = d.querySelector('.pc-go'), st = d.querySelector('.pc-status');
     d.querySelectorAll('[data-alt]').forEach(function (b) {
@@ -172,7 +177,7 @@ window.CA = window.CA || {};
       '<form class="pc-form" novalidate>' +
         '<label class="pc-label" for="pc-code">' + esc(_t('Code à 6 chiffres')) + '</label>' +
         '<input class="dlg-field pc-field pc-code" type="text" id="pc-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false">' +
-        '<button type="submit" class="cart-order pc-go">' + esc(p.send ? _t('Confirmer et envoyer') : _t('Confirmer')) + '</button>' +
+        '<button type="submit" class="cart-order pc-go">' + esc(p.send ? word('confirmSend', 'Confirmer et envoyer') : _t('Confirmer')) + '</button>' +
         '<p class="pc-status" role="status" aria-live="polite"></p>' +
         '<p class="pc-links"><button type="button" class="pc-link" data-act="resend"></button>' +
         '<button type="button" class="pc-link" data-act="change">' + esc(_t('Changer de courriel')) + '</button></p>' +
@@ -226,7 +231,7 @@ window.CA = window.CA || {};
 
   /* ---------- session -> nom au besoin -> fin ---------- */
   function signIn(session, send) {
-    var c = window.CA.custOrder.client();
+    var c = opts.client ? opts.client() : window.CA.custOrder.client();
     if (!c) throw new Error('no client');
     return c.auth.setSession(session).then(function (s) {
       if (s && s.error) throw s.error;
@@ -240,11 +245,11 @@ window.CA = window.CA || {};
     });
   }
   function stepName(c, acct, send) {
-    var d = paint('user', _t('Ton compte est créé ✓'), esc(_t('Il nous manque ton nom pour préparer ta commande.')),
+    var d = paint('user', _t('Ton compte est créé ✓'), esc(word('nameWhy', 'Il nous manque ton nom pour préparer ta commande.')),
       '<form class="pc-form" novalidate>' +
         '<label class="pc-label" for="pc-name">' + esc(_t('Ton nom')) + '</label>' +
         '<input class="dlg-field pc-field" type="text" id="pc-name" autocomplete="name" maxlength="80">' +
-        '<button type="submit" class="cart-order pc-go">' + esc(send ? _t('Envoyer ma commande') : _t('Enregistrer')) + '</button>' +
+        '<button type="submit" class="cart-order pc-go">' + esc(send ? word('sendNow', 'Envoyer ma commande') : _t('Enregistrer')) + '</button>' +
         '<p class="pc-status" role="status" aria-live="polite"></p>' +
       '</form>');
     // fermer ici : Mon compte redemandera le nom ; rien n'est envoyé
@@ -320,6 +325,10 @@ window.CA = window.CA || {};
     open: function (send) {
       openDlg();
       stepEmail(!!send);
+    },
+    askName: function (c, acct) {
+      openDlg();
+      stepName(c, acct, true);
     },
     // true si une étape de code a été rouverte (le panier doit alors s'ouvrir derrière)
     resume: function () {

@@ -4675,3 +4675,372 @@ revoke all on function public.admin_save_dealer_order(uuid, text, jsonb, text, t
 grant execute on function public.dealer_discovery(text) to authenticated;
 grant execute on function public.dealer_submit_order(jsonb, text, text, jsonb) to authenticated;
 grant execute on function public.admin_save_dealer_order(uuid, text, jsonb, text, text, jsonb) to authenticated;
+
+-- ------------------------------------------------------------
+-- DEMANDES DE SERVICE (Impression 3D, Entretien) — 2026-11-06
+-- Une demande n'est ni un message ni une commande d'articles : fiche numérotée D-0001,
+-- statuts datés (service_request_events), soumission à accepter, discussion dans la fiche.
+-- Courriels : EF service-request-notify, appelée par la base (pg_net), jamais par le navigateur.
+-- Fichiers : bucket privé « print-files » ; retirés 12 mois après la fermeture (purge lancée par l'onglet admin).
+-- ------------------------------------------------------------
+create sequence if not exists public.service_request_seq;
+create table if not exists public.service_requests (
+  id                  uuid primary key default gen_random_uuid(),
+  number              text not null unique,
+  kind                text not null check (kind in ('print','maintenance')),
+  customer_id         uuid references public.customers(id) on delete set null,
+  email               text not null,
+  name                text,
+  phone               text,
+  lang                text not null default 'fr',
+  status              text not null default 'received'
+    check (status in ('received','evaluating','quoted','accepted','in_progress','done','invoiced','refused','cancelled')),
+  details             jsonb not null default '{}'::jsonb,
+  files               jsonb not null default '[]'::jsonb,
+  page                text,
+  quote_price         numeric(10,2),
+  quote_date          date,
+  quote_note          text,
+  quoted_at           timestamptz,
+  quote_ack_at        timestamptz,
+  client_ack_at       timestamptz,
+  admin_ack_at        timestamptz,
+  notify_tries        integer not null default 0,
+  invoice_id          uuid references public.invoices(id) on delete set null,
+  closed_at           timestamptz,
+  files_purged_at     timestamptz,
+  admin_unread        integer not null default 0,
+  client_unread       integer not null default 0,
+  admin_unread_since  timestamptz,
+  client_unread_since timestamptz,
+  admin_notified_at   timestamptz,
+  client_notified_at  timestamptz,
+  created_at          timestamptz not null default now(),
+  updated_at          timestamptz not null default now()
+);
+create index if not exists service_requests_customer_idx on public.service_requests (customer_id, created_at desc);
+create index if not exists service_requests_status_idx   on public.service_requests (status, created_at desc);
+create index if not exists service_requests_invoice_idx  on public.service_requests (invoice_id);
+
+create table if not exists public.service_request_events (
+  id         uuid primary key default gen_random_uuid(),
+  request_id uuid not null references public.service_requests(id) on delete cascade,
+  status     text not null,
+  actor      text not null default 'system' check (actor in ('client','admin','system')),
+  created_at timestamptz not null default now()
+);
+create index if not exists service_request_events_idx on public.service_request_events (request_id, created_at);
+
+create table if not exists public.service_request_messages (
+  id         uuid primary key default gen_random_uuid(),
+  request_id uuid not null references public.service_requests(id) on delete cascade,
+  sender     text not null check (sender in ('client','admin')),
+  body       text not null default '' check (length(body) <= 4000),
+  photos     jsonb not null default '[]'::jsonb,
+  files      jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists service_request_messages_idx on public.service_request_messages (request_id, created_at);
+
+alter table public.service_requests         enable row level security;
+alter table public.service_request_events   enable row level security;
+alter table public.service_request_messages enable row level security;
+drop policy if exists service_requests_admin_all on public.service_requests;
+create policy service_requests_admin_all on public.service_requests for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists service_request_events_admin_all on public.service_request_events;
+create policy service_request_events_admin_all on public.service_request_events for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists service_request_messages_admin_all on public.service_request_messages;
+create policy service_request_messages_admin_all on public.service_request_messages for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.service_requests         from anon;
+revoke all on public.service_request_events   from anon;
+revoke all on public.service_request_messages from anon;
+revoke all on sequence public.service_request_seq from public, anon, authenticated;
+
+-- Statut changé : date de fermeture ; série non lue remise à zéro (comme les conversations)
+create or replace function public._sr_before_update()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if new.admin_unread = 0 then new.admin_unread_since := null; new.admin_notified_at := null; end if;
+  if new.client_unread = 0 then new.client_unread_since := null; new.client_notified_at := null; end if;
+  if new.status is distinct from old.status then
+    new.updated_at := now();
+    if new.status in ('done','invoiced','refused','cancelled') then new.closed_at := now();
+    else new.closed_at := null; end if;
+  end if;
+  return new;
+end $$;
+revoke all on function public._sr_before_update() from public, anon, authenticated;
+drop trigger if exists service_requests_before_update on public.service_requests;
+create trigger service_requests_before_update before update on public.service_requests
+  for each row execute function public._sr_before_update();
+
+-- Chaque statut, à la création comme au changement, laisse une ligne datée : c'est la traçabilité
+create or replace function public._sr_log_status()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' or new.status is distinct from old.status then
+    insert into public.service_request_events (request_id, status, actor)
+    values (new.id, new.status,
+            case when (select auth.uid()) is null then 'system' when public.is_admin() then 'admin' else 'client' end);
+  end if;
+  return null;
+end $$;
+revoke all on function public._sr_log_status() from public, anon, authenticated;
+drop trigger if exists service_requests_log_status on public.service_requests;
+create trigger service_requests_log_status after insert or update of status on public.service_requests
+  for each row execute function public._sr_log_status();
+
+create or replace function public._sr_message_after_insert()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update public.service_requests set
+    updated_at          = new.created_at,
+    admin_unread        = case when new.sender = 'client' then admin_unread + 1 else 0 end,
+    client_unread       = case when new.sender = 'admin' then client_unread + 1 else client_unread end,
+    admin_unread_since  = case when new.sender = 'client' then coalesce(admin_unread_since, new.created_at) end,
+    client_unread_since = case when new.sender = 'admin' then coalesce(client_unread_since, new.created_at) else client_unread_since end
+  where id = new.request_id;
+  return null;
+end $$;
+revoke all on function public._sr_message_after_insert() from public, anon, authenticated;
+drop trigger if exists service_request_messages_after_insert on public.service_request_messages;
+create trigger service_request_messages_after_insert after insert on public.service_request_messages
+  for each row execute function public._sr_message_after_insert();
+
+-- Compte supprimé : la fiche part, sauf si elle est facturée (elle reste comme la facture, sans discussion ni fichiers).
+create or replace function public._sr_customer_deleted()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  delete from public.service_requests where customer_id = old.id and status <> 'invoiced';
+  delete from public.service_request_messages m using public.service_requests r
+   where m.request_id = r.id and r.customer_id = old.id;
+  update public.service_requests set files = '[]'::jsonb, files_purged_at = now() where customer_id = old.id;
+  return old;
+end $$;
+revoke all on function public._sr_customer_deleted() from public, anon, authenticated;
+drop trigger if exists customers_sr_deleted on public.customers;
+create trigger customers_sr_deleted before delete on public.customers
+  for each row execute function public._sr_customer_deleted();
+
+-- Appel de l'EF : jamais bloquant (la demande reste enregistrée, le tick reprend l'envoi manqué)
+create or replace function public._sr_notify(p_event text, p_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  perform net.http_post(
+    url := 'https://cqfmvdknppscazfynoiy.supabase.co/functions/v1/service-request-notify',
+    body := jsonb_build_object('event', p_event, 'id', p_id),
+    headers := jsonb_build_object('Content-Type', 'application/json',
+                 'x-cron-key', (select value from private.secrets where key = 'cron_key')),
+    timeout_milliseconds := 20000);
+exception when others then
+  raise warning 'service-request-notify : %', sqlerrm;
+end $$;
+revoke all on function public._sr_notify(text, uuid) from public, anon, authenticated;
+
+-- ---- côté client ----
+-- details : print {service, material, color, qty, desc, notes[]} ; maintenance {machines, city, other}
+create or replace function public.sr_submit(p_kind text, p_details jsonb, p_files jsonb default '[]'::jsonb,
+                                            p_page text default null, p_lang text default 'fr')
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); c public.customers; v_fl jsonb; v_d jsonb := coalesce(p_details, '{}'::jsonb); r public.service_requests;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  select * into c from public.customers where id = v_uid;
+  if not found then raise exception 'Compte introuvable. Reconnecte-toi.' using errcode = '42501'; end if;
+  if p_kind not in ('print','maintenance') then raise exception 'Demande invalide.'; end if;
+  if jsonb_typeof(v_d) <> 'object' or length(v_d::text) > 8000 then raise exception 'Demande invalide.'; end if;
+  if (select count(*) from public.service_requests where customer_id = v_uid and created_at > now() - interval '1 day') >= 10 then
+    raise exception 'Trop de demandes aujourd''hui. Écris-nous à contact@creationaudio.ca.';
+  end if;
+  v_fl := public._msg_files(p_files, v_uid);
+  if p_kind = 'print' and jsonb_array_length(v_fl) = 0 and btrim(coalesce(v_d ->> 'desc', '')) = '' then
+    raise exception 'Ajoute un fichier ou décris ta pièce.';
+  end if;
+  if p_kind = 'maintenance' and btrim(coalesce(v_d ->> 'city', '')) = '' then
+    raise exception 'Indique ta ville.';
+  end if;
+  update public.customers set last_seen_at = now() where id = v_uid;
+  insert into public.service_requests (number, kind, customer_id, email, name, phone, lang, details, files, page)
+  values ('D-' || lpad(nextval('public.service_request_seq')::text, 4, '0'), p_kind, v_uid, c.email, c.name, c.phone,
+          case when p_lang = 'en' then 'en' else 'fr' end, v_d, v_fl, nullif(left(btrim(coalesce(p_page, '')), 200), ''))
+  returning * into r;
+  perform public._sr_notify('created', r.id);
+  return jsonb_build_object('id', r.id, 'number', r.number, 'email', r.email);
+end $$;
+
+create or replace function public.me_service_requests()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'id', r.id, 'number', r.number, 'kind', r.kind, 'status', r.status, 'details', r.details, 'files', r.files,
+      'quote_price', r.quote_price, 'quote_date', r.quote_date, 'quote_note', r.quote_note, 'quoted_at', r.quoted_at,
+      'files_purged_at', r.files_purged_at, 'unread', r.client_unread, 'created_at', r.created_at, 'updated_at', r.updated_at,
+      'events', coalesce((select jsonb_agg(jsonb_build_object('status', e.status, 'at', e.created_at) order by e.created_at, e.id)
+                          from public.service_request_events e where e.request_id = r.id), '[]'::jsonb)
+    ) order by r.created_at desc), '[]'::jsonb)
+  from (select * from public.service_requests where customer_id = (select auth.uid())
+        order by created_at desc limit 100) r;
+$$;
+
+-- Discussion d'une de ses demandes (relue aux 10 s) ; l'ouvrir vaut lecture
+create or replace function public.me_sr_messages(p_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid());
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  update public.service_requests set client_unread = 0 where id = p_id and customer_id = v_uid;
+  if not found then raise exception 'Demande introuvable.'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('id', m.id, 'sender', m.sender, 'body', m.body, 'photos', m.photos,
+                     'files', m.files, 'created_at', m.created_at) order by m.created_at, m.id)
+                   from public.service_request_messages m where m.request_id = p_id), '[]'::jsonb);
+end $$;
+
+create or replace function public.sr_send(p_id uuid, p_body text, p_photos jsonb default '[]'::jsonb, p_files jsonb default '[]'::jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); v_ph jsonb; v_fl jsonb; v_msg uuid;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  if not exists (select 1 from public.service_requests where id = p_id and customer_id = v_uid) then
+    raise exception 'Demande introuvable.';
+  end if;
+  if length(btrim(coalesce(p_body, ''))) > 4000 then raise exception 'Message trop long (4000 caractères max).'; end if;
+  if (select count(*) from public.service_request_messages m join public.service_requests r on r.id = m.request_id
+       where r.customer_id = v_uid and m.sender = 'client' and m.created_at > now() - interval '1 hour') >= 30 then
+    raise exception 'Trop de messages envoyés en peu de temps. Réessaie plus tard.';
+  end if;
+  v_ph := public._msg_photos(p_photos, v_uid);
+  v_fl := public._msg_files(p_files, v_uid);
+  if btrim(coalesce(p_body, '')) = '' and jsonb_array_length(v_ph) = 0 and jsonb_array_length(v_fl) = 0 then
+    raise exception 'Écris ton message.';
+  end if;
+  update public.customers set last_seen_at = now() where id = v_uid;
+  insert into public.service_request_messages (request_id, sender, body, photos, files)
+  values (p_id, 'client', btrim(coalesce(p_body, '')), v_ph, v_fl) returning id into v_msg;
+  return jsonb_build_object('message_id', v_msg);
+end $$;
+
+-- Accepter ou refuser la soumission en cours. La décision a son propre courriel : le tick n'en renvoie pas un second.
+create or replace function public.sr_decide(p_id uuid, p_accept boolean, p_note text default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); r public.service_requests; v_note text := left(btrim(coalesce(p_note, '')), 4000);
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  select * into r from public.service_requests where id = p_id and customer_id = v_uid for update;
+  if not found then raise exception 'Demande introuvable.'; end if;
+  if r.status <> 'quoted' then raise exception 'Cette soumission n''attend plus de réponse.'; end if;
+  update public.service_requests set status = case when p_accept then 'accepted' else 'refused' end where id = p_id;
+  if v_note <> '' then
+    insert into public.service_request_messages (request_id, sender, body) values (p_id, 'client', v_note);
+  end if;
+  update public.service_requests
+     set admin_unread = admin_unread + case when v_note = '' then 1 else 0 end,
+         admin_unread_since = coalesce(admin_unread_since, now()), admin_notified_at = now()
+   where id = p_id;
+  perform public._sr_notify(case when p_accept then 'accepted' else 'refused' end, p_id);
+  return jsonb_build_object('status', case when p_accept then 'accepted' else 'refused' end);
+end $$;
+
+-- ---- côté admin ----
+create or replace function public.admin_sr_set_status(p_id uuid, p_status text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare r public.service_requests;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into r from public.service_requests where id = p_id for update;
+  if not found then raise exception 'Demande introuvable.'; end if;
+  if p_status not in ('received','evaluating','quoted','accepted','in_progress','done','refused','cancelled') then
+    raise exception 'Statut invalide.';
+  end if;
+  if r.status = 'invoiced' and r.invoice_id is not null then raise exception 'Cette demande est déjà facturée.'; end if;
+  if p_status = 'quoted' and r.quote_price is null then raise exception 'Envoie d''abord une soumission.'; end if;
+  update public.service_requests set status = p_status where id = p_id;
+end $$;
+
+create or replace function public.admin_sr_quote(p_id uuid, p_price numeric, p_date date, p_note text default null)
+returns void language plpgsql security definer set search_path = '' as $$
+declare r public.service_requests;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into r from public.service_requests where id = p_id for update;
+  if not found then raise exception 'Demande introuvable.'; end if;
+  if r.status = 'invoiced' then raise exception 'Cette demande est déjà facturée.'; end if;
+  if p_price is null or p_price <= 0 then raise exception 'Entre un prix.'; end if;
+  if p_date is null then raise exception 'Entre une date.'; end if;
+  update public.service_requests set quote_price = round(p_price, 2), quote_date = p_date,
+         quote_note = nullif(left(btrim(coalesce(p_note, '')), 1000), ''), quoted_at = now(), quote_ack_at = null,
+         notify_tries = 0, status = 'quoted', updated_at = now() where id = p_id;
+  perform public._sr_notify('quoted', p_id);
+end $$;
+
+-- Facture enregistrée depuis la fiche : Facturée + compte relié à sa fiche client (comme admin_invoice_customer_order)
+create or replace function public.admin_sr_invoice(p_id uuid, p_invoice uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.service_requests; c public.customers; v_cid uuid;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into r from public.service_requests where id = p_id for update;
+  if not found then raise exception 'Demande introuvable.'; end if;
+  update public.service_requests set status = 'invoiced', invoice_id = p_invoice where id = p_id;
+  if r.customer_id is not null then
+    select * into c from public.customers where id = r.customer_id;
+    v_cid := c.client_id;
+    if v_cid is null then
+      select id into v_cid from public.clients where lower(email) = lower(r.email) limit 1;
+      if v_cid is null then
+        insert into public.clients (name, email, phone)
+        values (coalesce(nullif(btrim(r.name), ''), r.email), lower(r.email), r.phone) returning id into v_cid;
+      end if;
+      if exists (select 1 from public.customers x where x.client_id = v_cid and x.id <> c.id) then
+        v_cid := null;
+      else
+        update public.customers set client_id = v_cid, linked_at = now() where id = c.id;
+      end if;
+    end if;
+    if v_cid is not null then update public.invoices set client_id = v_cid where id = p_invoice; end if;
+  end if;
+  return jsonb_build_object('client_id', v_cid);
+end $$;
+
+revoke all on function public.sr_submit(text, jsonb, jsonb, text, text)  from public, anon;
+revoke all on function public.me_service_requests()                       from public, anon;
+revoke all on function public.me_sr_messages(uuid)                        from public, anon;
+revoke all on function public.sr_send(uuid, text, jsonb, jsonb)           from public, anon;
+revoke all on function public.sr_decide(uuid, boolean, text)              from public, anon;
+revoke all on function public.admin_sr_set_status(uuid, text)             from public, anon;
+revoke all on function public.admin_sr_quote(uuid, numeric, date, text)   from public, anon;
+revoke all on function public.admin_sr_invoice(uuid, uuid)                from public, anon;
+grant execute on function public.sr_submit(text, jsonb, jsonb, text, text)  to authenticated;
+grant execute on function public.me_service_requests()                       to authenticated;
+grant execute on function public.me_sr_messages(uuid)                        to authenticated;
+grant execute on function public.sr_send(uuid, text, jsonb, jsonb)           to authenticated;
+grant execute on function public.sr_decide(uuid, boolean, text)              to authenticated;
+grant execute on function public.admin_sr_set_status(uuid, text)             to authenticated;
+grant execute on function public.admin_sr_quote(uuid, numeric, date, text)   to authenticated;
+grant execute on function public.admin_sr_invoice(uuid, uuid)                to authenticated;
+
+-- Tick (chaque minute) : discussion non lue depuis 5 min, ou courriel manqué (3 essais) -> service-request-notify
+create or replace function public.service_requests_tick()
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.service_requests
+              where (admin_unread > 0 and admin_notified_at is null
+                     and admin_unread_since <= now() - interval '5 minutes' and admin_unread_since > now() - interval '2 days')
+                 or (client_unread > 0 and client_notified_at is null
+                     and client_unread_since <= now() - interval '5 minutes' and client_unread_since > now() - interval '2 days')
+                 or (notify_tries < 3 and created_at <= now() - interval '3 minutes' and created_at > now() - interval '1 day'
+                     and (client_ack_at is null or admin_ack_at is null))
+                 or (notify_tries < 3 and quoted_at <= now() - interval '3 minutes' and quoted_at > now() - interval '1 day'
+                     and quote_ack_at is null)) then
+    perform net.http_post(
+      url := 'https://cqfmvdknppscazfynoiy.supabase.co/functions/v1/service-request-notify',
+      body := '{"cron":true}'::jsonb,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                   'x-cron-key', (select value from private.secrets where key = 'cron_key')),
+      timeout_milliseconds := 20000);
+  end if;
+end $$;
+revoke all on function public.service_requests_tick() from public, anon, authenticated;
+select cron.unschedule(jobid) from cron.job where jobname = 'service-requests-tick';
+select cron.schedule('service-requests-tick', '* * * * *', 'select public.service_requests_tick()');

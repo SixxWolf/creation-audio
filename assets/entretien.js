@@ -168,17 +168,14 @@
     status.textContent = '';
   });
 
-  var city = $('et-city'), other = $('et-other'), status = $('et-status'), ask = $('et-ask');
+  var city = $('et-city'), other = $('et-other'), status = $('et-status'), submit = $('et-submit');
 
   function flag(el, bad) { el.classList.toggle('is-bad', bad); el.setAttribute('aria-invalid', bad ? 'true' : 'false'); }
 
   form.addEventListener('submit', function (e) {
     e.preventDefault();
-    var c = city.value.trim(), o = other.value.trim(), parts = [];
-    if (qty.a1) parts.push(qty.a1 + ' ' + _t('Bambu Lab A1'));
-    if (qty.xp) parts.push(qty.xp + ' ' + _t('Bambu Lab série X / P'));
-    if (qty.snap) parts.push(qty.snap + ' ' + _t('Snapmaker U1'));
-    var noMachine = !parts.length && !o;
+    var c = city.value.trim(), o = other.value.trim();
+    var noMachine = !qty.a1 && !qty.xp && !qty.snap && !o;
     flag(city, !c);
     status.className = 'et-status';
     if (!c || noMachine) {
@@ -187,13 +184,27 @@
       if (!c) city.focus(); else other.focus();
       return;
     }
-    var body = _t('Bonjour, je veux un entretien mensuel de mes imprimantes.') + '\n' +
-      _t('Ville ou secteur :') + ' ' + c;
-    if (parts.length) body += '\n' + _t('Machines :') + ' ' + parts.join(', ');
-    if (o) body += '\n' + _t('Précision :') + ' ' + o;
-    ask.setAttribute('data-msg-body', body);
     status.textContent = '';
-    ask.click();
+    window.CA.demande.submit({
+      details: { machines: { a1: qty.a1, xp: qty.xp, snap: qty.snap }, city: c, other: o, monthly: unit * qty.a1 },
+      files: []
+    });
   });
   city.addEventListener('input', function () { flag(city, false); });
+
+  window.CA.demande.init({
+    kind: 'maintenance', form: form, status: status,
+    onBusy: function (on) { submit.disabled = on; },
+    onReset: function () {
+      qty.a1 = 1; qty.xp = 0; qty.snap = 0;
+      city.value = ''; other.value = '';
+      render(false);
+    },
+    onRestore: function (d) {
+      var m = d.machines || {};
+      qty.a1 = +m.a1 || 0; qty.xp = +m.xp || 0; qty.snap = +m.snap || 0;
+      city.value = d.city || ''; other.value = d.other || '';
+      render(false);
+    }
+  });
 })();
