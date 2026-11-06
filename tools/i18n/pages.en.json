@@ -885,5 +885,13 @@
  "Pouvez-vous dessiner la pièce pour moi ?": "Can you design the part for me?",
  "Oui. L'aperçu se fait dans ton navigateur : rien ne part avant que tu envoies ta demande. Ensuite, tes fichiers servent seulement à ta demande et ne sont pas partagés.": "Yes. The preview runs in your browser: nothing leaves until you send your request. After that, your files are used only for your request and are not shared.",
  "Prêt ? Dépose ton fichier.": "Ready? Drop your file.",
- "Dépose ton fichier": "Drop your file"
+ "Dépose ton fichier": "Drop your file",
+ "Livraison pour les revendeurs.": "Delivery for dealers.",
+ "Les revendeurs approuvés peuvent choisir la livraison au Canada depuis le portail revendeur. Le coût de la livraison et, s'il y a lieu, le montant à partir duquel elle est gratuite sont affichés dans le panier avant l'envoi de la commande.": "Approved dealers can choose delivery within Canada from the dealer portal. The delivery cost and, where applicable, the amount above which delivery is free are shown in the cart before the order is sent.",
+ "La livraison gratuite est une": "Free delivery is a",
+ "offre d'une durée limitée": "limited-time offer",
+ ", que nous pouvons modifier ou retirer à tout moment. Une commande déjà envoyée conserve le coût de livraison affiché à son envoi.": ", which we may change or withdraw at any time. An order already sent keeps the delivery cost shown when it was sent.",
+ "Une commande livrée se paie par": "A delivered order is paid by",
+ "virement Interac": "Interac e-Transfer",
+ ", à la réception de la facture.": ", upon receipt of the invoice."
 }

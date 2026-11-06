@@ -229,6 +229,21 @@ section[id], main { scroll-margin-top:84px; }
 .rv-field input:hover { border-color:color-mix(in srgb, var(--rv-ink) 30%, var(--rv-line-2)); }
 .rv-field input:focus { outline:none; border-color:var(--rv-accent); box-shadow:0 0 0 3px var(--rv-accent-wash); }
 .rv-field input[aria-invalid="true"] { border-color:var(--rv-bad); }
+.rv-field .cpk { position:relative; min-width:0; }
+.rv-field .cpk-btn { display:flex; align-items:center; width:100%; height:48px; padding:0 34px 0 14px; border-radius:12px; border:1px solid var(--rv-line-2);
+  background:var(--rv-bg); color:var(--rv-ink); font:500 1rem var(--font); text-align:left; cursor:pointer; transition:border-color .15s, box-shadow .15s; }
+.rv-field .cpk::after { content:""; position:absolute; right:16px; top:50%; width:8px; height:8px; margin-top:-6px; border-right:2px solid var(--rv-muted); border-bottom:2px solid var(--rv-muted); transform:rotate(45deg); pointer-events:none; }
+.rv-field .cpk-btn:hover, .rv-field .cpk-btn[aria-expanded="true"], .rv-field .cpk-btn:focus-visible { outline:none; border-color:var(--rv-accent); }
+.rv-field .cpk:has(select[aria-invalid="true"]) .cpk-btn { border-color:var(--rv-bad); }
+.rv-field .cpk-txt { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rv-field .cpk-txt.is-ph { color:var(--rv-dim); }
+/* la liste s'ouvre hors de .rv : couleurs écrites directement */
+.cpk-pop { position:fixed; z-index:200; display:flex; flex-direction:column; padding:6px; background:#161A1F; border:1px solid #343A45; border-radius:12px; box-shadow:0 22px 44px -22px rgba(0,0,0,.8); color-scheme:dark; }
+.cpk-list { flex:1 1 auto; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.cpk-item { display:flex; width:100%; padding:10px; font:500 1rem var(--font); color:#ECEDF0; text-align:left; cursor:pointer; background:none; border:0; border-radius:9px; }
+.cpk-item:hover, .cpk-item.is-active { background:#252A32; }
+.cpk-item.is-sel { font-weight:700; color:color-mix(in srgb, var(--ember) 72%, #fff); }
+.cpk-item.is-ph { color:#9AA1AC; }
 .rv-hp { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
 .rv-submit { width:100%; margin-top:22px; }
 .rv-status { min-height:1.4em; margin:12px 0 0; text-align:center; color:var(--rv-muted); font-weight:600; }

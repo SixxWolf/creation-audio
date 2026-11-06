@@ -3985,17 +3985,27 @@ create policy dealer_requests_admin_all on public.dealer_requests for all to aut
 -- Nouvelle demande (Edge Function seulement). -> { status: 'new'|'pending'|'dealer'|'wait', id? }
 --   pending = une demande attend déjà pour ce courriel ; dealer = déjà revendeur ;
 --   wait = trop de demandes depuis cette adresse IP. Refus récent (30 j) : 'new' sans rien créer.
+alter table public.dealer_requests add column if not exists address text;
+
 create or replace function public.dealer_request_submit(p jsonb, p_ip text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   v_email text := lower(btrim(coalesce(p ->> 'email', '')));
   v_id uuid;
   f text;
+  v_city text := btrim(coalesce(p ->> 'city', ''));
+  v_addr text;
 begin
   if random() < 0.05 then
     delete from public.dealer_requests where status = 'refused' and decided_at < now() - interval '90 days';
   end if;
-  foreach f in array array['business', 'contact', 'phone', 'city'] loop
+  -- le formulaire envoie « adresse | Ville, QC G1A 1A1 » dans city (la fonction Edge ne laisse passer que city)
+  if position(' |' in v_city) > 0 then
+    v_addr := nullif(btrim(split_part(v_city, ' |', 1)), '');
+    v_city := btrim(split_part(v_city, ' |', 2));
+  end if;
+  if v_city = '' then raise exception 'Champ manquant : city' using errcode = '22023'; end if;
+  foreach f in array array['business', 'contact', 'phone'] loop
     if btrim(coalesce(p ->> f, '')) = '' then raise exception 'Champ manquant : %', f using errcode = '22023'; end if;
   end loop;
   if v_email !~ '^[^\s@]+@[^\s@]+\.[a-z]{2,}$' then raise exception 'Courriel invalide.' using errcode = '22023'; end if;
@@ -4013,9 +4023,9 @@ begin
               and decided_at > now() - interval '30 days') then
     return jsonb_build_object('status', 'new');
   end if;
-  insert into public.dealer_requests (business, contact, email, phone, city, website, facebook, lang, ip)
+  insert into public.dealer_requests (business, contact, email, phone, city, address, website, facebook, lang, ip)
   values (left(btrim(p ->> 'business'), 120), left(btrim(p ->> 'contact'), 120), v_email,
-          left(btrim(p ->> 'phone'), 40), left(btrim(p ->> 'city'), 120),
+          left(btrim(p ->> 'phone'), 40), left(v_city, 120), left(v_addr, 200),
           nullif(left(btrim(coalesce(p ->> 'website', '')), 300), ''),
           nullif(left(btrim(coalesce(p ->> 'facebook', '')), 300), ''),
           case when p ->> 'lang' = 'en' then 'en' else 'fr' end, nullif(left(p_ip, 64), ''))
@@ -4025,7 +4035,6 @@ end $$;
 revoke all on function public.dealer_request_submit(jsonb, text) from public, anon, authenticated;
 grant execute on function public.dealer_request_submit(jsonb, text) to service_role;
 
--- Décision de l'admin. Approuver = ajout à « dealers » (nom = commerce). -> la demande (courriel de bienvenue)
 create or replace function public.admin_dealer_request_decide(p_id uuid, p_approve boolean)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare r public.dealer_requests;
@@ -4036,11 +4045,12 @@ begin
    where id = p_id and status = 'pending' returning * into r;
   if not found then raise exception 'Demande introuvable ou déjà traitée.'; end if;
   if p_approve then
-    insert into public.dealers (email, name, phone, city)
-    values (lower(r.email), r.business, r.phone, r.city)
-    on conflict (email) do update set name  = coalesce(public.dealers.name, excluded.name),
-                                      phone = coalesce(public.dealers.phone, excluded.phone),
-                                      city  = coalesce(public.dealers.city, excluded.city);
+    insert into public.dealers (email, name, phone, city, address)
+    values (lower(r.email), r.business, r.phone, r.city, r.address)
+    on conflict (email) do update set name    = coalesce(public.dealers.name, excluded.name),
+                                      phone   = coalesce(public.dealers.phone, excluded.phone),
+                                      city    = coalesce(public.dealers.city, excluded.city),
+                                      address = coalesce(public.dealers.address, excluded.address);
   end if;
   return to_jsonb(r) - 'ip';
 end $$;

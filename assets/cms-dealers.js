@@ -189,7 +189,7 @@
   setInterval(function () { if (document.visibilityState === 'visible') refreshBadge(); }, 60000);
 
   function loadReqs() {
-    return sb.from('dealer_requests').select('id,business,contact,email,phone,city,website,facebook,lang,created_at')
+    return sb.from('dealer_requests').select('id,business,contact,email,phone,address,city,website,facebook,lang,created_at')
       .eq('status', 'pending').order('created_at', { ascending: true }).then(function (res) {
         if (res.error) { reqs = []; renderReqs(); return; }
         reqs = res.data || [];
@@ -226,7 +226,7 @@
             '<span class="pm">' + esc(r.contact) + '</span>' +
             '<span class="pm pm-mail">' + CA.pv(r.email) + '</span>' +
             '<span class="pm pm-tel">' + CA.pv(r.phone) + '</span>' +
-            '<span class="pm pm-loc">' + esc(r.city) + '</span>' +
+            '<span class="pm pm-loc">' + esc((r.address ? r.address + ', ' : '') + r.city) + '</span>' +
             (web ? '<span class="pm pm-link"><a href="' + esc(web) + '" target="_blank" rel="noopener noreferrer">Site web</a></span>' : '') +
             (fb ? '<span class="pm pm-link"><a href="' + esc(fb) + '" target="_blank" rel="noopener noreferrer">Facebook</a></span>' : '') +
             '<span class="pm pm-date">' + esc(when(r.created_at)) + '</span>' +

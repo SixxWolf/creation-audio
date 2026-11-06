@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/revendeur.css?v=5">
+<link rel="stylesheet" href="assets/revendeur.css?v=6">
 <!-- Page « Atelier » sombre : pas de thème des fêtes (nav.js lit data-fetes-off) ; .rv-js = animations d'apparition -->
 <script>document.documentElement.setAttribute('data-fetes-off','');document.documentElement.classList.add('rv-js');</script>
 <script src="assets/i18n.js?v=1"></script>
@@ -183,11 +183,17 @@
               <input name="email" type="email" required maxlength="254" autocomplete="email" inputmode="email"></label>
             <label class="rv-field"><span>Téléphone</span>
               <input name="phone" type="tel" required maxlength="40" autocomplete="tel"></label>
-            <label class="rv-field rv-wide"><span>Ville, province</span>
-              <input name="city" required maxlength="120" autocomplete="address-level2" placeholder="ex. Québec, QC"></label>
+            <label class="rv-field rv-wide"><span>Adresse</span>
+              <input name="address" required maxlength="60" autocomplete="address-line1"></label>
+            <label class="rv-field"><span>Ville</span>
+              <input name="city" required maxlength="45" autocomplete="address-level2"></label>
+            <div class="rv-field"><span>Province</span>
+              <select name="province" required data-nosearch aria-label="Province"><option value="">Choisir</option><option value="QC">Québec</option><option value="ON">Ontario</option><option value="NB">Nouveau-Brunswick</option><option value="NS">Nouvelle-Écosse</option><option value="PE">Île-du-Prince-Édouard</option><option value="NL">Terre-Neuve-et-Labrador</option><option value="MB">Manitoba</option><option value="SK">Saskatchewan</option><option value="AB">Alberta</option><option value="BC">Colombie-Britannique</option><option value="YT">Yukon</option><option value="NT">Territoires du Nord-Ouest</option><option value="NU">Nunavut</option></select></div>
+            <label class="rv-field"><span>Code postal</span>
+              <input name="postal" required maxlength="7" autocomplete="postal-code"></label>
             <label class="rv-field"><span>Site web <small>facultatif</small></span>
               <input name="website" maxlength="300" autocomplete="url" inputmode="url"></label>
-            <label class="rv-field"><span>Page Facebook <small>facultatif</small></span>
+            <label class="rv-field rv-wide"><span>Page Facebook <small>facultatif</small></span>
               <input name="facebook" maxlength="300" inputmode="url"></label>
           </div>
           <!-- champ piège : invisible pour les gens, rempli par les robots -->
@@ -229,6 +235,7 @@
 <script src="assets/nav.js?v=18"></script>
 <script src="assets/promo.js?v=1"></script>
 <script src="assets/spacer-catalog.js?v=17"></script>
-<script src="assets/revendeur.js?v=4"></script>
+<script src="assets/ca-pick.js?v=2"></script>
+<script src="assets/revendeur.js?v=5"></script>
 </body>
 </html>

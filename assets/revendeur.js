@@ -206,21 +206,23 @@
   /* ---------- formulaire de demande ---------- */
   var form = $('#rv-form'), status = $('#rv-status'), btn = $('#rv-submit');
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
-  var REQUIRED = ['business', 'contact', 'email', 'phone', 'city'];
+  var POSTAL_RE = /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/;
+  var REQUIRED = ['business', 'contact', 'email', 'phone', 'address', 'city', 'province', 'postal'];
+  var provPk = window.CA.pick(form.elements.province);
   function say(msg, bad) { status.textContent = msg || ''; status.classList.toggle('is-bad', !!bad); }
   function field(n) { return form.elements[n]; }
   function check() {
     var first = null;
     REQUIRED.forEach(function (n) {
       var el = field(n), v = el.value.trim();
-      var bad = !v || (n === 'email' && !EMAIL_RE.test(v));
+      var bad = !v || (n === 'email' && !EMAIL_RE.test(v)) || (n === 'postal' && !POSTAL_RE.test(v));
       el.setAttribute('aria-invalid', bad ? 'true' : 'false');
       if (bad && !first) first = el;
     });
     return first;
   }
   REQUIRED.forEach(function (n) {
-    field(n).addEventListener('input', function () { if (this.getAttribute('aria-invalid') === 'true') this.setAttribute('aria-invalid', 'false'); });
+    field(n).addEventListener(n === 'province' ? 'change' : 'input', function () { if (this.getAttribute('aria-invalid') === 'true') this.setAttribute('aria-invalid', 'false'); });
   });
   function done(kind, email) {
     var t = $('#rv-done-t'), p = $('#rv-done-p'), portal = $('#rv-done-portal');
@@ -243,12 +245,19 @@
     var bad = check();
     if (bad) {
       var onlyEmail = bad.name === 'email' && REQUIRED.every(function (n) { return n === 'email' || field(n).getAttribute('aria-invalid') !== 'true'; });
-      say(onlyEmail ? _t('Entre un courriel valide.') : _t('Remplis les champs requis.'), true); bad.focus(); return;
+      var onlyPostal = bad.name === 'postal' && bad.value.trim() && REQUIRED.every(function (n) { return n === 'postal' || field(n).getAttribute('aria-invalid') !== 'true'; });
+      say(onlyEmail ? _t('Entre un courriel valide.') : onlyPostal ? _t('Code postal invalide.') : _t('Remplis les champs requis.'), true);
+      if (bad.name === 'province') provPk.focus(); else bad.focus();
+      return;
     }
     var cfg = window.CA_SUPABASE || {};
     if (!cfg.url || !window.fetch) { say(_t('Envoi impossible pour l\'instant. Écris-nous à contact@creationaudio.ca.'), true); return; }
     var body = { action: 'submit', lang: EN ? 'en' : 'fr', hp: field('hp').value };
-    ['business', 'contact', 'email', 'phone', 'city', 'website', 'facebook'].forEach(function (n) { body[n] = field(n).value.trim(); });
+    ['business', 'contact', 'email', 'phone', 'website', 'facebook'].forEach(function (n) { body[n] = field(n).value.trim(); });
+    // « adresse | Ville, QC G1A 1A1 » : séparé par dealer_request_submit (60 + 3 + 45 + 12 = 120 max)
+    var post = field('postal').value.trim().toUpperCase().replace(/[ -]/, '');
+    function clean(n) { return field(n).value.trim().replace(/\s*\|\s*/g, ' '); }
+    body.city = clean('address') + ' | ' + clean('city') + ', ' + field('province').value + ' ' + post.slice(0, 3) + ' ' + post.slice(3);
     btn.disabled = true; say(_t('Envoi…'));
     fetch(cfg.url + '/functions/v1/dealer-request', {
       method: 'POST',
