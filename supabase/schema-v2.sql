@@ -5169,8 +5169,6 @@ $$;
 -- ------------------------------------------------------------
 create table if not exists public.maintenance_calc (
   id               smallint primary key default 1 check (id = 1),
-  travel_minutes   integer not null default 60 check (travel_minutes between 0 and 600),
-  machines_per_visit integer not null default 1 check (machines_per_visit between 1 and 100),
   margin_pct       numeric(5,2) not null default 40 check (margin_pct >= 0 and margin_pct < 95)
 );
 insert into public.maintenance_calc (id) values (1) on conflict (id) do nothing;
@@ -5203,3 +5201,4 @@ select v.n, v.c, v.q, v.o from (values
 where not exists (select 1 from public.maintenance_materials);
 
 alter table public.maintenance_calc drop column if exists travel_cost;
+alter table public.maintenance_calc drop column if exists travel_minutes, drop column if exists machines_per_visit;

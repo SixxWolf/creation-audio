@@ -16,9 +16,9 @@
 
   var BUCKET = 'products', DIR = 'entretien';
   var rows = [], rate = 60, loaded = false;
-  var calc = { travel_minutes: 60, machines_per_visit: 1, margin_pct: 40 }, mats = [];
+  var calc = { margin_pct: 40 }, mats = [];
   var matsEl = document.getElementById('ec-mats'), resEl = document.getElementById('ec-res');
-  var CFG = { 'ec-tmin': 'travel_minutes', 'ec-mpv': 'machines_per_visit', 'ec-margin': 'margin_pct' };
+  var CFG = { 'ec-margin': 'margin_pct' };
   var rateEl = document.getElementById('en-rate'), fileEl = document.getElementById('en-file');
   var uploadFor = null;
 
@@ -60,15 +60,14 @@
     paintRes();
   }
 
-  /* ---- calculateur de prix : temps × taux + matériaux + part du déplacement, puis marge visée ---- */
+  /* ---- calculateur de prix : temps × taux + matériaux, puis marge visée (le déplacement est facturé à part au client) ---- */
   function money(n) { return CA.money ? CA.money(n) : (Math.round(n * 100) / 100).toFixed(2) + ' $'; }
   function matCost() { return mats.reduce(function (t, m) { return t + (+m.cost || 0) * (+m.qty || 0); }, 0); }
-  function travelShare() { return (rate * calc.travel_minutes / 60) / Math.max(1, calc.machines_per_visit); }
   function figures(r) {
-    var min = r.minutes || 0, labor = rate * min / 60, mat = matCost(), trav = travelShare(), cost = labor + mat + trav;
+    var min = r.minutes || 0, labor = rate * min / 60, mat = matCost(), cost = labor + mat;
     var sug = min ? Math.ceil(cost / (1 - calc.margin_pct / 100)) : null;
     var cur = r.price_month == null ? null : +r.price_month;
-    return { labor: labor, mat: mat, trav: trav, cost: cost, sug: sug, cur: cur, profit: cur == null ? null : cur - cost, pct: cur ? (cur - cost) / cur * 100 : null };
+    return { labor: labor, mat: mat, cost: cost, sug: sug, cur: cur, profit: cur == null ? null : cur - cost, pct: cur ? (cur - cost) / cur * 100 : null };
   }
   function paintCfg() {
     Object.keys(CFG).forEach(function (id) { var el = document.getElementById(id); if (el) el.value = calc[CFG[id]]; });
@@ -90,7 +89,7 @@
     var body = rows.map(function (r) {
       var x = figures(r);
       if (!x.sug) miss = true;
-      return '<tr data-id="' + esc(r.id) + '"><td>' + esc([r.brand, r.name].filter(Boolean).join(' ')) + '<small>' + esc(money(x.labor) + ' + ' + money(x.mat) + ' + ' + money(x.trav)) + '</small></td>' +
+      return '<tr data-id="' + esc(r.id) + '"><td>' + esc([r.brand, r.name].filter(Boolean).join(' ')) + '<small>' + esc(money(x.labor) + ' + ' + money(x.mat)) + '</small></td>' +
         '<td><input type="number" data-cm min="1" max="600" step="1" inputmode="numeric" value="' + esc(r.minutes == null ? '' : r.minutes) + '" aria-label="Minutes"></td>' +
         '<td>' + money(x.cost) + '</td>' +
         '<td><b>' + (x.sug ? money(x.sug) : '—') + '</b><small>' + (x.cur == null ? 'Sur évaluation' : 'Actuel ' + money(x.cur)) + '</small></td>' +
@@ -98,7 +97,7 @@
         '<td>' + (x.sug && x.sug !== x.cur ? '<button type="button" class="btn btn-ghost btn-sm" data-apply>Appliquer</button>' : '') + '</td></tr>';
     }).join('');
     resEl.innerHTML = '<table><thead><tr><th>Machine</th><th>Minutes</th><th>Coût</th><th>Prix suggéré</th><th>Profit</th><th></th></tr></thead><tbody>' + body + '</tbody></table>' +
-      '<p class="muted en-note">Sous chaque machine : main-d’œuvre + matériaux + déplacement.' + (miss ? ' Entre les minutes d’une machine pour obtenir son prix suggéré.' : '') + '</p>';
+      '<p class="muted en-note">Sous chaque machine : main-d’œuvre + matériaux. Le déplacement est facturé à part.' + (miss ? ' Entre les minutes d’une machine pour obtenir son prix suggéré.' : '') + '</p>';
   }
 
   /* ---- données ---- */
@@ -284,8 +283,8 @@
     cfgEl.addEventListener('change', function (e) {
       var el = e.target, id = el.id;
       if (CFG[id]) {
-        var k = CFG[id], v = num(el.value), max = k === 'margin_pct' ? 94 : k === 'travel_minutes' ? 600 : 100;
-        if (v == null || v < 0 || (k === 'machines_per_visit' && v < 1) || v > max) { el.value = calc[k]; return; }
+        var k = CFG[id], v = num(el.value), max = 94;
+        if (v == null || v < 0 || v > max) { el.value = calc[k]; return; }
         v = k === 'margin_pct' ? Math.round(v * 100) / 100 : Math.round(v);
         var patch = {}; patch[k] = v;
         sb.from('maintenance_calc').update(patch).eq('id', 1).then(function (res) {
