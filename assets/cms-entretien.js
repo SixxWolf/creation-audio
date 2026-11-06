@@ -39,18 +39,17 @@
   function card(r, i) {
     var url = photoUrl(r.photo);
     return '<article class="en-card' + (r.visible ? '' : ' is-off') + '" data-id="' + esc(r.id) + '">' +
+      '<span class="drag-handle" title="Glisser pour réordonner">⠿</span>' +
       '<button type="button" class="en-ph" data-act="photo" aria-label="Changer la photo">' +
         (url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span>Photo</span>') + '</button>' +
       '<div class="en-fields">' +
         '<label class="field"><span class="lbl">Marque</span><input type="text" data-f="brand" value="' + esc(r.brand || '') + '" maxlength="40" autocomplete="off"></label>' +
         '<label class="field"><span class="lbl">Modèle</span><input type="text" data-f="name" value="' + esc(r.name) + '" maxlength="80" autocomplete="off"></label>' +
-        '<label class="field"><span class="lbl">Prix par mois</span><span class="unit" data-unit="$"><input type="number" data-f="price_month" min="0.01" step="0.01" inputmode="decimal" placeholder="Sur évaluation" value="' + esc(r.price_month == null ? '' : r.price_month) + '"></span></label>' +
-        '<label class="field"><span class="lbl">Temps estimé</span><span class="unit" data-unit="min"><input type="number" data-f="minutes" min="1" max="600" step="1" inputmode="numeric" value="' + esc(r.minutes == null ? '' : r.minutes) + '"></span></label>' +
+        '<label class="field"><span class="lbl">Prix/mois</span><span class="unit" data-unit="$"><input type="number" data-f="price_month" min="0.01" step="0.01" inputmode="decimal" placeholder="À évaluer" value="' + esc(r.price_month == null ? '' : r.price_month) + '"></span></label>' +
+        '<label class="field"><span class="lbl">Minutes</span><span class="unit" data-unit="min"><input type="number" data-f="minutes" min="1" max="600" step="1" inputmode="numeric" value="' + esc(r.minutes == null ? '' : r.minutes) + '"></span></label>' +
       '</div>' +
       '<div class="en-acts">' +
         '<label class="en-vis"><input type="checkbox" data-f="visible"' + (r.visible ? ' checked' : '') + '> Visible</label>' +
-        '<button type="button" class="btn btn-ghost btn-sm" data-act="up" aria-label="Monter"' + (i === 0 ? ' disabled' : '') + '>↑</button>' +
-        '<button type="button" class="btn btn-ghost btn-sm" data-act="down" aria-label="Descendre"' + (i === rows.length - 1 ? ' disabled' : '') + '>↓</button>' +
         '<button type="button" class="btn btn-ghost btn-sm" data-act="del" data-ic="trash" aria-label="Supprimer"></button>' +
       '</div>' +
     '</article>';
@@ -91,16 +90,15 @@
     var body = rows.map(function (r) {
       var x = figures(r);
       if (!x.sug) miss = true;
-      return '<tr data-id="' + esc(r.id) + '"><td>' + esc([r.brand, r.name].filter(Boolean).join(' ')) + '</td>' +
+      return '<tr data-id="' + esc(r.id) + '"><td>' + esc([r.brand, r.name].filter(Boolean).join(' ')) + '<small>' + esc(money(x.labor) + ' + ' + money(x.mat) + ' + ' + money(x.trav)) + '</small></td>' +
         '<td><input type="number" data-cm min="1" max="600" step="1" inputmode="numeric" value="' + esc(r.minutes == null ? '' : r.minutes) + '" aria-label="Minutes"></td>' +
-        '<td>' + money(x.labor) + '</td><td>' + money(x.mat) + '</td><td>' + money(x.trav) + '</td><td>' + money(x.cost) + '</td>' +
-        '<td><b>' + (x.sug ? money(x.sug) : '—') + '</b></td>' +
-        '<td>' + (x.cur == null ? 'Sur évaluation' : money(x.cur)) + '</td>' +
+        '<td>' + money(x.cost) + '</td>' +
+        '<td><b>' + (x.sug ? money(x.sug) : '—') + '</b><small>' + (x.cur == null ? 'Sur évaluation' : 'Actuel ' + money(x.cur)) + '</small></td>' +
         '<td class="' + (x.pct == null ? '' : x.pct >= calc.margin_pct ? 'is-good' : x.pct >= 0 ? '' : 'is-bad') + '">' + (x.pct == null ? '—' : money(x.profit) + ' (' + Math.round(x.pct) + ' %)') + '</td>' +
         '<td>' + (x.sug && x.sug !== x.cur ? '<button type="button" class="btn btn-ghost btn-sm" data-apply>Appliquer</button>' : '') + '</td></tr>';
     }).join('');
-    resEl.innerHTML = '<table><thead><tr><th>Machine</th><th>Minutes</th><th>Main-d’œuvre</th><th>Matériaux</th><th>Déplacement</th><th>Coût</th><th>Prix suggéré</th><th>Prix actuel</th><th>Profit</th><th></th></tr></thead><tbody>' + body + '</tbody></table>' +
-      (miss ? '<p class="muted en-note">Entre les minutes d’une machine pour obtenir son prix suggéré.</p>' : '');
+    resEl.innerHTML = '<table><thead><tr><th>Machine</th><th>Minutes</th><th>Coût</th><th>Prix suggéré</th><th>Profit</th><th></th></tr></thead><tbody>' + body + '</tbody></table>' +
+      '<p class="muted en-note">Sous chaque machine : main-d’œuvre + matériaux + déplacement.' + (miss ? ' Entre les minutes d’une machine pour obtenir son prix suggéré.' : '') + '</p>';
   }
 
   /* ---- données ---- */
@@ -170,16 +168,6 @@
     var r = byId(art.getAttribute('data-id')), act = b.getAttribute('data-act');
     if (!r) return;
     if (act === 'photo') { uploadFor = r; fileEl.value = ''; fileEl.click(); return; }
-    if (act === 'up' || act === 'down') {
-      var i = rows.indexOf(r), j = act === 'up' ? i - 1 : i + 1;
-      if (j < 0 || j >= rows.length) return;
-      rows.splice(j, 0, rows.splice(i, 1)[0]);
-      Promise.all(rows.map(function (x, k) {
-        x.sort_order = k + 1;
-        return sb.from('maintenance_printers').update({ sort_order: k + 1 }).eq('id', x.id);
-      })).then(function () { paint(); if (CA.entretienChanged) CA.entretienChanged(); }, function (er) { window.caDialog.error(er); load(); });
-      return;
-    }
     if (act === 'del') {
       window.caDialog.confirm({ title: 'Supprimer ' + [r.brand, r.name].filter(Boolean).join(' ') + ' ?', message: 'Les demandes déjà reçues gardent son nom.', ok: 'Supprimer', cancel: 'Annuler', danger: true }).then(function (ok) {
         if (!ok) return;
@@ -192,6 +180,56 @@
         }, function (er) { window.caDialog.error(er); });
       });
     }
+  });
+
+  /* ---- glisser-déposer (comme l'onglet Filaments) : seule façon de réordonner ---- */
+  var dragRow = null;
+  function persistOrder() {
+    var ups = rows.map(function (x, k) {
+      if (x.sort_order === k + 1) return null;
+      x.sort_order = k + 1;
+      return sb.from('maintenance_printers').update({ sort_order: k + 1 }).eq('id', x.id);
+    }).filter(Boolean);
+    if (!ups.length) return;
+    Promise.all(ups).then(function () { if (CA.entretienChanged) CA.entretienChanged(); }, function (er) { window.caDialog.error(er); load(); });
+  }
+  // la carte n'est glissable que si on la saisit ailleurs que dans un champ (le texte reste sélectionnable)
+  listEl.addEventListener('mousedown', function (e) {
+    var art = e.target.closest('.en-card');
+    if (art) art.draggable = !e.target.closest('input, textarea, select');
+  });
+  listEl.addEventListener('dragstart', function (e) {
+    var art = e.target.closest && e.target.closest('.en-card');
+    if (!art) return;
+    dragRow = byId(art.getAttribute('data-id'));
+    art.classList.add('dragging');
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', art.getAttribute('data-id')); } catch (_) {} }
+  });
+  listEl.addEventListener('dragend', function () {
+    dragRow = null;
+    Array.prototype.forEach.call(listEl.querySelectorAll('.en-card'), function (c) { c.classList.remove('dragging', 'drop-target'); c.draggable = false; });
+  });
+  listEl.addEventListener('dragover', function (e) {
+    if (!dragRow || !e.target.closest('.en-card')) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+  });
+  listEl.addEventListener('dragenter', function (e) {
+    var art = e.target.closest('.en-card');
+    Array.prototype.forEach.call(listEl.querySelectorAll('.drop-target'), function (c) { c.classList.remove('drop-target'); });
+    if (dragRow && art && art.getAttribute('data-id') !== dragRow.id) art.classList.add('drop-target');
+  });
+  listEl.addEventListener('drop', function (e) {
+    var art = e.target.closest('.en-card');
+    if (!dragRow || !art) return;
+    e.preventDefault();
+    var to = byId(art.getAttribute('data-id')), from = dragRow;
+    dragRow = null;
+    if (!to || to === from) { paint(); return; }
+    var i = rows.indexOf(from), j = rows.indexOf(to);
+    rows.splice(j, 0, rows.splice(i, 1)[0]);
+    paint();
+    persistOrder();
   });
 
   /* ---- photo ---- */

@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=142">
+<link rel="stylesheet" href="assets/admin.css?v=148">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=1">
@@ -2839,12 +2839,16 @@
         <span class="grow"></span>
         <button class="btn btn-accent" id="en-new" type="button" data-ic="plus">Imprimante</button>
       </div>
-      <div class="en-rate"><label class="field"><span class="lbl">Taux horaire (première visite)</span><span class="unit" data-unit="$/h"><input type="number" id="en-rate" min="1" step="0.01" inputmode="decimal"></span></label></div>
-      <div class="en-list" id="en-list"><p class="muted">Chargement…</p></div>
-      <input type="file" id="en-file" accept="image/*" hidden>
-      <div class="en-calc" id="en-calc">
+      <div class="en-split">
+      <div class="en-left">
+        <div class="en-list" id="en-list"><p class="muted">Chargement…</p></div>
+        <input type="file" id="en-file" accept="image/*" hidden>
+      </div>
+      <aside class="en-calc" id="en-calc">
         <h2 class="en-h">Calculateur de prix</h2>
+        <div class="en-res" id="ec-res"></div>
         <div class="en-cfg">
+          <label class="field"><span class="lbl">Taux horaire</span><span class="unit" data-unit="$/h"><input type="number" id="en-rate" min="1" step="0.01" inputmode="decimal"></span></label>
           <label class="field"><span class="lbl">Déplacement (aller-retour)</span><span class="unit" data-unit="min"><input type="number" id="ec-tmin" min="0" max="600" step="5" inputmode="numeric"></span></label>
           <label class="field"><span class="lbl">Essence et frais de route</span><span class="unit" data-unit="$"><input type="number" id="ec-tcost" min="0" step="0.5" inputmode="decimal"></span></label>
           <label class="field"><span class="lbl">Machines par visite</span><input type="number" id="ec-mpv" min="1" max="100" step="1" inputmode="numeric"></label>
@@ -2853,7 +2857,7 @@
         <h3 class="en-h3">Matériaux utilisés par machine</h3>
         <div class="en-mats" id="ec-mats"></div>
         <button class="btn btn-ghost btn-sm" id="ec-addmat" type="button" data-ic="plus">Matériau</button>
-        <div class="en-res" id="ec-res"></div>
+      </aside>
       </div>
     </section>
 
@@ -3048,7 +3052,7 @@
 <script src="assets/cms-boites.js?v=22"></script>
 <script src="assets/cms-production.js?v=13"></script>
 <script src="assets/cms-imprimantes.js?v=8"></script>
-<script src="assets/cms-entretien.js?v=2"></script>
+<script src="assets/cms-entretien.js?v=5"></script>
 <script src="assets/cms-aujourdhui.js?v=2"></script>
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-promotions.js?v=5"></script>
