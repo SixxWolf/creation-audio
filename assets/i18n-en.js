@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 25;
+window.CA_EN_V = 27;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -961,8 +961,40 @@ window.CA_EN = (function (pairs) {
   // ---- impression.js (page Impression 3D) + fichiers 3D de messagerie.js
   [` Mo`, ` MB`],
   [` Ko`, ` KB`],
-  [`Formats acceptés : STL, 3MF, STEP, OBJ.`, `Accepted formats: STL, 3MF, STEP, OBJ.`],
+  [`Formats acceptés : STL, 3MF, STEP, OBJ, G-code.`, `Accepted formats: STL, 3MF, STEP, OBJ, G-code.`],
   [`Temps`, `Time`],
+  [`Voir en 3D`, `View in 3D`],
+  [`Un fichier 3D dans la conversation ? Le bouton Voir en 3D l'ouvre sur place.`, `A 3D file in the conversation? The View in 3D button opens it right there.`],
+  [`Aperçu indisponible pour ce fichier.`, `Preview unavailable for this file.`],
+  [`Mur intérieur`, `Inner wall`],
+  [`Mur extérieur`, `Outer wall`],
+  [`Mur en surplomb`, `Overhang wall`],
+  [`Remplissage`, `Sparse infill`],
+  [`Remplissage solide interne`, `Internal solid infill`],
+  [`Coque verticale flottante`, `Floating vertical shell`],
+  [`Surface supérieure`, `Top surface`],
+  [`Surface inférieure`, `Bottom surface`],
+  [`Lissage`, `Ironing`],
+  [`Pont`, `Bridge`],
+  [`Remplissage d'espace`, `Gap infill`],
+  [`Supports`, `Support`],
+  [`Interface de support`, `Support interface`],
+  [`Transition de support`, `Support transition`],
+  [`Lissage de support`, `Support ironing`],
+  [`Tour de purge`, `Prime tower`],
+  [`Jupe`, `Skirt`],
+  [`Bordure`, `Brim`],
+  [`Autre`, `Other`],
+  [`Lecture`, `Play`],
+  [`Pause`, `Pause`],
+  [`Couche`, `Layer`],
+  [`Zoom avant`, `Zoom in`],
+  [`Zoom arrière`, `Zoom out`],
+  [`Aperçu 3D`, `3D preview`],
+  [`Aperçu 3D de la pièce. Les flèches du clavier la font tourner.`, `3D preview of the part. The arrow keys rotate it.`],
+  [`Plateaux du fichier`, `Plates in the file`],
+  [`Chargement…`, `Loading…`],
+  [`Dimensions`, `Dimensions`],
   [`Fichier trop lourd (50 Mo maximum).`, `File too large (50 MB maximum).`],
   [`Au plus 3 fichiers 3D par message.`, `At most 3 3D files per message.`],
   [`" aria-label="Retirer le fichier `, `" aria-label="Remove file `],

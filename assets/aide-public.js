@@ -103,7 +103,8 @@
         'Clique un lien **Écris-nous** sur le site, ou ouvre **Mon compte › Messages**.',
         _t('Connecte-toi si ce n\'est pas fait.'),
         _t('Écris ton message. Joins des photos au besoin.'),
-        _t('Envoie. Tu reçois un courriel quand on répond.')
+        _t('Envoie. Tu reçois un courriel quand on répond.'),
+        _t('Un fichier 3D dans la conversation ? Le bouton Voir en 3D l\'ouvre sur place.')
       ],
       tip: _t('Aussi possible par Messenger ou à contact@creationaudio.ca.') },
     { id: 'profil', group: _t('Mon compte'), title: _t('Modifier ton profil ou supprimer ton compte'),

@@ -7,8 +7,10 @@
      client (clé « ca-compte-auth », la même que compte.html) -> envoi.
      Le brouillon (photos comprises) survit au passage par l'appli courriel.
    - Connecté : envoi direct ; liste de ses conversations ; fil + réponse.
-   - Fichiers 3D (page Impression 3D) : STL/3MF/STEP/OBJ, 3 max, 50 Mo chacun, bucket privé
+   - Fichiers 3D (page Impression 3D) : STL/3MF/STEP/OBJ/G-code, 3 max, 50 Mo chacun, bucket privé
      « print-files » (<uid>/<uuid>.<ext>) ; gardés en IndexedDB le temps du code par courriel.
+   - Fil : « Voir en 3D » ouvre la fenêtre CA.ap3d (apercu-3d.js, chargé au premier clic) sur tout
+     sauf le STEP. Un .capv (plateau joint par l'atelier) n'est qu'un aperçu : jamais de lien de téléchargement.
    - Photos : 4 max, réduites à 1600 px (JPEG) dans le navigateur, téléversées
      dans le bucket privé « messages » (<uid>/<uuid>.jpg), lues par URL signée.
    - Courriels différés (tick pg_cron + Edge Function message-notify) : rien
@@ -31,7 +33,8 @@
   var FB = 'https://m.me/61591945465745', EMAIL = 'contact@creationaudio.ca';
   var CODE_TTL = 10 * 60 * 1000, RESEND_MS = 60 * 1000, POLL_MS = 10000;
   var MAX_PHOTOS = 4, MAX_SIDE = 1600;
-  var MAX_FILES = 3, MAX_FILE_BYTES = 50 * 1024 * 1024, FILE_EXT = /\.(stl|3mf|step|stp|obj)$/i;
+  var MAX_FILES = 3, MAX_FILE_BYTES = 50 * 1024 * 1024, FILE_EXT = /\.(stl|3mf|step|stp|obj|gcode)$/i;
+  var VIEW_EXT = /\.(stl|obj|3mf|gcode)$/i, PREVIEW_EXT = /\.capv$/i, AP3D_V = 1;
   var TOPICS = [['filaments', _t('Filaments')], ['spacers', _t('Spacers')], ['compte', _t('Mon compte')], ['autre', _t('Autre')]];
   var TOPIC_NAME = {}; TOPICS.forEach(function (t) { TOPIC_NAME[t[0]] = t[1]; });
   var HINT = {
@@ -180,14 +183,14 @@
     }, function () {});
   }
 
-  /* ---------- fichiers 3D (page Impression 3D) : STL/3MF/STEP/OBJ, 3 max, 50 Mo chacun ---------- */
+  /* ---------- fichiers 3D (page Impression 3D) : STL/3MF/STEP/OBJ/G-code, 3 max, 50 Mo chacun ---------- */
   function fmtSize(b) {
     return b >= 1048576 ? (b / 1048576).toLocaleString(CA.locale, { maximumFractionDigits: 1 }) + _t(' Mo') : Math.max(1, Math.round(b / 1024)) + _t(' Ko');
   }
   function addFiles3d(files, statusEl) {
     var bad = '';
     Array.prototype.slice.call(files || []).forEach(function (f) {
-      if (!FILE_EXT.test(f.name)) { bad = _t('Formats acceptés : STL, 3MF, STEP, OBJ.'); return; }
+      if (!FILE_EXT.test(f.name)) { bad = _t('Formats acceptés : STL, 3MF, STEP, OBJ, G-code.'); return; }
       if (f.size > MAX_FILE_BYTES) { bad = _t('Fichier trop lourd (50 Mo maximum).'); return; }
       if (st.files.length >= MAX_FILES) { bad = _t('Au plus 3 fichiers 3D par message.'); return; }
       st.files.push({ name: f.name, blob: f });
@@ -229,6 +232,33 @@
     return c.storage.from('print-files').createSignedUrls(need, 3600).then(function (r) {
       (r.data || []).forEach(function (x) { if (x.signedUrl) fileUrlCache[x.path] = x.signedUrl; });
     }, function () {});
+  }
+  // « Voir en 3D » : la fenêtre partagée n'est chargée qu'au premier clic ; l'adresse signée est fraîche (le fil peut être ouvert depuis longtemps)
+  var ap3dP = null;
+  function loadAp3d() {
+    if (CA.ap3d) return Promise.resolve(CA.ap3d);
+    if (!ap3dP) ap3dP = new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = ROOT + 'assets/apercu-3d.js?v=' + AP3D_V;
+      s.onload = function () { if (CA.ap3d) res(CA.ap3d); else rej(new Error('apercu')); };
+      s.onerror = function () { rej(new Error('apercu')); };
+      document.head.appendChild(s);
+    });
+    ap3dP.catch(function () { ap3dP = null; });
+    return ap3dP;
+  }
+  function view3d(btn) {
+    var path = btn.getAttribute('data-v3d'), name = btn.getAttribute('data-n') || '';
+    if (btn.disabled) return;
+    btn.disabled = true;
+    loadAp3d().then(function (A) {
+      return sb().storage.from('print-files').createSignedUrl(path, 600).then(function (r) {
+        if (r.error || !r.data || !r.data.signedUrl) throw new Error('url');
+        A.show({ name: name, url: r.data.signedUrl, ext: path.split('.').pop().toLowerCase() });
+      });
+    }).catch(function () {
+      say($('.msg-reply .msg-status', main), _t('Aperçu indisponible pour ce fichier.'), 'bad');
+    }).then(function () { btn.disabled = false; });
   }
   // les fichiers survivent au passage par l'appli courriel (rechargement de l'onglet) : IndexedDB
   function idb(mode, fn) {
@@ -308,6 +338,10 @@
     $('.msg-x', panel).addEventListener('click', close);
     backdrop.addEventListener('click', close);
     backBtn.addEventListener('click', function () { if (st.view === 'thread') loadConvs().then(showList); else showList(); });
+    panel.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-v3d]');
+      if (b) view3d(b);
+    });
     panel.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { e.stopPropagation(); close(); return; }
       if (e.key !== 'Tab') return;                          // focus gardé dans le panneau
@@ -717,10 +751,13 @@
                    : _t('<span class="msg-b-ph" title="Photo indisponible"></span>');
         }).join('') + '</div>' : '') +
         ((m.files || []).length ? '<div class="msg-b-files">' + m.files.map(function (f) {
-          var u = fileUrlCache[f.p], inner = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>' +
-            '<span>' + esc(f.n) + '</span><em>' + esc(fmtSize(+f.s || 0)) + '</em>';
-          return u ? '<a class="msg-b-file" href="' + esc(u) + '" download="' + esc(f.n) + '" target="_blank" rel="noopener">' + inner + '</a>'
-                   : '<span class="msg-b-file is-off">' + inner + '</span>';
+          var u = fileUrlCache[f.p], ic = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>',
+              inner = ic + '<span>' + esc(f.n) + '</span><em>' + esc(fmtSize(+f.s || 0)) + '</em>',
+              data = ' data-v3d="' + esc(f.p) + '" data-n="' + esc(f.n) + '"';
+          if (PREVIEW_EXT.test(f.p)) return '<button type="button" class="msg-b-file msg-b-capv"' + data + '>' + ic + '<span>' + esc(f.n) + '</span><b>' + _t('Voir en 3D') + '</b></button>';
+          if (!u) return '<span class="msg-b-file is-off">' + inner + '</span>';
+          var link = '<a class="msg-b-file" href="' + esc(u) + '" download="' + esc(f.n) + '" target="_blank" rel="noopener">' + inner + '</a>';
+          return VIEW_EXT.test(f.p) ? '<div class="msg-b-frow">' + link + '<button type="button" class="msg-b-3d"' + data + '>' + _t('Voir en 3D') + '</button></div>' : link;
         }).join('') + '</div>' : '') +
         (m.body ? '<p>' + esc(m.body) + '</p>' : '') +
         '<time>' + (me ? '' : _t('Création Audio · ')) + esc(hour(m.created_at)) + '</time></div>';

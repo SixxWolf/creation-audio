@@ -37,7 +37,7 @@
 <script>document.documentElement.classList.add('ip-ready')</script>
 <script src="../assets/look.js?v=5"></script>
 <script src="../assets/i18n.js?v=1"></script>
-<script src="../assets/i18n-en.js?v=25"></script>
+<script src="../assets/i18n-en.js?v=27"></script>
 </head>
 <body class="home-page">
 <a class="skip" href="#main">Skip to content</a>
@@ -90,7 +90,7 @@
           <span class="ip-drop-t">
             <b class="ip-fine">Drag your file here</b>
             <b class="ip-touch">Choose your file</b>
-            <small>STL, 3MF, STEP, OBJ · 50 MB</small>
+            <small>STL, 3MF, STEP, OBJ, G-code · 50 MB</small>
           </span>
           <span class="ip-drop-go">Browse</span>
         </label>
@@ -143,6 +143,7 @@
           <span id="ip-nopreview-t">No preview for this file. It still goes with your request.</span>
         </div>
       </div>
+      <div class="v3d-ctl" id="ip-ctl" hidden></div>
       <ul class="ip-plates" id="ip-plates" aria-label="Plates in the file" hidden></ul>
       <dl class="ip-read">
         <div><dt id="ip-l-dim">Dimensions</dt><dd id="ip-r-dim">—</dd><dd class="ip-r-sub" id="ip-r-dim2" hidden></dd></div>
@@ -274,7 +275,7 @@
     <div class="ip-faq rv" style="--d:1">
       <details class="ip-fq">
         <summary>Which files do you accept?</summary>
-        <p>STL, 3MF, STEP et OBJ, jusqu'à 50 Mo chacun et 3 fichiers par demande. L'aperçu fonctionne avec les STL, les OBJ et les 3MF. Pas de fichier ? Décris ta pièce, on s'en occupe.</p>
+        <p>STL, 3MF, STEP, OBJ and G-code, up to 50 MB each and 3 files per request. The preview works with all of them except STEP. No file? Describe your part and we'll take care of it.</p>
       </details>
       <details class="ip-fq">
         <summary>How much does it cost?</summary>
@@ -392,8 +393,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="../assets/supabase-config.js?v=1"></script>
 <script src="../assets/supabase-client.js?v=1"></script>
-<script src="../assets/nav.js?v=18"></script>
+<script src="../assets/nav.js?v=19"></script>
 <script src="../assets/promo.js?v=1"></script>
-<script src="../assets/impression.js?v=3"></script>
+<script src="../assets/apercu-3d.js?v=1"></script>
+<script src="../assets/impression.js?v=4"></script>
 </body>
 </html>

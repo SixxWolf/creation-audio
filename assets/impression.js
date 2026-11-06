@@ -1,11 +1,12 @@
 /* =========================================================
    Création Audio — page IMPRESSION 3D (v2).
-   - Aperçu 3D (WebGL) : lit un STL ou un OBJ DANS le navigateur (rien n'est envoyé avant la demande) :
+   - Aperçu 3D (apercu-3d.js) : lit un STL ou un OBJ DANS le navigateur (rien n'est envoyé avant la demande) :
      dimensions, poids estimé, couleur choisie ; la pièce tourne au toucher, ne boucle jamais.
      Sans fichier : un adaptateur d'exemple, construit par calcul. STEP : simplement joint.
-   - 3MF : lu par le Worker impression-3mf.js. Plateaux en vignettes à cocher, couleurs du fichier, vrai plateau
-     sous les pièces ; tranché sans pièce : image du plateau + vrais chiffres ; téléphone : version allégée.
-   - Formulaire : se déplie sous la zone de dépôt. Fichiers STL/3MF/STEP/OBJ, 3 max, 50 Mo chacun.
+   - 3MF et G-code : lus par le Worker impression-3mf.js. Plateaux en vignettes à cocher, couleurs du fichier, vrai plateau
+     sous les pièces ; tranché : trajets en cordons, curseur de couches, Lecture ; téléphone : version allégée.
+     Sans dessin possible (pas d'instanciation WebGL) : image du plateau + vrais chiffres.
+   - Formulaire : se déplie sous la zone de dépôt. Fichiers STL/3MF/STEP/OBJ/G-code, 3 max, 50 Mo chacun.
      L'envoi compose le message puis ouvre la Messagerie avec les fichiers
      (CA.msg.open({ topic, ref, body, files }) : messagerie.js les téléverse dans le bucket « print-files »).
    - Couleurs : stock réel lu dans products_public (qty ou qty_2 > 0). Toucher une pastille recolore la pièce
@@ -14,8 +15,8 @@
    ========================================================= */
 (function () {
   'use strict';
-  var WORKER = document.currentScript ? document.currentScript.src.replace(/impression\.js.*$/, 'impression-3mf.js?v=1') : 'assets/impression-3mf.js?v=1';
   var CA0 = window.CA || {};
+  var A = CA0.ap3d;
   var _t = CA0.t || function (s) { return s; };
   var tn = CA0.tn || function (n, one, many) { return (n >= 2 ? many : one).replace('{n}', n); };
   var EN = CA0.lang === 'en';
@@ -38,79 +39,6 @@
       });
     }, { threshold: 0.08, rootMargin: '0px 0px -4% 0px' });
     all('.rv').forEach(function (el) { io.observe(el); });
-  }
-
-  /* =========================================================
-     Maillages : tout finit en un Float32Array de triangles (x,y,z × 3 × n), posé sur le plateau et centré.
-     ========================================================= */
-  function fromTris(raw, n) {
-    var minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-    var i, vol = 0, area = 0;
-    for (i = 0; i < n * 9; i += 3) {
-      var x = raw[i], y = raw[i + 1], z = raw[i + 2];
-      if (x < minX) minX = x; if (x > maxX) maxX = x;
-      if (y < minY) minY = y; if (y > maxY) maxY = y;
-      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
-    }
-    if (!n || !isFinite(minX + maxX + minY + maxY + minZ + maxZ)) return null;
-    if (Math.max(maxX - minX, maxY - minY, maxZ - minZ) > 1e5) return null;   // 100 m : fichier abîmé, pas une pièce
-    var cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-    for (i = 0; i < n * 9; i += 9) {
-      var ax = raw[i] - cx, ay = raw[i + 1] - cy, az = raw[i + 2] - minZ;
-      var bx = raw[i + 3] - cx, by = raw[i + 4] - cy, bz = raw[i + 5] - minZ;
-      var dx = raw[i + 6] - cx, dy = raw[i + 7] - cy, dz = raw[i + 8] - minZ;
-      raw[i] = ax; raw[i + 1] = ay; raw[i + 2] = az;
-      raw[i + 3] = bx; raw[i + 4] = by; raw[i + 5] = bz;
-      raw[i + 6] = dx; raw[i + 7] = dy; raw[i + 8] = dz;
-      vol += ax * (by * dz - bz * dy) + ay * (bz * dx - bx * dz) + az * (bx * dy - by * dx);
-      var ux = bx - ax, uy = by - ay, uz = bz - az, vx = dx - ax, vy = dy - ay, vz = dz - az;
-      var cxx = uy * vz - uz * vy, cyy = uz * vx - ux * vz, czz = ux * vy - uy * vx;
-      area += Math.sqrt(cxx * cxx + cyy * cyy + czz * czz) / 2;
-    }
-    if (vol < 0) {       // normales inversées : on retourne les triangles, l'aperçu s'en sert pour l'intérieur
-      for (i = 0; i < n * 9; i += 9) {
-        var t0 = raw[i + 3], t1 = raw[i + 4], t2 = raw[i + 5];
-        raw[i + 3] = raw[i + 6]; raw[i + 4] = raw[i + 7]; raw[i + 5] = raw[i + 8];
-        raw[i + 6] = t0; raw[i + 7] = t1; raw[i + 8] = t2;
-      }
-    }
-    return { pos: raw, count: n * 3, size: [maxX - minX, maxY - minY, maxZ - minZ], volume: Math.abs(vol) / 6, area: area };
-  }
-
-  function parseSTL(buf) {
-    var dv = new DataView(buf), n = buf.byteLength > 84 ? dv.getUint32(80, true) : 0, raw, i, o, k;
-    if (buf.byteLength === 84 + n * 50) {       // binaire
-      raw = new Float32Array(n * 9);
-      for (i = 0, o = 96, k = 0; i < n; i++, o += 50) {
-        for (var j = 0; j < 9; j++) raw[k++] = dv.getFloat32(o + j * 4, true);
-      }
-      return fromTris(raw, n);
-    }
-    var txt = new TextDecoder().decode(buf), re = /vertex\s+(\S+)\s+(\S+)\s+(\S+)/g, m, list = [];
-    while ((m = re.exec(txt))) list.push(+m[1], +m[2], +m[3]);
-    n = Math.floor(list.length / 9);
-    return fromTris(new Float32Array(list), n);
-  }
-
-  function parseOBJ(buf) {
-    var txt = new TextDecoder().decode(buf), vs = [], out = [], lines = txt.split(/\r?\n/);
-    for (var i = 0; i < lines.length; i++) {
-      var l = lines[i];
-      if (l.charCodeAt(0) === 118 && l.charCodeAt(1) === 32) {       // « v »
-        var p = l.trim().split(/\s+/);
-        vs.push(+p[1], +p[2], +p[3]);
-      } else if (l.charCodeAt(0) === 102 && l.charCodeAt(1) === 32) { // « f »
-        var f = l.trim().split(/\s+/), idx = [];
-        for (var j = 1; j < f.length; j++) {
-          var v = parseInt(f[j], 10);
-          idx.push(v < 0 ? vs.length / 3 + v : v - 1);
-        }
-        for (var t = 1; t + 1 < idx.length; t++) {
-          [idx[0], idx[t], idx[t + 1]].forEach(function (a) { out.push(vs[a * 3], vs[a * 3 + 1], vs[a * 3 + 2]); });
-        }
-      }
-    }
-    return fromTris(new Float32Array(out), Math.floor(out.length / 9));
   }
 
   /* Exemple : un adaptateur de haut-parleur (bride à 4 oreilles percées + collet). */
@@ -169,7 +97,7 @@
     }
     face(HF, true);
     face(0, false);
-    return fromTris(new Float32Array(out), Math.floor(out.length / 9));
+    return A.fromTris(new Float32Array(out), Math.floor(out.length / 9));
   }
 
   /* Poids estimé : parois + dessus/dessous (≈ 1,2 mm) en plein, 15 % de remplissage pour le reste. */
@@ -179,232 +107,27 @@
     var shell = Math.min(mesh.volume, mesh.area * 1.2);
     return (shell + (mesh.volume - shell) * 0.15) / 1000 * (DENS[mat] || DENS.pla);
   }
-  function fmtDim(mesh) {
-    return mesh.size.map(function (v) { return num(v, v < 10 ? 1 : 0); }).join(' × ') + ' mm';
-  }
-  function fmtWeight(g) { return g >= 1000 ? num(g / 1000, 1) + ' kg' : num(Math.max(1, g), g < 10 ? 1 : 0) + ' g'; }
+  var fmtDim = A.fmtDim, fmtWeight = A.fmtWeight, fmtTime = A.fmtTime;
   function fmtGrams(g) { return g == null ? '—' : '≈ ' + fmtWeight(g); }
-  function fmtTime(s) {
-    var m = Math.max(1, Math.round(s / 60)), h = Math.floor(m / 60);
-    m -= h * 60;
-    if (!h) return m + ' min';
-    return EN ? h + ' h ' + m + ' min' : h + ' h ' + (m < 10 ? '0' : '') + m;
-  }
 
   /* =========================================================
-     Aperçu WebGL : dessiné à la demande seulement (pas de boucle).
+     Aperçu : apercu-3d.js dessine ; la page garde la demande, le mini-aperçu de la section Matériaux suit.
      ========================================================= */
-  var VS = 'attribute vec3 aP;uniform mat4 uVP;uniform mat4 uV;varying vec3 vW;varying vec3 vV;' +
-    'void main(){vW=aP;vV=(uV*vec4(aP,1.)).xyz;gl_Position=uVP*vec4(aP,1.);}';
-  var FS = '#extension GL_OES_standard_derivatives : enable\n' +
-    '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' +
-    'uniform vec3 uC;uniform float uClip;uniform float uTop;uniform float uLayer;varying vec3 vW;varying vec3 vV;' +
-    'void main(){if(vW.z>uClip)discard;' +
-    'vec3 n=normalize(cross(dFdx(vV),dFdy(vV)));vec3 w=normalize(cross(dFdx(vW),dFdy(vW)));' +
-    'vec3 k=normalize(vec3(-.45,.75,.6));vec3 f=normalize(vec3(.7,.15,.5));' +
-    'float dk=max(dot(n,k),0.);float df=max(dot(n,f),0.);float rim=pow(1.-max(n.z,0.),3.);' +
-    'float sp=pow(max(dot(n,normalize(k+vec3(0.,0.,1.))),0.),48.);' +
-    'vec3 a=max(uC,vec3(.15));vec3 c=a*(.38+.6*dk+.17*df)+vec3(.09*rim+.14*sp);' +
-    'float t=vW.z/uLayer;float aa=clamp(1.-fwidth(t)*1.5,0.,1.);c*=1.+(1.-abs(w.z))*aa*.075*sin(t*6.2832);' +
-    'if(uClip<uTop){if(!gl_FrontFacing)c*=.5;float e=clamp(1.-(uClip-vW.z)/(uLayer*1.6),0.,1.);c=mix(c,vec3(1.,.93,.72),e*.6);}' +
-    'gl_FragColor=vec4(c,1.);}';
-  var VS_P = 'attribute vec2 aP;uniform mat4 uVP;uniform float uQ;varying vec2 vP;' +
-    'void main(){vP=aP*uQ;gl_Position=uVP*vec4(vP,0.,1.);}';
-  // uRect : centre x,y et demi-largeurs du vrai plateau (3MF) ; z = 0 : pas de plateau, la grille s'estompe seule
-  var FS_P = '#extension GL_OES_standard_derivatives : enable\nprecision highp float;' +
-    'uniform float uR;uniform float uFoot;uniform float uGrid;uniform vec4 uRect;varying vec2 vP;' +
-    'void main(){float d=length(vP)/uR;float fade=1.-smoothstep(.5,1.,d);vec2 q=uRect.z>0.?vP-uRect.xy+uRect.zw:vP;' +
-    'vec2 g=abs(fract(q/uGrid-.5)-.5)/fwidth(q/uGrid);float l=1.-min(min(g.x,g.y),1.);' +
-    'float a;if(uRect.z>0.){vec2 e=abs(vP-uRect.xy)-uRect.zw;float s=max(e.x,e.y);float w=fwidth(s);' +
-    'a=(.055+l*.085*fade)*(1.-smoothstep(-w,w,s))+.42*(1.-smoothstep(w*.7,w*1.7,abs(s)));}' +
-    'else{float sh=exp(-pow(length(vP)/uFoot,4.))*.2;a=(.035+l*.085)*fade;a=a+sh*(1.-a);}' +
-    'gl_FragColor=vec4(vec3(.09,.1,.12)*a,a);}';
-
   var canvas = $('ip-gl'), viewEl = $('ip-view'), mini = $('ip-mini');
-  var gl = null, ext = null;
-  var prog, progP, bufMesh, bufPlate, U = {}, UP = {};
-  var cam = { az: -0.62, el: 0.72 }, mesh = null, color = [1, 0.416, 0.075], clipT = 1, anim = 0;
+  var mesh = null, color = [1, 0.416, 0.075];
   var miniCtx = mini && mini.getContext ? mini.getContext('2d') : null;
-
-  function compile(vs, fs) {
-    function sh(type, src) {
-      var s = gl.createShader(type);
-      gl.shaderSource(s, src); gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
-      return s;
-    }
-    var p = gl.createProgram();
-    gl.attachShader(p, sh(gl.VERTEX_SHADER, vs));
-    gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
-    return p;
-  }
-  function initGL() {
-    if (!canvas || !canvas.getContext) return false;
-    try {
-      gl = canvas.getContext('webgl', { alpha: true, antialias: true, premultipliedAlpha: true, powerPreference: 'low-power' });
-      if (!gl) return false;
-      ext = gl.getExtension('OES_standard_derivatives');
-      if (!ext) { gl = null; return false; }
-      prog = compile(VS, FS); progP = compile(VS_P, FS_P);
-    } catch (e) { gl = null; return false; }
-    ['uVP', 'uV', 'uC', 'uClip', 'uTop', 'uLayer'].forEach(function (u) { U[u] = gl.getUniformLocation(prog, u); });
-    ['uVP', 'uR', 'uQ', 'uFoot', 'uGrid', 'uRect'].forEach(function (u) { UP[u] = gl.getUniformLocation(progP, u); });
-    bufMesh = gl.createBuffer(); bufPlate = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, bufPlate);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
-    gl.enable(gl.DEPTH_TEST);
-    gl.clearColor(0, 0, 0, 0);
-    return true;
-  }
-  function uploadMesh() {
-    if (!gl || !mesh) return;
-    gl.bindBuffer(gl.ARRAY_BUFFER, bufMesh);
-    gl.bufferData(gl.ARRAY_BUFFER, mesh.pos, gl.STATIC_DRAW);
-  }
-  function persp(fovy, asp, n, f) {
-    var t = 1 / Math.tan(fovy / 2), d = 1 / (n - f);
-    return [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) * d, -1, 0, 0, 2 * f * n * d, 0];
-  }
-  function mul(a, b) {
-    var r = new Array(16);
-    for (var c = 0; c < 4; c++) for (var i = 0; i < 4; i++) {
-      r[c * 4 + i] = a[i] * b[c * 4] + a[4 + i] * b[c * 4 + 1] + a[8 + i] * b[c * 4 + 2] + a[12 + i] * b[c * 4 + 3];
-    }
-    return r;
-  }
-  function draw() {
-    if (!gl || !mesh) return;
-    var dpr = Math.min(window.devicePixelRatio || 1, 2);
-    var W = Math.max(1, Math.round(canvas.clientWidth * dpr)), H = Math.max(1, Math.round(canvas.clientHeight * dpr));
-    if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
-    gl.viewport(0, 0, W, H);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    var s = mesh.size, h = s[2];
-    var R = Math.max(0.5, Math.sqrt(s[0] * s[0] + s[1] * s[1] + h * h) / 2);
-    var asp = W / H, fovy = 26 * Math.PI / 180, fovx = 2 * Math.atan(Math.tan(fovy / 2) * asp);
-    var dist = R / Math.sin(Math.min(fovy, fovx) / 2) * 1.04;
-    var ce = Math.cos(cam.el), se = Math.sin(cam.el), ca = Math.cos(cam.az), sa = Math.sin(cam.az);
-    var fwd = [-ce * sa, ce * ca, -se];                 // caméra → cible
-    var tgt = [0, 0, h * 0.42];
-    var eye = [tgt[0] - fwd[0] * dist, tgt[1] - fwd[1] * dist, tgt[2] - fwd[2] * dist];
-    var right = [ca, sa, 0];
-    var up = [right[1] * fwd[2] - right[2] * fwd[1], right[2] * fwd[0] - right[0] * fwd[2], right[0] * fwd[1] - right[1] * fwd[0]];
-    function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
-    var V = [right[0], up[0], -fwd[0], 0, right[1], up[1], -fwd[1], 0, right[2], up[2], -fwd[2], 0, -dot(right, eye), -dot(up, eye), dot(fwd, eye), 1];
-    var rc = mesh.rect || [0, 0, 0, 0];                 // le vrai plateau, à sa place sous les pièces
-    var reach = rc[2] ? Math.sqrt(Math.pow(Math.abs(rc[0]) + rc[2], 2) + Math.pow(Math.abs(rc[1]) + rc[3], 2)) : 0;
-    var VP = mul(persp(fovy, asp, Math.max(0.1, dist - R * 4), dist + Math.max(R * 6, reach * 2)), V);
-
-    // le plateau : grille de 10 mm qui s'estompe, ombre de contact
-    var plateR = Math.max(R * 2.4, 8);
-    var grid = plateR > 400 ? 100 : plateR > 120 ? 20 : plateR > 30 ? 10 : plateR > 12 ? 2 : 1;
-    gl.useProgram(progP);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bufPlate);
-    var aPp = gl.getAttribLocation(progP, 'aP');
-    gl.enableVertexAttribArray(aPp); gl.vertexAttribPointer(aPp, 2, gl.FLOAT, false, 0, 0);
-    gl.uniformMatrix4fv(UP.uVP, false, new Float32Array(VP));
-    gl.uniform1f(UP.uR, plateR); gl.uniform1f(UP.uQ, Math.max(plateR, reach)); gl.uniform1f(UP.uGrid, grid);
-    gl.uniform4f(UP.uRect, rc[0], rc[1], rc[2], rc[3]);
-    gl.uniform1f(UP.uFoot, Math.max(s[0], s[1]) * 0.56 + 0.5);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    gl.depthMask(true); gl.disable(gl.BLEND);
-
-    // la pièce
-    gl.useProgram(prog);
-    gl.bindBuffer(gl.ARRAY_BUFFER, bufMesh);
-    var aP = gl.getAttribLocation(prog, 'aP');
-    gl.enableVertexAttribArray(aP); gl.vertexAttribPointer(aP, 3, gl.FLOAT, false, 0, 0);
-    gl.uniformMatrix4fv(U.uVP, false, new Float32Array(VP));
-    gl.uniformMatrix4fv(U.uV, false, new Float32Array(V));
-    gl.uniform1f(U.uTop, h + 1);
-    gl.uniform1f(U.uClip, clipT >= 1 ? h + 1 : h * clipT);
-    gl.uniform1f(U.uLayer, Math.max(R / 70, 0.02));
-    if (mesh.groups && !state.color) {                  // couleurs du fichier ; une pastille choisie recolore tout
-      mesh.groups.forEach(function (g) {
-        gl.uniform3fv(U.uC, g.c || color);
-        gl.drawArrays(gl.TRIANGLES, g.first, g.count);
-      });
-    } else {
-      gl.uniform3fv(U.uC, color);
-      gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
-    }
-
-    if (miniCtx) {
+  var view = A.viewer(canvas, {
+    box: viewEl, tint: color,
+    onDraw: function (W, H) {
+      if (!miniCtx) return;
       var mw = mini.width, mh = mini.height, k = Math.min(mw / W, mh / H) * 1.02, dw = W * k, dh = H * k;
       miniCtx.clearRect(0, 0, mw, mh);
       miniCtx.drawImage(canvas, (mw - dw) / 2, (mh - dh) / 2, dw, dh);
     }
-  }
-  function build(animated) {
-    cancelAnimationFrame(anim);
-    if (!animated || reduce) { clipT = 1; draw(); return; }
-    var t0 = null, finished = false;
-    clipT = 0; draw();
-    function step(ts) {
-      if (t0 == null) t0 = ts;
-      var p = Math.min(1, (ts - t0) / 1250);
-      clipT = 1 - Math.pow(1 - p, 2.2);
-      draw();
-      if (p < 1) anim = requestAnimationFrame(step); else finished = true;
-    }
-    anim = requestAnimationFrame(step);
-    // onglet en arrière-plan : la pièce finit quand même affichée
-    setTimeout(function () { if (!finished && clipT < 0.05) { cancelAnimationFrame(anim); clipT = 1; draw(); } }, 1600);
-  }
-
-  var glOK = initGL();
+  });
+  var glOK = view.ok;
   if (glOK) root.classList.add('ip-gl');
-
-  /* la pièce tourne au toucher : glisser (souris ou doigt, le défilement vertical reste au téléphone) ou flèches */
-  if (glOK) {
-    var drag = null, vel = 0, spin = 0;
-    var clampEl = function (e) { return Math.max(0.1, Math.min(1.5, e)); };
-    canvas.addEventListener('pointerdown', function (e) {
-      if (e.button) return;
-      cancelAnimationFrame(spin); vel = 0;
-      drag = { x: e.clientX, y: e.clientY };
-      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* sans capture, le glisser marche dans le cadre */ }
-    });
-    canvas.addEventListener('pointermove', function (e) {
-      if (!drag) return;
-      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      drag.x = e.clientX; drag.y = e.clientY;
-      vel = dx * 0.008;
-      cam.az += vel;
-      if (e.pointerType === 'mouse' || e.pointerType === 'pen') cam.el = clampEl(cam.el + dy * 0.006);
-      draw();
-    });
-    var endDrag = function () {
-      if (!drag) return;
-      drag = null;
-      if (reduce || Math.abs(vel) < 0.002) return;
-      var coast = function () {
-        vel *= 0.92; cam.az += vel; draw();
-        if (Math.abs(vel) > 0.0006) spin = requestAnimationFrame(coast);
-      };
-      spin = requestAnimationFrame(coast);
-    };
-    canvas.addEventListener('pointerup', endDrag);
-    canvas.addEventListener('pointercancel', function () { drag = null; });
-    canvas.addEventListener('keydown', function (e) {
-      var k = e.key;
-      if (k === 'ArrowLeft') cam.az -= 0.14;
-      else if (k === 'ArrowRight') cam.az += 0.14;
-      else if (k === 'ArrowUp') cam.el = clampEl(cam.el + 0.1);
-      else if (k === 'ArrowDown') cam.el = clampEl(cam.el - 0.1);
-      else return;
-      e.preventDefault();
-      draw();
-    });
-    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); cancelAnimationFrame(anim); });
-    canvas.addEventListener('webglcontextrestored', function () { if (initGL()) { uploadMesh(); clipT = 1; draw(); } });
-    if ('ResizeObserver' in window) new ResizeObserver(function () { draw(); }).observe(viewEl);
-    else window.addEventListener('resize', draw);
-  }
+  var ctl = A.controls($('ip-ctl'), view, { box: viewEl });
 
   /* =========================================================
      État de la demande + lecture du fichier
@@ -417,7 +140,7 @@
   var lDim = $('ip-l-dim'), lG = $('ip-l-g'), totalEl = $('ip-total'), shot = $('ip-shot'), strip = $('ip-plates');
   var DEF = { name: fname.textContent, size: fsize.textContent, mat: rMat.textContent, lDim: lDim.textContent, lG: lG.textContent };
   var DEF_RGB = color.slice();
-  var MAX_FILES = 3, MAX_BYTES = 50 * 1048576, EXT = /\.(stl|3mf|step|stp|obj)$/i, READ = /\.(stl|obj)$/i, READ3 = /\.3mf$/i;
+  var MAX_FILES = 3, MAX_BYTES = 50 * 1048576, EXT = /\.(stl|3mf|step|stp|obj|gcode)$/i, READ = /\.(stl|obj)$/i, READ3 = /\.(3mf|gcode)$/i;
   var FAM_OF = { pla: 'PLA', petg: 'PETG', abs: 'ABS', tpu: 'TPU' };
   var example = exampleMesh();
   var files = [], current = -1, handed = false;
@@ -451,8 +174,8 @@
   }
   function readout() {
     var f = current >= 0 ? files[current] : null;
-    var t = f && f.three, pl = t ? t.plates[t.pi] : null;
-    var m = pl ? (pl.hasMesh ? pl : null) : (f ? f.mesh : example);
+    var t = f && f.three, pl = t ? t.plates[t.pi] : null, has = pl && (pl.hasMesh || pl.drawn);
+    var m = pl ? (has ? pl : null) : (f ? f.mesh : example);
     if (f) {
       fname.textContent = f.file.name;
       fsize.textContent = sizeText(f);
@@ -460,18 +183,18 @@
       fname.textContent = DEF.name;
       fsize.textContent = DEF.size;
     }
-    // image du plateau : tranché sans pièce, ou navigateur sans WebGL
-    var img = pl && pl.url && (!pl.hasMesh || !glOK);
+    // image du plateau : rien à dessiner, ou navigateur sans WebGL
+    var img = pl && pl.url && (!has || !glOK);
     shot.hidden = !img;
     if (img && shot.getAttribute('src') !== pl.url) { shot.src = pl.url; shot.alt = _t('Plateau') + ' ' + pl.id; }
     noPrev.hidden = !(f && !f.reading && !m && !img);
     canvas.style.visibility = noPrev.hidden && !img ? '' : 'hidden';
 
     // sans pièce, le temps réel remplace les dimensions ; poids réel : plus de « estimé »
-    var noMeshTime = pl && !pl.hasMesh && pl.time > 0;
+    var noMeshTime = pl && !has && pl.time > 0;
     lDim.textContent = noMeshTime ? _t('Temps d\'impression') : DEF.lDim;
     rDim.textContent = noMeshTime ? fmtTime(pl.time) : (m ? fmtDim(m) : '—');
-    rDim2.hidden = !(pl && pl.hasMesh && pl.time > 0);
+    rDim2.hidden = !(has && pl.time > 0);
     rDim2.textContent = rDim2.hidden ? '' : _t('{t} d\'impression').replace('{t}', fmtTime(pl.time));
     var real = pl && pl.weight > 0;
     lG.textContent = real ? _t('Poids') : DEF.lG;
@@ -503,7 +226,15 @@
     var f = i >= 0 ? files[i] : null;
     var m = f ? f.mesh : example;
     var changed = m !== mesh;
-    if (m) { mesh = m; if (changed) { uploadMesh(); build(!still && (!!f || !booted)); } else draw(); }
+    if (m) {
+      mesh = m;
+      if (changed) {
+        view.set(m);
+        view.tint(color, !!state.color);
+        view.build(!still && (!!f || !booted));
+        ctl.sync();
+      } else view.draw();
+    } else if (view.paths()) { view.set(null); ctl.sync(); }
     readout();
     paintList();
     paintPlates();
@@ -536,57 +267,56 @@
   function askPlate(f, i) {
     var t = f.three, p = t.plates[i];
     t.pi = i;
-    t.req++;
     if (!glOK) return false;
-    if (!p.hasMesh) { f.mesh = null; return false; }
-    t.w.postMessage({ t: 'plate', i: i, req: t.req });
+    if (!p.hasMesh && !(p.gcode && view.canPaths)) { f.mesh = null; return false; }
+    t.rd.ask(i);
     return true;
   }
   function read3mf(f) {
     return new Promise(function (resolve) {
-      var w, timer = 0;
-      function end() { clearTimeout(timer); f.reading = false; resolve(); }
-      function fail() {
-        var late = !f.reading;
-        try { w.terminate(); } catch (e) { /* déjà fini */ }
-        dropFile(f);
-        f.mesh = null;
-        end();
-        if (late && files[current] === f) { mesh = null; show(current, true); }   // plateau suivant impossible à lire
-      }
-      function alive() { clearTimeout(timer); timer = setTimeout(fail, 90000); }
-      if (!window.Worker || !window.DecompressionStream) { f.reading = false; resolve(); return; }
-      try { w = new Worker(WORKER); } catch (e) { f.reading = false; resolve(); return; }
-      f.stop = function () { clearTimeout(timer); w.terminate(); };
-      w.onerror = fail;
-      w.onmessage = function (e) {
-        var m = e.data, cur = files[current] === f;
-        if (m.t === 'progress') {
-          alive();
-          f.pct = Math.round(m.p * 100);
-          if (cur) fsize.textContent = sizeText(f);
-        } else if (m.t === 'fail') {
-          fail();
-        } else if (m.t === 'meta') {
-          alive();
+      function end() { f.reading = false; resolve(); }
+      var rd = A.reader(f.file, {
+        paths: view.canPaths,
+        progress: function (v) {
+          f.pct = Math.round(v * 100);
+          if (files[current] === f) fsize.textContent = sizeText(f);
+        },
+        fail: function () {
+          var late = !f.reading;
+          dropFile(f);
+          f.mesh = null;
+          end();
+          if (late && files[current] === f) { mesh = null; show(current, true); }   // plateau suivant impossible à lire
+        },
+        meta: function (m) {
           m.plates.forEach(function (p) {
             p.on = true;
             p.url = p.thumb ? URL.createObjectURL(p.thumb) : '';
           });
-          f.three = { w: w, plates: m.plates, pi: 0, req: 0, lightened: m.lightened };
+          f.three = { rd: rd, plates: m.plates, pi: 0, lightened: m.lightened };
           if (!askPlate(f, 0)) end();
-        } else if (m.t === 'plate') {
+        },
+        plate: function (m) {
           var t = f.three;
-          if (!t || m.req !== t.req) return;      // un autre plateau a été choisi entre-temps
-          var p = t.plates[m.i];
-          f.mesh = m.pos ? { pos: m.pos, count: m.pos.length / 3, size: p.size, volume: p.volume, area: p.area, groups: m.groups, rect: m.rect } : null;
+          if (!t) return;
+          var p = t.plates[m.i], P = m.paths;
+          if (P) {                                 // G-code : les trajets, les vraies dimensions, les chiffres du fichier
+            p.size = P.size;
+            p.drawn = true;
+            if (!p.time) p.time = P.time;
+            if (!p.weight) p.weight = P.weight;
+            if (P.light) t.lightened = true;
+            f.mesh = P;
+          } else {
+            p.drawn = false;
+            f.mesh = m.pos ? { pos: m.pos, count: m.pos.length / 3, size: p.size, volume: p.volume, area: p.area, groups: m.groups, rect: m.rect } : null;
+          }
           if (f.reading) end();
-          else if (cur) { mesh = null; show(current, true); }
+          else if (files[current] === f) { mesh = null; show(current, true); }
         }
-      };
-      alive();
-      var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-      w.postMessage({ t: 'open', file: f.file, budget: coarse ? 6e5 : 8e6, maxTris: coarse ? 12e6 : 3e7 });
+      });
+      if (!rd) { end(); return; }
+      f.stop = rd.stop;
     });
   }
   function dropFile(f) {
@@ -643,14 +373,14 @@
     if (!READ.test(f.file.name)) { f.reading = false; return Promise.resolve(); }
     f.reading = true;
     return f.file.arrayBuffer().then(function (buf) {
-      f.mesh = /\.stl$/i.test(f.file.name) ? parseSTL(buf) : parseOBJ(buf);
+      f.mesh = /\.stl$/i.test(f.file.name) ? A.parseSTL(buf) : A.parseOBJ(buf);
     }).catch(function () { f.mesh = null; }).then(function () { f.reading = false; });
   }
 
   function add(fl) {
     var bad = '', fresh = null;
     [].slice.call(fl || []).forEach(function (f) {
-      if (!EXT.test(f.name)) { bad = _t('Formats acceptés : STL, 3MF, STEP, OBJ.'); return; }
+      if (!EXT.test(f.name)) { bad = _t('Formats acceptés : STL, 3MF, STEP, OBJ, G-code.'); return; }
       if (f.size > MAX_BYTES) { bad = _t('Fichier trop lourd (50 Mo maximum).'); return; }
       if (files.some(function (x) { return x.file.name === f.name && x.file.size === f.size; })) return;
       if (files.length >= MAX_FILES) { bad = _t('Au plus 3 fichiers 3D par demande.'); return; }
@@ -818,7 +548,8 @@
     }
     paintColors();
     readout();
-    draw();
+    view.setColor(color, !!state.color);
+    ctl.sync();
   }
   document.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('.ip-dot') : null;
@@ -833,7 +564,7 @@
       if (!r.checked) return;
       state.mat = r.value;
       // la couleur choisie n'existe pas dans l'autre matériau : on la retire
-      if (state.color && FAM_OF[state.mat] !== state.color.fam) { state.color = null; color = DEF_RGB.slice(); draw(); }
+      if (state.color && FAM_OF[state.mat] !== state.color.fam) { state.color = null; color = DEF_RGB.slice(); view.setColor(color, false); ctl.sync(); }
       paintColors();
       readout();
     });
@@ -902,7 +633,7 @@
     var mat = state.mat !== 'any' ? state.mat : 'pla', t = f.three;
     if (!t) return [_t('Fichier :') + ' ' + f.file.name + (f.mesh ? ', ' + fmtDim(f.mesh) + ', ' + fmtGrams(grams(f.mesh, mat)) : '')];
     var sum = checkedTotal(t, mat), bits = [f.file.name], n = t.plates.length;
-    if (n === 1 && t.plates[0].hasMesh) bits.push(fmtDim(t.plates[0]));
+    if (n === 1 && (t.plates[0].hasMesh || t.plates[0].drawn)) bits.push(fmtDim(t.plates[0]));
     if (sum.g) bits.push(sum.est ? fmtGrams(sum.g) : fmtWeight(sum.g));
     if (sum.time) bits.push(fmtTime(sum.time));
     var out = [_t('Fichier :') + ' ' + bits.join(', ')];
@@ -962,11 +693,11 @@
   /* ---------- départ : l'exemple se construit une fois, quand il entre à l'écran ---------- */
   var booted = false;
   mesh = example;
-  uploadMesh();
+  view.set(example);
   readout();
   if (glOK) {
-    var start = function () { booted = true; build(true); };
-    clipT = 0;
+    var start = function () { booted = true; view.build(true); };
+    view.setClip(0);
     if ('IntersectionObserver' in window && !reduce) {
       var seen = new IntersectionObserver(function (en) {
         if (!en[0].isIntersecting) return;
@@ -974,7 +705,7 @@
         setTimeout(start, 260);
       }, { threshold: 0.3 });
       seen.observe(viewEl);
-      setTimeout(function () { if (!booted) { clipT = 1; draw(); } }, 2500);
-    } else { booted = true; clipT = 1; draw(); }
+      setTimeout(function () { if (!booted) { view.setClip(1); view.draw(); } }, 2500);
+    } else { booted = true; view.setClip(1); view.draw(); }
   } else booted = true;
 })();

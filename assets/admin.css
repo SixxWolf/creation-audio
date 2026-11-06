@@ -1691,6 +1691,25 @@ button.co-link:hover { background:color-mix(in srgb, var(--ember) 24%, transpare
 .ms-b-file em { flex:none; font-style:normal; font-size:.76rem; color:var(--muted); }
 a.ms-b-file:hover { border-color:var(--ink); }
 .ms-b-file.is-off { opacity:.55; }
+.ms-b-frow { display:flex; align-items:stretch; gap:6px; min-width:0; }
+.ms-b-frow .ms-b-file { flex:1; }
+.ms-b-3d { flex:none; padding:0 11px; cursor:pointer; border-radius:10px; border:1px solid var(--line); background:rgba(255,255,255,.55);
+  color:var(--ember-ink, var(--ember)); font:inherit; font-size:.86rem; font-weight:700; white-space:nowrap; }
+.ms-b-capv { width:100%; cursor:pointer; font-family:inherit; text-align:left; }
+.ms-b-capv svg, .ms-f3d svg { flex:none; width:18px; height:18px; fill:none; stroke:var(--ember-ink, var(--ember)); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.ms-b-capv b { flex:none; font-weight:700; color:var(--ember-ink, var(--ember)); white-space:nowrap; }
+.ms-b-3d:hover, .ms-b-capv:hover { border-color:var(--ink); }
+.ms-b-3d:disabled, .ms-b-capv:disabled { opacity:.6; cursor:progress; }
+.ms-f3d-list { list-style:none; display:flex; flex-direction:column; gap:6px; margin:0; padding:0; }
+.ms-f3d-list[hidden] { display:none; }
+.ms-f3d { display:flex; align-items:center; gap:9px; min-width:0; padding:5px 6px 5px 11px; border:1px solid var(--line); border-radius:10px; background:var(--wash); font-size:.86rem; }
+.ms-f3d-n, .ms-f3d-v { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:inherit; font-weight:600; color:var(--ink); text-align:left; }
+.ms-f3d-v { padding:0; cursor:pointer; background:none; border:0; text-decoration:underline; text-decoration-color:var(--line-2, var(--line)); text-underline-offset:3px; }
+.ms-f3d-v:hover { text-decoration-color:currentColor; }
+.ms-f3d em { flex:none; font-style:normal; font-size:.78rem; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.ms-f3d-x { flex:none; width:30px; height:30px; padding:0; border:0; border-radius:8px; background:transparent; cursor:pointer; font-size:1.2rem; line-height:1; color:var(--muted); }
+.ms-f3d-x:hover { background:color-mix(in srgb, var(--ink) 8%, transparent); color:var(--ink); }
+.ms-attach.is-full { opacity:.45; pointer-events:none; }
 
 .ms-reply { flex:none; display:flex; flex-direction:column; gap:6px; padding:12px 14px; border-top:1px solid var(--line); }
 .ms-reply-row { display:flex; align-items:flex-end; gap:8px; }

@@ -62,10 +62,14 @@
   function about(c) { return (TOPIC[c.topic] || 'Question') + (c.ref ? ' · ' + c.ref : ''); }
   function who(c) { var k = c.customers || {}; return k.name || k.email || 'Client'; }
   var MAX_PHOTOS = 4, MAX_SIDE = 1600, KEEP_DAYS = 365;
+  // Fichiers 3D : un plateau tranché (.gcode, .gcode.3mf) part en aperçu .capv, jamais le fichier lui-même (pas de vitesses, profils ni compte Bambu).
+  var MAX_3D = 3, MAX_3D_BYTES = 50 * 1024 * 1024, EXT_3D = /\.(gcode|3mf|stl|obj|step|stp)$/i, SLICED = /\.(gcode|3mf)$/i;
+  var VIEW_3D = /\.(stl|obj|3mf|gcode)$/i, CAPV = /\.capv$/i, AP3D_V = 1;
+  var ICON_3D = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>';
 
   var wrap = $('#ms-wrap'), listEl = $('#ms-list'), threadEl = $('#ms-thread'), navN = $('#nav-msgs-n');
   if (!wrap || !listEl || !threadEl) return;
-  var convs = [], filter = 'open', curId = null, msgs = [], photos = [], urlCache = {};
+  var convs = [], filter = 'open', curId = null, msgs = [], photos = [], files3d = [], urlCache = {};
   var tabOpen = false, loaded = false, pending = null, purged = false, busy = false;
   var accounts = null, accQ = '', draft = null, flash = '';
   var tplGrant = null;   // modèle choisi qui active la réservation à l'envoi   // filtre Comptes ; brouillon = conversation pas encore créée
@@ -345,9 +349,11 @@
       '<div class="ms-msgs" id="ms-msgs"><p class="muted">Chargement…</p></div>' +
       '<form class="ms-reply" id="ms-reply" novalidate>' +
         '<div class="ms-thumbs" hidden></div>' +
+        '<ul class="ms-f3d-list" hidden></ul>' +
         '<div class="ms-reply-row">' +
           '<label class="btn btn-ghost ms-attach" title="Joindre des photos"><input type="file" accept="image/*" multiple hidden aria-label="Joindre des photos">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg></label>' +
+          '<label class="btn btn-ghost ms-attach ms-attach-3d" title="Joindre un plateau 3D"><input type="file" accept=".gcode,.3mf,.stl,.obj,.step,.stp" multiple hidden aria-label="Joindre un plateau 3D">' + ICON_3D + '</label>' +
           '<div class="ms-tpl"><button type="button" class="btn btn-ghost ms-tpl-btn" aria-haspopup="menu" aria-expanded="false" title="Modèles de message">' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>' +
             '<span>Modèles</span></button><div class="ms-tpl-menu" role="menu" hidden></div></div>' +
@@ -368,6 +374,14 @@
       var p = photos.splice(+b.getAttribute('data-i'), 1)[0];
       if (p) try { URL.revokeObjectURL(p.url); } catch (x) {}
       paintThumbs();
+    });
+    var inp3d = $('.ms-attach-3d input', form);
+    inp3d.addEventListener('change', function () { add3d(inp3d.files); inp3d.value = ''; });
+    $('.ms-f3d-list', form).addEventListener('click', function (e) {
+      var x = e.target.closest('.ms-f3d-x');
+      if (x) { files3d.splice(+x.getAttribute('data-i'), 1); paint3d(); $('#ms-status', form).textContent = ''; return; }
+      var v = e.target.closest('.ms-f3d-v');
+      if (v) preview3d(files3d[+v.getAttribute('data-i')]);
     });
     ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } });
     ta.addEventListener('input', function () { if (!ta.value.trim()) tplGrant = null; });
@@ -422,9 +436,12 @@
                    : '<span class="ms-b-ph" title="Photo indisponible"></span>';
         }).join('') + '</div>' : '') +
         ((m.files || []).length ? '<div class="ms-b-files">' + m.files.map(function (f) {
-          var u = fileUrlCache[f.p], inner = '<span>' + esc(f.n) + '</span><em>' + esc(fmtSize(+f.s || 0)) + '</em>';
-          return u ? '<a class="ms-b-file" href="' + esc(u) + '" download="' + esc(f.n) + '" target="_blank" rel="noopener">' + inner + '</a>'
-                   : '<span class="ms-b-file is-off">' + inner + '</span>';
+          var u = fileUrlCache[f.p], inner = '<span>' + esc(f.n) + '</span><em>' + esc(fmtSize(+f.s || 0)) + '</em>',
+              data = ' data-v3d="' + esc(f.p) + '" data-n="' + esc(f.n) + '"';
+          if (CAPV.test(f.p)) return '<button type="button" class="ms-b-file ms-b-capv"' + data + '>' + ICON_3D + '<span>' + esc(f.n) + '</span><b>Voir en 3D</b></button>';
+          if (!u) return '<span class="ms-b-file is-off">' + inner + '</span>';
+          var link = '<a class="ms-b-file" href="' + esc(u) + '" download="' + esc(f.n) + '" target="_blank" rel="noopener">' + inner + '</a>';
+          return VIEW_3D.test(f.p) ? '<div class="ms-b-frow">' + link + '<button type="button" class="ms-b-3d"' + data + '>Voir en 3D</button></div>' : link;
         }).join('') + '</div>' : '') +
         (m.body ? '<p>' + esc(m.body) + '</p>' : '') +
         '<time>' + esc(hour(m.created_at)) + '</time></div>';
@@ -447,6 +464,35 @@
       (r.data || []).forEach(function (x) { if (x.signedUrl) fileUrlCache[x.path] = x.signedUrl; });
     }, function () {});
   }
+  // « Voir en 3D » : apercu-3d.js n'est chargé qu'au premier besoin (fenêtre + préparation de l'aperçu)
+  var ap3dP = null;
+  function loadAp3d() {
+    if (CA.ap3d) return Promise.resolve(CA.ap3d);
+    if (!ap3dP) ap3dP = new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = 'assets/apercu-3d.js?v=' + AP3D_V;
+      s.onload = function () { if (CA.ap3d) res(CA.ap3d); else rej(new Error('apercu')); };
+      s.onerror = function () { rej(new Error('apercu')); };
+      document.head.appendChild(s);
+    });
+    ap3dP.catch(function () { ap3dP = null; });
+    return ap3dP;
+  }
+  threadEl.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-v3d]');
+    if (!b || b.disabled) return;
+    var path = b.getAttribute('data-v3d'), name = b.getAttribute('data-n') || '';
+    b.disabled = true;
+    loadAp3d().then(function (A) {
+      return sb.storage.from('print-files').createSignedUrl(path, 600).then(function (r) {
+        if (r.error || !r.data || !r.data.signedUrl) throw new Error('url');
+        A.show({ name: name, url: r.data.signedUrl, ext: path.split('.').pop().toLowerCase() });
+      });
+    }).catch(function () {
+      var st = $('#ms-status', threadEl);
+      if (st) st.textContent = 'Aperçu indisponible pour ce fichier.';
+    }).then(function () { b.disabled = false; });
+  });
   function signedUrls(paths) {
     var need = paths.filter(function (p) { return !urlCache[p]; });
     if (!need.length) return Promise.resolve();
@@ -488,14 +534,87 @@
   function clearPhotos() {
     photos.forEach(function (p) { try { URL.revokeObjectURL(p.url); } catch (e) {} });
     photos = []; paintThumbs();
+    files3d = []; paint3d();
+  }
+  /* Plateau 3D joint : tranché -> aperçu seulement (peut dépasser 50 Mo au départ). Sans parcours lisible : le .3mf part tel quel, le .gcode est refusé. */
+  var job3d = Promise.resolve();   // préparation en cours : l'envoi l'attend
+  function add3d(list) {
+    var st = $('#ms-status', threadEl), said = '';
+    Array.prototype.slice.call(list || []).forEach(function (f) {
+      if (!EXT_3D.test(f.name)) { said = 'Formats acceptés : STL, 3MF, STEP, OBJ, G-code.'; return; }
+      if (files3d.length >= MAX_3D) { said = 'Au plus 3 fichiers 3D par message.'; return; }
+      if (!SLICED.test(f.name) && f.size > MAX_3D_BYTES) { said = 'Fichier trop lourd (50 Mo maximum).'; return; }
+      var it = { name: f.name, file: f, blob: SLICED.test(f.name) ? null : f, preview: false, pct: 0 };
+      files3d.push(it);
+      if (it.blob) return;
+      job3d = Promise.all([job3d, prepare3d(it)]);
+    });
+    if (st) st.textContent = said;
+    paint3d();
+  }
+  function prepare3d(it) {
+    var st = $('#ms-status', threadEl);
+    function drop(why) {
+      files3d = files3d.filter(function (x) { return x !== it; });
+      if (st) st.textContent = why;
+      paint3d();
+    }
+    return loadAp3d().then(function (A) {
+      return A.makePreview(it.file, function (p) {
+        it.pct = Math.round(p * 100);
+        var em = threadEl.querySelector('.ms-f3d[data-k="' + files3d.indexOf(it) + '"] em');
+        if (em) em.textContent = 'Préparation… ' + it.pct + ' %';
+      });
+    }).then(function (r) {
+      if (r) { it.blob = r.blob; it.preview = true; paint3d(); return; }
+      if (/\.gcode$/i.test(it.name)) { drop('Aucun parcours lisible dans ce G-code.'); return; }
+      if (it.file.size > MAX_3D_BYTES) { drop('Fichier trop lourd (50 Mo maximum).'); return; }
+      it.blob = it.file; paint3d();
+    }, function () { drop('Aperçu indisponible pour ce fichier.'); });
+  }
+  function paint3d() {
+    var box = $('.ms-f3d-list', threadEl); if (!box) return;
+    box.innerHTML = files3d.map(function (it, i) {
+      var tag = !it.blob ? 'Préparation… ' + it.pct + ' %' : (it.preview ? 'aperçu · ' : 'fichier complet · ') + fmtSize(it.blob.size);
+      var seen = it.blob && (it.preview || VIEW_3D.test(it.name));
+      return '<li class="ms-f3d" data-k="' + i + '">' + ICON_3D +
+        (seen ? '<button type="button" class="ms-f3d-v" data-i="' + i + '" title="Voir en 3D">' + esc(it.name) + '</button>' : '<span class="ms-f3d-n">' + esc(it.name) + '</span>') +
+        '<em>' + esc(tag) + '</em>' +
+        '<button type="button" class="ms-f3d-x" data-i="' + i + '" aria-label="Retirer le fichier">×</button></li>';
+    }).join('');
+    box.hidden = !files3d.length;
+    var lab = $('.ms-attach-3d', threadEl);
+    if (lab) lab.classList.toggle('is-full', files3d.length >= MAX_3D);
+  }
+  function preview3d(it) {
+    if (!it || !it.blob) return;
+    loadAp3d().then(function (A) {
+      A.show({ name: previewName(it.name), blob: it.blob, ext: it.preview ? 'capv' : it.name.split('.').pop().toLowerCase() });
+    }, function () {
+      var st = $('#ms-status', threadEl);
+      if (st) st.textContent = 'Aperçu indisponible pour ce fichier.';
+    });
+  }
+  function previewName(n) { return String(n).replace(/(\.gcode)?(\.3mf)?$/i, '') || n; }
+  function upload3d(c) {
+    return Promise.all(files3d.map(function (it) {
+      var path = c.customer_id + '/' + uuid() + '.' + (it.preview ? 'capv' : it.name.split('.').pop().toLowerCase());
+      // le bucket n'accepte que octet-stream, et supabase-js envoie le type du Blob
+      var body = it.blob.slice(0, it.blob.size, 'application/octet-stream');
+      return sb.storage.from('print-files').upload(path, body, { contentType: 'application/octet-stream', upsert: false }).then(function (r) {
+        if (r.error) throw new Error('Fichier 3D non envoyé : ' + r.error.message);
+        return { p: path, n: it.preview ? previewName(it.name) : it.name, s: it.blob.size };
+      });
+    }));
   }
   function send() {
     var c = conv(); if (!c || busy) return;
     var ta = $('#ms-reply-in', threadEl), btn = $('.ms-send', threadEl), st = $('#ms-status', threadEl);
     busy = true; btn.disabled = true;
-    photoJob.then(function () {
+    if (files3d.some(function (it) { return !it.blob; })) st.textContent = 'Préparation de l\'aperçu…';
+    Promise.all([photoJob, job3d]).then(function () {
       var body = ta.value.trim();
-      if (!body && !photos.length) { busy = false; btn.disabled = false; ta.focus(); return; }
+      if (!body && !photos.length && !files3d.length) { busy = false; btn.disabled = false; ta.focus(); return; }
       st.textContent = 'Envoi…';
       return sendNow(c, body, ta, btn, st);
     });
@@ -525,7 +644,9 @@
         return path;
       });
     })).then(function (paths) {
-      return sb.from('messages').insert({ conversation_id: c.id, sender: 'admin', body: body, photos: paths }).select('id').single();
+      return upload3d(c).then(function (files) {
+        return sb.from('messages').insert({ conversation_id: c.id, sender: 'admin', body: body, photos: paths, files: files }).select('id').single();
+      });
     }).then(function (res) {
       if (res.error) throw new Error(res.error.message);
       busy = false; btn.disabled = false; ta.value = ''; clearPhotos();

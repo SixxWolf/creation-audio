@@ -89,7 +89,7 @@
           <span class="ip-drop-t">
             <b class="ip-fine">Glisse ton fichier ici</b>
             <b class="ip-touch">Choisis ton fichier</b>
-            <small>STL, 3MF, STEP, OBJ · 50 Mo</small>
+            <small>STL, 3MF, STEP, OBJ, G-code · 50 Mo</small>
           </span>
           <span class="ip-drop-go">Parcourir</span>
         </label>
@@ -142,6 +142,7 @@
           <span id="ip-nopreview-t">Pas d'aperçu pour ce fichier. Il part quand même avec ta demande.</span>
         </div>
       </div>
+      <div class="v3d-ctl" id="ip-ctl" hidden></div>
       <ul class="ip-plates" id="ip-plates" aria-label="Plateaux du fichier" hidden></ul>
       <dl class="ip-read">
         <div><dt id="ip-l-dim">Dimensions</dt><dd id="ip-r-dim">—</dd><dd class="ip-r-sub" id="ip-r-dim2" hidden></dd></div>
@@ -273,7 +274,7 @@
     <div class="ip-faq rv" style="--d:1">
       <details class="ip-fq">
         <summary>Quels fichiers acceptez-vous ?</summary>
-        <p>STL, 3MF, STEP et OBJ, jusqu'à 50 Mo chacun et 3 fichiers par demande. L'aperçu fonctionne avec les STL, les OBJ et les 3MF. Pas de fichier ? Décris ta pièce, on s'en occupe.</p>
+        <p>STL, 3MF, STEP, OBJ et G-code, jusqu'à 50 Mo chacun et 3 fichiers par demande. L'aperçu fonctionne avec tous, sauf le STEP. Pas de fichier ? Décris ta pièce, on s'en occupe.</p>
       </details>
       <details class="ip-fq">
         <summary>Combien ça coûte ?</summary>
@@ -391,8 +392,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
-<script src="assets/nav.js?v=18"></script>
+<script src="assets/nav.js?v=19"></script>
 <script src="assets/promo.js?v=1"></script>
-<script src="assets/impression.js?v=3"></script>
+<script src="assets/apercu-3d.js?v=1"></script>
+<script src="assets/impression.js?v=4"></script>
 </body>
 </html>

@@ -3041,7 +3041,7 @@ begin
 end $$;
 revoke all on function public._msg_photos(jsonb, uuid) from public, anon, authenticated;
 
--- Fichiers 3D joints (STL, 3MF, STEP, OBJ) : chemins du dossier du compte dans le bucket « print-files »,
+-- Fichiers 3D joints (STL, 3MF, STEP, OBJ, G-code) : chemins du dossier du compte dans le bucket « print-files »,
 -- déjà téléversés, 3 max. -> [{p, n, s}] (n = nom d'origine, s = taille lue dans Storage).
 create or replace function public._msg_files(p_files jsonb, p_owner uuid)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
@@ -3051,7 +3051,7 @@ begin
   if jsonb_array_length(p_files) > 3 then raise exception 'Au plus 3 fichiers 3D par message.'; end if;
   for x in select jsonb_array_elements(p_files) loop
     v_p := x ->> 'p';
-    if v_p is null or v_p !~ ('^' || p_owner::text || '/[0-9a-f-]{36}\.(stl|3mf|step|stp|obj)$') then
+    if v_p is null or v_p !~ ('^' || p_owner::text || '/[0-9a-f-]{36}\.(stl|3mf|step|stp|obj|gcode)$') then
       raise exception 'Fichier invalide.';
     end if;
     select (o.metadata ->> 'size')::bigint into v_size from storage.objects o where o.bucket_id = 'print-files' and o.name = v_p;
@@ -3197,7 +3197,8 @@ create policy messages_photos_delete on storage.objects for delete to authentica
 
 -- ---- fichiers 3D (page « Impression 3D ») : bucket privé « print-files », un dossier par compte ----
 -- 50 Mo par fichier (maximum Supabase sans plan payant), 30 fichiers max par compte, extensions limitées
--- (.stl .3mf .step .stp .obj). Le navigateur téléverse en application/octet-stream ; lecture par URL signée.
+-- (.stl .3mf .step .stp .obj .gcode). Le navigateur téléverse en application/octet-stream ; lecture par URL signée.
+-- L'admin dépose aussi, dans le dossier du client, l'aperçu .capv d'un plateau tranché : hors quota du client, et lui ne peut pas en créer.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('print-files', 'print-files', false, 52428800, array['application/octet-stream'])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit,
@@ -3206,7 +3207,8 @@ on conflict (id) do update set public = false, file_size_limit = excluded.file_s
 create or replace function public._pf_quota_ok()
 returns boolean language sql stable security definer set search_path = '' as $$
   select (select count(*) from storage.objects o
-           where o.bucket_id = 'print-files' and (storage.foldername(o.name))[1] = (select auth.uid())::text) < 30;
+           where o.bucket_id = 'print-files' and (storage.foldername(o.name))[1] = (select auth.uid())::text
+             and o.name !~* '\.capv$') < 30;
 $$;
 revoke all on function public._pf_quota_ok() from public, anon;
 grant execute on function public._pf_quota_ok() to authenticated;
@@ -3217,8 +3219,10 @@ create policy print_files_read on storage.objects for select to authenticated
                                           or (select public.is_admin()) ) );
 drop policy if exists print_files_insert on storage.objects;
 create policy print_files_insert on storage.objects for insert to authenticated
-  with check ( bucket_id = 'print-files' and (storage.foldername(name))[1] = (select auth.uid())::text
-               and name ~* '\.(stl|3mf|step|stp|obj)$' and (select public._pf_quota_ok()) );
+  with check ( bucket_id = 'print-files' and (
+    ((storage.foldername(name))[1] = (select auth.uid())::text
+       and name ~* '\.(stl|3mf|step|stp|obj|gcode)$' and (select public._pf_quota_ok()))
+    or ((select public.is_admin()) and name ~* '\.(stl|3mf|step|stp|obj|gcode|capv)$') ) );
 drop policy if exists print_files_delete on storage.objects;
 create policy print_files_delete on storage.objects for delete to authenticated
   using ( bucket_id = 'print-files' and ( (storage.foldername(name))[1] = (select auth.uid())::text

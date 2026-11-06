@@ -106,6 +106,15 @@ html.msg-open { overflow:hidden; }
 .msg-b-file span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 a.msg-b-file:hover { border-color:var(--ink); }
 .msg-b-file.is-off { opacity:.55; }
+.msg-b-frow { display:flex; align-items:stretch; gap:6px; min-width:0; }
+.msg-b-frow .msg-b-file { flex:1; }
+.msg-panel .msg-b-3d { flex:none; min-height:40px; padding:0 11px; cursor:pointer; border-radius:10px; background:rgba(255,255,255,.55); border:1px solid var(--line);
+  color:var(--ember-ink, var(--ember)); font-size:.86rem; font-weight:700; white-space:nowrap; }
+.msg-panel .msg-b-capv { width:100%; min-height:44px; cursor:pointer; color:var(--ink); font-size:.86rem; font-weight:600; text-align:left; }
+.msg-panel .msg-b-3d:hover, .msg-panel .msg-b-capv:hover { border-color:var(--ink); }
+.msg-panel .msg-b-3d:disabled, .msg-panel .msg-b-capv:disabled { opacity:.6; cursor:progress; }
+.msg-b-capv b { flex:none; font-weight:700; color:var(--ember-ink, var(--ember)); white-space:nowrap; }
+.msg-b-3d:focus-visible, .msg-b-capv:focus-visible { outline:3px solid var(--ember-dim); outline-offset:2px; }
 
 /* boutons + statuts */
 .msg-send { display:inline-flex; align-items:center; justify-content:center; width:100%; height:48px; padding:0 18px; cursor:pointer;

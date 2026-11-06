@@ -1,27 +1,39 @@
 /* =========================================================
-   Création Audio — lecture d'un 3MF dans un Worker (page Impression 3D).
+   Création Audio — lecture d'un 3MF ou d'un G-code dans un Worker (aperçu 3D : page Impression 3D, Messagerie, admin).
    Rien ne quitte le navigateur : le fichier est lu ici, pour l'aperçu seulement.
    - 3MF = ZIP + XML. Le XML est décompressé et lu par morceaux, sans jamais tenir en mémoire d'un bloc.
    - Plateaux, instances, couleur de chaque pièce : Metadata/model_settings.config et project_settings.config
      (Bambu Studio et Orca). Un 3MF ordinaire donne un seul plateau.
-   - Déjà tranché : temps et poids réels dans slice_info.config ; certains n'ont aucune pièce, seulement du G-code.
-   - Téléphone : au-delà du budget de triangles par plateau, version allégée (regroupement de sommets).
-   Messages reçus : {t:'open', file, budget, maxTris}, {t:'plate', i, req}
-   Messages envoyés : {t:'progress', p}, {t:'meta', …}, {t:'plate', req, pos, groups, rect}, {t:'fail'}
+   - Déjà tranché : temps et poids réels dans slice_info.config ; le G-code (Metadata/plate_N.gcode, ou un .gcode brut
+     d'Orca, Prusa, Cura) est lu au moment d'afficher le plateau et donne les trajets d'extrusion.
+   - Téléphone : au-delà du budget par plateau, version allégée (sommets regroupés ; trajets sans le remplissage).
+   Messages reçus : {t:'open', file, budget, maxTris, maxPts, paths}, {t:'plate', i, req}, {t:'capv', req}
+   Messages envoyés : {t:'progress', p}, {t:'meta', …}, {t:'plate', req, pos, groups, rect | paths}, {t:'capv', req, blob}, {t:'fail'}
    ========================================================= */
 'use strict';
 
-var doc = null;            // { plates, colors, W, H }
-var totalTris = 0, totalVerts = 0, limitTris = 3e7;
+var doc = null;            // { plates, colors, kinds, W, H, ax, ay, file, zip }
+var totalTris = 0, totalVerts = 0, limitTris = 3e7, limitPts = 8e6, wantPaths = true, lastReq = 0;
+var jobs = Promise.resolve();
 
 self.onmessage = function (e) {
   var m = e.data;
   if (m.t === 'open') {
-    openFile(m.file, m.budget || 8e6, m.maxTris || 3e7).catch(function (err) {
+    limitPts = m.maxPts || 8e6;
+    wantPaths = m.paths !== false;
+    var open = /\.gcode$/i.test(m.file.name) ? openGcode(m.file) : openFile(m.file, m.budget || 8e6, m.maxTris || 3e7);
+    open.catch(function (err) {
       self.postMessage({ t: 'fail', why: String(err && err.message || err) });
     });
   } else if (m.t === 'plate' && doc) {
-    sendPlate(m.i, m.req);
+    lastReq = m.req;
+    jobs = jobs.then(function () { return sendPlate(m.i, m.req); }).catch(function () {
+      self.postMessage({ t: 'plate', req: m.req, i: m.i, pos: null });
+    });
+  } else if (m.t === 'capv' && doc) {
+    jobs = jobs.then(function () { return sendCapv(m.req); }).catch(function () {
+      self.postMessage({ t: 'capv', req: m.req, blob: null });
+    });
   }
 };
 
@@ -490,8 +502,10 @@ function simplify(o, ratio) {
 function rgb(hex) {
   return [1, 3, 5].map(function (i) { return parseInt(hex.substr(i, 2), 16) / 255; });
 }
-function sendPlate(i, req) {
+async function sendPlate(i, req) {
+  if (req !== lastReq) return;                       // un autre plateau a été demandé entre-temps
   var p = doc.plates[i];
+  if (p && p.gcode && wantPaths && await sendPaths(p, i, req)) return;
   if (!p || !p.meshes.length) { self.postMessage({ t: 'plate', req: req, i: i, pos: null }); return; }
   var colors = doc.colors, slots = {}, order = [], counts = [];
   function slotOf(hex) {
@@ -534,7 +548,336 @@ function sendPlate(i, req) {
   self.postMessage({ t: 'plate', req: req, i: i, pos: pos, groups: groups, rect: [rx - cx, ry - cy, hw, hh] }, [pos.buffer]);
 }
 
+/* ---------- G-code : les trajets d'extrusion, 8 octets par point ----------
+   x, y, z en Int16 (0,02 mm) + 16 bits : 0x8000 = début de trajet | type << 10 | outil << 6 | largeur en 0,025 mm.
+   Un segment relie un point au suivant, sauf si le suivant commence un trajet.
+   Types = ceux de Bambu Studio, mêmes numéros que TYPES dans apercu-3d.js :
+   0 mur intérieur, 1 mur extérieur, 2 surplomb, 3 remplissage, 4 solide interne, 5 coque flottante, 6 surface supérieure, 7 surface inférieure,
+   8 lissage, 9 pont, 10 remplissage d'espace, 11 support, 12 interface, 13 transition, 14 lissage de support, 15 tour de purge, 16 jupe, 17 bordure, 18 autre.
+   À partir de 15 : pas la pièce (hors dimensions). */
+var K = 50, SAG = 0.04, T_SPARSE = 3, T_NOT_PART = 15, T_OTHER = 18;
+function gtype(name) {
+  var n = name.toLowerCase();
+  if (/custom/.test(n)) return -1;       // ligne de purge du début : pas la pièce
+  if (/iron/.test(n)) return /support/.test(n) ? 14 : 8;
+  if (/support/.test(n)) return /transition/.test(n) ? 13 : /interface/.test(n) ? 12 : 11;
+  if (/tower|prime/.test(n)) return 15;
+  if (/skirt/.test(n)) return 16;
+  if (/brim/.test(n)) return 17;
+  if (/overhang/.test(n)) return 2;
+  if (/floating/.test(n)) return 5;
+  if (/outer wall|external perimeter|wall-outer/.test(n)) return 1;
+  if (/wall|perimeter|shell/.test(n)) return 0;
+  if (/top/.test(n)) return 6;
+  if (/bottom/.test(n)) return 7;
+  if (/bridge/.test(n)) return 9;
+  if (/gap/.test(n)) return 10;
+  if (/solid|skin/.test(n)) return 4;
+  if (/sparse|infill|fill$/.test(n)) return T_SPARSE;
+  return T_OTHER;
+}
+function hms(s) {
+  var m = /^\s*(?:(\d+)\s*d)?\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*m(?!s))?\s*(?:(\d+)\s*s)?/.exec(s);
+  return m ? (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + (+m[4] || 0) : 0;
+}
+function afterSign(r) { var i = r.search(/[=:]/); return i < 0 ? '' : r.slice(i + 1).trim(); }
+function bedOf(v) {
+  var pts = v.split(',').map(function (a) { return a.trim().split('x').map(Number); }).filter(function (a) { return a.length === 2 && isFinite(a[0]) && isFinite(a[1]); });
+  if (pts.length < 3) return null;
+  var xs = pts.map(function (a) { return a[0]; }), ys = pts.map(function (a) { return a[1]; });
+  var ax = Math.min.apply(null, xs), ay = Math.min.apply(null, ys), w = Math.max.apply(null, xs) - ax, h = Math.max.apply(null, ys) - ay;
+  return w > 0 && h > 0 ? [ax, ay, w, h] : null;
+}
+function GcodeReader(o) {
+  var cap = 65536, P = new Int16Array(cap * 4), n = 0, layers = [], layerZ = [];
+  var x = 0, y = 0, z = 0, E = 0, relE = false, abs = true, cur = T_OTHER, tool = 0, w = 0, w0 = 0.45, on = !!o.noMarkers, done = false, flush = false, markers = false, lastZ = -1e9;
+  var a0 = Infinity, a1 = Infinity, a2 = Infinity, a3 = -Infinity, a4 = -Infinity, a5 = -Infinity;     // tout ce qui est dessiné
+  var b0 = Infinity, b1 = Infinity, b3 = -Infinity, b4 = -Infinity, b5 = -Infinity;                    // les pièces : sans tour de purge ni bordure
+  var toolMask = 0, typeMask = 0, heights = {}, time = 0, timeM73 = 0, weight = 0, weightTotal = false, dens = 0, diam = 0, ext = 0, colors = null, kinds = null, bed = null, cfgH = 0;
+  var lx = NaN, ly = NaN, lz = NaN, lm = -1, mx = new Float64Array(48), nm = 0, tol = o.tol;
+  function push(px, py, pz, meta) {
+    if (n >= cap) {
+      if (n >= o.cap) throw new Error('LIMITE');
+      cap *= 2;
+      var Q = new Int16Array(cap * 4); Q.set(P); P = Q;
+    }
+    var i = n * 4;
+    P[i] = Math.round(px * K); P[i + 1] = Math.round(py * K); P[i + 2] = Math.round(pz * K); P[i + 3] = meta;
+    n++;
+  }
+  function near(ox, oy, dx, dy, L, qx, qy) {
+    var c = ((qx - ox) * dx + (qy - oy) * dy) / L, d = Math.abs((qx - ox) * dy - (qy - oy) * dx) / L;
+    return c >= -0.001 && c <= L + 0.001 && d <= tol;
+  }
+  function seg(ax, ay, bx, by, bz, meta, t) {
+    if (Math.abs(ax) > 650 || Math.abs(ay) > 650 || Math.abs(bx) > 650 || Math.abs(by) > 650 || bz > 650 || bz < -10) return;
+    if (ax !== lx || ay !== ly || bz !== lz || meta !== lm) {            // nouveau trajet
+      push(ax, ay, bz, meta | 0x8000);
+      push(bx, by, bz, meta);
+      nm = 0;
+      if (ax < a0) a0 = ax; if (ax > a3) a3 = ax;
+      if (ay < a1) a1 = ay; if (ay > a4) a4 = ay;
+      if (t < T_NOT_PART) { if (ax < b0) b0 = ax; if (ax > b3) b3 = ax; if (ay < b1) b1 = ay; if (ay > b4) b4 = ay; }
+    } else {                                                             // presque aligné : le dernier point s'allonge
+      var j = (n - 2) * 4, ox = P[j] / K, oy = P[j + 1] / K, dx = bx - ox, dy = by - oy, L = Math.sqrt(dx * dx + dy * dy);
+      var ok = L > 0 && nm < 24 && !(P[(n - 1) * 4 + 3] & 0x8000) && near(ox, oy, dx, dy, L, lx, ly);
+      for (var q = 0; ok && q < nm; q++) ok = near(ox, oy, dx, dy, L, mx[q * 2], mx[q * 2 + 1]);
+      if (ok) {
+        mx[nm * 2] = lx; mx[nm * 2 + 1] = ly; nm++;
+        var i = (n - 1) * 4;
+        P[i] = Math.round(bx * K); P[i + 1] = Math.round(by * K);
+      } else { push(bx, by, bz, meta); nm = 0; }
+    }
+    if (bx < a0) a0 = bx; if (bx > a3) a3 = bx;
+    if (by < a1) a1 = by; if (by > a4) a4 = by;
+    if (bz < a2) a2 = bz; if (bz > a5) a5 = bz;
+    if (t < T_NOT_PART) { if (bx < b0) b0 = bx; if (bx > b3) b3 = bx; if (by < b1) b1 = by; if (by > b4) b4 = by; if (bz > b5) b5 = bz; }
+    lx = bx; ly = by; lz = bz; lm = meta;
+  }
+  function note(r) {
+    if (r.startsWith('model printing time') || r.startsWith('total estimated time')) {
+      var m = /total estimated time:\s*(.+)$/.exec(r);
+      time = hms(m ? m[1] : afterSign(r));
+    } else if (r.startsWith('estimated printing time')) { if (!time) time = hms(afterSign(r)); }
+    else if (r.startsWith('TIME:')) { if (!time) time = +r.slice(5) || 0; }
+    else if (/^(total )?filament (used|weight) \[g\]/.test(r)) {
+      var tot = r.charCodeAt(0) === 116;
+      if (tot || !weightTotal) {
+        var g = afterSign(r).split(/[,;]/).reduce(function (s, v) { return s + (parseFloat(v) || 0); }, 0);
+        if (g > 0) { weight = g; weightTotal = tot; }
+      }
+    } else if (r.startsWith('filament_density')) { if (!dens) dens = parseFloat(afterSign(r)) || 0; }
+    else if (r.startsWith('filament_diameter')) { if (!diam) diam = parseFloat(afterSign(r)) || 0; }
+    else if (r.startsWith('filament_colour')) {
+      if (!colors) colors = afterSign(r).split(/[,;]/).map(function (c) { c = c.trim(); return /^#[0-9a-f]{6}/i.test(c) ? c.slice(0, 7).toUpperCase() : null; });
+    } else if (r.startsWith('filament_type')) {
+      if (!kinds) kinds = afterSign(r).split(/[,;]/).map(function (c) { return c.trim().replace(/["']/g, '').slice(0, 16); });
+    } else if (r.startsWith('printable_area') || r.startsWith('bed_shape')) { if (!bed) bed = bedOf(afterSign(r)); }
+    else if (r.startsWith('nozzle_diameter')) { var d = parseFloat(afterSign(r)); if (d > 0.1 && d < 2) w0 = d * 1.125; }
+    else if (r.startsWith('layer_height') || r.startsWith('Layer height:')) { if (!cfgH) cfgH = parseFloat(afterSign(r)) || 0; }
+  }
+  function comment(l) {
+    var r = l.charCodeAt(1) === 32 ? l.slice(2) : l.slice(1), c = r.charCodeAt(0);
+    if (!done) {
+      if (r.startsWith('FEATURE:') || r.startsWith('TYPE:')) { cur = gtype(r.slice(r.indexOf(':') + 1).trim()); return; }
+      if (r.startsWith('CHANGE_LAYER') || r.startsWith('LAYER_CHANGE') || /^LAYER:\d/.test(r)) {
+        markers = true; on = true; layers.push(n); layerZ.push(z);
+        return;
+      }
+      if (r.startsWith('LINE_WIDTH:') || r.startsWith('WIDTH:')) { w = parseFloat(r.slice(r.indexOf(':') + 1)) || w; return; }
+      if (r.startsWith('LAYER_HEIGHT:') || r.startsWith('HEIGHT:')) {
+        var h = Math.round((parseFloat(r.slice(r.indexOf(':') + 1)) || 0) * 100);
+        if (h > 0) heights[h] = (heights[h] || 0) + 1;
+        return;
+      }
+      if (c === 70 && r.startsWith('FLUSH_START')) { flush = true; return; }
+      if (c === 70 && r.startsWith('FLUSH_END')) { flush = false; return; }
+      if (on && (r.startsWith('EXECUTABLE_BLOCK_END') || r.startsWith('MACHINE_END_GCODE_START'))) { done = true; return; }
+    }
+    note(r);
+  }
+  function words(l, i, end, out) {
+    out.x = NaN; out.y = NaN; out.z = NaN; out.e = NaN; out.i = 0; out.j = 0;
+    while (i < end) {
+      var a = l.charCodeAt(i);
+      if (a < 65 || a > 90) { i++; continue; }
+      var j = i + 1;
+      while (j < end) {
+        var c = l.charCodeAt(j);
+        if (c === 32 || c === 9 || (c >= 65 && c <= 90)) break;
+        j++;
+      }
+      var v = +l.slice(i + 1, j);
+      if (a === 88) out.x = v; else if (a === 89) out.y = v; else if (a === 90) out.z = v; else if (a === 69) out.e = v;
+      else if (a === 73) out.i = v; else if (a === 74) out.j = v;
+      i = j;
+    }
+  }
+  var W = { x: 0, y: 0, z: 0, e: 0, i: 0, j: 0 };
+  this.line = function (l) {
+    var c0 = l.charCodeAt(0);
+    if (c0 === 59) { comment(l); return; }
+    if (c0 === 77) {
+      if (l.startsWith('M83')) relE = true;
+      else if (l.startsWith('M82')) relE = false;
+      else if (!timeM73 && l.startsWith('M73')) { var rm = /\bR(\d+)/.exec(l); if (rm) timeM73 = +rm[1] * 60; }
+      return;
+    }
+    if (done) return;
+    if (c0 === 84) { var t = /^T(\d+)/.exec(l); if (t && +t[1] < 16) tool = +t[1]; return; }
+    if (c0 !== 71) return;
+    var i = 1, code = 0, c = l.charCodeAt(1);
+    while (c >= 48 && c <= 57) { code = code * 10 + c - 48; c = l.charCodeAt(++i); }
+    if (i === 1) return;
+    if (code === 90) { abs = true; return; }
+    if (code === 91) { abs = false; return; }
+    if (code === 92) { var ge = /E(-?[\d.]+)/.exec(l); if (ge) E = +ge[1]; return; }
+    if (code > 3) return;
+    var sc = l.indexOf(';');
+    words(l, i, sc < 0 ? l.length : sc, W);
+    var bx = W.x !== W.x ? x : abs ? W.x : x + W.x, by = W.y !== W.y ? y : abs ? W.y : y + W.y, bz = W.z !== W.z ? z : abs ? W.z : z + W.z;
+    var de = W.e !== W.e ? 0 : (relE || !abs) ? W.e : W.e - E;
+    if (!relE && abs && W.e === W.e) E = W.e;
+    if (on && !flush && cur >= 0 && de > 0 && (bx !== x || by !== y) && !(o.noInfill && cur === T_SPARSE)) {
+      if (!markers && bz > lastZ + 1e-4) { lastZ = bz; layers.push(n); layerZ.push(bz); }
+      var width = Math.max(1, Math.min(63, Math.round((w || w0) * 40)));
+      var meta = (cur << 10) | (tool << 6) | width;
+      toolMask |= 1 << tool; typeMask |= 1 << cur; ext += de;
+      if (code >= 2 && (W.i || W.j)) {
+        var cx = x + W.i, cy = y + W.j, rr = Math.sqrt(W.i * W.i + W.j * W.j);
+        var s0 = Math.atan2(y - cy, x - cx), d = Math.atan2(by - cy, bx - cx) - s0;
+        if (code === 2) { if (d >= -1e-9) d -= 2 * Math.PI; } else if (d <= 1e-9) d += 2 * Math.PI;
+        var st = Math.min(64, Math.max(1, Math.ceil(Math.abs(d) / (2 * Math.acos(Math.max(0, 1 - SAG / Math.max(rr, SAG)))))));
+        var px = x, py = y;
+        for (var s = 1; s <= st; s++) {
+          var u = s0 + d * s / st, qx = s === st ? bx : cx + rr * Math.cos(u), qy = s === st ? by : cy + rr * Math.sin(u);
+          seg(px, py, qx, qy, bz, meta, cur);
+          px = qx; py = qy;
+        }
+      } else seg(x, y, bx, by, bz, meta, cur);
+    }
+    x = bx; y = by; z = bz;
+  };
+  this.finished = function () { return done; };
+  this.empty = function () { return !markers && n < 2; };
+  this.finish = function () {
+    if (n < 2 || !isFinite(a0 + a1 + a2 + a3 + a4 + a5)) return null;
+    var L = [];
+    for (var k = 0; k < layers.length; k++) if (layers[k] < n && (k + 1 === layers.length || layers[k + 1] > layers[k])) L.push(layers[k]);
+    if (!L.length) L.push(0);
+    L[0] = 0;
+    // hauteur de couche : la plus fréquente
+    var best = 0, bh = 0;
+    Object.keys(heights).forEach(function (h) { if (heights[h] > best) { best = heights[h]; bh = +h / 100; } });
+    if (!bh) {
+      var dz = {};
+      for (var q = 1; q < layerZ.length; q++) { var t = Math.round((layerZ[q] - layerZ[q - 1]) * 100); if (t > 0) dz[t] = (dz[t] || 0) + 1; }
+      Object.keys(dz).forEach(function (h) { if (dz[h] > best) { best = dz[h]; bh = +h / 100; } });
+    }
+    bh = Math.max(0.02, Math.min(2, bh || cfgH || 0.2));
+    var d = diam || 1.75, g = ext * Math.PI * d * d / 4 / 1000 * (dens || 1.24);
+    var noPart = !isFinite(b0 + b3 + b1 + b4 + b5);
+    return {
+      n: n, pts: P.slice(0, n * 4), layers: new Uint32Array(L), h: bh,
+      box: [a0, a1, a2, a3, a4, a5],
+      size: noPart ? [a3 - a0, a4 - a1, a5] : [b3 - b0, b4 - b1, b5],
+      tools: toolMask, types: typeMask, time: time || timeM73, weight: weight || g, colors: colors, kinds: kinds, bed: bed
+    };
+  };
+}
+async function readLines(stream, rd, tick, stopWhenDone) {
+  var reader = stream.getReader(), dec = new TextDecoder('latin1'), tail = '', r;
+  try {
+    for (;;) {
+      r = await reader.read();
+      if (r.done) break;
+      tick(r.value.length);
+      var ls = (tail + dec.decode(r.value, { stream: true })).split('\n');
+      tail = ls.pop();
+      if (tail.length > 4194304) throw new Error('ligne trop longue');
+      for (var i = 0; i < ls.length; i++) rd.line(ls[i]);
+      if (stopWhenDone && rd.finished()) { reader.cancel().catch(function () {}); return; }
+    }
+    if (tail) rd.line(tail);
+  } catch (err) {
+    try { reader.cancel().catch(function () {}); } catch (e2) { /* déjà fermé */ }
+    throw err;
+  }
+}
+/* Trop de points pour le budget : sans le remplissage, puis des trajets plus grossiers. */
+var TRIES = [[0.04, false], [0.04, true], [0.15, true]];
+async function parseGcode(p) {
+  var entry = p.raw ? null : doc.zip['metadata/plate_' + p.id + '.gcode'], total = p.raw ? p.raw.size : entry.us, noMarkers = false;
+  for (var a = 0; a < TRIES.length; a++) {
+    var rd = new GcodeReader({ tol: TRIES[a][0], noInfill: TRIES[a][1], noMarkers: noMarkers, cap: limitPts }), seen = 0, last = 0;
+    var tick = function (bytes) {
+      seen += bytes;
+      var now = Date.now();
+      if (now - last > 120) { last = now; self.postMessage({ t: 'progress', p: Math.min(0.97, seen / Math.max(1, total)) }); }
+    };
+    var stream = p.raw ? p.raw.stream() : await entryStream(doc.file, entry);
+    try {
+      await readLines(stream, rd, tick, !p.raw);
+    } catch (err) {
+      if (err.message === 'LIMITE') continue;
+      throw err;
+    }
+    if (rd.empty() && !noMarkers) { noMarkers = true; a--; continue; }      // aucun repère de couche : on suit le Z
+    var res = rd.finish();
+    if (res) res.light = a > 0;
+    return res;
+  }
+  return null;
+}
+async function parsedOf(p) {
+  if (p.parsed !== undefined) return p.parsed;
+  var r = null;
+  try { r = await parseGcode(p); } catch (err) { r = null; }
+  p.parsed = r;
+  // on garde les plateaux déjà lus, dans la limite du budget
+  var sum = r ? r.n : 0;
+  doc.plates.forEach(function (o) {
+    if (o === p || !o.parsed) return;
+    if (sum + o.parsed.n > limitPts * 2) o.parsed = undefined; else sum += o.parsed.n;
+  });
+  return r;
+}
+function pathsInfo(p, r) {
+  var b = r.box, cx = (b[0] + b[3]) / 2, cy = (b[1] + b[4]) / 2, bed = doc.zip ? [doc.ax, doc.ay, doc.W, doc.H] : r.bed, rect = null;
+  if (bed) {
+    var hw = bed[2] / 2, hh = bed[3] / 2, rx = bed[0] + hw, ry = bed[1] + hh;
+    if (Math.abs(cx - rx) > hw || Math.abs(cy - ry) > hh) { rx = cx; ry = cy; }
+    rect = [rx - cx, ry - cy, hw, hh];
+  }
+  var cols = doc.colors && doc.colors.length ? doc.colors : r.colors || [], kinds = doc.kinds && doc.kinds.length ? doc.kinds : r.kinds || [], tools = [];
+  for (var t = 0; t < 16; t++) if (r.tools >> t & 1) tools.push({ i: t, c: cols[t] || null, k: kinds[t] || '' });
+  return {
+    id: p.id, h: r.h, off: [cx, cy], fit: [b[3] - b[0], b[4] - b[1], b[5]], size: r.size, rect: rect, tools: tools, types: r.types,
+    time: p.time || r.time, weight: p.weight || r.weight, light: r.light, count: r.n
+  };
+}
+async function sendPaths(p, i, req) {
+  var r = await parsedOf(p);
+  if (req !== lastReq) return true;
+  if (!r) return false;
+  var info = pathsInfo(p, r), pts = r.pts.slice(), layers = r.layers.slice();
+  info.pts = pts; info.layers = layers; info.volume = 0; info.area = 0;
+  self.postMessage({ t: 'plate', req: req, i: i, paths: info }, [pts.buffer, layers.buffer]);
+  return true;
+}
+/* L'aperçu qu'on peut envoyer à un client : les trajets et les chiffres, jamais le G-code ni les réglages.
+   'CAPV' + version + taille de l'en-tête JSON + en-tête + pour chaque plateau : couches, 4 colonnes en écarts, vignette. Le tout en gzip. */
+async function sendCapv(req) {
+  var heads = [], parts = [], points = 0, list = doc.plates.filter(function (p) { return p.gcode; });
+  for (var a = 0; a < list.length; a++) {
+    var p = list[a], r = await parsedOf(p);
+    if (!r) continue;
+    var n = r.n, cols = new Int16Array(n * 4);
+    for (var c = 0; c < 4; c++) {
+      var prev = 0;
+      for (var i = 0; i < n; i++) { var v = r.pts[i * 4 + c]; cols[c * n + i] = v - prev; prev = v; }
+    }
+    var thumb = p.thumb ? new Uint8Array(await p.thumb.arrayBuffer()) : null, info = pathsInfo(p, r);
+    info.n = n; info.m = r.layers.length; info.thumb = thumb ? thumb.length : 0; delete info.count;
+    heads.push(info);
+    parts.push(r.layers, cols);
+    if (thumb) parts.push(thumb);
+    points += n;
+  }
+  if (!heads.length) { self.postMessage({ t: 'capv', req: req, blob: null }); return; }
+  var json = new TextEncoder().encode(JSON.stringify({ v: 1, plates: heads })), top = new Uint8Array(12);
+  top.set([67, 65, 80, 86, 1]);
+  new DataView(top.buffer).setUint32(8, json.length, true);
+  var blob = new Blob([top, json].concat(parts), { type: 'application/octet-stream' });
+  if (self.CompressionStream) blob = await new Response(blob.stream().pipeThrough(new CompressionStream('gzip'))).blob();
+  self.postMessage({ t: 'capv', req: req, blob: blob, plates: heads.length, points: points });
+}
+
 /* ---------- ouverture ---------- */
+async function openGcode(file) {
+  doc = { plates: [{ id: 1, meshes: [], gcode: true, raw: file, time: 0, weight: 0, tris: 0, thumb: null, ox: 0, oy: 0 }], colors: [], kinds: [], W: 0, H: 0, ax: 0, ay: 0, file: file, zip: null };
+  self.postMessage({ t: 'meta', lightened: false, tooBig: false, tris: 0, plates: [{ id: 1, hasMesh: false, gcode: true, size: null, volume: 0, area: 0, tris: 0, thumb: null, time: 0, weight: 0 }] });
+}
 async function openFile(file, budget, maxTris) {
   limitTris = maxTris;
   var zip = await zipList(file), st = { objs: {}, mats: {}, items: [], queue: [], seen: {}, unit: null, colors: [], cfg: null, scale: 1 };
@@ -573,11 +916,12 @@ async function openFile(file, budget, maxTris) {
   st.scale = UNITS[st.unit] || 1;
 
   // réglages du projet
-  var W = 256, H = 256, ax = 0, ay = 0;
+  var W = 256, H = 256, ax = 0, ay = 0, kinds = [];
   if (zip['metadata/project_settings.config']) {
     try {
       var ps = JSON.parse(await entryText(file, zip['metadata/project_settings.config']));
       if (Array.isArray(ps.filament_colour)) st.colors = ps.filament_colour.map(function (c) { return /^#[0-9a-f]{6}/i.test(c) ? c.slice(0, 7).toUpperCase() : null; });
+      if (Array.isArray(ps.filament_type)) kinds = ps.filament_type.map(function (c) { return String(c).slice(0, 16); });
       if (Array.isArray(ps.printable_area) && ps.printable_area.length >= 3) {
         var xs = ps.printable_area.map(function (a) { return parseFloat(a.split('x')[0]); }), ys = ps.printable_area.map(function (a) { return parseFloat(a.split('x')[1]); });
         ax = Math.min.apply(null, xs); ay = Math.min.apply(null, ys);
@@ -664,11 +1008,11 @@ async function openFile(file, budget, maxTris) {
     }
   }
 
-  doc = { plates: plates, colors: st.colors, W: W || 256, H: H || 256 };
+  doc = { plates: plates, colors: st.colors, kinds: kinds, W: W || 256, H: H || 256, ax: ax, ay: ay, file: file, zip: zip };
   self.postMessage({
     t: 'meta', lightened: lightened, tooBig: tooBig, tris: maxPlate,
     plates: plates.map(function (p) {
-      return { id: p.id, hasMesh: p.meshes.length > 0, size: p.size || null, volume: p.volume || 0, area: p.area || 0, tris: p.tris, thumb: p.thumb, time: p.time, weight: p.weight };
+      return { id: p.id, hasMesh: p.meshes.length > 0, gcode: !!p.gcode, size: p.size || null, volume: p.volume || 0, area: p.area || 0, tris: p.tris, thumb: p.thumb, time: p.time, weight: p.weight };
     })
   });
 }
