@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 22;
+window.CA_EN_V = 23;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -429,7 +429,6 @@ window.CA_EN = (function (pairs) {
   [` mise à jour ✓`, ` updated ✓`],
   [` envoyée ✓`, ` sent ✓`],
   [` — Création Audio est avisé. Total dealer : `, ` — Création Audio is notified. Dealer total: `],
-  [` (hors taxes).`, ` (before tax).`],
   [`Le système de commande n'est pas encore activé. Écris-nous en attendant.`, `Online ordering isn't enabled yet. Write to us in the meantime.`],
   [` Tes changements restent dans le panier : tu peux les envoyer comme nouvelle commande.`, ` Your changes stay in the cart: you can send them as a new order.`],
   [`Envoyée`, `Sent`],
@@ -452,7 +451,6 @@ window.CA_EN = (function (pairs) {
   [`En cours`, `In progress`],
   [`Historique`, `History`],
   [`Préparation`, `Preparation`],
-  [` · hors taxes`, ` · before tax`],
   // ---- doc-print.js
   [`Reçu de`, `Received from`],
   [`Facturé à`, `Billed to`],
@@ -484,7 +482,6 @@ window.CA_EN = (function (pairs) {
   [`Virement Interac`, `Interac e-Transfer`],
   [` reçu comptant le `, ` received in cash on `],
   [`Ta note`, `Your note`],
-  [`</b> <small>hors taxes</small></span>`, `</b> <small>before tax</small></span>`],
   [`<button type="button" class="dl-btn js-edit">Modifier</button>`, `<button type="button" class="dl-btn js-edit">Edit</button>`],
   [`<button type="button" class="dl-btn is-danger js-cancel">Annuler</button></span>`, `<button type="button" class="dl-btn is-danger js-cancel">Cancel</button></span>`],
   [`Abandonner la modification de `, `Discard the changes to `],

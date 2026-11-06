@@ -244,7 +244,7 @@
           '<tbody>' + rows + '</tbody></table></div>' +
         '<footer class="co-foot">' +
           '<span class="co-total">' + plural(pairs, 'paire', 'paires') + (OPEN[o.status] && toPrint ? ' · <span class="co-print-n">' + toPrint + ' à imprimer</span>' : '') +
-            ' · <b>' + money(o.total) + '</b> <small>hors taxes</small></span>' +
+            ' · <b>' + money(o.total) + '</b></span>' +
           '<div class="co-actions">' + actionsFor(o) + '</div>' +
         '</footer>' +
       '</article>';
@@ -448,7 +448,7 @@
       pairs += it.qty; total += round2(unitOf(p, it.qty) * it.qty);
     });
     var sum = $('.cof-sum', fLines);
-    if (sum) sum.innerHTML = '<span class="co-total">' + plural(pairs, 'paire', 'paires') + ' · <b>' + money(total) + '</b> <small>hors taxes</small></span>';
+    if (sum) sum.innerHTML = '<span class="co-total">' + plural(pairs, 'paire', 'paires') + ' · <b>' + money(total) + '</b></span>';
   }
   function renderLines() {
     fItems = fItems.filter(function (it) { return stock[it.id]; });

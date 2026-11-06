@@ -558,7 +558,7 @@
       stopEditing(); clearCart(); resetNote(); cartMsg.textContent = '';
       closeCart();
       flash = { id: o.id, text: (wasEditing ? _t('Commande ') + o.number + _t(' mise à jour ✓') : _t('Commande ') + o.number + _t(' envoyée ✓')) +
-        _t(' — Création Audio est avisé. Total dealer : ') + money(o.total) + _t(' (hors taxes).') };
+        _t(' — Création Audio est avisé. Total dealer : ') + money(o.total) + '.' };
       if (/^#\/commandes/.test(location.hash)) loadOrders(); else location.hash = '#/commandes';
     }).then(null, function (err) {
       sending = false;
@@ -645,7 +645,7 @@
       var isNew = o.status === 'new';
       var cls = 'dl-order is-' + esc(o.status) + (flash && flash.id === o.id ? ' is-flash' : '');
       var meta = (o.created_by === 'admin' ? _t(' · ajoutée par Création Audio') : '') + (o.edited_at ? _t(' · modifiée') : '');
-      var total = '<span class="dl-order-total"><b>' + money(o.total) + '</b><small>' + plural(pairs, 'paire', 'paires') + _t(' · hors taxes') + '</small></span>';
+      var total = '<span class="dl-order-total"><b>' + money(o.total) + '</b><small>' + plural(pairs, 'paire', 'paires') + '</small></span>';
       var pill = '<span class="dl-status is-' + (o.paid_at && o.status === 'invoiced' ? 'paid' : esc(o.status)) + '">' + esc(st.label) + '</span>';
       var head = past
         ? '<summary class="dl-order-head">' +
