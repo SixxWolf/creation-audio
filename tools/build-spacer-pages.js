@@ -218,11 +218,13 @@ function pageHtml(tpl, CAS, c, sc, p, slug, pagesList, en) {
     ]
   };
 
+  // case « Vous êtes une entreprise ? » du gabarit : suit la page (liens relatifs, traduction) jusqu'à la fiche
+  const bizOf = (html) => (/<!-- biz[\s\S]*?<!-- \/biz -->/.exec(html) || [''])[0];
   let h = relink(tpl);
   if (en) {
     h = blankMeta(h, ['description', 'og:title', 'og:description', 'twitter:title', 'twitter:description'])
       .replace(/<title>[\s\S]*?<\/title>/, '<title></title>')
-      .replace(/<main class="shop" id="main">[\s\S]*?<\/main>/, '<main class="shop" id="main"></main>');
+      .replace(/<main class="shop" id="main">[\s\S]*?<\/main>/, (m) => '<main class="shop" id="main">' + bizOf(m) + '</main>');
     h = EN.translatePage(h, DIR + '/' + slug + '.html');
   } else {
     h = h.replace(/href="\.\.\/en\/spacers\.html"/g, 'href="../en/' + DIR + '/' + slug + '.html"');   // lien EN : la même fiche
@@ -241,11 +243,12 @@ function pageHtml(tpl, CAS, c, sc, p, slug, pagesList, en) {
     '<script>window.CA_SPACER_PAGES=' + JSON.stringify(pagesList) + ';</script>\n' +
     jsonLd({ '@context': 'https://schema.org', '@graph': [product, crumbs] }));
   h = h.replace(/<body class="([^"]*)">/, (m, cls) => '<body class="' + cls + '" data-spacer="' + esc(slug) + '">');
-  h = h.replace(/<main class="shop" id="main">[\s\S]*?<\/main>/, () =>
+  h = h.replace(/<main class="shop" id="main">[\s\S]*?<\/main>/, (m) =>
     '<main class="shop" id="main">\n' +
     '  <!-- Fiche pré-rendue (tools/build-spacer-pages.js) ; spacers.js la remplace par la version live -->\n' +
     '  <div id="sp-catalog" hidden><div id="sp-list"></div></div>\n' +
     '  <div id="sp-product">' + sc.staticProduct(slug) + '</div>\n' +
+    '  ' + bizOf(m) + '\n' +
     '</main>');
   return h;
 }

@@ -727,6 +727,36 @@ body.cart-lock { overflow:hidden; }
 .toast.show { opacity:1; transform:translate(-50%, 0); }
 
 /* =========================================================
+   Case « Vous êtes une entreprise ? » (spacers.html + fiches spacer)
+   Bandeau par défaut ; dans la marge gauche, collante, dès qu'il y a la place
+   ========================================================= */
+.biz-rail { margin:0 0 18px; }
+#sp-product ~ .biz-rail { margin:clamp(28px, 4vw, 44px) 0 0; }
+#sp-product[hidden] ~ .biz-rail { display:none; }
+.biz-card { display:flex; align-items:center; gap:12px 14px; padding:12px 14px; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
+.biz-q { flex:none; display:grid; place-items:center; width:32px; height:32px; border-radius:50%; font-family:var(--display); font-weight:800; font-size:1.05rem; line-height:1;
+  color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 13%, transparent); }
+.biz-txt { flex:1 1 0; min-width:0; }
+.biz-title { margin:0; font-family:var(--display); font-weight:700; font-size:1.02rem; line-height:1.25; letter-spacing:-.01em; color:var(--ink); }
+.biz-body { margin:2px 0 0; font-size:.92rem; line-height:1.42; color:var(--ink-2); }
+.biz-cta { flex:none; display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:44px; padding:0 16px; border-radius:12px; font-weight:700; font-size:.92rem; white-space:nowrap;
+  text-decoration:none; color:#fff; background:var(--fill-strong); transition:opacity .2s; }
+.biz-cta:hover { opacity:.85; }
+.biz-cta svg { width:16px; height:16px; }
+@media (max-width:560px) {
+  .biz-card { flex-wrap:wrap; }
+  .biz-txt { flex-basis:calc(100% - 46px); }
+  .biz-cta { width:100%; }
+}
+@media (min-width:1780px) {
+  .shop { position:relative; }
+  .biz-rail, #sp-product ~ .biz-rail { position:absolute; top:0; bottom:0; right:calc(100% + 20px); width:230px; margin:0; padding-top:clamp(30px, 4.4vw, 56px); }
+  .biz-card { position:sticky; top:calc(var(--top-h) + 24px); flex-direction:column; align-items:flex-start; padding:18px; border-radius:18px; }
+  .biz-txt { flex:none; }
+  .biz-cta { width:100%; }
+}
+
+/* =========================================================
    RESPONSIVE
    ========================================================= */
 @media (max-width:1100px) {
