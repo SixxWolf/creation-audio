@@ -80,8 +80,11 @@ function detailLines(r: Req): [string, string][] {
   const d = r.details || {};
   const out: [string, string][] = [];
   if (r.kind === "maintenance") {
-    const mach = d.machines || {};
-    const list = Object.keys(mach).filter((k) => Number(mach[k]) > 0).map((k) => mach[k] + " × " + (MACHINE[k] || k));
+    const mach = d.machines || [];
+    const list = Array.isArray(mach)
+      ? mach.filter((m: { qty?: number }) => Number(m.qty) > 0).map((m: { qty: number; brand?: string; name?: string; price?: number | null }) =>
+          m.qty + " × " + [m.brand, m.name].filter(Boolean).join(" ") + (m.price == null ? " (à évaluer)" : ""))
+      : Object.keys(mach).filter((k) => Number(mach[k]) > 0).map((k) => mach[k] + " × " + (MACHINE[k] || k));
     if (list.length) out.push(["Machines", list.join(", ")]);
     if (d.city) out.push(["Ville", String(d.city)]);
     if (d.other) out.push(["Autres machines", String(d.other)]);

@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=20">
 <link rel="stylesheet" href="assets/accueil.css?v=23">
-<link rel="stylesheet" href="assets/entretien-v2.css?v=2">
+<link rel="stylesheet" href="assets/entretien-v2.css?v=3">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
 <link rel="stylesheet" href="assets/demande.css?v=2">
 <link rel="stylesheet" href="assets/fetes.css?v=3">
@@ -191,34 +191,13 @@
     </div>
 
     <form class="et-form rv" style="--d:1" id="demande" novalidate aria-label="Demander un entretien">
-      <ul class="et-models" id="et-models">
-        <li class="et-model" data-model="a1" data-price="25" data-qty="1">
-          <span class="et-th"><img src="assets/entretien/a1.webp" alt="" width="56" height="56" loading="lazy" decoding="async"></span>
-          <span class="et-pm"><b>Bambu Lab A1</b><small><b class="et-unit" data-price="25">25 $</b> par machine</small></span>
-          <span class="et-stepper" role="group" aria-label="Nombre de machines">
-            <button type="button" class="et-minus" aria-label="Moins">−</button><output class="et-qty">1</output><button type="button" class="et-plus" aria-label="Plus">+</button>
-          </span>
-        </li>
-        <li class="et-model" data-model="xp" data-qty="0">
-          <span class="et-th"><img src="assets/entretien/p2s.webp" alt="" width="56" height="56" loading="lazy" decoding="async"></span>
-          <span class="et-pm"><b>Bambu Lab série X / P</b><small>X1C, P1S, P2S, X2D · sur évaluation</small></span>
-          <span class="et-stepper" role="group" aria-label="Nombre de machines">
-            <button type="button" class="et-minus" aria-label="Moins">−</button><output class="et-qty">0</output><button type="button" class="et-plus" aria-label="Plus">+</button>
-          </span>
-        </li>
-        <li class="et-model" data-model="snap" data-qty="0">
-          <span class="et-th"><img class="et-th-wide" src="assets/entretien/snap-u1.webp" alt="" width="56" height="56" loading="lazy" decoding="async"></span>
-          <span class="et-pm"><b>Snapmaker U1</b><small>Sur évaluation</small></span>
-          <span class="et-stepper" role="group" aria-label="Nombre de machines">
-            <button type="button" class="et-minus" aria-label="Moins">−</button><output class="et-qty">0</output><button type="button" class="et-plus" aria-label="Plus">+</button>
-          </span>
-        </li>
-      </ul>
+      <ul class="et-models" id="et-models"><li class="et-model-err">Chargement des machines…</li></ul>
       <div class="et-total" aria-live="polite">
         <span class="et-total-l">Total par mois</span>
         <b class="et-total-v" id="et-total">25 $</b>
         <p class="et-extra" id="et-extra" hidden></p>
       </div>
+      <p class="et-warn" id="et-warn" role="note" hidden></p>
       <div class="et-fields">
         <label class="et-field"><span>Ville ou secteur</span>
           <input name="city" id="et-city" required maxlength="120" autocomplete="address-level2" placeholder="ex. Lévis"></label>
@@ -350,6 +329,6 @@
 <script src="assets/dialog.js?v=5"></script>
 <script src="assets/panier-compte.js?v=3"></script>
 <script src="assets/demande.js?v=2"></script>
-<script src="assets/entretien.js?v=5"></script>
+<script src="assets/entretien.js?v=6"></script>
 </body>
 </html>

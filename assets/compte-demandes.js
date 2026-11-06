@@ -14,7 +14,7 @@ window.CA = window.CA || {};
   var SERVICE = { file: 'Mon fichier', batch: 'Une série', design: 'À dessiner', proto: 'Prototype' };
   var MATERIAL = { pla: 'PLA', petg: 'PETG', abs: 'ABS', tpu: 'TPU', any: 'À conseiller' };
   var MACHINE = { a1: 'Bambu Lab A1', xp: 'Bambu Lab série X / P', snap: 'Snapmaker U1' };
-  var sb = null, list = [], loaded = false, wantId = '', threads = {};
+  var sb = null, list = [], loaded = false, wantId = '', threads = {}, photos = {};
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -34,18 +34,59 @@ window.CA = window.CA || {};
   }
   function kindOf(r) { return r.kind === 'maintenance' ? _t('Entretien d\'imprimantes') : _t('Impression 3D'); }
   function line(k, v) { return v == null || v === '' ? '' : '<div class="dq-l"><dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd></div>'; }
+  function photoUrl(p) {
+    if (!p) return '';
+    if (p.charAt(0) === '/') return (CA.lang === 'en' ? '..' : '') + p;
+    var c = window.CA_SUPABASE || {};
+    return c.url ? c.url + '/storage/v1/object/public/products/' + p.split('/').map(encodeURIComponent).join('/') : '';
+  }
+  // machines d'une demande d'entretien (ancien format a1/xp/snap converti)
+  function machinesOf(d) {
+    var m = d && d.machines;
+    if (Array.isArray(m)) return m.filter(function (x) { return (+x.qty) > 0; });
+    return Object.keys(m || {}).filter(function (k) { return +m[k] > 0; }).map(function (k) {
+      return { name: MACHINE[k] || k, qty: +m[k], price: k === 'a1' ? 25 : null };
+    });
+  }
+  function machinesHtml(r) {
+    var d = r.details || {}, ms = machinesOf(d), total = 0, un = 0;
+    if (!ms.length) return '';
+    var rows = ms.map(function (m) {
+      var name = [m.brand, m.name].filter(Boolean).join(' '), src = photoUrl(photos[m.id]), priced = m.price != null;
+      if (priced) total += m.qty * +m.price; else un += m.qty;
+      return '<li class="dq-m"><span class="dq-th">' + (src ? '<img src="' + esc(src) + '" alt="" loading="lazy">' : '') + '</span>' +
+        '<span class="dq-mn"><b>' + esc(m.qty + ' × ' + name) + '</b><small>' + (priced ? esc((CA.priceShort ? CA.priceShort(+m.price) : m.price) + ' ' + _t('par machine'))
+          : esc(_t('Sur évaluation'))) + '</small></span>' +
+        '<span class="dq-mp">' + (priced ? esc(CA.money ? CA.money(m.qty * +m.price) : m.qty * +m.price) : '—') + '</span></li>';
+    }).join('');
+    var rate = CA.priceShort ? CA.priceShort(+d.rate || 60) : (+d.rate || 60);
+    return '<h3 class="dq-h">' + esc(_t('Machines')) + '</h3><ul class="dq-ml">' + rows + '</ul>' +
+      (total ? '<div class="dq-mt"><span>' + esc(_t('Total par mois')) + '</span><b>' + esc(CA.money ? CA.money(total) : total) + '</b></div>' : '') +
+      (un ? '<p class="dq-warn">' + esc(_t("Première visite d'un modèle qu'on n'a jamais entretenu : facturée {rate} de l'heure. Ensuite, prix fixe par mois.", { rate: rate })) + '</p>' : '');
+  }
   function lines(r) {
     var d = r.details || {}, h = '';
     if (r.kind === 'maintenance') {
-      var m = d.machines || {};
-      var mach = Object.keys(m).filter(function (k) { return +m[k] > 0; }).map(function (k) { return m[k] + ' × ' + _t(MACHINE[k] || k); }).join(', ');
-      h += line(_t('Machines'), mach) + line(_t('Ville ou secteur'), d.city) + line(_t('Précision'), d.other);
+      h += line(_t('Ville ou secteur'), d.city) + line(_t('Précision'), d.other);
     } else {
       h += line(_t('Service'), SERVICE[d.service] ? _t(SERVICE[d.service]) : '') +
         line(_t('Matériau'), MATERIAL[d.material] ? _t(MATERIAL[d.material]) : '') +
         line(_t('Couleur'), d.color && d.color.name) + line(_t('Quantité'), d.qty) + line(_t('Ta pièce'), d.desc);
     }
     return h;
+  }
+  var ICON = {
+    print: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4 7.5v9L12 21l8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/></svg>',
+    maintenance: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5.5a4 4 0 0 0-5 5L4 16l4 4 5.5-5.5a4 4 0 0 0 5-5l-2.5 2.5-2.5-.5-.5-2.5z"/></svg>'
+  };
+  function timeline(r) {
+    var ev = r.events || [];
+    return '<h3 class="dq-h">' + esc(_t('Suivi')) + '</h3><ol class="dq-tl">' + ev.map(function (e, i) {
+      return '<li class="' + (i === ev.length - 1 ? 'is-now' : 'is-done') + '"><b>' + esc(_t(LABEL[e.status] || e.status)) + '</b><time>' + esc(stamp(e.at)) + '</time></li>';
+    }).join('') + '</ol>';
+  }
+  function invoiceBtn(r) {
+    return r.invoice_id ? '<div class="ord-acts"><button type="button" class="acct-btn acct-btn-go" data-inv="' + esc(r.invoice_id) + '">' + esc(_t('Voir ma facture')) + '</button></div>' : '';
   }
   function quoteHtml(r) {
     if (r.quote_price == null) return '';
@@ -66,19 +107,19 @@ window.CA = window.CA || {};
     return '<h3 class="dq-h">' + esc(_t('Fichiers')) + '</h3><div class="dq-files">' + r.files.map(function (f) { return CA.demandeFil.fileRow(f, urls); }).join('') + '</div>';
   }
   function card(r) {
-    var open = wantId === r.id;
+    var open = wantId === r.id, price = r.quote_price != null ? (CA.money ? CA.money(r.quote_price) : r.quote_price) + (r.kind === 'maintenance' ? ' ' + _t('par mois') : '') : '';
     return '<details class="ord dq" data-id="' + esc(r.id) + '"' + (open ? ' open' : '') + '>' +
-      '<summary><span class="ord-main"><span class="ord-no">' + esc(r.number) + ' · ' + esc(kindOf(r)) + '</span>' +
-        '<span class="ord-meta">' + esc(day(r.created_at)) + '</span></span>' +
+      '<summary><span class="dq-ic is-' + esc(r.kind) + '">' + (ICON[r.kind] || '') + '</span>' +
+        '<span class="ord-main"><span class="ord-no">' + esc(r.number) + ' · ' + esc(kindOf(r)) + '</span>' +
+        '<span class="ord-meta">' + esc(day(r.created_at)) + (price ? ' · ' + esc(price) : '') + '</span></span>' +
         (r.unread ? '<b class="acct-n">' + esc(r.unread) + '</b>' : '') +
         '<span class="ord-pill ' + (PILL[r.status] || '') + '">' + esc(_t(LABEL[r.status] || r.status)) + '</span></summary>' +
       '<div class="ord-body dq-body">' +
         quoteHtml(r) +
+        timeline(r) +
+        (r.kind === 'maintenance' ? machinesHtml(r) : '') +
         '<h3 class="dq-h">' + esc(_t('Ta demande')) + '</h3><dl class="dq-dl">' + lines(r) + '</dl>' +
-        filesHtml(r) +
-        '<h3 class="dq-h">' + esc(_t('Suivi')) + '</h3><ol class="dq-ev">' + (r.events || []).map(function (e) {
-          return '<li><b>' + esc(_t(LABEL[e.status] || e.status)) + '</b><time>' + esc(stamp(e.at)) + '</time></li>';
-        }).join('') + '</ol>' +
+        filesHtml(r) + invoiceBtn(r) +
         '<h3 class="dq-h">' + esc(_t('Discussion')) + '</h3><div class="dq-fil"></div>' +
       '</div></details>';
   }
@@ -96,6 +137,12 @@ window.CA = window.CA || {};
       var map = {};
       (x.data || []).forEach(function (u) { if (u.signedUrl) map[u.path] = u.signedUrl; });
       list.forEach(function (r) { r._urls = map; });
+    }, function () {});
+  }
+  function loadPhotos() {
+    if (!list.some(function (r) { return r.kind === 'maintenance'; })) return Promise.resolve();
+    return sb.from('maintenance_printers').select('id,photo').then(function (x) {
+      (x.data || []).forEach(function (p) { photos[p.id] = p.photo; });
     }, function () {});
   }
   function mountFil(det) {
@@ -130,7 +177,7 @@ window.CA = window.CA || {};
       if (res.error) throw res.error;
       list = res.data || [];
       loaded = true;
-      return sign();
+      return Promise.all([sign(), loadPhotos()]);
     }).then(paint, function () {
       var el = $('acct-dem');
       if (el && !loaded) el.innerHTML = '<p class="acct-empty">' + esc(_t('Impossible de charger tes demandes. Réessaie plus tard.')) + '</p>';
@@ -155,6 +202,18 @@ window.CA = window.CA || {};
   }
   document.addEventListener('click', function (e) {
     if (!e.target.closest) return;
+    var iv = e.target.closest('#acct-dem [data-inv]');
+    if (iv) {
+      var want = iv.getAttribute('data-inv'), tries = 0;
+      location.hash = '#/commandes';
+      var look = function () {
+        var el = document.querySelector('details.ord[data-id="' + want + '"]');
+        if (el) { el.open = true; el.scrollIntoView({ block: 'start' }); return; }
+        if (++tries < 20) setTimeout(look, 150);
+      };
+      setTimeout(look, 150);
+      return;
+    }
     var a = e.target.closest('[data-acc]'), n = e.target.closest('[data-ref]'), v = e.target.closest('#acct-dem .dq-files [data-v3d]');
     if (a) decide(a.getAttribute('data-acc'), true);
     if (n) decide(n.getAttribute('data-ref'), false);

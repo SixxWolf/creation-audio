@@ -5044,3 +5044,120 @@ end $$;
 revoke all on function public.service_requests_tick() from public, anon, authenticated;
 select cron.unschedule(jobid) from cron.job where jobname = 'service-requests-tick';
 select cron.schedule('service-requests-tick', '* * * * *', 'select public.service_requests_tick()');
+
+-- ------------------------------------------------------------
+-- ENTRETIEN — catalogue d'imprimantes (onglet admin Entretien) — 2026-11-06
+-- Prix par mois (vide = « sur évaluation » : 1re visite au taux horaire), photo, temps estimé, ordre.
+-- Photo : chemin du bucket « products » (dossier entretien/) ou chemin du site commençant par « / ».
+-- La page publique et le formulaire lisent ce catalogue ; sr_submit en refait un instantané (nom, prix) dans la demande.
+-- ------------------------------------------------------------
+create table if not exists public.maintenance_printers (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null check (length(btrim(name)) between 1 and 80),
+  brand       text,
+  photo       text,
+  price_month numeric(8,2) check (price_month is null or price_month > 0),
+  minutes     integer check (minutes is null or minutes between 1 and 600),
+  sort_order  integer not null default 0,
+  visible     boolean not null default true,
+  created_at  timestamptz not null default now()
+);
+create table if not exists public.maintenance_settings (
+  id          smallint primary key default 1 check (id = 1),
+  hourly_rate numeric(8,2) not null default 60 check (hourly_rate > 0)
+);
+insert into public.maintenance_settings (id, hourly_rate) values (1, 60) on conflict (id) do nothing;
+alter table public.maintenance_printers enable row level security;
+alter table public.maintenance_settings enable row level security;
+drop policy if exists maintenance_printers_read on public.maintenance_printers;
+create policy maintenance_printers_read on public.maintenance_printers for select to anon, authenticated using (visible);
+drop policy if exists maintenance_printers_admin on public.maintenance_printers;
+create policy maintenance_printers_admin on public.maintenance_printers for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists maintenance_settings_read on public.maintenance_settings;
+create policy maintenance_settings_read on public.maintenance_settings for select to anon, authenticated using (true);
+drop policy if exists maintenance_settings_admin on public.maintenance_settings;
+create policy maintenance_settings_admin on public.maintenance_settings for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.maintenance_printers from anon, authenticated;
+revoke all on public.maintenance_settings from anon, authenticated;
+grant select on public.maintenance_printers to anon, authenticated;
+grant select on public.maintenance_settings to anon, authenticated;
+grant insert, update, delete on public.maintenance_printers to authenticated;
+grant update on public.maintenance_settings to authenticated;
+
+insert into public.maintenance_printers (name, brand, photo, price_month, sort_order)
+select v.name, v.brand, v.photo, v.price, v.ord
+from (values
+  ('A1',  'Bambu Lab', '/assets/entretien/a1.webp',      25::numeric, 1),
+  ('P1S', 'Bambu Lab', '/assets/entretien/p1s.webp',     null, 2),
+  ('P2S', 'Bambu Lab', '/assets/entretien/p2s.webp',     null, 3),
+  ('X2D', 'Bambu Lab', '/assets/entretien/x2d.webp',     null, 4),
+  ('U1',  'Snapmaker', '/assets/entretien/snap-u1.webp', null, 5)
+) as v(name, brand, photo, price, ord)
+where not exists (select 1 from public.maintenance_printers);
+
+-- Les demandes d'entretien déjà reçues étaient des essais de Théo (ancien format a1/xp/snap) : retirées
+delete from public.service_requests where kind = 'maintenance' and jsonb_typeof(details -> 'machines') = 'object';
+
+-- sr_submit : l'entretien refait ses machines depuis le catalogue (jamais de prix venu du navigateur)
+create or replace function public.sr_submit(p_kind text, p_details jsonb, p_files jsonb default '[]'::jsonb,
+                                            p_page text default null, p_lang text default 'fr')
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); c public.customers; v_fl jsonb; v_d jsonb := coalesce(p_details, '{}'::jsonb); r public.service_requests;
+        v_m jsonb; v_in jsonb; v_rate numeric;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  select * into c from public.customers where id = v_uid;
+  if not found then raise exception 'Compte introuvable. Reconnecte-toi.' using errcode = '42501'; end if;
+  if p_kind not in ('print','maintenance') then raise exception 'Demande invalide.'; end if;
+  if jsonb_typeof(v_d) <> 'object' or length(v_d::text) > 8000 then raise exception 'Demande invalide.'; end if;
+  if (select count(*) from public.service_requests where customer_id = v_uid and created_at > now() - interval '1 day') >= 10 then
+    raise exception 'Trop de demandes aujourd''hui. Écris-nous à contact@creationaudio.ca.';
+  end if;
+  v_fl := public._msg_files(p_files, v_uid);
+  if p_kind = 'print' and jsonb_array_length(v_fl) = 0 and btrim(coalesce(v_d ->> 'desc', '')) = '' then
+    raise exception 'Ajoute un fichier ou décris ta pièce.';
+  end if;
+  if p_kind = 'maintenance' then
+    if btrim(coalesce(v_d ->> 'city', '')) = '' then raise exception 'Indique ta ville.'; end if;
+    v_in := case when jsonb_typeof(v_d -> 'machines') = 'array' then v_d -> 'machines' else '[]'::jsonb end;
+    select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name, 'brand', p.brand, 'qty', q.qty,
+                                                 'price', p.price_month, 'minutes', p.minutes) order by p.sort_order), '[]'::jsonb)
+      into v_m
+      from (select (e ->> 'id')::uuid as id, least(99, greatest(0, coalesce((e ->> 'qty')::int, 0))) as qty
+              from jsonb_array_elements(v_in) e) q
+      join public.maintenance_printers p on p.id = q.id and p.visible
+     where q.qty > 0;
+    if jsonb_array_length(v_m) = 0 and btrim(coalesce(v_d ->> 'other', '')) = '' then
+      raise exception 'Choisis au moins une machine.';
+    end if;
+    select hourly_rate into v_rate from public.maintenance_settings where id = 1;
+    v_d := jsonb_build_object('machines', v_m, 'city', left(btrim(v_d ->> 'city'), 120),
+             'other', left(btrim(coalesce(v_d ->> 'other', '')), 500), 'rate', coalesce(v_rate, 60),
+             'monthly', coalesce((select sum((m ->> 'qty')::int * (m ->> 'price')::numeric) from jsonb_array_elements(v_m) m
+                                   where (m ->> 'price') is not null), 0));
+  end if;
+  update public.customers set last_seen_at = now() where id = v_uid;
+  insert into public.service_requests (number, kind, customer_id, email, name, phone, lang, details, files, page)
+  values ('D-' || lpad(nextval('public.service_request_seq')::text, 4, '0'), p_kind, v_uid, c.email, c.name, c.phone,
+          case when p_lang = 'en' then 'en' else 'fr' end, v_d, v_fl, nullif(left(btrim(coalesce(p_page, '')), 200), ''))
+  returning * into r;
+  perform public._sr_notify('created', r.id);
+  return jsonb_build_object('id', r.id, 'number', r.number, 'email', r.email);
+end $$;
+
+-- me_service_requests : ajoute invoice_id (bouton « Voir la facture » dans Mon compte)
+create or replace function public.me_service_requests()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'id', r.id, 'number', r.number, 'kind', r.kind, 'status', r.status, 'details', r.details, 'files', r.files,
+      'quote_price', r.quote_price, 'quote_date', r.quote_date, 'quote_note', r.quote_note, 'quoted_at', r.quoted_at,
+      'files_purged_at', r.files_purged_at, 'unread', r.client_unread, 'created_at', r.created_at, 'updated_at', r.updated_at,
+      'invoice_id', r.invoice_id,
+      'events', coalesce((select jsonb_agg(jsonb_build_object('status', e.status, 'at', e.created_at) order by e.created_at, e.id)
+                          from public.service_request_events e where e.request_id = r.id), '[]'::jsonb)
+    ) order by r.created_at desc), '[]'::jsonb)
+  from (select * from public.service_requests where customer_id = (select auth.uid())
+        order by created_at desc limit 100) r;
+$$;

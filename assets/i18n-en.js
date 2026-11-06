@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 29;
+window.CA_EN_V = 31;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -957,6 +957,15 @@ window.CA_EN = (function (pairs) {
   [`Snapmaker U1`, `Snapmaker U1`],
   [`+ {n} machine sur évaluation`, `+ {n} machine to be assessed`],
   [`+ {n} machines sur évaluation`, `+ {n} machines to be assessed`],
+  [`Total par mois`, `Total per month`],
+  [`Voir ma facture`, `View my invoice`],
+  [`Première visite d'un modèle qu'on n'a jamais entretenu : facturée {rate} de l'heure. Ensuite, prix fixe par mois.`, `First visit for a model we have never maintained: billed at {rate} an hour. Then a fixed monthly price.`],
+  [`par machine`, `per machine`],
+  [`Nombre de machines`, `Number of machines`],
+  [`Moins`, `Fewer`],
+  [`Plus`, `More`],
+  [`Première fois qu'on entretient {models} : on ne sait pas combien de temps ça prendra. La première visite est facturée {rate} de l'heure, puis on fixe un prix par mois pour ce modèle.`, `First time we maintain {models}: we can't know how long it will take. The first visit is billed at {rate} an hour, then we set a monthly price for this model.`],
+  [`Liste des machines indisponible. Décris-les dans « Autre modèle ou précision ».`, `Machine list unavailable. Describe them in “Other model or details”.`],
 
   // ---- impression.js (page Impression 3D) + fichiers 3D de messagerie.js
   [` Mo`, ` MB`],

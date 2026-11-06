@@ -333,7 +333,7 @@
         }
         var next = prefix + year + '-' + ('000' + seq).slice(-3);
         lastAutoNumber = next;
-        if (!saved && !editing) elNumber.value = next;   // en modification : on garde le n° de la facture
+        if (!saved && !editing) { elNumber.value = next; if (lines.length) render(); }   // en modification : on garde le n° de la facture ; l'aperçu déjà dessiné (facture d'une demande) reprend le n°
         elNextHint.textContent = 'Prochaine : ' + next;
       }, function () {});
   }
@@ -1406,9 +1406,12 @@
       editToken = null;
       setClientType('client');
       setClientFields({ name: order.name || order.email || '', email: order.email || '', phone: order.phone || '' });
-      lines = [{ id: uid(), productId: null, ptype: 'divers', kind: 'free', label: order.label || order.number, meta: '', hex: null,
-        qty: 1, base: 0, tiers: [], cost: 0, tierKey: null, price: +order.price || 0, manual: true, sp: null }];
-      elNote.value = 'Demande ' + order.number;
+      // entretien : une ligne par modèle (order.lines) ; impression 3D : une ligne au prix de la soumission
+      lines = (order.lines && order.lines.length ? order.lines : [{ label: order.label || order.number, meta: '', qty: 1, price: +order.price || 0 }]).map(function (l) {
+        return { id: uid(), productId: null, ptype: 'divers', kind: 'free', label: l.label, meta: l.meta || '', hex: null,
+          qty: l.qty | 0 || 1, base: 0, tiers: [], cost: 0, tierKey: null, price: +l.price || 0, manual: true, sp: null };
+      });
+      elNote.value = '';   // le n° de la demande reste en référence (bandeau + fiche), pas dans les notes
       setCat('filament');
       unlock();
       elStatus.textContent = '';

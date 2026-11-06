@@ -107,14 +107,25 @@
     select(0);
   }
 
-  /* ---------- calculateur et demande : un seul bloc ---------- */
+  /* ---------- calculateur et demande : un seul bloc ----------
+     Les machines viennent du catalogue de l'admin (table maintenance_printers, onglet Entretien) ;
+     une machine sans prix est « sur évaluation » : 1re visite au taux horaire (maintenance_settings). */
   var form = $('demande');
   if (!form) return;
-  var rows = all('.et-model', form), totalEl = $('et-total'), extraEl = $('et-extra');
-  var unit = +form.querySelector('[data-model="a1"]').getAttribute('data-price') || 25;
-  var qty = {};
-  rows.forEach(function (r) { qty[r.getAttribute('data-model')] = +r.getAttribute('data-qty') || 0; });
-  var shown = unit * qty.a1, raf = 0;
+  var listEl = $('et-models'), totalEl = $('et-total'), extraEl = $('et-extra'), warnEl = $('et-warn');
+  var items = [], qty = {}, rate = 60, shown = 0, raf = 0;
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+  var photo = function (p) {
+    if (!p) return '';
+    if (p.charAt(0) === '/') return p;
+    var c = window.CA_SUPABASE || {};
+    return c.url ? c.url + '/storage/v1/object/public/products/' + p.split('/').map(encodeURIComponent).join('/') : '';
+  };
+  var label = function (it) { return [it.brand, it.name].filter(Boolean).join(' '); };
 
   var bump = function (el) {
     if (reduce) return;
@@ -133,35 +144,90 @@
     };
     raf = requestAnimationFrame(step);
   };
+  var monthly = function () {
+    var t = 0, un = [], n = 0;
+    items.forEach(function (it) {
+      var q = qty[it.id] || 0;
+      if (!q) return;
+      if (it.price_month != null) t += q * +it.price_month; else { n += q; un.push(it); }
+    });
+    return { total: t, unpriced: n, models: un };
+  };
   var render = function (animate) {
-    rows.forEach(function (r) {
-      var m = r.getAttribute('data-model'), q = qty[m];
+    all('.et-model', form).forEach(function (r) {
+      var q = qty[r.getAttribute('data-id')] || 0;
       r.querySelector('.et-qty').textContent = q;
       r.querySelector('.et-minus').disabled = q <= 0;
       r.querySelector('.et-plus').disabled = q >= 99;
     });
-    var others = qty.xp + qty.snap;
-    var onlyOthers = !qty.a1 && others > 0;
+    var m = monthly(), onlyOthers = !m.total && m.unpriced > 0;
     totalEl.classList.toggle('is-text', onlyOthers);
-    extraEl.hidden = !others || onlyOthers;
-    if (others && !onlyOthers) extraEl.textContent = tn(others, '+ {n} machine sur évaluation', '+ {n} machines sur évaluation');
+    extraEl.hidden = !m.unpriced || onlyOthers;
+    if (m.unpriced && !onlyOthers) extraEl.textContent = tn(m.unpriced, '+ {n} machine sur évaluation', '+ {n} machines sur évaluation');
+    if (warnEl) {
+      warnEl.hidden = !m.unpriced;
+      if (m.unpriced) warnEl.textContent = _t("Première fois qu'on entretient {models} : on ne sait pas combien de temps ça prendra. La première visite est facturée {rate} de l'heure, puis on fixe un prix par mois pour ce modèle.",
+        { models: m.models.map(label).join(', '), rate: priceShort(rate) });
+    }
     if (onlyOthers) {
       cancelAnimationFrame(raf);
       shown = 0;
       totalEl.textContent = _t('Sur évaluation');
     } else if (animate) {
-      countTo(unit * qty.a1);
+      countTo(m.total);
     } else {
-      totalEl.textContent = priceShort(unit * qty.a1);
+      shown = m.total;
+      totalEl.textContent = priceShort(m.total);
     }
   };
+  var defaults = function () {
+    qty = {};
+    var first = items.filter(function (it) { return it.price_month != null; })[0];
+    if (first) qty[first.id] = 1;
+  };
+  var paintList = function () {
+    listEl.innerHTML = items.map(function (it) {
+      var src = photo(it.photo);
+      return '<li class="et-model" data-id="' + esc(it.id) + '">' +
+        '<span class="et-th">' + (src ? '<img src="' + esc(src) + '" alt="" width="56" height="56" loading="lazy" decoding="async">' : '') + '</span>' +
+        '<span class="et-pm"><b>' + esc(label(it)) + '</b><small>' + (it.price_month != null
+          ? '<b class="et-unit">' + esc(priceShort(+it.price_month)) + '</b> ' + esc(_t('par machine'))
+          : esc(_t('Sur évaluation'))) + '</small></span>' +
+        '<span class="et-stepper" role="group" aria-label="' + esc(_t('Nombre de machines')) + '">' +
+          '<button type="button" class="et-minus" aria-label="' + esc(_t('Moins')) + '">−</button><output class="et-qty">0</output>' +
+          '<button type="button" class="et-plus" aria-label="' + esc(_t('Plus')) + '">+</button></span></li>';
+    }).join('');
+    all('.et-th img', listEl).forEach(function (im) {
+      im.addEventListener('load', function () { if (im.naturalWidth > im.naturalHeight * 1.2) im.classList.add('et-th-wide'); });
+    });
+  };
+  var unavailable = function () {
+    listEl.innerHTML = '<li class="et-model-err">' + esc(_t('Liste des machines indisponible. Décris-les dans « Autre modèle ou précision ».')) + '</li>';
+  };
+
+  var sb = window.CA && window.CA.sb;
+  if (sb) {
+    Promise.all([
+      sb.from('maintenance_printers').select('id,name,brand,photo,price_month,minutes,sort_order').order('sort_order').order('created_at'),
+      sb.from('maintenance_settings').select('hourly_rate').eq('id', 1).maybeSingle()
+    ]).then(function (out) {
+      if (out[0].error) throw out[0].error;
+      items = out[0].data || [];
+      if (out[1].data) rate = +out[1].data.hourly_rate || 60;
+      var a1 = items.filter(function (it) { return /^A1$/i.test(it.name) && it.price_month != null; })[0], hero = document.querySelector('.et-price .et-unit');
+      if (a1 && hero) hero.textContent = priceShort(+a1.price_month);   // le prix du héros suit le catalogue
+      if (!Object.keys(qty).length) defaults();
+      paintList();
+      render(false);
+    }, unavailable);
+  } else unavailable();
   render(false);
 
   form.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('.et-minus, .et-plus') : null;
     if (!b || b.disabled) return;
-    var row = b.closest('.et-model'), m = row.getAttribute('data-model');
-    qty[m] = Math.max(0, Math.min(99, qty[m] + (b.classList.contains('et-plus') ? 1 : -1)));
+    var row = b.closest('.et-model'), id = row.getAttribute('data-id');
+    qty[id] = Math.max(0, Math.min(99, (qty[id] || 0) + (b.classList.contains('et-plus') ? 1 : -1)));
     bump(row.querySelector('.et-qty'));
     render(true);
     status.className = 'et-status';
@@ -175,10 +241,10 @@
   form.addEventListener('submit', function (e) {
     e.preventDefault();
     var c = city.value.trim(), o = other.value.trim();
-    var noMachine = !qty.a1 && !qty.xp && !qty.snap && !o;
+    var picked = Object.keys(qty).filter(function (id) { return qty[id] > 0; });
     flag(city, !c);
     status.className = 'et-status';
-    if (!c || noMachine) {
+    if (!c || (!picked.length && !o)) {
       status.className = 'et-status is-err';
       status.textContent = _t('Indique ta ville et au moins une machine.');
       if (!c) city.focus(); else other.focus();
@@ -186,7 +252,7 @@
     }
     status.textContent = '';
     window.CA.demande.submit({
-      details: { machines: { a1: qty.a1, xp: qty.xp, snap: qty.snap }, city: c, other: o, monthly: unit * qty.a1 },
+      details: { machines: picked.map(function (id) { return { id: id, qty: qty[id] }; }), city: c, other: o },
       files: []
     });
   });
@@ -196,13 +262,13 @@
     kind: 'maintenance', form: form, status: status,
     onBusy: function (on) { submit.disabled = on; },
     onReset: function () {
-      qty.a1 = 1; qty.xp = 0; qty.snap = 0;
+      defaults();
       city.value = ''; other.value = '';
       render(false);
     },
     onRestore: function (d) {
-      var m = d.machines || {};
-      qty.a1 = +m.a1 || 0; qty.xp = +m.xp || 0; qty.snap = +m.snap || 0;
+      qty = {};
+      (Array.isArray(d.machines) ? d.machines : []).forEach(function (m) { if (m && m.id) qty[m.id] = +m.qty || 0; });
       city.value = d.city || ''; other.value = d.other || '';
       render(false);
     }

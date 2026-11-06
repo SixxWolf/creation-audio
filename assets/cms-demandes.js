@@ -34,6 +34,16 @@
   var rows = [], filter = 'all', curId = '', curTab = 'details', fil = null, loading = null;
   var listEl = $('#dm-list'), sheetEl = $('#dm-sheet'), shell = $('#dm-shell');
 
+  // machines d'une demande d'entretien : liste [{name, brand, qty, price, minutes}] (ancien format a1/xp/snap converti)
+  function machinesOf(d) {
+    var m = d && d.machines;
+    if (Array.isArray(m)) return m.filter(function (x) { return (+x.qty) > 0; }).map(function (x) {
+      return { brand: x.brand, name: x.name, qty: +x.qty, price: x.price == null ? null : +x.price, minutes: x.minutes == null ? null : +x.minutes };
+    });
+    return Object.keys(m || {}).filter(function (k) { return +m[k] > 0; }).map(function (k) {
+      return { brand: '', name: MACHINE[k] || k, qty: +m[k], price: k === 'a1' ? 25 : null, minutes: null };
+    });
+  }
   function money(n) { return (+n || 0).toFixed(2).replace('.', ',') + ' $'; }
   function day(d) {
     if (!d) return '';
@@ -127,9 +137,9 @@
   function detailsHtml(r) {
     var d = r.details || {}, h = '';
     if (r.kind === 'maintenance') {
-      var m = d.machines || {};
-      h += line('Machines', Object.keys(m).filter(function (k) { return +m[k] > 0; }).map(function (k) { return m[k] + ' × ' + (MACHINE[k] || k); }).join(', ')) +
-        line('Ville ou secteur', d.city) + line('Précision', d.other);
+      h += line('Machines', machinesOf(d).map(function (m) {
+        return m.qty + ' × ' + [m.brand, m.name].filter(Boolean).join(' ') + (m.price == null ? ' (sur évaluation)' : ' · ' + money(m.price) + '/mois');
+      }).join('\n')) + line('Ville ou secteur', d.city) + line('Précision', d.other);
     } else {
       h += line('Service', SERVICE[d.service] || d.service) + line('Matériau', MATERIAL[d.material] || d.material) +
         line('Couleur', d.color && [d.color.material, d.color.name].filter(Boolean).join(' · ')) +
@@ -150,7 +160,7 @@
     if (lateMail(r)) head += '<p class="dm-warn">Courriel de soumission pas encore parti.</p>';
     if (locked) return head;
     return head + '<form class="dm-q" id="dm-q" novalidate>' +
-      '<div class="dm-q-row"><label>' + (monthly ? 'Prix par mois' : 'Prix') + '<input type="number" id="dm-q-p" min="0.01" step="0.01" inputmode="decimal" value="' + esc(r.quote_price == null ? '' : r.quote_price) + '"></label>' +
+      '<div class="dm-q-row"><label>' + (monthly ? 'Prix par mois' : 'Prix') + '<input type="number" id="dm-q-p" min="0.01" step="0.01" inputmode="decimal" value="' + esc(r.quote_price != null ? r.quote_price : monthly && +(r.details || {}).monthly > 0 ? r.details.monthly : '') + '"></label>' +
       '<label>' + (monthly ? 'Première visite' : 'Prête le') + '<input type="date" id="dm-q-d" value="' + esc(r.quote_date || '') + '"></label></div>' +
       '<label>Note<textarea id="dm-q-n" rows="3" maxlength="1000">' + esc(r.quote_note || '') + '</textarea></label>' +
       '<div class="dm-q-foot"><button type="submit" class="btn btn-accent" data-ic="send">' + (r.quote_price != null ? 'Renvoyer la soumission' : 'Envoyer la soumission') + '</button><span class="dm-q-st" role="status"></span></div></form>';
@@ -257,11 +267,35 @@
       load();
     }, function () { btn.disabled = false; st.textContent = 'Erreur réseau — réessaie.'; });
   }
+  // Lignes d'une facture d'entretien : une par modèle (nom, quantité, prix du catalogue) ; machine sans prix = 1re visite au taux horaire
+  function maintLines(r, rate) {
+    var d = r.details || {}, ms = machinesOf(d), out = [], unpriced = false, sum = 0;
+    ms.forEach(function (m) {
+      var name = [m.brand, m.name].filter(Boolean).join(' ');
+      if (m.price != null) {
+        sum += m.qty * m.price;
+        out.push({ label: 'Entretien mensuel — ' + name, meta: 'Par machine', qty: m.qty, price: m.price });
+      } else {
+        unpriced = true;
+        var h = m.minutes ? m.minutes / 60 : 1;
+        out.push({ label: 'Entretien — ' + name, meta: 'Première visite · taux horaire ' + money(rate) + ' (temps réel à ajuster)', qty: m.qty, price: Math.round(rate * h * 100) / 100 });
+      }
+    });
+    if (!unpriced && r.quote_price != null && out.length && Math.abs(r.quote_price - sum) > 0.005) {
+      out.push({ label: 'Ajustement de la soumission', meta: '', qty: 1, price: Math.round((r.quote_price - sum) * 100) / 100 });
+    }
+    return out;
+  }
   function bill(r) {
     if (!CA.invoiceFromOrder) { window.caDialog.error('Facturation indisponible.'); return; }
     var d = r.details || {}, what = r.kind === 'maintenance' ? 'Entretien d\'imprimantes' : 'Impression 3D' + (d.desc ? ' — ' + String(d.desc).slice(0, 80) : '');
     var ord = { id: r.id, number: r.number, kind: 'service', name: r.name, email: r.email, phone: r.phone, label: what, price: +r.quote_price || 0 };
-    if (CA.invoiceFromOrder(ord, []) !== false) location.hash = '#facturation';
+    var go = function () { if (CA.invoiceFromOrder(ord, []) !== false) location.hash = '#facturation'; };
+    if (r.kind !== 'maintenance' || !machinesOf(d).length) { go(); return; }
+    sb.from('maintenance_settings').select('hourly_rate').eq('id', 1).maybeSingle().then(function (res) {
+      ord.lines = maintLines(r, res.data ? +res.data.hourly_rate : (+d.rate || 60));
+      go();
+    }, function () { ord.lines = maintLines(r, +d.rate || 60); go(); });
   }
 
   /* ---- événements ---- */
