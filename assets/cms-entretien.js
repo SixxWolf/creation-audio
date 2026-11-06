@@ -60,14 +60,15 @@
     paintRes();
   }
 
-  /* ---- calculateur de prix : temps × taux + matériaux, puis marge visée (le déplacement est facturé à part au client) ---- */
+  /* ---- calculateur de prix : prix suggéré = (temps × taux + matériaux) + marge visée ; profit = prix − matériaux (ton temps n'est pas un coût) ; gain/h = profit ÷ temps, comparé au taux horaire. Déplacement facturé à part. ---- */
   function money(n) { return CA.money ? CA.money(n) : (Math.round(n * 100) / 100).toFixed(2) + ' $'; }
   function matCost() { return mats.reduce(function (t, m) { return t + (+m.cost || 0) * (+m.qty || 0); }, 0); }
   function figures(r) {
     var min = r.minutes || 0, labor = rate * min / 60, mat = matCost(), cost = labor + mat;
     var sug = min ? Math.ceil(cost / (1 - calc.margin_pct / 100)) : null;
     var cur = r.price_month == null ? null : +r.price_month;
-    return { labor: labor, mat: mat, cost: cost, sug: sug, cur: cur, profit: cur == null ? null : cur - cost, pct: cur ? (cur - cost) / cur * 100 : null };
+    var profit = cur == null ? null : cur - mat;
+    return { labor: labor, mat: mat, cost: cost, sug: sug, cur: cur, profit: profit, pct: cur ? profit / cur * 100 : null, perHour: profit != null && min ? profit / (min / 60) : null };
   }
   function paintCfg() {
     Object.keys(CFG).forEach(function (id) { var el = document.getElementById(id); if (el) el.value = calc[CFG[id]]; });
@@ -91,13 +92,14 @@
       if (!x.sug) miss = true;
       return '<tr data-id="' + esc(r.id) + '"><td>' + esc([r.brand, r.name].filter(Boolean).join(' ')) + '<small>' + esc(money(x.labor) + ' + ' + money(x.mat)) + '</small></td>' +
         '<td><input type="number" data-cm min="1" max="600" step="1" inputmode="numeric" value="' + esc(r.minutes == null ? '' : r.minutes) + '" aria-label="Minutes"></td>' +
-        '<td>' + money(x.cost) + '</td>' +
+        '<td>' + money(x.mat) + '</td>' +
         '<td><b>' + (x.sug ? money(x.sug) : '—') + '</b><small>' + (x.cur == null ? 'Sur évaluation' : 'Actuel ' + money(x.cur)) + '</small></td>' +
-        '<td class="' + (x.pct == null ? '' : x.pct >= calc.margin_pct ? 'is-good' : x.pct >= 0 ? '' : 'is-bad') + '">' + (x.pct == null ? '—' : money(x.profit) + ' (' + Math.round(x.pct) + ' %)') + '</td>' +
+        '<td class="' + (x.profit != null && x.profit < 0 ? 'is-bad' : '') + '">' + (x.profit == null ? '—' : money(x.profit)) + '</td>' +
+        '<td class="' + (x.perHour == null ? '' : x.perHour >= rate ? 'is-good' : 'is-bad') + '">' + (x.perHour == null ? '—' : money(x.perHour) + '/h') + '</td>' +
         '<td>' + (x.sug && x.sug !== x.cur ? '<button type="button" class="btn btn-ghost btn-sm" data-apply>Appliquer</button>' : '') + '</td></tr>';
     }).join('');
-    resEl.innerHTML = '<table><thead><tr><th>Machine</th><th>Minutes</th><th>Coût</th><th>Prix suggéré</th><th>Profit</th><th></th></tr></thead><tbody>' + body + '</tbody></table>' +
-      '<p class="muted en-note">Sous chaque machine : main-d’œuvre + matériaux. Le déplacement est facturé à part.' + (miss ? ' Entre les minutes d’une machine pour obtenir son prix suggéré.' : '') + '</p>';
+    resEl.innerHTML = '<table><thead><tr><th>Machine</th><th>Minutes</th><th>Matériaux</th><th>Prix suggéré</th><th>Profit</th><th>Gain/h</th><th></th></tr></thead><tbody>' + body + '</tbody></table>' +
+      '<p class="muted en-note">Profit = prix − matériaux. Gain/h = profit ÷ temps : vert s’il atteint ton taux horaire. Le déplacement est facturé à part.' + (miss ? ' Entre les minutes d’une machine pour obtenir son prix suggéré.' : '') + '</p>';
   }
 
   /* ---- données ---- */
