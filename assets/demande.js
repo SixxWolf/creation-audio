@@ -175,9 +175,10 @@ window.CA = window.CA || {};
     okEl.setAttribute('role', 'status');
     okEl.innerHTML =
       '<span class="dm-ok-ic" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>' +
-      '<h2 class="dm-ok-t" tabindex="-1">' + esc(_t('Demande reçue')) + ' · ' + esc(d.number) + '</h2>' +
+      '<h2 class="dm-ok-t" tabindex="-1">' + esc(_t('Ta demande a bien été envoyée')) + '</h2>' +
+      '<p class="dm-ok-n">' + esc(d.number) + '</p>' +
       '<p class="dm-ok-m">' + esc(_t('On te revient dans les plus brefs délais.')) + '</p>' +
-      '<p class="dm-ok-m">' + esc(_t('Une confirmation part à ')) + '<b>' + esc(d.email) + '</b>.</p>' +
+      '<p class="dm-ok-m">' + esc(_t('Une confirmation t\'est envoyée par courriel.')) + '</p>' +
       '<div class="dm-ok-acts">' +
         '<a class="btn btn-ember btn-lg" href="compte.html#/demandes/' + esc(d.id) + '">' + esc(_t('Suivre ma demande')) + '</a>' +
         '<button type="button" class="btn btn-ghost btn-lg dm-ok-new">' + esc(_t('Nouvelle demande')) + '</button>' +

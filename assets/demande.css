@@ -35,14 +35,15 @@
 .pc-link:disabled { color:var(--muted); cursor:default; text-decoration:none; }
 
 /* confirmation : remplace le formulaire */
-.dm-ok { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:26px 24px; background:var(--paper);
+.dm-ok { display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:36px 28px; background:var(--paper);
   border:1px solid var(--line); border-radius:var(--radius, 16px); }
-.dm-ok-ic { display:grid; place-items:center; width:48px; height:48px; margin-bottom:6px; color:var(--good-ink); background:var(--good-wash); border-radius:50%; }
-.dm-ok-ic svg { width:26px; height:26px; }
-.dm-ok-t { margin:0; font-size:1.5rem; line-height:1.2; color:var(--ink); outline:none; overflow-wrap:anywhere; }
+.dm-ok-ic { display:grid; place-items:center; width:64px; height:64px; margin-bottom:6px; color:var(--good-ink); background:var(--good-wash); border-radius:50%; }
+.dm-ok-ic svg { width:34px; height:34px; }
+.dm-ok .dm-ok-t { margin:0; font-size:clamp(1.7rem, 4.5vw, 2.3rem); font-weight:800; line-height:1.15; color:#1a1a1f; outline:none; overflow-wrap:anywhere; }
+.dm-ok .dm-ok-n { margin:0; font-size:.95rem; font-weight:700; letter-spacing:.04em; color:var(--ink-2); }
 .dm-ok-m { margin:0; color:var(--ink-2); overflow-wrap:anywhere; }
 .dm-ok-m b { color:var(--ink); }
-.dm-ok-acts { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+.dm-ok-acts { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin-top:14px; }
 @media (max-width:560px) {
   .dm-ok { padding:22px 18px; }
   .dm-ok-acts, .dm-ok-acts .btn { width:100%; }
