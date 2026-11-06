@@ -527,8 +527,9 @@
             '<div class="citem-line">' + money(lineTotal(it)) + '</div>' +
           '</div>' + tierBarHtml(p, tierQty(it));
         row.setAttribute('data-id', it.id);
-        var up = $('.tb-up', row);
-        if (up) up.addEventListener('click', function () { changeQty(it.id, +up.getAttribute('data-add')); });
+        $$('.tb-tier', row).forEach(function (b) {
+          b.addEventListener('click', function (e) { pickTier(it.id, +b.getAttribute('data-min'), e.detail === 0); });
+        });
         $('.citem-thumb', row).addEventListener('click', closeCart);
         $('.cq-minus', row).addEventListener('click', function () { changeQty(it.id, -1); });
         $('.cq-plus', row).addEventListener('click', function () { changeQty(it.id, 1); });
@@ -548,50 +549,52 @@
     if (typeof fitPanel === 'function') fitPanel();
   }
 
-  /* ---- barre de rabais par modèle : jalons = paliers, « +N → −X % » complète le suivant ---- */
+  /* ---- paliers par modèle (ligne du panier) : un clic met la quantité au palier choisi ---- */
   function tierInfo(p, qty) {
     var base = +p.sell_price || 0;
     var tiers = window.CASpacers.normalizeTiers(p.tiers).filter(function (t) { return t.min > 1 && t.price < base; });
     if (!tiers.length || !base) return null;
     var reached = -1;
     tiers.forEach(function (t, i) { if (qty >= t.min) reached = i; });
-    var max = tiers[tiers.length - 1].min;
-    return { tiers: tiers, reached: reached, next: tiers[reached + 1] || null, max: max,
-      fill: Math.min(qty / max, 1) * 100, pct: function (t) { return Math.round((1 - t.price / base) * 100); } };
+    return { tiers: tiers, reached: reached, next: tiers[reached + 1] || null,
+      pct: function (t) { return Math.round((1 - t.price / base) * 100); } };
   }
   function tierBarHtml(p, qty) {
     var ti = tierInfo(p, qty); if (!ti) return '';
-    var marks = '', labels = '';
-    ti.tiers.forEach(function (t, i) {
-      var at = t.min / ti.max * 100, on = i <= ti.reached ? ' is-on' : '';
-      marks += '<i class="tb-mark' + on + '" style="left:' + at + '%"></i>';
-      labels += '<span class="tb-lbl' + on + '" style="left:' + at + '%"><b>' + t.min + '</b>−' + ti.pct(t) + ' %</span>';
-    });
-    var foot = ti.next
-      ? '<button type="button" class="tb-up" data-add="' + (ti.next.min - qty) + '" aria-label="' +
-          esc(_t('Ajouter ') + plural(ti.next.min - qty, 'paire', 'paires') + _t(' pour ') + '−' + ti.pct(ti.next) + ' %') + '">+' +
-          (ti.next.min - qty) + ' → −' + ti.pct(ti.next) + ' %</button>'
-      : '<span class="tb-max">' + _t('Meilleur prix ✓') + '</span>';
-    return '<div class="citem-tiers" data-fill="' + ti.fill + '" data-reached="' + ti.reached + '">' +
-      '<div class="tb-track"><span class="tb-fill"></span>' + marks + '</div>' +
-      '<div class="tb-lbls">' + labels + '</div>' + foot + '</div>';
+    var best = ti.tiers.length - 1;
+    return '<div class="citem-tiers" data-reached="' + ti.reached + '">' + ti.tiers.map(function (t, i) {
+      var q = plural(t.min, 'paire', 'paires'), off = _t('{n} % de rabais', { n: ti.pct(t) });
+      return '<button type="button" class="tb-tier' + (i === best ? ' is-best' : '') + (i === ti.reached ? ' is-reached' : '') + '" data-min="' + t.min + '"' +
+          (i === ti.reached ? ' aria-current="true"' : '') + ' aria-label="' + esc(q + ' · ' + money(t.price) + ' · ' + off) + '">' +
+        '<span class="tb-q">' + esc(q) + '</span>' +
+        '<span class="tb-pw"><span class="tb-p">' + money(t.price) + '</span></span>' +
+        '<span class="tb-r">' + esc(off) + '</span></button>';
+    }).join('') + '</div>';
   }
-  var tierPrev = {};   // id -> { fill, reached } du rendu précédent : la barre glisse, le jalon atteint s'allume
+  /* Met le modèle au palier. Commande découverte : le palier se compte sur toutes les paires, donc seul ce
+     modèle s'ajuste pour que le total y arrive ; si les autres modèles le dépassent déjà, rien ne change. */
+  function pickTier(id, min, keepFocus) {
+    if (!cart[id]) return;
+    var n = min;
+    if (mixOn()) {
+      n = min - (count() - cart[id].qty);
+      if (n < 1) return;
+    }
+    setQty(id, n);
+    if (keepFocus) {
+      var b = $('.citem[data-id="' + id + '"] .tb-tier[data-min="' + min + '"]', cartItems);
+      if (b) b.focus({ preventScroll: true });
+    }
+  }
+  var tierPrev = {};   // id -> palier atteint au rendu précédent : le palier qui vient d'être atteint s'anime
   function animateTiers() {
     var now = {};
     $$('.citem', cartItems).forEach(function (row) {
       var id = row.getAttribute('data-id'), box = $('.citem-tiers', row); if (!box) return;
-      var fill = +box.getAttribute('data-fill'), reached = +box.getAttribute('data-reached'), prev = tierPrev[id];
-      var bar = $('.tb-fill', box);
-      now[id] = { fill: fill, reached: reached };
-      if (reduceMotion) { bar.style.width = fill + '%'; return; }
-      bar.style.width = (prev ? prev.fill : 0) + '%';
-      bar.getBoundingClientRect();
-      bar.style.width = fill + '%';
-      if (prev && reached > prev.reached) {
-        var mk = $$('.tb-mark', box)[reached], lb = $$('.tb-lbl', box)[reached], un = $('.citem-unit', row);
-        [mk, lb, un].forEach(function (el) { if (el) el.classList.add('is-pop'); });
-      }
+      var reached = +box.getAttribute('data-reached'), prev = tierPrev[id];
+      now[id] = reached;
+      if (reduceMotion || prev == null || reached <= prev) return;
+      [$('.tb-p', $$('.tb-tier', box)[reached]), $('.citem-unit', row)].forEach(function (el) { if (el) el.classList.add('is-pop'); });
     });
     tierPrev = now;
   }
