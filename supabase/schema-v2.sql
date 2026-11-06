@@ -5170,7 +5170,6 @@ $$;
 create table if not exists public.maintenance_calc (
   id               smallint primary key default 1 check (id = 1),
   travel_minutes   integer not null default 60 check (travel_minutes between 0 and 600),
-  travel_cost      numeric(8,2) not null default 10 check (travel_cost >= 0),
   machines_per_visit integer not null default 1 check (machines_per_visit between 1 and 100),
   margin_pct       numeric(5,2) not null default 40 check (margin_pct >= 0 and margin_pct < 95)
 );
@@ -5202,3 +5201,5 @@ select v.n, v.c, v.q, v.o from (values
   ('Chiffons et cotons-tiges', 0.50, 1, 3)
 ) as v(n, c, q, o)
 where not exists (select 1 from public.maintenance_materials);
+
+alter table public.maintenance_calc drop column if exists travel_cost;

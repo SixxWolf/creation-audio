@@ -16,9 +16,9 @@
 
   var BUCKET = 'products', DIR = 'entretien';
   var rows = [], rate = 60, loaded = false;
-  var calc = { travel_minutes: 60, travel_cost: 10, machines_per_visit: 1, margin_pct: 40 }, mats = [];
+  var calc = { travel_minutes: 60, machines_per_visit: 1, margin_pct: 40 }, mats = [];
   var matsEl = document.getElementById('ec-mats'), resEl = document.getElementById('ec-res');
-  var CFG = { 'ec-tmin': 'travel_minutes', 'ec-tcost': 'travel_cost', 'ec-mpv': 'machines_per_visit', 'ec-margin': 'margin_pct' };
+  var CFG = { 'ec-tmin': 'travel_minutes', 'ec-mpv': 'machines_per_visit', 'ec-margin': 'margin_pct' };
   var rateEl = document.getElementById('en-rate'), fileEl = document.getElementById('en-file');
   var uploadFor = null;
 
@@ -63,7 +63,7 @@
   /* ---- calculateur de prix : temps × taux + matériaux + part du déplacement, puis marge visée ---- */
   function money(n) { return CA.money ? CA.money(n) : (Math.round(n * 100) / 100).toFixed(2) + ' $'; }
   function matCost() { return mats.reduce(function (t, m) { return t + (+m.cost || 0) * (+m.qty || 0); }, 0); }
-  function travelShare() { return (rate * calc.travel_minutes / 60 + calc.travel_cost) / Math.max(1, calc.machines_per_visit); }
+  function travelShare() { return (rate * calc.travel_minutes / 60) / Math.max(1, calc.machines_per_visit); }
   function figures(r) {
     var min = r.minutes || 0, labor = rate * min / 60, mat = matCost(), trav = travelShare(), cost = labor + mat + trav;
     var sug = min ? Math.ceil(cost / (1 - calc.margin_pct / 100)) : null;
@@ -285,8 +285,8 @@
       var el = e.target, id = el.id;
       if (CFG[id]) {
         var k = CFG[id], v = num(el.value), max = k === 'margin_pct' ? 94 : k === 'travel_minutes' ? 600 : 100;
-        if (v == null || v < 0 || (k === 'machines_per_visit' && v < 1) || (k !== 'travel_cost' && v > max)) { el.value = calc[k]; return; }
-        v = k === 'travel_cost' || k === 'margin_pct' ? Math.round(v * 100) / 100 : Math.round(v);
+        if (v == null || v < 0 || (k === 'machines_per_visit' && v < 1) || v > max) { el.value = calc[k]; return; }
+        v = k === 'margin_pct' ? Math.round(v * 100) / 100 : Math.round(v);
         var patch = {}; patch[k] = v;
         sb.from('maintenance_calc').update(patch).eq('id', 1).then(function (res) {
           if (res.error) { window.caDialog.error(res.error); el.value = calc[k]; return; }
