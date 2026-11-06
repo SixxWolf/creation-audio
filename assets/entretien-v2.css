@@ -168,6 +168,7 @@ html:not(.et-ready) .et-tag span { display:none; }
 .et-model { display:flex; align-items:center; gap:14px; padding:13px 0; border-bottom:1px solid var(--line); }
 .et-th { flex:none; display:grid; place-items:center; width:56px; height:56px; overflow:hidden; border-radius:12px; background:#fff; border:1px solid var(--line); color:#6C727C; }
 .et-th img { display:block; width:100%; height:100%; object-fit:contain; scale:1.42; mix-blend-mode:multiply; filter:brightness(1.05) contrast(1.06); }
+.et-th img.et-th-wide { scale:1.08; }
 .et-th svg { width:30px; height:30px; }
 .et-pm { display:grid; min-width:0; flex:1; }
 .et-pm b { font-size:1.02rem; color:var(--ink); }
