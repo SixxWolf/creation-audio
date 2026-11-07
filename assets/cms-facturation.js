@@ -73,6 +73,7 @@
   var PAY_LABEL = { cash: 'Comptant', interac: 'Virement Interac' };
   var pickerKind = 'spool';      // filament : bobine | recharge
   var brandFilter = 'all';       // filtre marque (catalogue filament)
+  var brandInit = false;         // défaut Bambu Lab appliqué une fois
   var matFilter = 'all';         // filtre matériau (catalogue filament)
   var lines = [];                // lignes de la facture
   var saved = false;             // verrou anti-double-enregistrement
@@ -552,6 +553,7 @@
   });
   if (elBrand) elBrand.addEventListener('change', function () {
     brandFilter = this.value; matFilter = 'all';       // la marque change -> matériau remis à « tous »
+    try { localStorage.setItem('ca_fx_brand', brandFilter); } catch (e) {}
     refreshFilterOptions(); buildPicker();
   });
   if (elMaterial) elMaterial.addEventListener('change', function () { matFilter = this.value; buildPicker(); });
@@ -563,6 +565,12 @@
     var brands = [];
     fils.forEach(function (p) { var b = p.brand || 'Autres'; if (brands.indexOf(b) === -1) brands.push(b); });
     brands.sort();
+    if (!brandInit && brands.length) {   // 1re ouverture : dernier choix mémorisé, sinon Bambu Lab (99 % des ventes)
+      brandInit = true;
+      var saved = null; try { saved = localStorage.getItem('ca_fx_brand'); } catch (e) {}
+      if (saved && (saved === 'all' || brands.indexOf(saved) !== -1)) brandFilter = saved;
+      else { var bb = brands.filter(function (b) { return /^bambu/i.test(b); })[0]; if (bb) brandFilter = bb; }
+    }
     if (brandFilter !== 'all' && brands.indexOf(brandFilter) === -1) brandFilter = 'all';
     elBrand.innerHTML = '<option value="all">Toutes les marques</option>' +
       brands.map(function (b) { return '<option value="' + esc(b) + '"' + (b === brandFilter ? ' selected' : '') + '>' + esc(b) + '</option>'; }).join('');
@@ -594,9 +602,7 @@
           '<span class="pk-price">' + (p.price_month != null ? money(p.price_month) : 'Sur évaluation') + '</span>' +
           '<span class="pk-badge"></span></button>';
       }).join('') + '</div>';
-      $$('.pk-cell', elCatalog).forEach(function (b) {
-        b.addEventListener('click', function () { addProduct(b.getAttribute('data-id')); });
-      });
+      bindPickerClicks();
       applyFilter(elSearch.value);
       refreshPickerBadges();
       return;
@@ -611,14 +617,16 @@
         if (brandFilter !== 'all' && (p.brand || 'Autres') !== brandFilter) return;
         if (matFilter !== 'all' && (p.material || 'Autres') !== matFilter) return;
         var key = (p.brand || 'Autres') + ' · ' + (p.material || 'Autres');
-        if (!(key in idx)) { idx[key] = groups.length; groups.push({ title: key, items: [] }); }
+        if (!(key in idx)) { idx[key] = groups.length; groups.push({ title: key, brand: p.brand || 'Autres', mat: p.material || 'Autres', items: [] }); }
         groups[idx[key]].items.push(p);
       });
       if (!groups.length) { elCatalog.innerHTML = '<p class="empty">Aucune couleur pour ces filtres.</p>'; return; }
       elCatalog.innerHTML = groups.map(function (g) {
-        return '<div class="pk-group"><div class="pk-group-title">' + esc(g.title) + '</div><div class="pk-grid">' +
+        return '<div class="pk-group"><div class="pk-group-title"><span class="pk-gt-brand">' + esc(g.brand) + '</span><span class="pk-gt-mat">' + esc(g.mat) + '</span></div><div class="pk-grid">' +
           g.items.map(function (p) {
-            return '<button type="button" class="pk-cell" data-id="' + esc(p.id) + '" data-search="' +
+            var hx = /^#[0-9a-f]{6}$/i.test(p.hex || '') ? p.hex : '#cccccc';
+            var lum = (parseInt(hx.slice(1, 3), 16) * 299 + parseInt(hx.slice(3, 5), 16) * 587 + parseInt(hx.slice(5, 7), 16) * 114) / 255000;
+            return '<button type="button" class="pk-cell pk-fil' + (lum > 0.78 ? ' pk-pale' : '') + '" style="--fc:' + hx + '" data-id="' + esc(p.id) + '" data-search="' +
               esc(((p.name || '') + ' ' + (p.material || '') + ' ' + (p.code || '')).toLowerCase()) + '">' +
               '<span class="pk-sw" style="background:' + esc(p.hex || '#ccc') + '"></span>' +
               '<span class="pk-name">' + esc(p.name) + '</span>' +
@@ -651,9 +659,7 @@
       }).join('') + '</div>';
     }
 
-    $$('.pk-cell', elCatalog).forEach(function (b) {
-      b.addEventListener('click', function () { addProduct(b.getAttribute('data-id')); });
-    });
+    bindPickerClicks();
     applyFilter(elSearch.value);
     refreshPickerBadges();
   }
@@ -675,10 +681,16 @@
     }
   }
   function refreshPickerBadges() {
-    var counts = {};
-    lines.forEach(function (l) { var k = l.productId || l.maintId; if (k) counts[k] = (counts[k] || 0) + l.qty; });
+    // filament : la pastille ne compte que le format actif (bobine OU recharge) ; un point signale l'autre format déjà ajouté
+    var counts = {}, other = {}, fil = cat === 'filament';
+    lines.forEach(function (l) {
+      var k = l.productId || l.maintId; if (!k) return;
+      if (fil && l.ptype === 'filament' && l.kind !== pickerKind) other[k] = (other[k] || 0) + l.qty;
+      else counts[k] = (counts[k] || 0) + l.qty;
+    });
     $$('.pk-cell', elCatalog).forEach(function (b) {
-      var n = counts[b.getAttribute('data-id')] || 0, badge = $('.pk-badge', b);
+      var id = b.getAttribute('data-id'), n = counts[id] || 0, badge = $('.pk-badge', b);
+      b.classList.toggle('alt', !n && (other[id] || 0) > 0);
       if (n > 0) { b.classList.add('sel'); if (badge) badge.textContent = n; }
       else { b.classList.remove('sel'); if (badge) badge.textContent = ''; }
     });
@@ -703,6 +715,30 @@
     if (ev != null) return ev;
     var ac = p && p.attrs && p.attrs.avg_cost && p.attrs.avg_cost.item;
     return +((ac != null && ac !== '') ? ac : (p && p.cost_price)) || 0;
+  }
+
+  // clic droit sur une case du catalogue : retire 1 (format actif pour les filaments) ; la ligne disparaît à 0
+  function removeOne(id) {
+    var key = String(id), kind = cat === 'filament' ? pickerKind : 'unit';
+    var cand = lines.filter(function (l) {
+      return cat === 'maintenance' ? l.maintId === key : (l.productId === key && l.kind === kind);
+    });
+    var l = cand.filter(function (x) { return !x.manual; })[0] || cand[0];
+    if (!l) return;
+    if (l.qty > 1) l.qty -= 1; else lines.splice(lines.indexOf(l), 1);
+    afterChange();
+  }
+  var lastTouch = 0;
+  document.addEventListener('touchstart', function () { lastTouch = Date.now(); }, { passive: true, capture: true });
+  function bindPickerClicks() {
+    $$('.pk-cell', elCatalog).forEach(function (b) {
+      b.addEventListener('click', function () { addProduct(b.getAttribute('data-id')); });
+      b.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        if (Date.now() - lastTouch < 1500) return;   // appui long au doigt : pas de retrait par accident
+        removeOne(b.getAttribute('data-id'));
+      });
+    });
   }
 
   // c : gabarit du produit (par défaut le gabarit courant ; le scanner le force)
