@@ -211,7 +211,18 @@
     screenAccs.hidden = name !== 'accs';
     screenAcc.hidden = name !== 'acc';
     var acc = name === 'accs' || name === 'acc';
-    $$('.home-nav a, .drawer-links a').forEach(function (a) {
+    // onglets des rayons : visibles sur les listes, pas sur une fiche
+    var tabs = $('#shop-tabs');
+    if (tabs) {
+      tabs.hidden = name === 'product' || name === 'acc';
+      var cur = acc ? 'accessoires' : (/[?&]promo=1/.test(location.search) ? 'promo' : 'filaments');
+      $$('a', tabs).forEach(function (a) {
+        var on = a.getAttribute('data-tab') === cur;
+        a.classList.toggle('is-active', on);
+        if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      });
+    }
+    $$('.nav-dd-m a, .drawer-sub a').forEach(function (a) {
       var h = a.getAttribute('href') || '';
       var on = acc ? /#\/accessoires$/.test(h) : /^boutique(#\/)?$/.test(h);
       a.classList.toggle('is-active', on);

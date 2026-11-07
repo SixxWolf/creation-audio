@@ -130,8 +130,30 @@
 }
 .home-top .spacer { flex:1; }
 
+/* Menu déroulant « Boutique » (nav.js) : survol et clavier sur ordi ; 1er toucher ouvre sur écran tactile */
+.nav-dd { position:relative; display:inline-flex; }
+.nav-dd-t { gap:5px; }
+.nav-dd-ic { width:13px; height:13px; flex:none; opacity:.7; transition:transform .15s; }
+.nav-dd-m {
+  position:absolute; top:100%; left:0; z-index:45; min-width:190px; margin-top:6px; padding:6px;
+  display:flex; flex-direction:column; gap:2px; background:var(--paper); border:1px solid var(--line); border-radius:14px;
+  box-shadow:0 18px 40px -18px rgba(0,0,0,.35);
+  opacity:0; visibility:hidden; transform:translateY(-4px); transition:opacity .14s, transform .14s, visibility 0s linear .14s;
+}
+.nav-dd-m::before { content:''; position:absolute; left:0; right:0; top:-8px; height:8px; }   /* pont : le survol ne décroche pas */
+.home-nav .nav-dd-m a { display:flex; width:100%; height:38px; padding:0 12px; }
+.home-nav .nav-dd-m a.is-active { color:var(--ember-ink); }
+.home-nav .nav-dd-m a.is-active::after { display:none; }
+.nav-dd.is-open .nav-dd-m { opacity:1; visibility:visible; transform:none; transition:opacity .14s, transform .14s, visibility 0s; }
+.nav-dd.is-open .nav-dd-ic { transform:rotate(180deg); }
+@media (hover:hover) {
+  .nav-dd:hover .nav-dd-m, .nav-dd:focus-within .nav-dd-m { opacity:1; visibility:visible; transform:none; transition:opacity .14s, transform .14s, visibility 0s; }
+  .nav-dd:hover .nav-dd-ic, .nav-dd:focus-within .nav-dd-ic { transform:rotate(180deg); }
+  .nav-dd.is-shut .nav-dd-m { opacity:0; visibility:hidden; }
+}
+
 /* Actions de droite : même hauteur partout (40 px) */
-.home-dealer, .home-cta, .home-top .cart-btn { height:40px; border-radius:12px; }
+.home-dealer, .home-top .cart-btn { height:40px; border-radius:12px; }
 .home-dealer {
   display:inline-flex; align-items:center; gap:7px; padding:0 14px; white-space:nowrap;
   text-decoration:none; color:var(--ink-2); font-weight:600; font-size:.88rem;
@@ -150,15 +172,6 @@
 .home-account svg { width:19px; height:19px; }
 .home-account.is-in::after { content:''; position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%;
   background:var(--ember); box-shadow:0 0 0 2px var(--paper); }
-.home-cta {
-  display:inline-flex; align-items:center; gap:8px; padding:0 18px; white-space:nowrap;
-  text-decoration:none; font-weight:700; font-size:.9rem; color:#fff;
-  background:var(--fill-strong); border:1px solid var(--fill-strong); transition:background .15s, transform .1s;
-}
-.home-cta svg { width:16px; height:16px; transition:transform .18s; }
-.home-cta:hover { background:var(--fill-strong-hover); }
-.home-cta:hover svg { transform:translateX(2px); }
-.home-cta:active { transform:translateY(1px); }
 .home-top .cart-btn { padding-top:0; padding-bottom:0; border-width:1px; }
 /* Langue (i18n.js) : FR ↔ EN, même gabarit que Mon compte */
 .home-lang {
@@ -214,6 +227,10 @@
 .drawer-links a::after { content:'→'; font-family:var(--font); font-size:1rem; color:var(--muted); transition:transform .15s, color .15s; }
 .drawer-links a:hover::after { transform:translateX(3px); color:var(--ember-ink); }
 .drawer-links a.is-active { color:var(--ember-ink); }
+.drawer-links a.drawer-parent { border-bottom:none; padding-bottom:6px; }
+.drawer-sub { display:flex; flex-direction:column; padding:0 0 10px 14px; border-bottom:1px solid var(--line); }
+.drawer-links .drawer-sub a { padding:9px 4px; border-bottom:none; font-family:var(--font); font-size:1.02rem; color:var(--ink-2); }
+.drawer-links .drawer-sub a.is-active { color:var(--ember-ink); }
 .drawer-cta { margin-top:18px; display:flex; flex-direction:column; gap:10px; }
 .drawer-cta a {
   display:flex; align-items:center; justify-content:center; gap:8px; height:48px; border-radius:12px;
@@ -225,21 +242,15 @@
 .drawer-foot { margin-top:auto; padding-top:22px; font-size:.84rem; color:var(--muted); line-height:1.6; }
 .drawer-foot a { color:var(--ink-2); font-weight:600; }
 
-/* Place de Mon compte + FR/EN : « Magasiner » (doublon de Filaments) part et les liens se resserrent sous 1450 px (6 liens de menu) */
+/* Place de Mon compte + FR/EN : les liens se resserrent sous 1450 px */
 @media (max-width:1450px) {
-  .home-top .home-cta { display:none; }
   .home-top { gap:14px; }
   .home-nav a { padding:0 9px; }
   .home-nav a.is-active::after { left:9px; right:9px; }
   .home-dealer { width:40px; padding:0; gap:0; justify-content:center; font-size:0; }   /* icône seule (le mot reste lu) */
 }
-/* fêtes : le bouton ❄ prend 66 px de plus, « Magasiner » part un peu plus tôt */
-@media (max-width:1700px) {
-  html.fetes .home-top .home-cta { display:none; }
-}
-/* « Programme revendeur » + « Mon compte » en toutes lettres : « Magasiner » part et le cadenas passe en icône seule plus tôt */
+/* « Programme revendeur » + « Mon compte » en toutes lettres : le cadenas passe en icône seule plus tôt */
 @media (max-width:1650px) {
-  .home-top .home-cta { display:none; }
   .home-dealer { width:40px; padding:0; gap:0; justify-content:center; font-size:0; }
 }
 @media (max-width:1140px) {   /* burger : 6 liens de menu */
@@ -282,7 +293,6 @@
 }
 @media (max-width:1800px) {   /* pages avec panier : le bouton Panier prend de la place */
   .home-top:has(.cart-btn) .home-dealer { width:40px; padding:0; gap:0; justify-content:center; font-size:0; }
-  .home-top:has(.cart-btn) .home-cta { display:none; }
 }
 @media (max-width:430px) {
   .brand-tx small { display:none; }
@@ -338,7 +348,7 @@
 }
 
 @media (prefers-reduced-motion:reduce) {
-  .nav-drawer, .home-top, .home-cta svg, .drawer-links a::after { transition:none; }
+  .nav-drawer, .home-top, .nav-dd-m, .nav-dd-ic, .drawer-links a::after { transition:none; }
 }
 
 /* « Écris-nous… » partout sur le site : lien bien visible (souligné, fond teinté, sans animation)

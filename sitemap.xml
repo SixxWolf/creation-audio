@@ -11,7 +11,7 @@
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacers</loc>
+    <loc>https://creationaudio.ca/boutique/spacers</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
@@ -56,91 +56,91 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacers</loc>
+    <loc>https://creationaudio.ca/en/boutique/spacers</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <!-- spacers:urls — une page par spacer, généré par tools/build-spacer-pages.js -->
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-hykia-001</loc>
-    <lastmod>2026-11-06</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-hykia-001</loc>
+    <loc>https://creationaudio.ca/boutique/spacers/ca-adp-hykia-001</loc>
     <lastmod>2026-11-07</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-525-001</loc>
-    <lastmod>2026-11-06</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-525-001</loc>
+    <loc>https://creationaudio.ca/en/boutique/spacers/ca-adp-hykia-001</loc>
     <lastmod>2026-11-07</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-4-001</loc>
-    <lastmod>2026-11-06</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-4-001</loc>
+    <loc>https://creationaudio.ca/boutique/spacers/ca-adp-525-001</loc>
     <lastmod>2026-11-07</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-8-001</loc>
-    <lastmod>2026-11-06</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-8-001</loc>
+    <loc>https://creationaudio.ca/en/boutique/spacers/ca-adp-525-001</loc>
     <lastmod>2026-11-07</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-ford-001</loc>
-    <lastmod>2026-11-06</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-ford-001</loc>
+    <loc>https://creationaudio.ca/boutique/spacers/ca-adp-4-001</loc>
     <lastmod>2026-11-07</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-ford-002</loc>
-    <lastmod>2026-11-06</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-ford-002</loc>
+    <loc>https://creationaudio.ca/en/boutique/spacers/ca-adp-4-001</loc>
     <lastmod>2026-11-07</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/spacer/ca-adp-toyota-001</loc>
-    <lastmod>2026-11-06</lastmod>
+    <loc>https://creationaudio.ca/boutique/spacers/ca-adp-8-001</loc>
+    <lastmod>2026-11-07</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://creationaudio.ca/en/spacer/ca-adp-toyota-001</loc>
+    <loc>https://creationaudio.ca/en/boutique/spacers/ca-adp-8-001</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/boutique/spacers/ca-adp-ford-001</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/en/boutique/spacers/ca-adp-ford-001</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/boutique/spacers/ca-adp-ford-002</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/en/boutique/spacers/ca-adp-ford-002</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/boutique/spacers/ca-adp-toyota-001</loc>
+    <lastmod>2026-11-07</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/en/boutique/spacers/ca-adp-toyota-001</loc>
     <lastmod>2026-11-07</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

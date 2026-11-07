@@ -68,7 +68,7 @@
 
     /* ---- Spacers ---- */
     { id: 'trouver-spacer', group: _t('Spacers'), title: _t('Trouver le spacer de ton véhicule'),
-      go: { href: 'spacers', label: _t('Spacers') }, keys: _t('adaptateur haut-parleur vehicule annee'),
+      go: { href: 'boutique/spacers', label: _t('Spacers') }, keys: _t('adaptateur haut-parleur vehicule annee'),
       steps: [
         'Ouvre **Spacers**.',
         _t('Tape ton véhicule et l\'année dans la recherche (ex. « civic 2008 ») — ou un code de pièce.'),

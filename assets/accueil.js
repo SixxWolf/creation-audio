@@ -382,7 +382,7 @@
       var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
       var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
       var title = isF ? esc((p.brand ? p.brand + ' ' : '') + (p.material || _t('Filament'))) : esc(p.name);
-      var href = p.type === 'spacer' ? 'spacers' : 'boutique?promo=1';
+      var href = p.type === 'spacer' ? 'boutique/spacers' : 'boutique?promo=1';
       var sub = isF ? tn(g.n, '{n} couleur', '{n} couleurs') : esc(P.nameOf(p));
       var end = P.endText(p.promo_ends);
       return '<a class="pop-card promo-card" href="' + esc(href) + '">' + P.ribbon(g.pc) +

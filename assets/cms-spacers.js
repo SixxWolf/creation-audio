@@ -381,8 +381,8 @@
     // le slug suit le nom ENREGISTRÉ (un nom modifié non enregistré n'a pas encore de fiche)
     var s = encodeURIComponent((editingRow && editingRow.slug) || slugify(editingRow ? editingRow.name : name));
     linksEl.innerHTML =
-      // vraie page (générée aux 6 h) ; pas encore publiée -> la 404 renvoie vers spacers#/s/<slug>
-      '<a class="btn btn-ghost btn-sm" href="' + SITE + 'spacer/' + s + '" target="_blank" rel="noopener">Site public ↗</a>' +
+      // vraie page (générée aux 6 h) ; pas encore publiée -> la 404 renvoie vers boutique/spacers#/s/<slug>
+      '<a class="btn btn-ghost btn-sm" href="' + SITE + 'boutique/spacers/' + s + '" target="_blank" rel="noopener">Site public ↗</a>' +
       '<a class="btn btn-ghost btn-sm" href="' + SITE + 'dealer#/s/' + s + '" target="_blank" rel="noopener">Portail dealer ↗</a>' +
       (activeI.checked ? '' : '<span class="hint">Masqué en boutique</span>');
   }

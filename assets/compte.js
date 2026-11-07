@@ -410,7 +410,7 @@
         localStorage.setItem('ca_v2_order_edit', JSON.stringify({ id: o.id, number: o.number, at: Date.now(),
           pickup: o.pickup_date ? { d: o.pickup_date, s: o.pickup_start } : null }));
       } catch (e) {}
-      location.href = spacersOnly ? 'spacers' : 'boutique#/';
+      location.href = spacersOnly ? 'boutique/spacers' : 'boutique#/';
     }
   }
   /* ---- cueillette : date + plage (commande ouverte, réservation gardée) — CA.custOrder (commande-client.js) ---- */
@@ -810,7 +810,7 @@
   var alertsEl = $('#acct-alerts'), alertsN = $('#acct-n-alerts');
   var KIND = { spool: _t('avec bobine'), refill: 'recharge' };
   function productHref(a) {
-    if (a.type === 'spacer') return 'spacers';
+    if (a.type === 'spacer') return 'boutique/spacers';
     if (a.type === 'accessory') return 'boutique#/a/' + encodeURIComponent(a.slug || slugify(a.name));
     return 'boutique#/m/' + (a.brand_slug || slugify(a.brand || _t('Autres'))) + '/' +
       (a.material_slug || slugify(a.material || _t('Autres'))) + '/' + (a.slug || slugify(a.name));

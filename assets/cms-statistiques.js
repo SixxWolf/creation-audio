@@ -336,7 +336,7 @@
     instagram: 'Instagram', youtube: 'YouTube', reddit: 'Reddit', autre: 'Autre site' };
   var DEV_LABEL = { mobile: 'Mobile', desktop: 'Ordinateur' };
   var LANG_LABEL = { fr: 'Français', en: 'Anglais' };
-  var PAGE_LABEL = { '/': 'Accueil', '/boutique': 'Boutique', '/spacers': 'Spacers', '/compte': 'Mon compte', '/dealer': 'Portail dealer',
+  var PAGE_LABEL = { '/': 'Accueil', '/boutique': 'Boutique', '/boutique/spacers': 'Spacers', '/spacers': 'Spacers', '/compte': 'Mon compte', '/dealer': 'Portail dealer',
     '/revendeur': 'Revendeurs', '/aide': 'Aide', '/conditions': 'Conditions', '/confidentialite': 'Confidentialité',
     '/retours': 'Retours', '/autre': 'Autres pages' };
   var visSeq = 0;

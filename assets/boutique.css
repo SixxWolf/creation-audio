@@ -30,6 +30,18 @@
 
 /* ---- Colonne de page ---- */
 .shop { max-width:var(--maxw); margin:0 auto; padding:0 var(--gutter) clamp(64px, 8vw, 110px); }
+/* Rayons de la boutique : Filaments · Spacers · Accessoires · Promotions */
+.shop-tabs { display:flex; gap:4px; margin-top:18px; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
+.shop-tabs::-webkit-scrollbar { display:none; }
+.shop-tabs[hidden] { display:none; }
+.shop-tabs a {
+  position:relative; flex:none; padding:10px 12px; white-space:nowrap; text-decoration:none;
+  font-weight:600; font-size:.95rem; color:var(--ink-2); transition:color .15s;
+}
+.shop-tabs a:hover { color:var(--ink); }
+.shop-tabs a.is-active { color:var(--ink); }
+.shop-tabs a.is-active::after { content:''; position:absolute; left:12px; right:12px; bottom:0; height:2px; border-radius:2px 2px 0 0; background:var(--ember); }
+@media (max-width:420px) { .shop-tabs { gap:0; } .shop-tabs a { padding:10px 6px; font-size:.9rem; } .shop-tabs a.is-active::after { left:6px; right:6px; } }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
 /* En-tête de page simple (spacers, dealer) */

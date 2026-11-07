@@ -20,10 +20,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/site.css?v=26">
+<link rel="stylesheet" href="assets/site.css?v=27">
 <link rel="stylesheet" href="assets/legal.css?v=1">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
-<link rel="stylesheet" href="assets/fetes.css?v=7">
+<link rel="stylesheet" href="assets/fetes.css?v=9">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
 <script src="assets/look.js?v=5"></script>
 <script src="assets/i18n.js?v=1"></script>
@@ -41,9 +41,15 @@
     <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
   </a>
   <nav class="home-nav" aria-label="Navigation principale">
-    <a href="boutique">Filaments</a>
-    <a href="spacers">Spacers</a>
-    <a href="boutique#/accessoires">Accessoires</a>
+    <div class="nav-dd">
+      <a class="nav-dd-t" href="boutique" aria-haspopup="true" aria-expanded="false">Boutique <svg class="nav-dd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
+      <div class="nav-dd-m">
+        <a href="boutique?promo=1">Promotions</a>
+        <a href="boutique">Filaments</a>
+        <a href="boutique/spacers">Spacers</a>
+        <a href="boutique#/accessoires">Accessoires</a>
+      </div>
+    </div>
     <a href="impression">Impression 3D</a>
     <a href="entretien">Entretien</a>
     <a href="./#contact">Contact</a>
@@ -57,7 +63,6 @@
   <a class="home-account" href="compte" aria-label="Mon compte" title="Mon compte">
     <span>Mon compte</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
   </a>
-  <a class="home-cta" href="boutique">Magasiner</a>
   <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-drawer">
     <span></span><span></span><span></span>
   </button>
@@ -141,7 +146,7 @@
     <nav class="foot-col" aria-label="Boutique">
       <h4>Boutique</h4>
       <a href="boutique">Filaments</a>
-      <a href="spacers">Spacers &amp; adaptateurs</a>
+      <a href="boutique/spacers">Spacers &amp; adaptateurs</a>
       <a href="boutique#/accessoires">Accessoires</a>
       <a href="impression">Impression 3D sur mesure</a>
       <a href="entretien">Entretien d'imprimantes</a>
@@ -179,9 +184,13 @@
   </div>
   <nav class="drawer-links" aria-label="Menu mobile">
     <a href="./">Accueil</a>
-    <a href="boutique">Filaments</a>
-    <a href="spacers">Spacers</a>
-    <a href="boutique#/accessoires">Accessoires</a>
+    <a class="drawer-parent" href="boutique">Boutique</a>
+    <div class="drawer-sub">
+      <a href="boutique?promo=1">Promotions</a>
+      <a href="boutique">Filaments</a>
+      <a href="boutique/spacers">Spacers</a>
+      <a href="boutique#/accessoires">Accessoires</a>
+    </div>
     <a href="impression">Impression 3D</a>
     <a href="entretien">Entretien</a>
     <a href="./#contact">Contact</a>
@@ -200,6 +209,6 @@
   </div>
 </aside>
 
-<script src="assets/nav.js?v=20"></script>
+<script src="assets/nav.js?v=22"></script>
 </body>
 </html>

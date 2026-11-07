@@ -3,20 +3,23 @@
    Création Audio — vraies pages des spacers (référencement)
    ---------------------------------------------------------
    Google ignore tout ce qui suit le « # » : les fiches
-   spacers.html#/s/<slug> ne forment qu'UNE page pour lui.
+   boutique/spacers#/s/<slug> ne forment qu'UNE page pour lui.
    Ce script écrit une vraie page par spacer actif :
-     - spacer/<slug>.html : titre, description, Open Graph
+     - boutique/spacers/<slug>.html : titre, description, Open Graph
        (aperçu Messenger/Facebook), données produit JSON-LD et
        la fiche déjà rendue (même HTML que spacer-catalog.js) ;
        spacers.js reprend la main au chargement (prix/stock live).
-     - spacers.html : catalogue pré-rendu (liens vers les pages)
+     - boutique/spacers.html : catalogue pré-rendu (liens vers les pages)
        + window.CA_SPACER_PAGES + liste JSON-LD, entre les
        repères <!-- spacers:head --> et <!-- spacers:list -->.
      - sitemap.xml : une URL par page (repère spacers:urls).
-     - en/spacer/<slug>.html + en/spacers.html : les mêmes en
+     - en/boutique/spacers/<slug>.html + en/boutique/spacers.html : les mêmes en
        anglais (gabarit traduit par build-en.js, catalogue rendu
        avec i18n.js + i18n-en.js, textes de la base : p.en) ;
        hreflang fr-CA / en-CA d'une fiche vers sa jumelle.
+   Anciennes adresses (spacers, spacer/<slug>) : petites pages de
+   redirection réécrites ici. boutique/index.html et
+   boutique/spacers/index.html rattrapent l'adresse avec « / » final.
    Pages des spacers retirés/masqués : supprimées (la 404
    renvoie vers le catalogue). N'écrit que ce qui a changé.
    Lancé par .github/workflows/spacer-pages.yml (aux 6 h et à
@@ -32,7 +35,9 @@ const EN = require('./build-en.js');   // translatePage : gabarit anglais (texte
 
 const ROOT = path.resolve(__dirname, '..');
 const SITE = 'https://creationaudio.ca/';
-const DIR = 'spacer';
+const DIR = 'boutique/spacers';      // fiches
+const CATALOG = 'boutique/spacers';  // gabarit source et catalogue (.html)
+const OLD_DIR = 'spacer', OLD_CATALOG = 'spacers';   // anciennes adresses : redirections
 const OG_DEFAULT = SITE + 'assets/img/og-creation-audio.png';
 const SLUG_OK = /^[a-z0-9][a-z0-9-]*$/;   // nom de fichier sûr ; sinon la fiche reste sur spacers.html#/s/…
 
@@ -86,7 +91,7 @@ function renderer(CAS, c, items, pages, onPage) {
     // le stock exact bouge à chaque vente : la page statique n'en dépend pas (le JS remet le vrai)
     maxQty: (p) => ((p.qty | 0) > 0 ? 1 : 0),
     // même règle que pageHref() dans spacers.js
-    pageHref: (s) => (pages.has(s) ? (onPage ? '' : DIR + '/') + s : (onPage ? '../spacers#/s/' + encodeURIComponent(s) : null)),
+    pageHref: (s) => (pages.has(s) ? (onPage ? '' : 'spacers/') + s : (onPage ? '../spacers#/s/' + encodeURIComponent(s) : null)),
     rootHref: onPage ? '../spacers' : '#/'
   });
   sc.setItems(items);
@@ -168,15 +173,23 @@ function setAttrOf(html, selector, attr, value) {
   if (!re.test(html)) throw new Error('balise ' + selector + ' introuvable');
   return html.replace(re, (m, a, b) => a + esc(value) + b);
 }
-// les liens relatifs de spacers.html, vus depuis spacer/<slug>.html
+// les liens relatifs de boutique/spacers.html, vus depuis boutique/spacers/<slug>.html : un cran de plus
 function relink(html) {
   return html.replace(/\b(href|src)="([^"]*)"/g, (m, a, v) => {
-    if (/^(?:[a-z][a-z0-9+.-]*:|\/|#|\.\.\/)/i.test(v)) return m;
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(v)) return m;
     return a + '="../' + (v.indexOf('./') === 0 ? v.slice(2) : v) + '"';
   });
 }
+// page de redirection (adresse déplacée) : canonical + refresh pour les moteurs, script pour garder le #
+function movedHtml(target, slug) {
+  const url = SITE + target;
+  return '<!doctype html>\n<html lang="fr">\n<head>\n<meta charset="utf-8">\n<title>Page déplacée — Création Audio</title>\n' +
+    '<link rel="canonical" href="' + url + '">\n<meta http-equiv="refresh" content="0; url=/' + target + '">\n' +
+    '<script>location.replace(' + JSON.stringify('/' + target) + ' + location.search + location.hash);</script>\n</head>\n' +
+    '<body' + (slug ? ' data-spacer="' + esc(slug) + '"' : '') + '>\n<p><a href="/' + target + '">Page déplacée / Page moved</a></p>\n</body>\n</html>\n';
+}
 
-// hreflang : chaque page pointe vers sa jumelle (le gabarit pointe vers spacers.html)
+// hreflang : chaque page pointe vers sa jumelle (le gabarit pointe vers boutique/spacers)
 function setAlternates(html, frUrl, enUrl) {
   return html.replace(/(<link rel="alternate" hreflang="(fr-CA|en-CA|x-default)" href=")[^"]*(")/g,
     (m, a, l, b) => a + esc(l === 'en-CA' ? enUrl : frUrl) + b);
@@ -213,7 +226,7 @@ function pageHtml(tpl, CAS, c, sc, p, slug, pagesList, en) {
   const crumbs = {
     '@type': 'BreadcrumbList', itemListElement: [
       { '@type': 'ListItem', position: 1, name: en ? 'Home' : 'Accueil', item: home },
-      { '@type': 'ListItem', position: 2, name: 'Spacers', item: home + 'spacers' },
+      { '@type': 'ListItem', position: 2, name: 'Spacers', item: home + CATALOG },
       { '@type': 'ListItem', position: 3, name: p.name, item: url }
     ]
   };
@@ -227,7 +240,7 @@ function pageHtml(tpl, CAS, c, sc, p, slug, pagesList, en) {
       .replace(/<main class="shop" id="main">[\s\S]*?<\/main>/, (m) => '<main class="shop" id="main">' + bizOf(m) + '</main>');
     h = EN.translatePage(h, DIR + '/' + slug + '.html');
   } else {
-    h = h.replace(/href="\.\.\/en\/spacers"/g, 'href="../en/' + DIR + '/' + slug + '"');   // lien EN : la même fiche
+    h = h.replace(/href="\.\.\/\.\.\/en\/boutique\/spacers"/g, 'href="../../en/' + DIR + '/' + slug + '"');   // lien EN : la même fiche
   }
   h = h.replace(/<title>[\s\S]*?<\/title>/, '<title>' + esc(t.title) + '</title>');
   h = setAttrOf(h, 'name="description"', 'content', t.desc);
@@ -305,7 +318,7 @@ function writeIfChanged(rel, html) {
 }
 const htmlIn = (d) => (fs.existsSync(file(d)) ? fs.readdirSync(file(d)).filter((f) => /\.html$/.test(f)) : []);
 
-// une langue : spacer/*.html + spacers.html (fr) ou en/spacer/*.html + en/spacers.html (en)
+// une langue : boutique/spacers/*.html + boutique/spacers.html (fr) ou la même chose sous en/ (en)
 function buildLang(lang, c, items, tpl, slugOf, pagesList, pages) {
   const en = lang === 'en', pre = en ? 'en/' : '';
   const CAS = loadCatalog(lang);
@@ -313,7 +326,7 @@ function buildLang(lang, c, items, tpl, slugOf, pagesList, pages) {
   const changed = new Set();
   items.forEach((p) => {
     const s = slugOf(p);
-    if (!pages.has(s)) { if (!en) console.warn('  ! slug non publiable « ' + s + ' » (' + p.name + ') : fiche laissée sur spacers.html#/s/'); return; }
+    if (!pages.has(s)) { if (!en) console.warn('  ! slug non publiable « ' + s + ' » (' + p.name + ') : fiche laissée sur boutique/spacers#/s/'); return; }
     if (writeIfChanged(pre + DIR + '/' + s + '.html', pageHtml(tpl, CAS, c, onPage, p, s, pagesList, en))) changed.add(s);
   });
   htmlIn(pre + DIR).forEach((f) => {
@@ -329,7 +342,7 @@ function buildLang(lang, c, items, tpl, slugOf, pagesList, pages) {
   let cat = tpl;
   if (en) {
     cat = blankMeta(block(block(cat, 'spacers:head', ''), 'spacers:list', ''), ['description', 'og:description']);
-    cat = EN.translatePage(cat, 'spacers.html');
+    cat = EN.translatePage(cat, CATALOG + '.html');
   }
   cat = block(cat, 'spacers:head', catalogHead(CAS, items, slugOf, pagesList, en));
   cat = block(cat, 'spacers:list', onCatalog.staticCatalog());
@@ -338,7 +351,20 @@ function buildLang(lang, c, items, tpl, slugOf, pagesList, pages) {
     cat = setAttrOf(cat, 'name="description"', 'content', d);
     cat = setAttrOf(cat, 'property="og:description"', 'content', d);
   }
-  writeIfChanged(pre + 'spacers.html', cat);
+  writeIfChanged(pre + CATALOG + '.html', cat);
+
+  // anciennes adresses → nouvelles (redirections, retirées avec le spacer)
+  writeIfChanged(pre + OLD_CATALOG + '.html', movedHtml(pre + CATALOG));
+  pagesList.forEach((s) => writeIfChanged(pre + OLD_DIR + '/' + s + '.html', movedHtml(pre + DIR + '/' + s, s)));
+  htmlIn(pre + OLD_DIR).forEach((f) => {
+    if (pages.has(f.replace(/\.html$/, ''))) return;
+    const rel = pre + OLD_DIR + '/' + f;
+    if (read(rel).indexOf('data-spacer="') === -1) return;
+    fs.unlinkSync(file(rel)); removed.push(rel);
+  });
+  // adresse avec « / » final : on retombe sur la page (extension explicite, sans boucle possible)
+  writeIfChanged(pre + 'boutique/index.html', movedHtml(pre + 'boutique.html'));
+  writeIfChanged(pre + DIR + '/index.html', movedHtml(pre + CATALOG + '.html'));
   return changed;
 }
 
@@ -356,8 +382,8 @@ async function main() {
   const pages = new Set(pagesList);
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1) français, puis 2) anglais (même gabarit spacers.html, traduit par build-en.js)
-  const tpl = read('spacers.html');
+  // 1) français, puis 2) anglais (même gabarit boutique/spacers.html, traduit par build-en.js)
+  const tpl = read(CATALOG + '.html');
   const changedFr = buildLang('fr', c, items, tpl, slugOf, pagesList, pages);
   const changedEn = buildLang('en', c, items, tpl, slugOf, pagesList, pages);
   const miss = EN.reportMissing('spacers');

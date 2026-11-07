@@ -77,6 +77,27 @@
   try { signedIn = !!localStorage.getItem('ca-compte-auth'); } catch (e) {}
   Array.prototype.forEach.call(document.querySelectorAll('.home-account'), function (a) { a.classList.toggle('is-in', signedIn); });
 
+  /* ---- menu déroulant « Boutique » : survol/clavier en CSS ; tactile = 1er toucher ouvre, le lien reste pour la souris ---- */
+  Array.prototype.forEach.call(document.querySelectorAll('.nav-dd'), function (dd) {
+    var t = dd.querySelector('.nav-dd-t');
+    function set(on) { dd.classList.toggle('is-open', on); t.setAttribute('aria-expanded', on ? 'true' : 'false'); }
+    t.addEventListener('click', function (e) {
+      if (!window.matchMedia('(hover: none)').matches) return;
+      e.preventDefault(); set(!dd.classList.contains('is-open'));
+    });
+    dd.addEventListener('mouseenter', function () { dd.classList.remove('is-shut'); t.setAttribute('aria-expanded', 'true'); });
+    dd.addEventListener('mouseleave', function () { dd.classList.remove('is-shut'); t.setAttribute('aria-expanded', 'false'); });
+    dd.addEventListener('focusin', function () { dd.classList.remove('is-shut'); t.setAttribute('aria-expanded', 'true'); });
+    dd.addEventListener('focusout', function (e) { if (!dd.contains(e.relatedTarget)) set(false); });
+    document.addEventListener('click', function (e) { if (!dd.contains(e.target)) set(false); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape' || t.getAttribute('aria-expanded') !== 'true') return;
+      var inside = dd.contains(document.activeElement);
+      set(false); dd.classList.add('is-shut');
+      if (inside) t.focus();
+    });
+  });
+
   /* ---- tiroir mobile ---- */
   var burger = $('#nav-burger'), drawer = $('#nav-drawer'), backdrop = $('#nav-backdrop'), closeBtn = $('#nav-close');
   if (!burger || !drawer) return;
@@ -130,7 +151,7 @@
     if (/^assets\//.test(path || '')) return (CA.siteRoot || '') + path;   // visuel hébergé dans le dépôt
     return c && path ? c.url + '/storage/v1/object/public/products/' + String(path).split('/').map(encodeURIComponent).join('/') : '';
   };
-  // lien saisi dans l'admin : http(s), mailto, ancre ou chemin du site (relatif à la racine, même depuis spacer/)
+  // lien saisi dans l'admin : http(s), mailto, ancre ou chemin du site (relatif à la racine, même depuis boutique/spacers/)
   CA.newsHref = function (u) {
     u = String(u || '').trim();
     if (!u) return '';
@@ -239,7 +260,7 @@
 (function () {
   'use strict';
   var CA = window.CA = window.CA || {};
-  var FETES_V = 2, KEY = 'ca-fetes', PREV = 'ca-fetes-voir', OFF = 'ca-fetes-off', SEEN = 'ca-fetes-vu', root = document.documentElement;
+  var FETES_V = 3, KEY = 'ca-fetes', PREV = 'ca-fetes-voir', OFF = 'ca-fetes-off', SEEN = 'ca-fetes-vu', root = document.documentElement;
   var _t = CA.t || function (x) { return x; };
   if (root.hasAttribute('data-fetes-off')) return;   // page à ambiance propre (revendeur) : jamais de thème des fêtes
   var q = /[?&]fetes=([01])/.exec(location.search), preview = q ? q[1] : null;

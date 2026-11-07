@@ -31,12 +31,12 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/site.css?v=26">
+<link rel="stylesheet" href="assets/site.css?v=27">
 <link rel="stylesheet" href="assets/accueil.css?v=23">
 <link rel="stylesheet" href="assets/impression.css?v=3">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
 <link rel="stylesheet" href="assets/demande.css?v=2">
-<link rel="stylesheet" href="assets/fetes.css?v=7">
+<link rel="stylesheet" href="assets/fetes.css?v=9">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
 <script>document.documentElement.classList.add('ip-ready')</script>
 <script src="assets/look.js?v=5"></script>
@@ -51,9 +51,15 @@
     <span class="brand-tx"><b>Création Audio</b><small>Impression 3D · Audio auto</small></span>
   </a>
   <nav class="home-nav" aria-label="Navigation principale">
-    <a href="boutique">Filaments</a>
-    <a href="spacers">Spacers</a>
-    <a href="boutique#/accessoires">Accessoires</a>
+    <div class="nav-dd">
+      <a class="nav-dd-t" href="boutique" aria-haspopup="true" aria-expanded="false">Boutique <svg class="nav-dd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
+      <div class="nav-dd-m">
+        <a href="boutique?promo=1">Promotions</a>
+        <a href="boutique">Filaments</a>
+        <a href="boutique/spacers">Spacers</a>
+        <a href="boutique#/accessoires">Accessoires</a>
+      </div>
+    </div>
     <a href="impression" aria-current="page">Impression 3D</a>
     <a href="entretien">Entretien</a>
     <a href="./#contact">Contact</a>
@@ -66,9 +72,6 @@
   </a>
   <a class="home-account" href="compte" aria-label="Mon compte" title="Mon compte">
     <span>Mon compte</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
-  </a>
-  <a class="home-cta" href="boutique">Magasiner
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
   </a>
   <button class="nav-burger" id="nav-burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="nav-drawer">
     <span></span><span></span><span></span>
@@ -260,7 +263,7 @@
       <p class="eyebrow">Déjà sur nos machines</p>
       <h2 class="ip-h2" id="ip-part-t">On imprime déjà nos propres pièces.</h2>
       <p class="ip-sub">Nos adaptateurs de haut-parleurs sortent du même atelier, à Québec.</p>
-      <a class="ip-more-link" href="spacers">Voir les spacers
+      <a class="ip-more-link" href="boutique/spacers">Voir les spacers
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
     <ul class="ip-parts rv" id="ip-parts" style="--d:1"></ul>
@@ -335,7 +338,7 @@
     <nav class="foot-col" aria-label="Boutique">
       <h4>Boutique</h4>
       <a href="boutique">Filaments</a>
-      <a href="spacers">Spacers &amp; adaptateurs</a>
+      <a href="boutique/spacers">Spacers &amp; adaptateurs</a>
       <a href="boutique#/accessoires">Accessoires</a>
       <a href="impression">Impression 3D sur mesure</a>
       <a href="entretien">Entretien d'imprimantes</a>
@@ -373,9 +376,13 @@
   </div>
   <nav class="drawer-links" aria-label="Menu mobile">
     <a href="./">Accueil</a>
-    <a href="boutique">Filaments</a>
-    <a href="spacers">Spacers</a>
-    <a href="boutique#/accessoires">Accessoires</a>
+    <a class="drawer-parent" href="boutique">Boutique</a>
+    <div class="drawer-sub">
+      <a href="boutique?promo=1">Promotions</a>
+      <a href="boutique">Filaments</a>
+      <a href="boutique/spacers">Spacers</a>
+      <a href="boutique#/accessoires">Accessoires</a>
+    </div>
     <a href="impression" class="is-active">Impression 3D</a>
     <a href="entretien">Entretien</a>
     <a href="./#contact">Contact</a>
@@ -396,12 +403,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="assets/supabase-config.js?v=1"></script>
 <script src="assets/supabase-client.js?v=1"></script>
-<script src="assets/nav.js?v=20"></script>
+<script src="assets/nav.js?v=22"></script>
 <script src="assets/promo.js?v=1"></script>
 <script src="assets/apercu-3d.js?v=1"></script>
 <script src="assets/dialog.js?v=5"></script>
-<script src="assets/panier-compte.js?v=4"></script>
+<script src="assets/panier-compte.js?v=5"></script>
 <script src="assets/demande.js?v=3"></script>
-<script src="assets/impression.js?v=6"></script>
+<script src="assets/impression.js?v=7"></script>
 </body>
 </html>

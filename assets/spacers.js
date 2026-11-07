@@ -2,9 +2,9 @@
    Création Audio V2 — page publique Spacers
    Lit products_public (type='spacer'). Catalogue (recherche véhicule +
    puces de taille) et fiche détaillée : voir spacer-catalog.js.
-   Adresses : spacers (catalogue) · spacer/<slug>.html (vraie page par
+   Adresses : boutique/spacers (catalogue) · boutique/spacers/<slug>.html (vraie page par
    spacer, générée par tools/build-spacer-pages.js : <body data-spacer>,
-   window.CA_SPACER_PAGES = slugs publiés) · repli spacers#/s/<slug>
+   window.CA_SPACER_PAGES = slugs publiés) · repli boutique/spacers#/s/<slug>
    pour un spacer dont la page n'est pas encore générée.
    Panier -> commande par Messenger / courriel (aucun paiement en ligne),
    plafonné au stock (le public ne commande pas sur demande).
@@ -23,15 +23,15 @@
   var esc = window.CASpacers.esc, money = window.CASpacers.money, _t = window.CA.t;
   function publicUrl(path) { if (!path || !sb) return ''; try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; } catch (e) { return ''; } }
 
-  // page générée d'un spacer (spacer/<slug>.html) ou catalogue (spacers)
+  // page générée d'un spacer (boutique/spacers/<slug>.html) ou catalogue (boutique/spacers)
   var PAGE = document.body.getAttribute('data-spacer') || '';
   var PAGES = {};
   (window.CA_SPACER_PAGES || []).forEach(function (s) { PAGES[s] = 1; });
-  var JUMP = 'ca_sp_jump';   // anti-boucle : page annoncée mais absente (404 -> spacers#/s/…)
+  var JUMP = 'ca_sp_jump';   // anti-boucle : page annoncée mais absente (404 -> boutique/spacers#/s/…)
   if (PAGE) { try { sessionStorage.removeItem(JUMP); } catch (e) {} }
   // lien d'une fiche : sa vraie page si publiée ; sinon la fiche du catalogue (même règle dans le générateur)
   function pageHref(s) {
-    if (PAGES[s]) return (PAGE ? '' : 'spacer/') + s;
+    if (PAGES[s]) return (PAGE ? '' : 'spacers/') + s;
     return PAGE ? '../spacers#/s/' + encodeURIComponent(s) : null;
   }
 
@@ -82,7 +82,7 @@
   // ancien lien #/s/<slug> (ou n° de la pièce d'origine) -> vraie page, une seule fois par slug
   function jumpToPage(s) {
     if (!PAGES[s]) return false;
-    var href = 'spacer/' + s;
+    var href = 'spacers/' + s;
     try {
       if (sessionStorage.getItem(JUMP) === s) { sessionStorage.removeItem(JUMP); return false; }
       sessionStorage.setItem(JUMP, s);
@@ -232,7 +232,7 @@
       editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login'),
       infoBtn = $('#cart-info');
   // Cueillette : choisie APRÈS l'envoi, sur l'écran « Ma cueillette » de Mon compte (compte.js)
-  function goPickup(kind, id) { location.href = (PAGE ? '../' : '') + 'compte#/cueillette/' + kind + '/' + encodeURIComponent(id); }
+  function goPickup(kind, id) { location.href = (window.CA.siteRoot || '') + 'compte#/cueillette/' + kind + '/' + encodeURIComponent(id); }
   function refreshAcctUi() {
     var on = canBackorder(), ed = on ? window.CA.custOrder.editing() : null;
     if (loginP) loginP.hidden = on;

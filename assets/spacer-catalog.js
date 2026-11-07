@@ -8,7 +8,7 @@
        puis sections Description / Compatibilité / Haut-parleurs (sans onglets), même taille
    Le panier et l'envoi restent dans la page hôte (callbacks) ; l'hôte
    route aussi l'URL : #/ = catalogue, #/s/<slug> = fiche — ou, en public,
-   les vraies pages spacer/<slug>.html (o.pageHref / o.rootHref) générées
+   les vraies pages boutique/spacers/<slug>.html (o.pageHref / o.rootHref) générées
    par tools/build-spacer-pages.js, qui réutilise staticCatalog/staticProduct.
    Données (products_public / products_dealer) : attrs.description (résumé),
    attrs.speaker_size, attrs.fitment [{make, model, from, to, pos}],
@@ -711,7 +711,7 @@
       productEl.innerHTML = productHtml();
       wireProduct();
     }
-    // fiche en HTML, sans câblage (pages spacer/<slug>.html du générateur) ; null si introuvable
+    // fiche en HTML, sans câblage (pages boutique/spacers/<slug>.html du générateur) ; null si introuvable
     function staticProduct(seg) {
       var p = findBySlug(seg);
       if (!p) return null;
