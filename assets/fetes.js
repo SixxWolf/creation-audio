@@ -6,11 +6,10 @@
      bouton ❄ dans l'en-tête et dans le menu mobile (choix mémorisé
      « ca-fetes-neige » ; coupée d'office si « réduire les animations ») ;
    - la guirlande lumineuse sous l'en-tête (.xm-garland) ;
-   - la tuque sur le loup du logo (.xm-hat) ;
-   - accueil : collines enneigées au bas du héros (.xm-hills) et sapin à côté
+   - accueil : sapin à côté
      de la bobine (.xm-tree) dont les boules prennent les couleurs du nuancier
      (#rail, accueil.js) — cliquer une boule choisit sa couleur ;
-   - sapins et cadeaux au-dessus du pied de page (.xm-village).
+   - sapins au-dessus du pied de page (.xm-village).
    Si la classe disparaît (thème éteint en ligne), fetes.css cache tout et la
    neige s'arrête.
    ========================================================= */
@@ -40,14 +39,14 @@
     try { v = localStorage.getItem(LS_SNOW); } catch (e) {}
     return v ? v === '1' : !reduce;
   }
-  // flocons pré-dessinés (blanc + liseré bleuté : visibles sur fond blanc comme sur la bobine noire)
+  // flocons pré-dessinés (bleu glacé : visibles sur le fond blanc du site)
   function makeSprite(r, crystal) {
     var s = Math.ceil((r + 3) * 2 * DPR), c = document.createElement('canvas'), g = c.getContext('2d');
     c.width = c.height = s;
     g.translate(s / 2, s / 2); g.scale(DPR, DPR);
     if (crystal) {
       for (var pass = 0; pass < 2; pass++) {
-        g.strokeStyle = pass ? '#fff' : 'rgba(110,138,170,.45)';
+        g.strokeStyle = pass ? '#DCE9F6' : 'rgba(96,132,172,.7)';
         g.lineWidth = pass ? 1.3 : 2.8; g.lineCap = 'round';
         for (var k = 0; k < 6; k++) {
           g.save(); g.rotate(k * Math.PI / 3);
@@ -58,8 +57,8 @@
       }
     } else {
       g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2);
-      g.fillStyle = 'rgba(255,255,255,.95)'; g.fill();
-      g.lineWidth = 1; g.strokeStyle = 'rgba(120,145,175,.42)'; g.stroke();
+      g.fillStyle = '#D5E4F4'; g.fill();
+      g.lineWidth = 1; g.strokeStyle = 'rgba(96,132,172,.65)'; g.stroke();
     }
     return { c: c, r: r + 3 };
   }
@@ -68,7 +67,7 @@
     W = window.innerWidth; H = window.innerHeight;
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     sprites = [makeSprite(1.6), makeSprite(2.3), makeSprite(3.1), makeSprite(5.5, true), makeSprite(7.5, true)];
-    var want = Math.max(18, Math.min(60, Math.round(W * H / 28000)));
+    var want = Math.max(12, Math.min(36, Math.round(W * H / 40000)));
     while (flakes.length < want) flakes.push(newFlake(true));
     flakes.length = want;
   }
@@ -183,36 +182,8 @@
   }
 
   /* =========================================================
-     TUQUE sur le loup (en-tête + menu mobile)
+     ACCUEIL — sapin du héros
      ========================================================= */
-  var HAT = '<svg class="xm-hat" viewBox="0 0 40 34" aria-hidden="true">' +
-    '<path fill="#C8102E" d="M8 27C10 17 16 8 25 4.2 29.5 2.4 33.4 4.6 34.4 9.4 35.5 15 36 21 36.4 27Z"/>' +
-    '<path fill="#A00D25" d="M8 27C10 17 16 8 25 4.2 21 9 18.4 17 18 27Z" opacity=".55"/>' +
-    '<path fill="#C8102E" d="M26 4.4C19.5 3.4 12 6.6 7.4 12.6 12.4 10 18.6 8.8 24.8 9.6Z"/>' +
-    '<circle cx="7.2" cy="12.8" r="4.2" fill="#fff" stroke="#D9E2EA" stroke-width=".8"/>' +
-    '<rect x="5.6" y="23.6" width="33" height="8.4" rx="4.2" fill="#fff" stroke="#D9E2EA" stroke-width=".8"/></svg>';
-  function hats() {
-    $$('.brand, .drawer-head').forEach(function (b) {
-      if ($('.xm-hat', b) || !$('.brand-mark', b)) return;
-      b.insertAdjacentHTML('afterbegin', HAT);
-    });
-  }
-
-  /* =========================================================
-     ACCUEIL — collines + sapin du héros
-     ========================================================= */
-  function hills() {
-    var hero = $('#hero');
-    if (!hero || $('.xm-hills', hero)) return;
-    var front = 'M0 112C240 82 420 94 640 110S1040 72 1240 98 1400 106 1440 94';
-    var h = el('div', 'xm-hills',
-      '<svg viewBox="0 0 1440 150" preserveAspectRatio="none"><path class="h-back" d="M0 72C180 32 360 42 540 68S900 32 1080 54 1320 72 1440 46V150H0Z"/></svg>' +
-      '<div class="h-trees"></div>' +
-      '<svg viewBox="0 0 1440 150" preserveAspectRatio="none"><path class="h-front" d="' + front + 'V150H0Z"/><path class="h-sheen" d="' + front + '"/></svg>');
-    h.setAttribute('aria-hidden', 'true');
-    hero.appendChild(h);
-  }
-
   // positions des boules (repère du sapin 200 × 290) ; « big » = boules plus grosses
   var ORN = [[88, 70], [114, 82, 1], [76, 118], [103, 128], [128, 112], [64, 166], [93, 174, 1], [122, 160], [146, 176],
              [54, 216], [84, 224], [114, 214], [141, 228, 1], [164, 210]];
@@ -232,13 +203,6 @@
       [[80, 77], [100, 84], [120, 76], [66, 130], [86, 139], [110, 138], [132, 127], [50, 183], [74, 191], [100, 194], [126, 189], [150, 177]]
         .map(function (p, i) { return '<circle class="light" cx="' + p[0] + '" cy="' + p[1] + '" r="2.2" fill="' + (i % 2 ? '#FFF1C9' : '#FFD36B') +
           '" style="animation-delay:' + (-(i * 0.37) % 1.9).toFixed(2) + 's"/>'; }).join('') +
-    '</g>' +
-    '<g class="gifts">' +
-      '<rect x="26" y="240" width="48" height="38" rx="3" fill="#C8102E"/><rect x="45" y="240" width="9" height="38" fill="#E8C05C"/><rect x="24" y="234" width="52" height="10" rx="3" fill="#B00E28"/><rect x="45" y="234" width="9" height="10" fill="#D9B04A"/>' +
-      '<path fill="none" stroke="#E8C05C" stroke-width="3.2" d="M49.5 234C43 222 33 225 37 231 39 234 49.5 234 49.5 234 56 222 66 225 62 231 60 234 49.5 234 49.5 234Z"/>' +
-      '<rect x="128" y="248" width="44" height="31" rx="3" fill="#1F5E3B"/><rect x="145" y="248" width="9" height="31" fill="#C8102E"/><rect x="126" y="243" width="48" height="9" rx="3" fill="#174A2F"/><rect x="145" y="243" width="9" height="9" fill="#A00D25"/>' +
-      '<rect x="80" y="256" width="36" height="24" rx="3" fill="#D4A24C"/><rect x="94" y="256" width="8" height="24" fill="#C8102E"/><rect x="78" y="252" width="40" height="8" rx="3" fill="#C29240"/>' +
-      '<path fill="#fff" d="M24 236Q50 229 76 236V238H24ZM126 245Q150 239 174 245V247H126ZM78 254Q98 249 118 254V256H78Z"/>' +
     '</g>' +
     '<path class="star" fill="url(#xm-star)" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" d="M100 1 104.7 12.5 117 13.4 107.6 21.3 110.6 33.4 100 26.8 89.4 33.4 92.4 21.3 83 13.4 95.3 12.5Z"/>' +
     '</svg>';
@@ -304,7 +268,7 @@
   }
 
   /* =========================================================
-     PIED DE PAGE — village
+     PIED DE PAGE — petits sapins
      ========================================================= */
   function village() {
     var foot = $('.site-foot');
@@ -322,7 +286,7 @@
     if (!on()) return;
     if (!built) {
       built = true;
-      hats(); garland(); hills(); tree(); village(); snowButtons();
+      garland(); tree(); village(); snowButtons();
       var rg = null, lastW = window.innerWidth;
       window.addEventListener('resize', function () {
         if (window.innerWidth === lastW) return;           // mobile : la barre d'adresse qui bouge ne compte pas
