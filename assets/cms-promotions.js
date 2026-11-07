@@ -397,7 +397,7 @@
         '<input type="number" class="tier-min" min="1" step="1" placeholder="4" value="' + (t.min != null ? esc(t.min) : '') + '" data-f="' + f + '" data-ti="' + i + '" data-tk="min">' +
         '<span class="t">→</span>' +
         '<input type="number" class="tier-price money" min="0" step="0.01" placeholder="18.00" value="' + (t.price != null ? esc(t.price) : '') + '" data-f="' + f + '" data-ti="' + i + '" data-tk="price">' +
-        '<span class="t">$ ch.</span><button type="button" class="tier-del" aria-label="Retirer ce palier" data-tdel="' + f + ':' + i + '">✕</button></div>';
+        '<span class="t">$ ch.</span><span class="pm-m" data-tm="' + f + ':' + i + '"></span><button type="button" class="tier-del" aria-label="Retirer ce palier" data-tdel="' + f + ':' + i + '">✕</button></div>';
     }).join('');
   }
   function priceField(label, f, val, reg) {
@@ -472,6 +472,11 @@
     Object.keys(map).forEach(function (f) {
       var span = $('[data-m="' + f + '"]', card); if (!span) return;
       span.innerHTML = marginHtml(num(s[f]), groupCost(g, map[f][1]), map[f][0]);
+    });
+    var tmap = { tiers: [rg.r1, 'spool'], tiers2: [rg.r2, 'refill'], dtiers: [rg.d, 'spool'] };
+    $$('[data-tm]', card).forEach(function (span) {
+      var p = span.getAttribute('data-tm').split(':'), t = tmap[p[0]] && (s[p[0]] || [])[+p[1]];
+      span.innerHTML = t ? marginHtml(num(t.price), groupCost(g, tmap[p[0]][1]), tmap[p[0]][0]) : '';
     });
   }
   function updateAllMargins() { $$('.pm-card', pricesEl).forEach(updateMargins); }
