@@ -64,6 +64,7 @@
   /* ---------- état ---------- */
   var loaded = false;
   var cat = 'filament';          // gabarit courant (pilote la colonne gauche)
+  var maintRate = 60;            // taux horaire de l'onglet Entretien (gabarit « maintenance »)
   var clientType = 'client';     // 'client' | 'dealer' | 'internal' (usage interne : prix 0 $, n° INT-)
   var INTERNAL_NAME = 'Usage interne';
   var taxEnabled = false;
@@ -344,6 +345,18 @@
     var shown = !quiet || which === cat;
     if (catalogLoaded[which]) { if (shown) buildPicker(); return Promise.resolve(); }
     if (shown) elCatalog.innerHTML = '<p class="muted">Chargement…</p>';
+    if (which === 'maintenance') {   // catalogue d'entretien (cms-entretien.js) : imprimantes + taux horaire
+      return Promise.all([
+        sb.from('maintenance_printers').select('*').order('sort_order', { ascending: true }).order('name', { ascending: true }),
+        sb.from('maintenance_settings').select('hourly_rate').eq('id', 1).maybeSingle()
+      ]).then(function (rs) {
+        if (rs[0].error) { if (shown) elCatalog.innerHTML = '<p class="empty">Impossible de charger le catalogue.</p>'; return; }
+        catalog.maintenance = rs[0].data || [];
+        maintRate = rs[1] && rs[1].data && +rs[1].data.hourly_rate > 0 ? +rs[1].data.hourly_rate : 60;
+        catalogLoaded.maintenance = true;
+        if (which === cat) buildPicker();
+      }, function () { if (shown) elCatalog.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
+    }
     return sb.from('products').select('*').eq('type', which)
       .order('sort_order', { ascending: true }).order('name', { ascending: true })
       .then(function (res) {
@@ -568,8 +581,26 @@
   /* ---------- catalogue cliquable ---------- */
   function buildPicker() {
     var items = catalog[cat] || [];
-    var catLabel = { filament: 'filament', spacer: 'spacer', accessory: 'accessoire' }[cat] || cat;
+    var catLabel = { filament: 'filament', spacer: 'spacer', accessory: 'accessoire', maintenance: 'modèle d\'entretien' }[cat] || cat;
     if (!items.length) { elCatalog.innerHTML = '<p class="empty">Aucun ' + catLabel + ' dans le catalogue.</p>'; return; }
+
+    if (cat === 'maintenance') {
+      elCatalog.innerHTML = '<div class="pk-grid pk-grid-cards">' + items.map(function (p) {
+        var url = p.photo && p.photo.charAt(0) === '/' ? p.photo : publicUrl(p.photo);
+        return '<button type="button" class="pk-cell pk-card" data-id="' + esc(p.id) + '" data-search="' +
+          esc(((p.brand || '') + ' ' + (p.name || '')).toLowerCase()) + '">' +
+          (url ? '<img class="pk-img" src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="pk-img pk-noimg"></span>') +
+          '<span class="pk-name">' + esc(p.name) + '</span>' +
+          '<span class="pk-price">' + (p.price_month != null ? money(p.price_month) : 'Sur évaluation') + '</span>' +
+          '<span class="pk-badge"></span></button>';
+      }).join('') + '</div>';
+      $$('.pk-cell', elCatalog).forEach(function (b) {
+        b.addEventListener('click', function () { addProduct(b.getAttribute('data-id')); });
+      });
+      applyFilter(elSearch.value);
+      refreshPickerBadges();
+      return;
+    }
 
     if (cat === 'filament') {
       refreshFilterOptions();
@@ -645,7 +676,7 @@
   }
   function refreshPickerBadges() {
     var counts = {};
-    lines.forEach(function (l) { if (l.productId) counts[l.productId] = (counts[l.productId] || 0) + l.qty; });
+    lines.forEach(function (l) { var k = l.productId || l.maintId; if (k) counts[k] = (counts[k] || 0) + l.qty; });
     $$('.pk-cell', elCatalog).forEach(function (b) {
       var n = counts[b.getAttribute('data-id')] || 0, badge = $('.pk-badge', b);
       if (n > 0) { b.classList.add('sel'); if (badge) badge.textContent = n; }
@@ -679,6 +710,19 @@
     c = c || cat;
     var p = c === cat ? prodById(id) : prodInCatalog(c, id);
     if (!p) return 0;
+    if (c === 'maintenance') {   // une ligne par modèle ; sans prix = 1re visite au taux horaire (à ajuster)
+      var mn = [p.brand, p.name].filter(Boolean).join(' '), priced = p.price_month != null;
+      var mp = priced ? +p.price_month : Math.round(maintRate * (p.minutes ? p.minutes / 60 : 1) * 100) / 100;
+      var mx = lines.filter(function (l) { return l.maintId === String(p.id) && !l.manual; })[0];
+      if (mx) { mx.qty += 1; }
+      else {
+        lines.push({ id: uid(), productId: null, maintId: String(p.id), ptype: 'divers', kind: 'free', label: (priced ? 'Entretien mensuel — ' : 'Entretien — ') + mn,
+          meta: priced ? 'Par machine' : 'Première visite · taux horaire ' + money(maintRate) + ' (temps réel à ajuster)',
+          hex: null, qty: 1, base: mp, tiers: [], cost: 0, tierKey: null, price: mp, manual: false, sp: null });
+      }
+      afterChange();
+      return mx ? mx.qty : 1;
+    }
     var kind, label, meta, base, cost, tiers, hex = null, ptype = c, sp = null, tierKey = null;
     if (c === 'filament') {
       kind = pickerKind;
@@ -758,7 +802,7 @@
   }
   function addFreeLine(preset) {
     preset = preset || {};
-    lines.push({ id: uid(), productId: null, ptype: cat, kind: 'free',
+    lines.push({ id: uid(), productId: null, ptype: cat === 'maintenance' ? 'divers' : cat, kind: 'free',
       label: preset.label || '', meta: preset.meta || '', hex: null,
       qty: preset.qty != null ? preset.qty : 1, base: 0, tiers: [], cost: preset.cost != null ? preset.cost : 0,
       price: preset.price != null ? preset.price : 0, manual: true });
