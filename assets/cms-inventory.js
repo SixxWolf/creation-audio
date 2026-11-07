@@ -1288,6 +1288,15 @@
   }
 
   // la « liste à commander » : agrège tous les manques, groupés par marque
+  var roFold = {}; // marques repliées dans la liste à commander
+  function brandCountText(list) {
+    var s = 0, r = 0;
+    list.forEach(function (it) { if (it.kind === 'refill') r += it.qty; else s += it.qty; });
+    var out = [];
+    if (s) out.push(s + ' bobine' + (s > 1 ? 's' : ''));
+    if (r) out.push(r + ' recharge' + (r > 1 ? 's' : ''));
+    return out.join(' · ');
+  }
   function renderReorderSummary() {
     if (!reorderSummary) return;
     var items = [];
@@ -1359,9 +1368,13 @@
           '<span class="ro-nm" title="' + nm + '">' + nm + '</span><span class="ro-kd">' + kindHtml + '</span><span class="ro-q">×' + it.qty + '</span>' +
           '<span class="ro-cd">' + (it.f.code ? '<span class="ro-code">' + esc(it.f.code) + '</span>' : '') + '</span>' + fors + '</li>';
       }).join('');
-      return '<div class="reorder-brandgroup"><h3 style="font-size:.9rem;margin:12px 0 4px">' + esc(brand) +
-          (multiBrand && estByBrand[brand] ? '<span class="ro-brand-est">≈ ' + money(estByBrand[brand]) + '</span>' : '') + '</h3>' +
-        '<ul class="reorder-list ro-grid">' + lis + '</ul></div>';
+      var folded = !!roFold[brand];
+      return '<div class="reorder-brandgroup' + (folded ? ' is-folded' : '') + '" data-brand="' + esc(brand) + '"><h3 style="font-size:.9rem;margin:12px 0 4px">' +
+          '<button type="button" class="ro-fold" aria-expanded="' + (folded ? 'false' : 'true') + '">' +
+          '<span class="ro-chev" aria-hidden="true"></span>' + esc(brand) +
+          '<span class="ro-brand-est">' + brandCountText(byBrand[brand]) + '</span>' +
+          (multiBrand && estByBrand[brand] ? '<span class="ro-brand-est">≈ ' + money(estByBrand[brand]) + '</span>' : '') + '</button></h3>' +
+        '<ul class="reorder-list ro-grid"' + (folded ? ' hidden' : '') + '>' + lis + '</ul></div>';
     }).join('');
 
     reorderSummary.innerHTML = '<div class="reorder-card has-miss">' +
@@ -1373,6 +1386,15 @@
         '<button class="btn btn-ghost btn-sm" id="reorder-copy" type="button" data-ic="copy">Copier la liste</button>' +
       '</div>' + noteHtml + listHtml + '</div>';
 
+    $$('.ro-fold', reorderSummary).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var g = b.closest('.reorder-brandgroup'), br = g.getAttribute('data-brand');
+        roFold[br] = !roFold[br];
+        g.classList.toggle('is-folded', !!roFold[br]);
+        b.setAttribute('aria-expanded', roFold[br] ? 'false' : 'true');
+        g.querySelector('.reorder-list').hidden = !!roFold[br];
+      });
+    });
     $$('.ro-for', reorderSummary).forEach(function (b) {
       b.addEventListener('click', function () {
         if (window.CA.reserved && window.CA.reserved.open) window.CA.reserved.open(b.getAttribute('data-type'), b.getAttribute('data-id'));
