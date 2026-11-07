@@ -28,11 +28,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/tokens.css?v=5">
-<link rel="stylesheet" href="../assets/site.css?v=20">
+<link rel="stylesheet" href="../assets/site.css?v=26">
 <link rel="stylesheet" href="../assets/boutique.css?v=53">
 <link rel="stylesheet" href="../assets/dialog.css?v=2">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
-<link rel="stylesheet" href="../assets/fetes.css?v=3">
+<link rel="stylesheet" href="../assets/fetes.css?v=7">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
 <!-- spacers:head — généré par tools/build-spacer-pages.js (ne pas éditer à la main) -->
 <script>window.CA_SPACER_PAGES=["ca-adp-hykia-001","ca-adp-525-001","ca-adp-4-001","ca-adp-8-001","ca-adp-ford-001","ca-adp-ford-002","ca-adp-toyota-001"];</script>
@@ -65,10 +65,10 @@
   <a class="home-lang" href="../en/spacer/ca-adp-8-001" data-lang-switch="en" hreflang="en" lang="en" title="English version">EN</a>
   <a class="home-dealer" href="../dealer">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-    Dealer
+    Programme revendeur
   </a>
   <a class="home-account" href="../compte" aria-label="Mon compte" title="Mon compte">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
+    <span>Mon compte</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
   </a>
   <button class="cart-btn" id="cart-btn" type="button" aria-label="Ouvrir le panier">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" width="20" height="20">
@@ -151,7 +151,7 @@
       <a href="../#etapes">Comment commander</a>
       <a href="../#contact">Nous joindre</a>
       <a href="../compte">Mon compte</a>
-      <a href="../dealer">Espace dealer</a>
+      <a href="../dealer">Programme revendeur</a>
       <a href="../revendeur">Devenir revendeur</a>
     </nav>
     <nav class="foot-col" aria-label="Légal">
@@ -190,7 +190,7 @@
   <div class="drawer-cta">
     <a class="primary" href="../boutique">Magasiner les filaments</a>
     <a class="secondary" href="../compte">Mon compte</a>
-    <a class="secondary" href="../dealer">Espace dealer</a>
+    <a class="secondary" href="../dealer">Programme revendeur</a>
   </div>
   <div class="drawer-foot">
     <a href="/compte#/messages" data-msg="">Messagerie</a> ·

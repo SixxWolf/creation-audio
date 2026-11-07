@@ -141,7 +141,8 @@
 .home-dealer svg { width:15px; height:15px; flex:none; }
 /* Mon compte : bouton icône, à toutes les largeurs ; point ember = client connecté (nav.js) */
 .home-account {
-  position:relative; flex:none; width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center;
+  position:relative; flex:none; min-width:40px; height:40px; display:inline-flex; align-items:center; justify-content:center;
+  gap:7px; padding:0 12px; white-space:nowrap; text-decoration:none; font-weight:600; font-size:.88rem;
   color:var(--ink-2); background:var(--paper); border:1px solid var(--line); border-radius:12px;
   transition:color .15s, border-color .15s, background .15s;
 }
@@ -233,24 +234,29 @@
   .home-dealer { width:40px; padding:0; gap:0; justify-content:center; font-size:0; }   /* icône seule (le mot reste lu) */
 }
 /* fêtes : le bouton ❄ prend 66 px de plus, « Magasiner » part un peu plus tôt */
-@media (max-width:1580px) {
+@media (max-width:1700px) {
   html.fetes .home-top .home-cta { display:none; }
 }
-@media (max-width:1040px) {   /* burger : 6 liens de menu */
+/* « Programme revendeur » + « Mon compte » en toutes lettres : « Magasiner » part et le cadenas passe en icône seule plus tôt */
+@media (max-width:1650px) {
+  .home-top .home-cta { display:none; }
+  .home-dealer { width:40px; padding:0; gap:0; justify-content:center; font-size:0; }
+}
+@media (max-width:1140px) {   /* burger : 6 liens de menu */
   .home-nav, .home-dealer, .home-lang { display:none; }
   .dealer-page .home-lang { display:inline-flex; }   /* portail dealer : pas de tiroir */
   .nav-burger { display:flex; }
 }
 /* fêtes : le bouton ❄ ajoute 54 px → tiroir un peu plus tôt ; pages avec panier (boutique, spacers) : le bouton Panier ajoute ~90 px */
-@media (max-width:1070px) {
+@media (max-width:1170px) {
   html.fetes .home-nav, html.fetes .home-dealer, html.fetes body:not(.dealer-page) .home-lang { display:none; }
   html.fetes .nav-burger { display:flex; }
 }
-@media (max-width:1140px) {
+@media (max-width:1240px) {
   .home-top:has(.cart-btn) .home-nav, .home-top:has(.cart-btn) .home-dealer, .home-top:has(.cart-btn) .home-lang { display:none; }
   .home-top:has(.cart-btn) .nav-burger { display:flex; }
 }
-@media (max-width:1190px) {
+@media (max-width:1290px) {
   html.fetes .home-top:has(.cart-btn) .home-nav, html.fetes .home-top:has(.cart-btn) .home-dealer, html.fetes .home-top:has(.cart-btn) .home-lang { display:none; }
   html.fetes .home-top:has(.cart-btn) .nav-burger { display:flex; }
 }
@@ -260,6 +266,23 @@
 }
 @media (max-width:340px) {
   .home-account { display:none; }
+}
+@media (max-width:430px) {   /* téléphone : « Mon compte » garde son mot, un peu plus compact */
+  .home-account { padding:0 9px; gap:5px; font-size:.82rem; }
+  .home-top { gap:8px; }
+}
+@media (max-width:400px) {   /* téléphone étroit : logo un peu plus compact pour garder « Mon compte » */
+  .home-top .brand-tx b { font-size:.84rem; letter-spacing:0; }
+  .home-top .brand-mark { width:36px; height:36px; }
+  .home-top .home-account { padding:0 8px; }
+}
+@media (max-width:370px) {   /* très petit téléphone : retour à l'icône seule */
+  .home-account { width:40px; padding:0; gap:0; }
+  .home-account span { display:none; }
+}
+@media (max-width:1800px) {   /* pages avec panier : le bouton Panier prend de la place */
+  .home-top:has(.cart-btn) .home-dealer { width:40px; padding:0; gap:0; justify-content:center; font-size:0; }
+  .home-top:has(.cart-btn) .home-cta { display:none; }
 }
 @media (max-width:430px) {
   .brand-tx small { display:none; }

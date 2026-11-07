@@ -25,9 +25,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/tokens.css?v=5">
-<link rel="stylesheet" href="/assets/site.css?v=20">
+<link rel="stylesheet" href="/assets/site.css?v=26">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
-<link rel="stylesheet" href="/assets/fetes.css?v=3">
+<link rel="stylesheet" href="/assets/fetes.css?v=7">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
 <script src="/assets/look.js?v=5"></script>
 <style>
@@ -69,10 +69,10 @@
   <a href="/" class="home-lang" hreflang="fr" lang="fr" title="Version française" data-lang-switch="fr">FR</a>
   <a class="home-dealer" href="/en/dealer">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-    Dealer
+    Dealer program
   </a>
   <a class="home-account" href="/en/compte" aria-label="My account" title="My account">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
+    <span>My account</span> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.6 7.2-5.6s6.3 2 7.2 5.6"/></svg>
   </a>
   <a class="home-cta" href="/en/boutique">See filament</a>
   <button class="nav-burger" id="nav-burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
@@ -117,7 +117,7 @@
   <div class="drawer-cta">
     <a class="primary" href="/en/boutique">Shop filament</a>
     <a class="secondary" href="/en/compte">My account</a>
-    <a class="secondary" href="/en/dealer">Dealer portal</a>
+    <a class="secondary" href="/en/dealer">Dealer program</a>
   </div>
   <div class="drawer-foot">
     <a href="/en/compte#/messages" data-msg="">Messages</a> ·
