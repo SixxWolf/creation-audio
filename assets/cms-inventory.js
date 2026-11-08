@@ -1721,4 +1721,20 @@
 
   // si les matériaux changent ailleurs (formats offerts, ORDRE réarrangé), rafraîchir
   if (window.CA.onMaterialsChange) window.CA.onMaterialsChange(function () { if (loaded) { renderReorder(); renderCodes(); } });
+
+  // colonne de gauche de « À commander » (grand écran) : collée par le haut, ou par le bas si elle dépasse l'écran
+  (function () {
+    var L = $('.ro-left');
+    if (!L) return;
+    function fit() {
+      if (!L.offsetParent) return;
+      var tb = document.querySelector('.topbar'), base = (tb ? tb.offsetHeight : 60) + 16;
+      L.style.top = Math.min(base, window.innerHeight - L.offsetHeight - 16) + 'px';
+    }
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(L);
+    window.addEventListener('resize', fit);
+    // filet de sécurité : recalcul au défilement (onglet affiché après coup, contenu qui change)
+    window.addEventListener('scroll', fit, { passive: true });
+    fit();
+  })();
 })();

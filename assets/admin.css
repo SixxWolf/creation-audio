@@ -1183,8 +1183,9 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 
   /* À commander : En route + Liste à commander collés à gauche | éditeur « J'ai commandé » + cibles */
   #inv-sub-commander:not([hidden]) { display:grid; grid-template-columns:400px minmax(0, 1fr); gap:20px; align-items:start; }
-  #inv-sub-commander > .ro-left { display:flex; flex-direction:column; gap:16px; position:sticky; top:calc(var(--top-h, 60px) + 16px);
-    max-height:calc(100vh - var(--top-h, 60px) - 32px); overflow-y:auto; scrollbar-width:thin; }
+  /* pas de défilement interne : colonne collée par le haut, ou par le bas quand elle est plus haute que l'écran
+     (top ajusté par cms-inventory.js) -> tout se lit avec le défilement de la page */
+  #inv-sub-commander > .ro-left { display:flex; flex-direction:column; gap:16px; position:sticky; top:calc(var(--top-h, 60px) + 16px); }
   #inv-sub-commander > .ro-main { display:block; min-width:0; }
   .ro-left > * { flex:none; margin:0; }
   .ro-left .reorder-list { columns:1; }
