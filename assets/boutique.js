@@ -690,13 +690,13 @@
     var st = stockOf(curColor, type), out = st <= 0, on = curType === type;
     return '<button type="button" class="fmt-opt' + (on ? ' is-active' : '') + (out ? ' is-out' : '') + '" data-type="' + type + '" aria-pressed="' + on + '">' +
       '<span class="fmt-name">' + label + '</span>' +
-      '<span class="fmt-meta">' + money(baseOf(curColor, type)) + ' · ' + (out ? _t('rupture') : st + _t(' en stock')) + '</span>' +
+      '<span class="fmt-meta">' + money(baseOf(curColor, type)) + (out ? ' · ' + _t('rupture') : '') + '</span>' +
     '</button>';
   }
   function swStockText(p) {
     if (!offered(p, curType)) return _t('offert ') + (curType === 'refill' ? _t('avec bobine seulement') : _t('en recharge seulement'));
     var st = stockOf(p, curType);
-    return st > 0 ? st + _t(' en stock') : _t('rupture en ') + fmtShort(curType);
+    return st > 0 ? _t('{n} disponibles', { n: st }) : _t('rupture en ') + fmtShort(curType);
   }
   // palier selon ce qui sera dans le panier après l'ajout (même marque, couleurs, matériaux et formats mélangés)
   function unitNow() { return tierPrice(baseOf(curColor, curType), tiersOf(curColor, curType), curQty + groupQty(curColor, curType)); }
@@ -710,10 +710,21 @@
     var scope = curColor.brand ? _t('Bobines et recharges ') + curColor.brand + _t(' comptent ensemble') : _t('Couleurs mélangées');
     return '<div class="pdp-tiers">' +
       _t('<p class="pdp-tiers-head">Prix selon la quantité <span>') + esc(scope) + '</span></p>' +
-      '<div class="pdp-tiergrid">' + rows.map(function (t, i) {
-        return '<div class="pdp-tier' + (i === on ? ' is-on' : '') + '"' + (i === on ? ' aria-current="true"' : '') + '>' +
-          '<span class="pt-q">' + (i === 0 ? '1' : t.min + '+') + '</span><span class="pt-p">' + money(t.price) + '</span></div>';
-      }).join('') + '</div></div>';
+      tierRowsHtml(rows, on) + '</div>';
+  }
+  // « Acheter 2 ou + · 19 $ chacune » : une phrase, pour qu'une quantité ne se lise jamais comme un stock
+  function tierRowsHtml(rows, on) {
+    return '<div class="pdp-tierlist">' + rows.map(function (t, i) {
+      return '<div class="pdp-tier' + (i === on ? ' is-on' : '') + '"' + (i === on ? ' aria-current="true"' : '') + '>' +
+        '<span class="pt-q">' + (i === 0 ? _t('Acheter {n}', { n: 1 }) : _t('Acheter {n} ou +', { n: t.min })) + '</span>' +
+        '<span class="pt-p">' + _t('{p} chacune', { p: '<b>' + money(t.price) + '</b>' }) + '</span></div>';
+    }).join('') + '</div>';
+  }
+  // stock : une seule ligne, séparée du prix (vert / orange quand il en reste peu / rouge)
+  function stockLineHtml(stock, out) {
+    var low = !out && stock <= 3;
+    return '<span class="stk ' + (out ? 'bad' : low ? 'low' : 'ok') + '">' +
+      (out ? _t('Rupture') : low ? _t('Plus que {n}', { n: stock }) : _t('{n} disponibles', { n: stock })) + '</span>';
   }
   function buySumText() {
     var bo = boNote(stockOf(curColor, curType), curQty);
@@ -783,8 +794,8 @@
           '<div class="pdp-priceline">' +
             (promoOn(p, curType) ? '<s class="pdp-was">' + money(regOf(p, curType)) + '</s>' : '') +
             '<span class="pdp-price">' + money(price) + '<small>/ ' + fmtShort(curType) + '</small></span>' +
-            '<span class="pill ' + (out ? 'bad' : 'ok') + '">' + (out ? _t('Rupture') : stock + _t(' en stock')) + '</span>' +
           '</div>' +
+          '<p class="pdp-stock">' + stockLineHtml(stock, out) + '</p>' +
           _t('<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>') +
           '<div class="js-tiers">' + tierGridHtml() + '</div>' +
 
@@ -797,7 +808,7 @@
 
           '<div class="pdp-sec sw-sec">' +
             '<div class="pdp-label sw-head">' +
-              _t('<span class="sw-head-tx"><span>Couleur · <b class="js-sw-name">') + esc(p.name) + '</b></span><span class="lbl-sub js-sw-sub">' + esc(swStockText(p)) + '</span></span>' +
+              _t('<span class="sw-head-tx"><span>Couleur · <b class="js-sw-name">') + esc(p.name) + '</b></span></span>' +
               '<label class="switch"><input type="checkbox" class="js-only-stock"' + (onlyStock ? ' checked' : '') + _t('><span class="switch-ui" aria-hidden="true"></span>En stock seulement</label>') +
             '</div>' +
             _t('<div class="sws" role="group" aria-label="Couleurs ') + esc(m.name) + '">' + swatches + '</div>' +
@@ -983,7 +994,7 @@
     // pastilles : chaque couleur = sa propre entrée d'historique ; flèches du clavier
     // pour se déplacer (un seul arrêt de tabulation) ; survol = aperçu du nom.
     var sws = $$('.sw', configEl), nameEl = $('.js-sw-name', configEl), subEl = $('.js-sw-sub', configEl);
-    function preview(p) { nameEl.textContent = p.name; subEl.textContent = swStockText(p); }
+    function preview(p) { nameEl.textContent = p.name; if (subEl) subEl.textContent = swStockText(p); }
     sws.forEach(function (b, i) {
       var p = byId[b.getAttribute('data-id')];
       b.addEventListener('click', function () {
@@ -1155,10 +1166,7 @@
     rows.forEach(function (t, i) { if (n >= t.min) on = i; });
     return '<div class="pdp-tiers">' +
       _t('<p class="pdp-tiers-head">Prix selon la quantité') + (a.cat ? ' <span>' + esc(a.cat) + _t(' : modèles mélangés</span>') : '') + '</p>' +
-      '<div class="pdp-tiergrid">' + rows.map(function (t, i) {
-        return '<div class="pdp-tier' + (i === on ? ' is-on' : '') + '"' + (i === on ? ' aria-current="true"' : '') + '>' +
-          '<span class="pt-q">' + (i === 0 ? '1' : t.min + '+') + '</span><span class="pt-p">' + money(t.price) + '</span></div>';
-      }).join('') + '</div></div>';
+      tierRowsHtml(rows, on) + '</div>';
   }
   function accBuySum() {
     var u = accUnitNow(), bo = boNote(curAcc.qty, accQty, isEmptySpool(curAcc));

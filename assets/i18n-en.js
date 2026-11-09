@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 31;
+window.CA_EN_V = 32;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -20,6 +20,13 @@ window.CA_EN = (function (pairs) {
   [`Nouvelle suivante`, `Next news`],
   [`Fermer les nouvelles`, `Close news`],
   [`Code`, `Code`],
+
+  // ---- boutique.js : prix par quantité / stock
+  [`Acheter {n}`, `Buy {n}`],
+  [`Acheter {n} ou +`, `Buy {n} or more`],
+  [`{p} chacune`, `{p} each`],
+  [`Plus que {n}`, `Only {n} left`],
+  [`{n} disponibles`, `{n} available`],
 
   // ---- accueil.js
   // palette de repli (FALLBACK) : _t(c[0])

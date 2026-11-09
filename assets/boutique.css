@@ -208,6 +208,20 @@
 .pt-p { font-size:1.1rem; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .pdp-tier.is-on { border-color:var(--ember-ink); background:color-mix(in srgb, var(--ember-ink) 9%, var(--paper)); }
 .pdp-tier.is-on .pt-q { color:var(--ember-ink); }
+/* Prix selon la quantité en lignes : « Acheter 2 ou + · 19 $ chacune » */
+.pdp-tierlist { display:grid; gap:6px; }
+.pdp-tierlist .pdp-tier { flex-direction:row; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; }
+.pdp-tierlist .pt-q { font-size:.92rem; color:var(--ink); }
+.pdp-tierlist .pt-p { font-size:.9rem; font-weight:500; color:var(--muted); }
+.pdp-tierlist .pt-p b { font-size:1.1rem; font-weight:800; color:var(--ink); }
+.pdp-tierlist .is-on .pt-p { color:var(--ember-ink); }
+/* Stock : ligne à part, sous le prix */
+.pdp-stock { margin:10px 0 0; }
+.stk { display:inline-flex; align-items:center; gap:7px; font-size:.95rem; font-weight:700; }
+.stk::before { content:''; width:9px; height:9px; border-radius:50%; background:currentColor; }
+.stk.ok { color:var(--good-ink); }
+.stk.low { color:var(--warn-ink); }
+.stk.bad { color:var(--bad-ink); }
 
 .pdp-sec { margin-top:24px; }
 .pdp-label { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 14px; margin:0 0 10px;
