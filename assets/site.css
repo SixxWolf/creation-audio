@@ -102,11 +102,10 @@
   position:sticky; top:0; z-index:30; height:var(--top-h);
   display:flex; align-items:center; gap:clamp(12px, 2vw, 26px);
   padding:0 max(var(--gutter), calc((100% - var(--maxw)) / 2 + var(--gutter)));
-  background:color-mix(in srgb, var(--paper) 90%, transparent);
-  -webkit-backdrop-filter:saturate(1.5) blur(12px); backdrop-filter:saturate(1.5) blur(12px);
-  border-bottom:1px solid var(--line); transition:box-shadow .2s, background .2s;
+  background:var(--paper);                 /* fond plein : l'en-tête a une vraie base */
+  border-bottom:1px solid var(--line-2); transition:box-shadow .2s, background .2s;
 }
-.home-top.is-scrolled { background:color-mix(in srgb, var(--paper) 96%, transparent); box-shadow:0 10px 30px -18px rgba(20,22,26,.28); }
+.home-top.is-scrolled { box-shadow:0 10px 30px -18px rgba(20,22,26,.28); }
 
 /* Logo : loup + mot-symbole (échos du logo officiel) */
 .brand { display:inline-flex; align-items:center; gap:10px; flex:none; text-decoration:none; color:var(--ink); }

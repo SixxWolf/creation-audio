@@ -377,7 +377,9 @@
       if (now < g.min) { g.min = now; g.reg = reg; }
     });
     var list = order.map(function (k) { return groups[k]; }).sort(function (a, b) { return b.pc - a.pc; }).slice(0, 8);
-    if (!list.length) { sec.hidden = true; return; }
+    if (!list.length) { sec.hidden = true; stripe(); return; }
+    var solo = list.length === 1;
+    grid.classList.toggle('is-solo', solo);
     grid.innerHTML = list.map(function (g) {
       var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
       var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
@@ -389,10 +391,24 @@
         '<span class="pop-media">' + media + '</span><span class="pop-body">' +
         '<span class="pop-name">' + title + '</span>' +
         '<span class="pop-meta"><span>' + sub + (end ? ' · ' + esc(end) : '') + '</span></span>' +
-        '<span class="pop-foot"><span>' + (isF ? _t('dès') + ' ' : '') + '<b>' + money(g.min) + '</b> <s class="promo-was">' + money(g.reg) + '</s></span></span></span></a>';
+        '<span class="pop-foot"><span>' + (isF ? _t('dès') + ' ' : '') + '<b>' + money(g.min) + '</b> <s class="promo-was">' + money(g.reg) + '</s></span></span>' +
+        (solo ? '<span class="promo-go">' + _t('Voir la promo') + ' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>' : '') +
+        '</span></a>';
     }).join('');
     sec.hidden = false;
+    stripe();
   }
+
+  /* bandes alternées : une section visible sur deux (après le héros) en crème */
+  function stripe() {
+    var n = 0;
+    $$('section.sec').forEach(function (s) {
+      s.classList.remove('sec-band');
+      if (s.hidden) return;
+      if (n++ % 2 === 0) s.classList.add('sec-band');
+    });
+  }
+  stripe();
 
   function renderStats(fils, nMats) {
     var inS = fils.filter(inStock);
@@ -498,7 +514,7 @@
       // la vedette d'abord, puis l'ordre de l'admin
       items.sort(function (a, b) { return (b.featured ? 1 : 0) - (a.featured ? 1 : 0); });
       var cur = 0, NEWS_MS = 8000, auto = items.length > 1 && !reduceMotion;
-      sec.hidden = false;
+      sec.hidden = false; stripe();
 
       function tag(n) { return '<span class="news-tag k-' + esc(n.kind) + '">' + esc(KINDS[n.kind] || '') + '</span>'; }
       function feature(n) {
