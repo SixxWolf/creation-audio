@@ -47,6 +47,59 @@ function esc(s: unknown) {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
 }
 
+// Photos des articles (vignettes du PDF). Produit relié : filament = photo du format (attrs.img_spool / img_refill,
+// sinon image_path), spacer/accessoire = image_path. Entretien : ligne « Entretien [mensuel] — Marque Modèle »
+// → maintenance_printers.photo. Storage : réduite par /render/image (sort en PNG/JPEG, même un WebP) ;
+// photo du site (/assets/entretien/x.webp) : sa copie PNG voisine (pdf-lib ne lit pas le WebP).
+// Une photo introuvable = pas de vignette, jamais d'échec de l'envoi.
+// deno-lint-ignore no-explicit-any
+async function lineImages(db: any, rows: any[]): Promise<(Uint8Array | null)[]> {
+  const base = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
+  const ids = [...new Set(rows.map((r) => r.product_id).filter(Boolean))];
+  // deno-lint-ignore no-explicit-any
+  const prods: Record<string, any> = {};
+  if (ids.length) {
+    const { data } = await db.from("products").select("id, type, image_path, attrs").in("id", ids);
+    for (const p of data || []) prods[p.id] = p;
+  }
+  const MAINT = /^Entretien(?: mensuel)? — (.+)$/;
+  // deno-lint-ignore no-explicit-any
+  let printers: any[] = [];
+  if (rows.some((r) => !r.product_id && MAINT.test(String(r.label || "")))) {
+    const { data } = await db.from("maintenance_printers").select("brand, name, photo");
+    printers = data || [];
+  }
+  const urlOf = (r: Record<string, unknown>): string => {
+    let path = "";
+    const p = r.product_id ? prods[r.product_id as string] : null;
+    if (p) {
+      const a = p.attrs || {};
+      path = (p.type === "filament" && (r.kind === "refill" ? a.img_refill : a.img_spool)) || p.image_path || "";
+    } else {
+      const m = MAINT.exec(String(r.label || ""));
+      const pr = m && printers.find((x) => [x.brand, x.name].filter(Boolean).join(" ").toLowerCase() === m[1].trim().toLowerCase());
+      path = pr?.photo || "";
+    }
+    path = String(path || "");
+    if (!path) return "";
+    if (/^https?:\/\//i.test(path)) return path;
+    if (path.startsWith("/")) return SITE + path.replace(/\.webp$/i, ".png");
+    if (!base) return "";
+    return base + "/storage/v1/render/image/public/products/" + path.split("/").map(encodeURIComponent).join("/") +
+      "?width=200&height=200&resize=contain&quality=80";
+  };
+  const cache: Record<string, Promise<Uint8Array | null>> = {};
+  const get = (u: string) => cache[u] ??= (async () => {
+    try {
+      const r = await fetch(u, { headers: { Accept: "image/png,image/jpeg" }, signal: AbortSignal.timeout(6000) });
+      if (!r.ok) return null;
+      const b = new Uint8Array(await r.arrayBuffer());
+      return b.length > 0 && b.length < 3_000_000 ? b : null;
+    } catch { return null; }
+  })();
+  return await Promise.all(rows.map((r) => { const u = urlOf(r); return u ? get(u) : Promise.resolve(null); }));
+}
+
 // polices : chargées au premier envoi, gardées en mémoire ; null = repli Helvetica
 let fontsP: Promise<Fonts> | null = null;
 function loadFonts(): Promise<Fonts> {
@@ -144,8 +197,12 @@ Deno.serve(async (req) => {
 
   // 5) données de la facture + coordonnées de l'entreprise
   const { data: lines } = await db.from("invoice_lines")
-    .select("label, meta, qty, unit_price, line_total").eq("invoice_id", invoiceId).order("sort_order");
-  const L = (lines || []) as InvoiceLine[];
+    .select("label, meta, qty, unit_price, line_total, product_id, kind").eq("invoice_id", invoiceId).order("sort_order");
+  const L = (lines || []) as (InvoiceLine & { product_id?: string | null; kind?: string })[];
+  try {
+    const imgs = await lineImages(db, L);
+    L.forEach((l, i) => { l.img = imgs[i]; });
+  } catch { /* sans vignettes */ }
   const { data: coRow } = await db.from("admin_settings").select("value").eq("key", "entreprise").maybeSingle();
   const company = (coRow?.value || {}) as Record<string, unknown>;
 

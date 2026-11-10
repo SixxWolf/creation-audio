@@ -37,7 +37,8 @@ export type InvoiceHead = {
   client_contact?: string | null; tax_enabled: boolean; subtotal: number; tax_gst: number; tax_qst: number; total: number; note?: string | null;
   pay_method?: "cash" | "interac" | null;
 };
-export type InvoiceLine = { label?: string | null; meta?: string | null; qty: number; unit_price: number; line_total: number };
+// img : photo de l'article (PNG ou JPEG, déjà réduite par index.ts) ; absente = pas de vignette
+export type InvoiceLine = { label?: string | null; meta?: string | null; qty: number; unit_price: number; line_total: number; img?: Uint8Array | null };
 
 // espaces fines / insécables et caractères invisibles : absents des polices
 const clean = (s: unknown) => String(s ?? "").replace(/[\u202f\u00a0\u2009]/g, " ").replace(/[\u200b-\u200d\ufeff]/g, "").replace(/\r/g, "");
@@ -136,7 +137,21 @@ export async function buildInvoicePdf(o: { company: Company; invoice: InvoiceHea
 
   // colonnes du tableau (bords droits)
   const colQty = W - M - 150, colUnit = W - M - 78, colTot = W - M;
-  const descW = colQty - 40 - M - 10;
+
+  // vignettes : PNG/JPEG reconnus par leurs premiers octets ; une image illisible est ignorée
+  const thumbs = await Promise.all(lines.map(async (l) => {
+    const b = l.img;
+    if (!b || b.length < 4) return null;
+    try {
+      if (b[0] === 0x89 && b[1] === 0x50) return await doc.embedPng(b);
+      if (b[0] === 0xff && b[1] === 0xd8) return await doc.embedJpg(b);
+    } catch { /* ignorée */ }
+    return null;
+  }));
+  // une colonne photo dès qu'une ligne en a une (les lignes sans photo restent alignées)
+  const TH = 38, thCol = thumbs.some(Boolean) ? TH + 12 : 0;
+  const descX = M + 8 + thCol;
+  const descW = colQty - 40 - descX - 2;
 
   const tableHead = () => {
     page.drawRectangle({ x: M, y: y - 6, width: W - 2 * M, height: 20, color: C.band });
@@ -198,21 +213,29 @@ export async function buildInvoicePdf(o: { company: Company; invoice: InvoiceHea
 
   // ---- tableau ----
   tableHead();
-  for (const l of lines) {
+  lines.forEach((l, li) => {
     const labelLines = wrap(l.label || "", semi, 9.5, descW);
     const metaLines = l.meta ? wrap(l.meta, reg, 8, descW) : [];
-    const rowH = labelLines.length * 13 + metaLines.length * 11 + 12;
+    const thumb = thumbs[li];
+    let rowH = labelLines.length * 13 + metaLines.length * 11 + 12;
+    if (thumb) rowH = Math.max(rowH, TH + 11);
     if (y - rowH < BOTTOM + 24) newPage(false);
+    if (thumb) {   // photo entière (jamais rognée), centrée dans un carré, haut aligné sur le libellé
+      const top = y + 5, s = Math.min(TH / thumb.width, TH / thumb.height);
+      const w = thumb.width * s, h = thumb.height * s;
+      page.drawRectangle({ x: M + 8, y: top - TH, width: TH, height: TH, color: WHITE, borderColor: C.line, borderWidth: 0.6 });
+      page.drawImage(thumb, { x: M + 8 + (TH - w) / 2, y: top - TH + (TH - h) / 2, width: w, height: h });
+    }
     let yy = y;
-    labelLines.forEach((s) => { text(s, M + 8, yy, { font: semi, size: 9.5 }); yy -= 13; });
-    metaLines.forEach((s) => { text(s, M + 8, yy + 1, { size: 8, color: C.soft }); yy -= 11; });
+    labelLines.forEach((s) => { text(s, descX, yy, { font: semi, size: 9.5 }); yy -= 13; });
+    metaLines.forEach((s) => { text(s, descX, yy + 1, { size: 8, color: C.soft }); yy -= 11; });
     text(qtyTxt(l.qty, en), colQty, y, { size: 9.5, align: "right" });
     text(money(l.unit_price, en), colUnit, y, { size: 9.5, align: "right" });
     text(money(l.line_total, en), colTot - 8, y, { font: semi, size: 9.5, align: "right" });
     y -= rowH - 4;
     hline(y + 4);
     y -= 8;
-  }
+  });
 
   // ---- totaux (bloc réservé : jamais coupé de la dernière ligne) ----
   const rows: [string, number][] = inv.tax_enabled ? [[T.sub, inv.subtotal], [T.gst, inv.tax_gst], [T.qst, inv.tax_qst]] : [];
