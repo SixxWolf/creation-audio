@@ -50,7 +50,7 @@ export function money(n: unknown, en: boolean) {
   if (en) return "$" + v.toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return clean(v.toLocaleString("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })) + " $";
 }
-function qtyTxt(q: unknown, en: boolean) {
+export function qtyTxt(q: unknown, en: boolean) {
   const v = Number(q) || 0;
   return Number.isInteger(v) ? String(v) : v.toLocaleString(en ? "en-CA" : "fr-CA", { maximumFractionDigits: 2 });
 }

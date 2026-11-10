@@ -15,6 +15,7 @@
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { buildInvoicePdf, dateTxt, money, type Fonts, type InvoiceLine } from "./pdf.ts";
+import { buildInvoiceEmail, fitBox, imageSize } from "./email.ts";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -42,18 +43,15 @@ const CORS = {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }
-function esc(s: unknown) {
-  return String(s ?? "").replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
-}
 
-// Photos des articles (vignettes du PDF). Produit relié : filament = photo du format (attrs.img_spool / img_refill,
+// Photos des articles (vignettes du PDF et du courriel : l'adresse sert au courriel, les octets au PDF et à la
+// taille d'affichage). Produit relié : filament = photo du format (attrs.img_spool / img_refill,
 // sinon image_path), spacer/accessoire = image_path. Entretien : ligne « Entretien [mensuel] — Marque Modèle »
 // → maintenance_printers.photo. Storage : réduite par /render/image (sort en PNG/JPEG, même un WebP) ;
 // photo du site (/assets/entretien/x.webp) : sa copie PNG voisine (pdf-lib ne lit pas le WebP).
 // Une photo introuvable = pas de vignette, jamais d'échec de l'envoi.
 // deno-lint-ignore no-explicit-any
-async function lineImages(db: any, rows: any[]): Promise<(Uint8Array | null)[]> {
+async function lineImages(db: any, rows: any[]): Promise<{ url: string; bytes: Uint8Array | null }[]> {
   const base = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
   const ids = [...new Set(rows.map((r) => r.product_id).filter(Boolean))];
   // deno-lint-ignore no-explicit-any
@@ -97,7 +95,7 @@ async function lineImages(db: any, rows: any[]): Promise<(Uint8Array | null)[]> 
       return b.length > 0 && b.length < 3_000_000 ? b : null;
     } catch { return null; }
   })();
-  return await Promise.all(rows.map((r) => { const u = urlOf(r); return u ? get(u) : Promise.resolve(null); }));
+  return await Promise.all(rows.map(async (r) => { const u = urlOf(r); return { url: u, bytes: u ? await get(u) : null }; }));
 }
 
 // polices : chargées au premier envoi, gardées en mémoire ; null = repli Helvetica
@@ -199,9 +197,10 @@ Deno.serve(async (req) => {
   const { data: lines } = await db.from("invoice_lines")
     .select("label, meta, qty, unit_price, line_total, product_id, kind").eq("invoice_id", invoiceId).order("sort_order");
   const L = (lines || []) as (InvoiceLine & { product_id?: string | null; kind?: string })[];
+  let imgs: { url: string; bytes: Uint8Array | null }[] = [];
   try {
-    const imgs = await lineImages(db, L);
-    L.forEach((l, i) => { l.img = imgs[i]; });
+    imgs = await lineImages(db, L);
+    L.forEach((l, i) => { l.img = imgs[i]?.bytes || null; });
   } catch { /* sans vignettes */ }
   const { data: coRow } = await db.from("admin_settings").select("value").eq("key", "entreprise").maybeSingle();
   const company = (coRow?.value || {}) as Record<string, unknown>;
@@ -225,32 +224,16 @@ Deno.serve(async (req) => {
       (payTxt ? T("Paiement : ", "Payment: ") + payTxt + "\n" : "") + "\n" +
       T("Tu retrouves aussi tes factures dans ton compte : ", "You can also find your invoices in your account: ") + accUrl + "\n\n" +
       "Création Audio\n" + SITE + (en ? "/en/" : "/");
-    const rowsHtml = L.map((l) => '<tr>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(l.label) + '</strong>' +
-        (l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(l.meta) + '</span>' : '') + '</td>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + m(l.line_total) + '</td></tr>').join("");
-    const taxHtml = inv.tax_enabled
-      ? '<p style="margin:12px 0 0;text-align:right;color:#6C727C;font-size:13px">' + T("Sous-total : ", "Subtotal: ") + m(inv.subtotal) + '<br>' +
-        T("TPS : ", "GST: ") + m(inv.tax_gst) + '<br>' + T("TVQ : ", "QST: ") + m(inv.tax_qst) + '</p>' : '';
-    const html =
-      '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-      '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-      '<h1 style="font-size:22px;margin:0 0 10px">' + T("Ta facture est jointe", "Your invoice is attached") + '</h1>' +
-      '<p style="margin:0 0 6px">' + T("Bonjour ", "Hello ") + esc(first) + ',</p>' +
-      '<p style="margin:0 0 16px">' + T("Voici ta facture <strong>" + esc(inv.number) + "</strong> du " + esc(dateStr) + ", en PDF.",
-        "Here is your invoice <strong>" + esc(inv.number) + "</strong> from " + esc(dateStr) + ", as a PDF.") + '</p>' +
-      '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
-        '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">' + T("Article", "Item") + '</th><th style="padding:8px 10px;text-align:right">' + T("Qté", "Qty") + '</th>' +
-        '<th style="padding:8px 10px;text-align:right">Total</th></tr>' + rowsHtml +
-      '</table>' + taxHtml +
-      '<p style="margin:10px 0 0;text-align:right;font-size:16px"><strong>Total' + T(" : ", ": ") + m(inv.total) + '</strong></p>' +
-      (payTxt ? '<p style="margin:2px 0 0;text-align:right;color:#6C727C;font-size:13px">' + T("Paiement : ", "Payment: ") + esc(payTxt) + '</p>' : '') +
-      '<p style="margin:22px 0"><a href="' + accUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
-        T("Voir mon compte", "Open my account") + '</a></p>' +
-      '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-      '<p style="font-size:12px;color:#6C727C">' + T("Une question&nbsp;? Réponds simplement à ce courriel.", "A question? Just reply to this email.") + '</p>' +
-      '</div>';
+    const html = buildInvoiceEmail({
+      company, invoice: inv, lang, accUrl, site: SITE,
+      lines: L.map((l, i) => {
+        const im = imgs[i];
+        const ok = !!(im?.url && im.bytes);   // photo réellement trouvée → affichée dans le courriel
+        const sz = ok ? fitBox(imageSize(im!.bytes)) : null;
+        return { label: l.label, meta: l.meta, qty: l.qty, unit_price: l.unit_price, line_total: l.line_total,
+          src: ok ? emailSrc(im!.url) : null, w: sz?.w, h: sz?.h };
+      }),
+    });
     const msg: Record<string, unknown> = {
       from, to: [to], reply_to: REPLY_TO, subject, html, text,
       attachments: [{ filename: (en ? "Invoice-" : "Facture-") + inv.number + ".pdf", content: b64(pdf) }],
@@ -269,3 +252,9 @@ Deno.serve(async (req) => {
   return json({ result: "sent", ...result });
 }
 );
+
+// Adresse de la photo dans le courriel : /render/image choisit le format selon le lecteur (WebP pour la
+// plupart) ; Outlook pour Windows ne lit pas le WebP → format d'origine quand l'original est PNG/JPEG.
+function emailSrc(u: string) {
+  return u.includes("/render/image/") && !/\.webp\?/i.test(u) ? u + "&format=origin" : u;
+}
