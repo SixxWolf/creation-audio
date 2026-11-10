@@ -33,6 +33,10 @@
     }
     return cs[0] || (p && isHex(p.hex) ? p.hex : '#c9c9c4');
   }
+  // demandes par sujet (sans produit) : page publique boutique/imprimantes.html (RPC waitlist_topic_subscribe)
+  var TOPIC_LABEL = { printers: 'Imprimantes 3D (bientôt)' };
+  function gkey(w) { return w.product_id || ('topic:' + w.topic); }
+  function groupLabel(key) { return key.indexOf('topic:') === 0 ? (TOPIC_LABEL[key.slice(6)] || key.slice(6)) : prodLabel(prodById[key]); }
   var SOURCE_LABEL = { site: 'Site (courriel)', marketplace: 'Marketplace', autre: 'Autre' };
   function kindLabel(k) { return k === 'refill' ? 'Recharge' : k === 'spool' ? 'Avec bobine' : k === 'item' ? 'Article' : 'Peu importe'; }
   function shortDate(iso) {
@@ -115,7 +119,10 @@
     if (w.source !== 'site' && w.contact) bits.push(w.contact);
     if (w.source === 'site' && w.name && w.contact) bits.push(w.contact);
     var act;
-    if (w.source === 'site') {
+    if (w.topic) {
+      act = '<button type="button" class="btn btn-ghost btn-sm wl-copy-mail" data-ids="' + esc(w.id) + '">Copier le courriel</button>' +
+            '<button type="button" class="btn btn-accent btn-sm wl-done" data-ic="check" data-id="' + esc(w.id) + '">Marquer avisé</button>';
+    } else if (w.source === 'site') {
       act = '<button type="button" class="btn btn-accent btn-sm wl-notify" data-ic="mail" data-id="' + esc(w.id) + '">Envoyer le courriel</button>';
     } else if (copied[w.id]) {
       act = '<button type="button" class="btn btn-accent btn-sm wl-done" data-ic="check" data-id="' + esc(w.id) + '">Marquer avisé</button>' +
@@ -145,6 +152,13 @@
     var p = prodById[pid];
     var kinds = reqs.map(function (w) { return w.kind || null; });
     var sites = reqs.filter(function (w) { return w.source === 'site'; });
+    if (String(pid).indexOf('topic:') === 0) {
+      return '<div class="wl-group" data-pid="' + esc(pid) + '">' +
+        '<div class="wl-group-head"><span class="wl-group-name">' + esc(groupLabel(pid)) + '</span>' +
+          '<span class="wl-group-n">' + reqs.length + ' en attente</span><span class="grow"></span>' +
+          (reqs.length > 1 ? '<button type="button" class="btn btn-accent btn-sm wl-copy-mail" data-ic="copy" data-ids="' + esc(reqs.map(function (w) { return w.id; }).join(',')) + '">Copier les ' + reqs.length + ' courriels</button>' : '') +
+        '</div>' + reqs.map(reqRow).join('') + '</div>';
+    }
     var all = (opts && opts.bulk && sites.length > 1)
       ? '<button type="button" class="btn btn-accent btn-sm wl-notify-all" data-ids="' + esc(sites.map(function (w) { return w.id; }).join(',')) + '" data-ic="mail">Aviser les ' + sites.length + ' courriels</button>' : '';
     return '<div class="wl-group" data-pid="' + esc(pid) + '">' +
@@ -162,7 +176,7 @@
     var el = $('#wl-list'); if (!el) return;
     if (!open.length) { el.innerHTML = '<p class="empty">Personne n\'attend de produit pour le moment.</p>'; return; }
     var by = {}, order = [];
-    open.forEach(function (w) { if (!by[w.product_id]) { by[w.product_id] = []; order.push(w.product_id); } by[w.product_id].push(w); });
+    open.forEach(function (w) { var k = gkey(w); if (!by[k]) { by[k] = []; order.push(k); } by[k].push(w); });
     // produits de retour en stock d'abord (à aviser), puis les plus demandés
     order.sort(function (a, b) {
       var pa = prodById[a], pb = prodById[b];
@@ -179,7 +193,7 @@
     var all = open.concat(history);
     if (!all.length) { el.innerHTML = ''; return; }
     var cnt = {};
-    all.forEach(function (w) { cnt[w.product_id] = (cnt[w.product_id] || 0) + 1; });
+    all.forEach(function (w) { var k = gkey(w); cnt[k] = (cnt[k] || 0) + 1; });
     var top = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; }).slice(0, 8);
     var notified = history.filter(function (w) { return w.status === 'notified'; }).length;
     var expired = history.filter(function (w) { return w.status === 'expired'; }).length;
@@ -192,7 +206,7 @@
         var p = prodById[pid];
         return '<div class="wl-stat-row">' +
           (p && p.type === 'filament' ? '<span class="wl-sw" style="background:' + esc(swatchBg(p)) + '"></span>' : '<span class="wl-sw wl-sw-none"></span>') +
-          '<span class="wl-stat-name">' + esc(prodLabel(p)) + '</span><span class="wl-stat-n">' + cnt[pid] + '</span></div>';
+          '<span class="wl-stat-name">' + esc(groupLabel(pid)) + '</span><span class="wl-stat-n">' + cnt[pid] + '</span></div>';
       }).join('') +
     '</div>';
   }
@@ -227,6 +241,7 @@
     $$('.wl-notify-all', root).forEach(function (b) { b.addEventListener('click', function () { notify(b.getAttribute('data-ids').split(','), b); }); });
     $$('.wl-copy', root).forEach(function (b) { b.addEventListener('click', function () { copyMsg(b.getAttribute('data-id')); }); });
     $$('.wl-done', root).forEach(function (b) { b.addEventListener('click', function () { markDone(b.getAttribute('data-id'), b); }); });
+    $$('.wl-copy-mail', root).forEach(function (b) { b.addEventListener('click', function () { copyMails(b.getAttribute('data-ids').split(',')); }); });
     $$('.wl-del', root).forEach(function (b) { b.addEventListener('click', function () { removeReq(b.getAttribute('data-id')); }); });
   }
 
@@ -266,7 +281,7 @@
     var now = new Date().toISOString();
     open = open.filter(function (w) {
       if (ids.indexOf(w.id) < 0) return true;
-      history.push({ id: w.id, product_id: w.product_id, kind: w.kind, source: w.source, status: 'notified', created_at: w.created_at, notified_at: now });
+      history.push({ id: w.id, product_id: w.product_id, topic: w.topic, kind: w.kind, source: w.source, status: 'notified', created_at: w.created_at, notified_at: now });
       return false;
     });
   }
@@ -295,6 +310,14 @@
       toast('Message copié — colle-le dans Messenger, puis « Marquer avisé ».');
     }, function () {
       caDialog.prompt({ title: 'Copie ce message', value: txt, ok: 'Fermer', cancel: false, readonly: true, icon: 'copy' }).then(function () { copied[id] = true; renderAll(); });
+    });
+  }
+  // sujet (Imprimantes 3D) : pas de courriel automatique, on copie les adresses puis « Marquer avisé »
+  function copyMails(ids) {
+    var txt = open.filter(function (w) { return ids.indexOf(w.id) >= 0 && w.contact; }).map(function (w) { return w.contact; }).join(', ');
+    if (!txt) return;
+    copyText(txt).then(function () { toast(ids.length > 1 ? '✓ ' + ids.length + ' courriels copiés.' : '✓ Courriel copié.'); }, function () {
+      caDialog.prompt({ title: 'Copie ces courriels', value: txt, ok: 'Fermer', cancel: false, readonly: true, icon: 'copy' });
     });
   }
   // avisé à la main -> on efface nom + contact (Loi 25), trace anonyme conservée

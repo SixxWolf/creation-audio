@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 32;
+window.CA_EN_V = 33;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -166,6 +166,10 @@ window.CA_EN = (function (pairs) {
   [`Trop de demandes pour le moment — réessaie un peu plus tard.`, `Too many requests right now — try again a bit later.`],
   [`Impossible d'enregistrer ta demande pour le moment. Écris-nous à `, `Couldn't save your request right now. Write to us at `],
   [`Erreur réseau — réessaie.`, `Network error — try again.`],
+
+  // ---- boutique-imprimantes.js : « M'avertir quand c'est prêt »
+  [`✓ C'est noté ! On t'écrit dès que les imprimantes 3D arrivent.`, `✓ Got it! We'll email you as soon as 3D printers arrive.`],
+  [`Tu es déjà sur la liste — on t'écrit dès que les imprimantes 3D arrivent.`, `You're already on the list — we'll email you as soon as 3D printers arrive.`],
   [`Maximum `, `Maximum `],
   [` en stock.`, ` in stock.`],
   [`Accessoires · Création Audio`, `Accessories · Création Audio`],

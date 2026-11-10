@@ -1,0 +1,35 @@
+/* Création Audio — page « Imprimantes 3D » (bientôt) : boutique/imprimantes.html */
+.ip3-soon { max-width:620px; margin:clamp(32px, 7vw, 88px) auto clamp(48px, 8vw, 104px); padding:0 16px; text-align:center; }
+.ip3-ic { width:96px; height:96px; margin:0 auto 18px; display:grid; place-items:center; border-radius:26px;
+  color:var(--ember-ink); background:var(--tint); border:1px solid var(--tint-line); }
+.ip3-ic svg { width:56px; height:56px; }
+.ip3-tag { display:inline-block; margin:0 0 10px; padding:4px 12px; border-radius:100px; font-size:.78rem; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--ember-ink); background:var(--tint); }
+.ip3-soon h1 { margin:0 0 12px; font-family:'Space Grotesk', var(--font); font-size:clamp(2rem, 5vw, 3rem); line-height:1.1; color:var(--ink); }
+.ip3-lead { margin:0 auto 28px; max-width:46ch; font-size:1.06rem; line-height:1.6; color:var(--ink-2); }
+
+.ip3-notify { padding:20px; border:1px solid var(--line); border-radius:var(--radius-lg); background:var(--paper); box-shadow:var(--shadow-sm); }
+.ip3-form { display:flex; gap:10px; }
+.ip3-form input[type=email] { flex:1 1 auto; min-width:0; height:48px; padding:0 14px; font:inherit; font-size:1rem; color:var(--ink);
+  background:var(--paper); border:1px solid var(--line-2); border-radius:12px; }
+.ip3-form input[type=email]:focus { outline:none; border-color:var(--ember); box-shadow:0 0 0 3px color-mix(in srgb, var(--ember) 22%, transparent); }
+.ip3-btn { flex:none; height:48px; padding:0 18px; font:inherit; font-weight:700; color:var(--on-ember); background:var(--ember);
+  border:0; border-radius:12px; cursor:pointer; white-space:nowrap; }
+.ip3-btn:hover { background:var(--ember-dim); }
+.ip3-btn:disabled { opacity:.6; cursor:default; }
+.ip3-hp { position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
+.ip3-msg { margin:10px 0 0; min-height:0; font-weight:600; color:var(--muted); }
+.ip3-msg:empty { display:none; }
+.ip3-msg.ok { margin:0; color:var(--good-ink); }
+.ip3-msg.bad { color:var(--bad-ink); }
+.ip3-legal { margin:12px 0 0; font-size:.86rem; line-height:1.5; color:var(--muted); }
+.ip3-legal a { color:inherit; text-decoration:underline; text-underline-offset:3px; }
+
+.ip3-ask { margin:22px 0 0; color:var(--ink-2); }
+.ip3-back { display:inline-block; margin-top:14px; font-weight:600; color:var(--ink-2); text-decoration:underline; text-underline-offset:3px; }
+.ip3-back:hover { color:var(--ember-ink); }
+
+@media (max-width:560px) {
+  .ip3-form { flex-direction:column; }
+  .ip3-btn { width:100%; }
+}

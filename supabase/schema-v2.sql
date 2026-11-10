@@ -5202,3 +5202,41 @@ where not exists (select 1 from public.maintenance_materials);
 
 alter table public.maintenance_calc drop column if exists travel_cost;
 alter table public.maintenance_calc drop column if exists travel_minutes, drop column if exists machines_per_visit;
+
+-- ------------------------------------------------------------
+-- LISTE D'ATTENTE PAR SUJET (2026-11-10) — page « Imprimantes 3D »
+-- (boutique/imprimantes.html) : « M'avertir quand c'est prêt » sans
+-- produit en base. Même table, mêmes règles Loi 25 (60 jours, effacé à
+-- l'avis). Une demande = un produit OU un sujet. Admin : cms-attente.js
+-- groupe par sujet, copie des courriels (pas d'EF waitlist-notify).
+-- ------------------------------------------------------------
+alter table public.waitlist alter column product_id drop not null;
+alter table public.waitlist add column if not exists topic text;
+do $$ begin
+  alter table public.waitlist add constraint waitlist_topic_chk check (topic is null or topic in ('printers'));
+exception when duplicate_object then null; end $$;
+do $$ begin
+  alter table public.waitlist add constraint waitlist_target_chk check ((product_id is null) <> (topic is null));
+exception when duplicate_object then null; end $$;
+
+create or replace function public.waitlist_topic_subscribe(p_topic text, p_email text, p_hp text default '', p_lang text default 'fr')
+returns text language plpgsql security definer set search_path = public as $$
+declare v_email text := lower(trim(coalesce(p_email, '')));
+        v_lang  text := case when p_lang = 'en' then 'en' else 'fr' end;
+begin
+  if coalesce(p_hp, '') <> '' then return 'ok'; end if;
+  if length(v_email) > 254 or v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$' then return 'invalid'; end if;
+  if p_topic is distinct from 'printers' then return 'unavailable'; end if;
+  perform public.waitlist_cleanup();
+  if (select count(*) from public.waitlist where status = 'open' and source = 'site' and lower(contact) = v_email) >= 5
+     or (select count(*) from public.waitlist where source = 'site' and created_at > now() - interval '1 hour') >= 40 then
+    return 'busy';
+  end if;
+  if exists (select 1 from public.waitlist where status = 'open' and source = 'site' and lower(contact) = v_email and topic = p_topic) then
+    return 'exists';
+  end if;
+  insert into public.waitlist (topic, contact, source, lang) values (p_topic, v_email, 'site', v_lang);
+  return 'ok';
+end $$;
+revoke all on function public.waitlist_topic_subscribe(text, text, text, text) from public;
+grant execute on function public.waitlist_topic_subscribe(text, text, text, text) to anon, authenticated;

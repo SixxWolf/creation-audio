@@ -144,6 +144,10 @@
 .home-nav .nav-dd-m a { display:flex; width:100%; height:38px; padding:0 12px; }
 .home-nav .nav-dd-m a.is-active { color:var(--ember-ink); }
 .home-nav .nav-dd-m a.is-active::after { display:none; }
+/* « Bientôt » : catégorie annoncée, pas encore ouverte (Imprimantes 3D, boutique/imprimantes.html) */
+.nav-soon { display:inline-flex; align-items:center; margin-left:8px; padding:2px 8px; border-radius:100px; font-size:.68rem; font-weight:700;
+  letter-spacing:.04em; text-transform:uppercase; line-height:1.4; white-space:nowrap; color:var(--ember-ink); background:var(--tint); }
+.home-nav .nav-dd-m a { white-space:nowrap; align-items:center; }
 .nav-dd.is-open .nav-dd-m { opacity:1; visibility:visible; transform:none; transition:opacity .14s, transform .14s, visibility 0s; }
 .nav-dd.is-open .nav-dd-ic { transform:rotate(180deg); }
 @media (hover:hover) {
