@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="fr-CA">
+<head>
+<meta charset="utf-8">
+<script>if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.pathname.slice(0,-5)+location.search+location.hash);</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Grille de prix — Filaments · Création Audio</title>
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Feuille de prix imprimable (lettre portrait), générée en direct depuis la base.
+     Ouverte depuis l'admin › Matériaux & prix › « Grille de prix ». ?lang=en pour l'anglais. */
+  :root { --ink:#181A1F; --muted:#5F6670; --line:#E2E2DC; --wash:#F6F6F4; --ember:#FF6A2B; --ember-ink:#C2410C;
+    --tint:#FFF3EC; --font:'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; --disp:'Space Grotesk', var(--font); }
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  body { font-family:var(--font); color:var(--ink); background:#E9E9E4; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+  /* Barre d'outils (écran seulement) */
+  .gp-bar { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:12px 16px; background:#14161A; color:#fff; }
+  .gp-bar b { font-family:var(--disp); font-size:1rem; margin-right:auto; }
+  .gp-seg { display:inline-flex; padding:3px; border-radius:100px; background:#2A2E36; }
+  .gp-seg button { font:inherit; font-weight:600; font-size:.85rem; color:#C9CDD4; background:none; border:0; padding:6px 14px; border-radius:100px; cursor:pointer; }
+  .gp-seg button[aria-pressed="true"] { background:#fff; color:#14161A; }
+  .gp-print { font:inherit; font-weight:700; font-size:.9rem; color:#181A1F; background:var(--ember); border:0; border-radius:100px; padding:9px 18px; cursor:pointer; }
+  .gp-print:disabled { opacity:.5; cursor:default; }
+
+  .gp-stage { padding:24px 16px 48px; display:flex; justify-content:center; }
+  .sheet { flex:none; width:8.5in; min-height:11in; padding:.45in .55in .4in; background:#fff; box-shadow:0 8px 30px rgba(20,22,26,.14);
+    display:flex; flex-direction:column; }
+
+  /* En-tête */
+  .hd { display:flex; align-items:center; gap:14px; padding-bottom:16px; border-bottom:3px solid var(--ink); }
+  .hd img { width:58px; height:58px; object-fit:contain; }
+  .hd-id b { display:block; font-family:var(--disp); font-size:22px; line-height:1.1; }
+  .hd-id span { font-size:12.5px; color:var(--muted); }
+  .hd-t { margin-left:auto; text-align:right; }
+  .hd-t small { display:block; font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--ember-ink); }
+  .hd-t h1 { margin:2px 0 0; font-family:var(--disp); font-size:34px; line-height:1; letter-spacing:-.01em; }
+  .hd-t em { display:block; margin-top:6px; font-style:normal; font-size:12px; color:var(--muted); }
+
+  .band { margin:16px 0 6px; padding:10px 14px; border-radius:10px; background:var(--tint); border:1px solid #FFD9C4;
+    font-weight:700; font-size:15px; text-align:center; }
+  .band i { font-style:normal; color:var(--ember-ink); padding:0 6px; }
+
+  /* Bloc marque */
+  .brand { margin-top:16px; break-inside:avoid; }
+  .brand h2 { display:flex; align-items:baseline; gap:10px; margin:0 0 8px; font-family:var(--disp); font-size:24px; }
+  .brand h2 span { font-family:var(--font); font-size:12.5px; font-weight:600; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; table-layout:fixed; }
+  th, td { padding:0; }
+  thead th { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); text-align:right; padding:0 12px 6px; }
+  thead th:first-child { text-align:left; padding-left:0; }
+  thead th.q b { display:inline-block; color:#fff; background:var(--ink); border-radius:100px; padding:3px 10px; letter-spacing:.02em; text-transform:none; font-size:13px; }
+  thead th.q:first-of-type b, thead th.q.one b { background:#fff; color:var(--ink); border:1.5px solid var(--ink); }
+  tbody.grp { border-top:1.5px solid var(--line); }
+  tbody.grp:first-of-type { border-top:2px solid var(--ink); }
+  .mats td { padding:10px 0 4px; }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { font-size:12.5px; font-weight:700; padding:3px 9px; border-radius:6px; background:var(--wash); border:1px solid var(--line); }
+  .row td { padding:4px 12px; text-align:right; font-variant-numeric:tabular-nums; font-size:22px; font-weight:800; white-space:nowrap; }
+  .row td:first-child { text-align:left; padding-left:0; font-size:15px; font-weight:600; }
+  .row td.best { color:var(--ember-ink); }
+  .row td.na { color:var(--muted); font-weight:600; font-size:13px; text-align:center; text-transform:uppercase; letter-spacing:.08em; }
+  .row:last-child td { padding-bottom:10px; }
+  .brand-note { margin:6px 0 0; font-size:12.5px; color:var(--muted); }
+  .brand-note b { color:var(--ink); }
+
+  /* Bas de page */
+  .ft { margin-top:auto; padding-top:16px; }
+  .legend { display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; padding:12px 14px; border-radius:10px; background:var(--wash); font-size:12.5px; line-height:1.4; }
+  .legend .def b { display:block; font-size:13px; }
+  .legend .ex { grid-column:1 / -1; padding-top:8px; border-top:1px solid var(--line); }
+  .site { display:flex; align-items:center; gap:14px; margin-top:14px; padding-top:12px; border-top:3px solid var(--ink); }
+  .qr { width:78px; height:78px; flex:none; }
+  .qr svg { width:100%; height:100%; display:block; }
+  .site b { display:block; font-family:var(--disp); font-size:18px; }
+  .site span { font-size:12.5px; color:var(--muted); }
+  .msg { padding:40px 0; text-align:center; color:var(--muted); }
+
+  @media print {
+    @page { size:letter portrait; margin:0; }
+    body { background:#fff; }
+    .gp-bar { display:none; }
+    .gp-stage { padding:0; display:block; }
+    .sheet { box-shadow:none; zoom:1 !important; width:8.5in; min-height:10.9in; }
+  }
+</style>
+</head>
+<body>
+<div class="gp-bar">
+  <b id="gp-title">Grille de prix</b>
+  <div class="gp-seg" role="group" aria-label="Langue">
+    <button type="button" data-lang="fr" aria-pressed="true">FR</button>
+    <button type="button" data-lang="en" aria-pressed="false">EN</button>
+  </div>
+  <button type="button" class="gp-print" id="gp-print" disabled>Imprimer</button>
+</div>
+<div class="gp-stage"><div class="sheet" id="sheet"><p class="msg">Chargement…</p></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" integrity="sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1" crossorigin="anonymous"></script>
+<script src="assets/supabase-config.js?v=1"></script>
+<script src="assets/supabase-client.js?v=1"></script>
+<script>
+(function () {
+  'use strict';
+  var sb = window.CA && window.CA.sb;
+  var sheet = document.getElementById('sheet'), btn = document.getElementById('gp-print');
+  var lang = /[?&]lang=en\b/.test(location.search) ? 'en' : 'fr';
+  var data = null;
+
+  var T = {
+    fr: { title: 'Grille de prix', kicker: 'Filaments 3D', h1: 'Grille de prix', tag: 'Audio auto & impression 3D', print: 'Imprimer',
+      asof: 'Prix en vigueur le ', band: ['Prix finaux', 'aucune taxe en plus', 'pas de minimum'],
+      tiers: 'Rabais selon la quantité', spool: 'Bobine', refill: 'Recharge', one: '1', plus: ' et +',
+      together: function (b) { return '<b>Bobines et recharges ' + b + ' comptent ensemble</b>, toutes couleurs et matériaux confondus.'; },
+      fixed: 'Prix fixe', spoolDef: 'Filament enroulé sur sa bobine, prêt à installer.',
+      refillDef: 'Filament seul, sans bobine : se pose sur une bobine réutilisable.',
+      ex: function (b, n1, n2, q, p1, p2) { return '<b>Exemple</b> : ' + n1 + ' bobines + ' + n2 + ' recharges ' + b + ' = ' + q + ' articles → ' + p1 + ' la bobine, ' + p2 + ' la recharge.'; },
+      site: 'Toutes les couleurs et le stock en direct', url: 'creationaudio.ca/boutique', href: 'https://creationaudio.ca/boutique',
+      empty: 'Aucun filament à afficher.', err: 'Impossible de charger les prix. Recharge la page.', loading: 'Chargement…' },
+    en: { title: 'Price list', kicker: '3D filament', h1: 'Price list', tag: 'Car audio & 3D printing', print: 'Print',
+      asof: 'Prices effective ', band: ['Final prices', 'no tax added', 'no minimum'],
+      tiers: 'Quantity discounts', spool: 'Spool', refill: 'Refill', one: '1', plus: '+',
+      together: function (b) { return '<b>' + b + ' spools and refills count together</b>, any color or material.'; },
+      fixed: 'Fixed price', spoolDef: 'Filament wound on its spool, ready to load.',
+      refillDef: 'Filament only, no spool: mounts on a reusable spool.',
+      ex: function (b, n1, n2, q, p1, p2) { return '<b>Example</b>: ' + n1 + ' spools + ' + n2 + ' ' + b + ' refills = ' + q + ' items → ' + p1 + ' per spool, ' + p2 + ' per refill.'; },
+      site: 'Every color and live stock', url: 'creationaudio.ca/en/boutique', href: 'https://creationaudio.ca/en/boutique',
+      empty: 'No filament to show.', err: 'Could not load prices. Reload the page.', loading: 'Loading…' }
+  };
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function money(v) {
+    var n = Number(v), whole = Math.abs(n - Math.round(n)) < 0.005;
+    if (lang === 'en') return '$' + (whole ? Math.round(n) : n.toFixed(2));
+    return (whole ? String(Math.round(n)) : n.toFixed(2).replace('.', ',')) + ' $';
+  }
+  // valeur la plus fréquente (une couleur au prix particulier ne change pas la grille)
+  function mode(arr) {
+    var c = {}, best = null, bn = 0;
+    arr.forEach(function (v) { if (v == null) return; var k = String(Number(v)); c[k] = (c[k] || 0) + 1; if (c[k] > bn) { bn = c[k]; best = Number(v); } });
+    return best;
+  }
+  function tierList(t) { return (Array.isArray(t) ? t : []).filter(function (x) { return x && x.min > 1 && x.price != null; }).map(function (x) { return { min: +x.min, price: +x.price }; }).sort(function (a, b) { return a.min - b.min; }); }
+  function priceAt(base, tiers, q) { var p = base; tiers.forEach(function (t) { if (q >= t.min) p = t.price; }); return p; }
+
+  function model(rows, brands) {
+    var bOrder = {}; (brands || []).forEach(function (b) { bOrder[b.name] = b.sort_order == null ? 9999 : b.sort_order; });
+    var map = {}, order = [];
+    rows.forEach(function (p) {
+      var b = (p.brand || '').trim(), m = (p.material || '').trim();
+      if (!b || !m) return;
+      if (!map[b]) { map[b] = { name: b, mats: {}, order: [] }; order.push(b); }
+      var B = map[b];
+      if (!B.mats[m]) { B.mats[m] = { name: m, en: (p.material_en && typeof p.material_en.name === 'string') ? p.material_en.name : '', sort: p.material_sort == null ? 9999 : p.material_sort, sp: [], rf: [], t: p.tiers, t2: p.tiers_2 }; B.order.push(m); }
+      var M = B.mats[m];
+      // prix régulier (une promo passagère ne s'imprime pas)
+      M.sp.push(p.promo_on && p.reg_price != null ? p.reg_price : p.sell_price);
+      M.rf.push(p.promo_on_2 && p.reg_price_2 != null ? p.reg_price_2 : p.sell_price_2);
+    });
+    order.sort(function (a, b) { return (bOrder[a] == null ? 9999 : bOrder[a]) - (bOrder[b] == null ? 9999 : bOrder[b]); });
+    return order.map(function (bn) {
+      var B = map[bn], groups = [], byKey = {}, mins = {};
+      B.order.sort(function (a, b) { return B.mats[a].sort - B.mats[b].sort; });
+      B.order.forEach(function (mn) {
+        var M = B.mats[mn], sp = mode(M.sp), rf = mode(M.rf);
+        if (sp == null && rf == null) return;
+        var ts = sp == null ? [] : tierList(M.t), tr = rf == null ? [] : tierList(M.t2);
+        ts.concat(tr).forEach(function (t) { mins[t.min] = true; });
+        var key = JSON.stringify([sp, rf, ts, tr]);
+        if (!byKey[key]) { byKey[key] = { sp: sp, rf: rf, ts: ts, tr: tr, mats: [] }; groups.push(byKey[key]); }
+        byKey[key].mats.push(M);
+      });
+      // les lignes à rabais d'abord (matériaux de base), les prix fixes ensuite ; tri stable
+      groups = groups.map(function (g, i) { return [g, i]; }).sort(function (a, b) {
+        return ((b[0].ts.length || b[0].tr.length) ? 1 : 0) - ((a[0].ts.length || a[0].tr.length) ? 1 : 0) || a[1] - b[1];
+      }).map(function (x) { return x[0]; });
+      return { name: bn, groups: groups, mins: Object.keys(mins).map(Number).sort(function (a, b) { return a - b; }) };
+    }).filter(function (B) { return B.groups.length; });
+  }
+
+  function rowHtml(label, base, tiers, mins) {
+    if (base == null) return '';
+    var cells = '<td>' + money(base) + '</td>';
+    if (!tiers.length) cells += mins.length ? '<td class="na" colspan="' + mins.length + '">' + esc(T[lang].fixed) + '</td>' : '';
+    else cells += mins.map(function (q, i) { var p = priceAt(base, tiers, q); return '<td' + (i === mins.length - 1 ? ' class="best"' : '') + '>' + money(p) + '</td>'; }).join('');
+    return '<tr class="row"><td>' + esc(label) + '</td>' + cells + '</tr>';
+  }
+
+  function render() {
+    var L = T[lang];
+    document.documentElement.lang = lang === 'en' ? 'en-CA' : 'fr-CA';
+    document.title = (lang === 'en' ? 'Price list — Filament' : 'Grille de prix — Filaments') + ' · Création Audio';
+    document.getElementById('gp-title').textContent = L.title;
+    btn.textContent = L.print;
+    Array.prototype.forEach.call(document.querySelectorAll('.gp-seg button'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-lang') === lang)); });
+    if (!data) return;
+    if (data.error) { sheet.innerHTML = '<p class="msg">' + esc(L.err) + '</p>'; btn.disabled = true; return; }
+    if (!data.brands.length) { sheet.innerHTML = '<p class="msg">' + esc(L.empty) + '</p>'; btn.disabled = true; return; }
+
+    var d = new Date(), date = d.toLocaleDateString(lang === 'en' ? 'en-CA' : 'fr-CA', { day: 'numeric', month: 'long', year: 'numeric' });
+    var html = '<header class="hd"><img src="assets/img/loup_ondes_rouges_512_transparent.png" alt="">' +
+      '<div class="hd-id"><b>Création Audio</b><span>' + esc(L.tag) + '</span></div>' +
+      '<div class="hd-t"><small>' + esc(L.kicker) + '</small><h1>' + esc(L.h1) + '</h1><em>' + esc(L.asof + date) + '</em></div></header>' +
+      '<div class="band">' + L.band.map(esc).join('<i>·</i>') + '</div>';
+
+    var example = null;
+    data.brands.forEach(function (B) {
+      var mins = B.mins, hasTier = mins.length > 0;
+      html += '<section class="brand"><h2>' + esc(B.name) + (hasTier ? '<span>' + esc(L.tiers) + '</span>' : '') + '</h2><table>' +
+        '<colgroup><col style="width:' + (hasTier ? 34 : 60) + '%">' + [1].concat(mins).map(function () { return '<col>'; }).join('') + '</colgroup>' +
+        '<thead><tr><th></th><th class="q one"><b>' + esc(L.one) + '</b></th>' +
+        mins.map(function (q) { return '<th class="q"><b>' + q + esc(L.plus) + '</b></th>'; }).join('') + '</tr></thead>';
+      B.groups.forEach(function (G) {
+        html += '<tbody class="grp"><tr class="mats"><td colspan="' + (mins.length + 2) + '"><div class="chips">' +
+          G.mats.map(function (M) { return '<span class="chip">' + esc(lang === 'en' && M.en ? M.en : M.name) + '</span>'; }).join('') + '</div></td></tr>' +
+          rowHtml(L.spool, G.sp, G.ts, mins) + rowHtml(L.refill, G.rf, G.tr, mins) + '</tbody>';
+        if (!example && G.ts.length && G.tr.length && G.sp != null && G.rf != null) {
+          var q = G.ts[0].min;
+          example = L.ex(esc(B.name), Math.ceil(q / 2), Math.floor(q / 2), q, money(priceAt(G.sp, G.ts, q)), money(priceAt(G.rf, G.tr, q)));
+        }
+      });
+      html += '</table>' + (hasTier ? '<p class="brand-note">' + L.together(esc(B.name)) + '</p>' : '') + '</section>';
+    });
+
+    var qr = '';
+    try { var c = window.qrcode(0, 'M'); c.addData(L.href); c.make(); qr = c.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); } catch (e) {}
+    html += '<footer class="ft"><div class="legend"><div class="def"><b>' + esc(L.spool) + '</b>' + esc(L.spoolDef) + '</div>' +
+      '<div class="def"><b>' + esc(L.refill) + '</b>' + esc(L.refillDef) + '</div>' + (example ? '<div class="ex">' + example + '</div>' : '') + '</div>' +
+      '<div class="site">' + (qr ? '<div class="qr">' + qr + '</div>' : '') + '<div><b>' + esc(L.url) + '</b><span>' + esc(L.site) + '</span></div></div></footer>';
+    sheet.innerHTML = html;
+    btn.disabled = false;
+    fit();
+  }
+
+  // à l'écran, la feuille rétrécit pour tenir dans la largeur (téléphone)
+  function fit() {
+    var w = document.documentElement.clientWidth - 32, full = 816;
+    sheet.style.zoom = w < full ? String(Math.max(0.3, w / full)) : '';
+  }
+  window.addEventListener('resize', fit);
+
+  Array.prototype.forEach.call(document.querySelectorAll('.gp-seg button'), function (b) {
+    b.addEventListener('click', function () {
+      lang = b.getAttribute('data-lang');
+      try { history.replaceState(null, '', location.pathname + (lang === 'en' ? '?lang=en' : '')); } catch (e) {}
+      render();
+    });
+  });
+  btn.addEventListener('click', function () { window.print(); });
+
+  render();
+  if (!sb) { data = { error: true }; render(); return; }
+  Promise.all([
+    sb.from('products_public').select('brand,material,material_en,material_sort,sell_price,sell_price_2,reg_price,reg_price_2,promo_on,promo_on_2,tiers,tiers_2').eq('type', 'filament'),
+    sb.from('brands').select('name,sort_order')
+  ]).then(function (r) {
+    if (r[0].error) { data = { error: true }; render(); return; }
+    data = { brands: model(r[0].data || [], r[1] && r[1].data) };
+    render();
+  }, function () { data = { error: true }; render(); });
+})();
+</script>
+</body>
+</html>
