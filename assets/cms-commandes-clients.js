@@ -152,7 +152,7 @@
     var c = CA.ordersCount, n = (c.dealer || 0) + (c.client || 0) + (c.resv || 0) + (c.req || 0);
     navN.textContent = n; navN.hidden = !n;
     var tab = navN.closest('.tab');
-    if (tab) tab.setAttribute('aria-label', 'Commandes' + (n ? ' (' + plural(n, 'nouvelle', 'nouvelles') + ')' : ''));
+    if (tab) tab.setAttribute('aria-label', 'Commandes' + (n ? ' (' + plural(n, 'en cours', 'en cours') + ')' : ''));
     var cn = $('#cc-new-n'); if (cn) { cn.textContent = c.client || 0; cn.hidden = !c.client; }
     var rn = $('#cr-n'); if (rn) { rn.textContent = c.resv || 0; rn.hidden = !c.resv; }
     var dn = $('#dm-n'); if (dn) { dn.textContent = c.req || 0; dn.hidden = !c.req; }   // demandes de service (cms-demandes.js)
@@ -232,7 +232,7 @@
   CA.reloadCustomerOrders = function () { if (loaded) load(); else refreshBadge(); };
 
   function refreshBadge() {
-    sb.from('customer_orders').select('id', { count: 'exact', head: true }).eq('status', 'new').then(function (res) {
+    sb.from('customer_orders').select('id', { count: 'exact', head: true }).in('status', ['new', 'preparing', 'ready']).then(function (res) {
       if (res && !res.error && typeof res.count === 'number') setClientBadge(res.count);
     }, function () {});
   }
@@ -263,7 +263,7 @@
             ((rp && rp.data) || []).forEach(function (p) { stock[p.id] = p; });
             loaded = true;
             if (CA.loadHeldStock) CA.loadHeldStock();   // attente / statut changé -> cartes de stock à jour
-            setClientBadge(orders.filter(function (o) { return o.status === 'new'; }).length);
+            setClientBadge(orders.filter(function (o) { return OPEN[o.status]; }).length);   // ouvertes : reste jusqu'à Facturée/Annulée
             render();
           });
       }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; })

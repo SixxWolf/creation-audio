@@ -87,10 +87,10 @@
     if (!navN) return;
     navN.textContent = n; navN.hidden = !n;
     var tab = navN.closest('.tab');
-    if (tab) tab.setAttribute('aria-label', 'Commandes' + (n ? ' (' + plural(n, 'nouvelle', 'nouvelles') + ')' : ''));
+    if (tab) tab.setAttribute('aria-label', 'Commandes' + (n ? ' (' + plural(n, 'en cours', 'en cours') + ')' : ''));
   }
   function refreshBadge() {
-    sb.from('dealer_orders').select('id', { count: 'exact', head: true }).eq('status', 'new').then(function (res) {
+    sb.from('dealer_orders').select('id', { count: 'exact', head: true }).in('status', ['new', 'preparing', 'ready']).then(function (res) {
       if (res && !res.error && typeof res.count === 'number') setBadge(res.count);
     }, function () {});
   }
@@ -128,7 +128,7 @@
         if (p) { p.dealer_price = x.p1; p.tiers = x.t1 || []; p.promo = x.promo_name; }
       });
       loaded = true;
-      setBadge(orders.filter(function (o) { return o.status === 'new'; }).length);
+      setBadge(orders.filter(function (o) { return OPEN[o.status]; }).length);   // ouvertes : reste jusqu'à Facturée/Annulée
       render();
     }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; })
       .then(function () { pending = null; });
