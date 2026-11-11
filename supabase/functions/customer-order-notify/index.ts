@@ -18,6 +18,7 @@
 // Secrets : RESEND_API_KEY ; MAIL_FROM et ORDER_NOTIFY_TO optionnels.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import * as M from "../_shared/mail.ts";   // gabarit commun des courriels (même look que la facture)
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -79,6 +80,25 @@ const boLabel = (l: Line, n: number, en = false) => en
   ? (isEmpty(l) ? n + " to make · not guaranteed" : n + " to order" + (l.ptype === "spacer" ? "" : " · " + BO_DELAY_EN))
   : isEmpty(l) ? n + " à compléter · sans garantie"
   : n + " à commander" + (l.ptype === "spacer" ? "" : " · " + BO_DELAY);
+// « 11 novembre 2026 » / « November 11, 2026 » (heure de Québec)
+function dayTxt(iso: unknown, en = false) {
+  try {
+    return new Intl.DateTimeFormat(en ? "en-CA" : "fr-CA", { timeZone: "America/Toronto", day: "numeric", month: "long", year: "numeric" })
+      .format(iso ? new Date(String(iso)) : new Date());
+  } catch { return ""; }
+}
+// articles du courriel au client : vignette, « qté × prix », reste à commander en orange
+function orderItems(L: Line[], pics: M.Thumb[], en: boolean, withBo = true) {
+  return M.items(L.map((l, i) => {
+    const bo = Number(l.qty_to_order) || 0;
+    return {
+      label: l.name, meta: l.meta, thumb: pics[i],
+      sub: esc(l.qty) + " × " + esc(money(l.unit_price, en)),
+      flag: withBo && bo ? { text: boLabel(l, bo, en), tone: "warn" as const } : undefined,
+      right: money(l.line_total, en),
+    };
+  }));
+}
 const EMPTY_TXT = "Bobines vides : elles viennent de nos propres impressions, on ne peut pas en commander chez un fournisseur. " +
   "On fera tout notre possible pour compléter ta commande, sans garantie de quantité ni de délai.";
 const EMPTY_TXT_EN = "Empty spools: they come from our own prints, we can't order them from a supplier. " +
@@ -168,6 +188,8 @@ Deno.serve(async (req) => {
     .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype").eq("order_id", orderId).order("sort_order");
   const L = (lines || []) as Line[];
   await loadEmptyIds(db, L);
+  await M.loadCompany(db);
+  const pics = await M.thumbs(db, L);
   const items = L.reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const toOrder = L.filter((l) => (Number(l.qty_to_order) || 0) > 0);
   const first = String(order.name || "").trim().split(/\s+/)[0] || "";
@@ -216,36 +238,21 @@ Deno.serve(async (req) => {
       "\n" + T("Tu peux suivre, modifier ou annuler ta commande (tant qu'elle n'est pas confirmée) dans ton compte : ",
                "You can track, edit or cancel your order (until it is confirmed) in your account: ") + link + "\n\n" +
       "Création Audio\n" + site + "/";
-    const rowsHtml = L.map((l) => {
-      const bo = Number(l.qty_to_order) || 0;
-      return '<tr>' +
-        '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(l.name) + '</strong>' +
-          (l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(l.meta) + '</span>' : '') +
-          (bo ? '<br><span style="color:#B23F12;font-size:12px;font-weight:700">' + esc(boLabel(l, bo, en)) + '</span>' : '') + '</td>' +
-        '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
-        '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + m(l.line_total) + '</td>' +
-      '</tr>';
-    }).join("");
-    const html =
-      '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-      '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-      '<h1 style="font-size:22px;margin:0 0 10px">' + T("Commande ", "Order ") + esc(order.number) + ' ' + verb + '</h1>' +
-      '<p style="margin:0 0 14px">' + T("Bonjour " + esc(first) + ", merci&nbsp;!", "Hello " + esc(first) + ", thank you!") + '</p>' +
-      '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;' +
-        (toOrder.length ? 'background:#FFF3EC;color:#9A4A0E' : 'background:#E7F6EE;color:#16794A') + ';font-weight:700">' + esc(status) + '</p>' +
-      '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
-        '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">' + T("Article", "Item") + '</th><th style="padding:8px 10px;text-align:right">' + T("Qté", "Qty") + '</th>' +
-        '<th style="padding:8px 10px;text-align:right">Total</th></tr>' + rowsHtml +
-      '</table>' +
-      '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>' + T("Total estimé : ", "Estimated total: ") + m(order.total) + '</strong></p>' +
-      '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">' + esc(pickupLine) + '</p>' +
-      (order.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>' + T("Ta note :", "Your note:") + '</strong> ' + esc(order.note) + '</p>' : "") +
-      '<p style="margin:22px 0"><a href="' + link + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
-        (toOrder.length || pkC ? T("Suivre ma commande", "Track my order") : T("Choisir ma plage de cueillette", "Choose my pickup time slot")) + '</a></p>' +
-      '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-      '<p style="font-size:12px;color:#6C727C">' + T("Tu peux modifier ou annuler ta commande dans ton compte tant qu'elle n'est pas confirmée. Une question&nbsp;? Réponds simplement à ce courriel.",
-        "You can edit or cancel your order in your account until it is confirmed. A question? Just reply to this email.") + '</p>' +
-      "</div>";
+    const html = M.page({
+      lang: en ? "en" : "fr", tag: T("Commande", "Order"), ref: order.number, refSub: dayTxt(order.created_at, en),
+      title: T("Commande " + verb, "Order " + verb),
+      preheader: status,
+      body:
+        M.text(T("Bonjour " + esc(first) + ", merci&nbsp;! Ta commande <strong>" + esc(order.number) + "</strong> est bien " + verb + ".",
+                 "Hello " + esc(first) + ", thank you! Your order <strong>" + esc(order.number) + "</strong> has been " + verb + ".")) +
+        M.notice(esc(status), toOrder.length ? "warn" : "ok") +
+        orderItems(L, pics, en) +
+        M.totalBox(T("Total estimé", "Estimated total"), m(order.total), [esc(pickupLine)]) +
+        (order.note ? M.quote(order.note, T("Ta note :", "Your note:")) : "") +
+        M.button(link, toOrder.length || pkC ? T("Suivre ma commande", "Track my order") : T("Choisir ma plage de cueillette", "Choose my pickup time slot"), 18) +
+        M.small(T("Tu peux modifier ou annuler ta commande dans ton compte tant qu'elle n'est pas confirmée.",
+                  "You can edit or cancel your order in your account until it is confirmed.")),
+    });
     try {
       await send(resendKey, from, { to: [order.email], reply_to: REPLY_TO, subject, html, text });
       results.client = "sent";
@@ -274,27 +281,24 @@ Deno.serve(async (req) => {
     "\n\nTotal : " + money(order.total) + "\n" + (pk ? "Cueillette : " + pk + "\n" : "") +
     (order.note ? "\nNote du client : " + order.note + "\n" : "") +
     "\nOuvrir dans l'admin : " + adminUrl + "\n";
-  const aHtml =
-    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Commande en ligne</p>' +
-    '<h1 style="font-size:22px;margin:0 0 6px">' + esc(label) + ' ' + esc(order.number) + '</h1>' +
-    '<p style="margin:0 0 16px;color:#3A3D45">' + esc(who) + ' · ' + esc(order.email) + (order.phone ? ' · ' + esc(order.phone) : '') + '</p>' +
-    '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
-      '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">Article</th><th style="padding:8px 10px;text-align:right">Qté</th>' +
-      '<th style="padding:8px 10px;text-align:right">Stock</th><th style="padding:8px 10px;text-align:right">Total</th></tr>' +
-      aRows.map((r) => '<tr>' +
-        '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(r.l.name) + '</strong>' +
-          (r.l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(r.l.meta) + '</span>' : '') + '</td>' +
-        '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(r.l.qty) + '</td>' +
-        '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right;color:' + (r.miss ? '#B23F12' : '#16794A') + '">' +
-          (r.miss ? r.miss + (isEmpty(r.l) ? ' à compléter' : ' à commander') : 'en stock') + '</td>' +
-        '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(r.l.line_total) + '</td></tr>').join("") +
-    '</table>' +
-    '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total : ' + money(order.total) + '</strong></p>' +
-    (pk ? '<p style="margin:16px 0 0;padding:10px 12px;background:#E7F6EE;color:#16794A;border-radius:10px"><strong>Cueillette :</strong> ' + esc(pk) + '</p>' : "") +
-    (order.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Note :</strong> ' + esc(order.note) + '</p>' : "") +
-    '<p style="margin:22px 0"><a href="' + adminUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">Ouvrir dans l\'admin</a></p>' +
-    "</div>";
+  const aHtml = M.page({
+    lang: "fr", admin: true, tag: "Commande en ligne", ref: order.number, refSub: dayTxt(order.created_at, false),
+    title: label,
+    preheader: who + " · " + plural(items, "article", "articles") + " · " + money(order.total),
+    body:
+      M.who(who, order.email, order.phone) +
+      (event === "cancelled" ? M.notice("Le client a annulé cette commande.", "bad") : "") +
+      (pk ? M.notice("Cueillette : " + esc(pk), "ok") : "") +
+      M.items(aRows.map((r, i) => ({
+        label: r.l.name, meta: r.l.meta, thumb: pics[i],
+        sub: esc(r.l.qty) + " × " + esc(money(r.l.unit_price)),
+        flag: r.miss ? { text: r.miss + (isEmpty(r.l) ? " à compléter" : " à commander"), tone: "warn" as const } : { text: "en stock", tone: "ok" as const },
+        right: money(r.l.line_total),
+      }))) +
+      M.totalBox("Total", money(order.total)) +
+      (order.note ? M.quote(order.note, "Note du client :") : "") +
+      M.button(adminUrl, "Ouvrir dans l'admin", 18),
+  });
   try {
     await send(resendKey, from, { to: [adminTo], reply_to: order.email, subject: aSubject, html: aHtml, text: aText });
     results.admin = "sent";
@@ -345,28 +349,20 @@ async function notifyReady(db: any, order: any, resendKey: string | undefined, f
     pickupLine + "\n\n" +
     (pk ? T("Mon compte : ", "My account: ") : T("Choisir ma plage de cueillette : ", "Choose my pickup time slot: ")) + accountUrl + "\n\n" +
     "Création Audio\n" + site + "/";
-  const rowsHtml = L.map((l) => '<tr>' +
-    '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(l.name) + '</strong>' +
-      (l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(l.meta) + '</span>' : '') + '</td>' +
-    '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
-    '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + m(l.line_total) + '</td></tr>').join("");
-  const html =
-    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-    '<h1 style="font-size:22px;margin:0 0 10px">' + T("Ta commande " + esc(order.number) + " est prête", "Your order " + esc(order.number) + " is ready") + '</h1>' +
-    '<p style="margin:0 0 14px">' + T("Bonjour ", "Hello ") + esc(first) + ',</p>' +
-    '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#E7F6EE;color:#16794A;font-weight:700">' + esc(status) + '</p>' +
-    '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
-      '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">' + T("Article", "Item") + '</th><th style="padding:8px 10px;text-align:right">' + T("Qté", "Qty") + '</th>' +
-      '<th style="padding:8px 10px;text-align:right">Total</th></tr>' + rowsHtml +
-    '</table>' +
-    '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total' + T(" : ", ": ") + m(order.total) + '</strong></p>' +
-    '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">' + esc(pickupLine) + '</p>' +
-    '<p style="margin:22px 0"><a href="' + accountUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' +
-      (pk ? T("Voir ma commande", "See my order") : T("Choisir ma plage de cueillette", "Choose my pickup time slot")) + '</a></p>' +
-    '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-    '<p style="font-size:12px;color:#6C727C">' + T("Une question&nbsp;? Réponds simplement à ce courriel.", "A question? Just reply to this email.") + '</p>' +
-    "</div>";
+  await M.loadCompany(db);
+  const pics = await M.thumbs(db, L);
+  const html = M.page({
+    lang: en ? "en" : "fr", tag: T("Commande", "Order"), ref: order.number, refSub: dayTxt(order.created_at, en),
+    title: T("Ta commande est prête", "Your order is ready"),
+    preheader: status,
+    body:
+      M.text(T("Bonjour " + esc(first) + ", ta commande <strong>" + esc(order.number) + "</strong> est prête&nbsp;!",
+               "Hello " + esc(first) + ", your order <strong>" + esc(order.number) + "</strong> is ready!")) +
+      M.notice(esc(status), "ok") +
+      orderItems(L, pics, en, false) +
+      M.totalBox("Total", m(order.total), [esc(pickupLine)]) +
+      M.button(accountUrl, pk ? T("Voir ma commande", "See my order") : T("Choisir ma plage de cueillette", "Choose my pickup time slot"), 18),
+  });
   try {
     await send(resendKey, from, { to: [order.email], reply_to: REPLY_TO, subject, html, text });
   } catch (e) { return json({ error: String((e as Error).message || e) }, 502); }
@@ -395,12 +391,13 @@ async function runCron(db: any, resendKey: string, from: string) {
           "Your stock is on hold, but we need a pickup day and time. Without it, your order will be cancelled soon.");
     const label = cancelled ? T("Voir mes commandes", "See my orders") : T("Choisir ma cueillette", "Choose my pickup");
     const link = cancelled ? SITE + (en ? "/en" : "") + "/compte#/commandes" : url;
-    const html =
-      '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-      '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-      '<h1 style="font-size:22px;margin:0 0 10px">' + esc(head) + '</h1>' +
-      '<p style="margin:0 0 14px">' + T("Bonjour ", "Hello ") + esc(first) + ',</p><p style="margin:0 0 16px">' + esc(msg) + '</p>' +
-      '<p style="margin:22px 0"><a href="' + link + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' + esc(label) + '</a></p></div>';
+    await M.loadCompany(db);
+    const html = M.page({
+      lang: en ? "en" : "fr", tag: T("Commande", "Order"), ref: o.number,
+      title: cancelled ? T("Commande annulée", "Order cancelled") : T("Choisis ta cueillette", "Choose your pickup"),
+      preheader: msg,
+      body: M.text(T("Bonjour ", "Hello ") + esc(first) + ",") + M.notice(esc(msg), cancelled ? "bad" : "warn") + M.button(link, label),
+    });
     const text = T("Bonjour ", "Hello ") + first + ",\n\n" + msg + "\n\n" + link + "\n\nCréation Audio\n" + SITE + (en ? "/en/" : "/");
     await send(resendKey, from, { to: [o.email], reply_to: REPLY_TO, subject: head + " — Création Audio", html, text });
   };
@@ -453,13 +450,14 @@ async function mailHour(db: any, resendKey: string, from: string, o: any) {
   const alt = T("Un empêchement ? Réponds à ce courriel ou change ta cueillette dans ton compte.",
     "Can't make it? Reply to this email or change your pickup in your account.");
   const label = T("Voir ma commande", "See my order");
-  const html =
-    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-    '<h1 style="font-size:22px;margin:0 0 10px">' + esc(head) + '</h1>' +
-    '<p style="margin:0 0 14px">' + T("Bonjour ", "Hello ") + esc(first) + ',</p><p style="margin:0 0 16px">' + esc(msg) + '</p>' +
-    '<p style="margin:0 0 16px;color:#6C727C;font-size:13px">' + esc(alt) + '</p>' +
-    '<p style="margin:22px 0"><a href="' + link + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' + esc(label) + '</a></p></div>';
+  await M.loadCompany(db);
+  const html = M.page({
+    lang: en ? "en" : "fr", tag: T("Cueillette", "Pickup"), ref: o.number,
+    title: T("Ta cueillette est dans environ 1 h", "Your pickup is in about 1 hour"),
+    preheader: msg,
+    body: M.text(T("Bonjour ", "Hello ") + esc(first) + ",") + M.notice(esc(when), "ok") + M.text(esc(msg)) +
+      M.button(link, label) + M.small(esc(alt)),
+  });
   const text = T("Bonjour ", "Hello ") + first + ",\n\n" + msg + "\n" + alt + "\n\n" + link + "\n\nCréation Audio\n" + SITE + (en ? "/en/" : "/");
   await send(resendKey, from, { to: [o.email], reply_to: REPLY_TO, subject: head + " — Création Audio", html, text });
 }

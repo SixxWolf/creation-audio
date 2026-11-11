@@ -18,6 +18,7 @@
 //   ORDER_NOTIFY_TO   optionnel, défaut « contact@creationaudio.ca »
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import * as M from "../_shared/mail.ts";
 
 const SITE = "https://creationaudio.ca";
 
@@ -117,36 +118,27 @@ Deno.serve(async (req) => {
     (order.note ? "\nNote du dealer : " + order.note + "\n" : "") +
     "\nOuvrir dans l'admin : " + adminUrl + "\n";
 
-  const rowsHtml = L.map((l) => {
-    const st = l.product_id ? (stock.get(l.product_id) ?? 0) : 0;
-    const toPrint = Math.max(0, l.qty - st);
-    return '<tr>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;font-weight:700">' + esc(l.name) + '</td>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right;color:' + (toPrint ? '#B23F12' : '#16794A') + '">' +
-        (toPrint ? toPrint + " à imprimer" : "en stock") + '</td>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(l.line_total) + '</td>' +
-    '</tr>';
-  }).join("");
-  const html =
-    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Portail dealer</p>' +
-    '<h1 style="font-size:22px;margin:0 0 6px">' + esc(label) + ' ' + esc(order.number) + '</h1>' +
-    '<p style="margin:0 0 16px;color:#3A3D45">' + esc(who) + '</p>' +
-    (event === "cancelled" ? '<p style="padding:10px 12px;background:#FDECEA;border-radius:10px;color:#B42A19;font-weight:700">Le dealer a annulé cette commande.</p>' : "") +
-    '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
-      '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">Spacer</th><th style="padding:8px 10px;text-align:right">Qté</th>' +
-      '<th style="padding:8px 10px;text-align:right">Stock</th><th style="padding:8px 10px;text-align:right">Total</th></tr>' +
-      rowsHtml +
-    '</table>' +
-    (order.delivery === "ship"
-      ? '<p style="margin:14px 0 0;text-align:right;font-size:14px">Livraison : ' + (Number(order.ship_fee) > 0 ? money(order.ship_fee) : "gratuite") + '</p>' +
-        '<p style="margin:4px 0 0;text-align:right;font-size:14px">' + esc(order.ship_address) + '</p>'
-      : '<p style="margin:14px 0 0;text-align:right;font-size:14px">Cueillette</p>') +
-    '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>Total dealer : ' + money(order.total) + '</strong></p>' +
-    (order.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Note :</strong> ' + esc(order.note) + '</p>' : "") +
-    '<p style="margin:22px 0"><a href="' + adminUrl + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">Ouvrir dans l\'admin</a></p>' +
-    "</div>";
+  await M.loadCompany(db);
+  const pics = await M.thumbs(db, L);
+  const html = M.page({
+    lang: "fr", admin: true, tag: "Portail dealer", ref: order.number, title: label,
+    preheader: who + " · " + pairs + " paire" + (pairs > 1 ? "s" : "") + " · " + money(order.total),
+    body:
+      M.who(order.dealer_name, order.dealer_email) +
+      (event === "cancelled" ? M.notice("Le dealer a annulé cette commande.", "bad") : "") +
+      M.items(L.map((l, i) => {
+        const st = l.product_id ? (stock.get(l.product_id) ?? 0) : 0;
+        const toPrint = Math.max(0, l.qty - st);
+        return { label: l.name, thumb: pics[i], sub: esc(l.qty) + " × " + esc(money(l.unit_price)),
+          flag: toPrint ? { text: toPrint + " à imprimer", tone: "warn" as const } : { text: "en stock", tone: "ok" as const },
+          right: money(l.line_total) };
+      })) +
+      M.totalBox("Total dealer", money(order.total), [],
+        order.delivery === "ship" ? [["Livraison", Number(order.ship_fee) > 0 ? money(order.ship_fee) : "gratuite"]] : [["Mode", "Cueillette"]]) +
+      (order.delivery === "ship" && order.ship_address ? M.kv([["Adresse de livraison", M.nl2br(order.ship_address)]]) : "") +
+      (order.note ? M.quote(order.note, "Note du dealer :") : "") +
+      M.button(adminUrl, "Ouvrir dans l'admin", 18),
+  });
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",

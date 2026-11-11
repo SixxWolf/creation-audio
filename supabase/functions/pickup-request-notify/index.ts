@@ -8,6 +8,7 @@
 // Secrets : RESEND_API_KEY ; MAIL_FROM et ORDER_NOTIFY_TO optionnels.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import * as M from "../_shared/mail.ts";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -58,16 +59,16 @@ async function send(key: string, from: string, msg: Record<string, unknown>) {
   if (!res.ok) throw new Error("Resend " + res.status + " : " + (await res.text()).slice(0, 200));
 }
 
+// gabarit commun (même look que la facture). wrap : lang / n° posés par la requête (LANG, REF)
+let LANG: "fr" | "en" = "fr", REF = "", TAG = "Cueillette";
 function wrap(kicker: string, title: string, body: string) {
-  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">' + esc(kicker) + '</p>' +
-    '<h1 style="font-size:22px;margin:0 0 10px">' + esc(title) + '</h1>' + body + "</div>";
+  const admin = kicker !== "Création Audio";
+  return M.page({ lang: admin ? "fr" : LANG, admin, tag: admin ? kicker : TAG, ref: REF, title, body });
 }
-const box = (t: string, ok = true) =>
-  '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:' + (ok ? "#E7F6EE;color:#16794A" : "#F3F3F0;color:#3A3D45") + ';font-weight:700">' + esc(t) + '</p>';
-const btn = (href: string, t: string) =>
-  '<p style="margin:22px 0"><a href="' + href + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' + esc(t) + '</a></p>';
-const quote = (t: string) => t ? '<p style="margin:0 0 16px;color:#3A3D45;font-style:italic">« ' + esc(t) + ' »</p>' : "";
+const box = (t: string, ok = true) => M.notice(esc(t), ok ? "ok" : "info");
+const btn = (href: string, t: string) => M.button(href, t);
+const quote = (t: string) => M.quote(t);
+const p = (h: string) => M.text(h);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -124,6 +125,9 @@ Deno.serve(async (req) => {
   const en = cust?.lang === "en";
   const accountUrl = SITE + (en ? "/en" : "") + "/compte#/cueillette/" + slug;
   const results: Record<string, string> = {};
+  LANG = en ? "en" : "fr"; REF = String(x.number || "");
+  TAG = kind === "invoice" ? (en ? "Invoice" : "Facture") : kind === "reservation" ? (en ? "Reservation" : "Réservation") : (en ? "Order" : "Commande");
+  await M.loadCompany(db);
 
   if (event === "request") {
     if (!rq || rq.state !== "pending") return json({ result: "skipped", reason: "aucune demande" });
@@ -132,7 +136,7 @@ Deno.serve(async (req) => {
     const aText = "Demande d'exception de cueillette — " + what + "\n" + who + " · " + x.email + (x.phone ? " · " + x.phone : "") +
       "\n\nDemande : " + pk + (rq.note ? "\nMot : " + rq.note : "") + "\n\nRépondre dans l'admin : " + adminUrl + "\n";
     const aHtml = wrap("Cueillette", "Demande d'exception — " + what,
-      '<p style="margin:0 0 16px;color:#3A3D45">' + esc(who) + ' · ' + esc(x.email) + (x.phone ? ' · ' + esc(x.phone) : '') + '</p>' +
+      M.who(who, x.email, x.phone) +
       box("Demande : " + pk) + quote(rq.note || "") + btn(adminUrl, "Approuver ou refuser"));
     try {
       await send(resendKey, from, { to: [adminTo], reply_to: x.email, subject: "Exception cueillette " + what + " — " + who + " · " + pk, html: aHtml, text: aText });
@@ -144,8 +148,8 @@ Deno.serve(async (req) => {
       ? "Hello " + first + ",\n\nWe got your request for " + pkE + ". We'll confirm by email.\n\n" + accountUrl + "\n\nCréation Audio\n" + SITE + "/en/"
       : "Bonjour " + first + ",\n\nC'est reçu : ta demande pour " + pk + ". On te confirme par courriel.\n\n" + accountUrl + "\n\nCréation Audio\n" + SITE;
     const cHtml = en
-      ? wrap("Création Audio", "Request received", '<p style="margin:0 0 14px">Hello ' + esc(first) + ', we got your request.</p>' + box("Requested: " + pkE, false) + btn(accountUrl, "See my order"))
-      : wrap("Création Audio", "Demande reçue", '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', c\'est reçu.</p>' + box("Demande : " + pk, false) + btn(accountUrl, "Voir ma commande"));
+      ? wrap("Création Audio", "Request received", p('Hello ' + esc(first) + ', we got your request.') + box("Requested: " + pkE, false) + btn(accountUrl, "See my order"))
+      : wrap("Création Audio", "Demande reçue", p('Bonjour ' + esc(first) + ', c\'est reçu.') + box("Demande : " + pk, false) + btn(accountUrl, "Voir ma commande"));
     try {
       await send(resendKey, from, { to: [x.email], reply_to: REPLY_TO, subject: cSubject, html: cHtml, text: cText });
       results.client = "sent";
@@ -158,10 +162,12 @@ Deno.serve(async (req) => {
   if (event === "ready") {
     // « tes articles sont arrivés » : le client choisit sa cueillette dans Mon compte
     if (kind !== "invoice" || !x.pickup_ready_at) return json({ result: "skipped", reason: "facture non prévenue" });
-    const { data: pl } = await db.from("invoice_lines").select("label,meta,qty_pending").eq("invoice_id", id).gt("qty_pending", 0).order("sort_order");
-    const items = (pl || []) as { label: string; meta: string | null; qty_pending: number }[];
+    const { data: pl } = await db.from("invoice_lines").select("label,meta,qty_pending,product_id,kind").eq("invoice_id", id).gt("qty_pending", 0).order("sort_order");
+    const items = (pl || []) as { label: string; meta: string | null; qty_pending: number; product_id: string | null; kind: string | null }[];
     const li = items.map((l) => l.qty_pending + " × " + l.label + (l.meta ? " — " + l.meta : ""));
-    const listHtml = '<ul style="margin:0 0 16px;padding-left:20px;color:#3A3D45">' + li.map((t) => "<li>" + esc(t) + "</li>").join("") + "</ul>";
+    const pics = await M.thumbs(db, items);
+    const listHtml = M.items(items.map((l, i) => ({ label: l.label, meta: l.meta, thumb: pics[i], right: "× " + l.qty_pending }))) +
+      '<div style="height:18px;line-height:18px;font-size:0">&nbsp;</div>';
     const listTxt = li.map((t) => "- " + t).join("\n");
     const nTxt = (items.reduce((s, l) => s + l.qty_pending, 0) > 1) ? true : false;
     cSubject = en ? "Your items have arrived — Création Audio" : (nTxt ? "Tes articles sont arrivés" : "Ton article est arrivé") + " — Création Audio";
@@ -170,8 +176,8 @@ Deno.serve(async (req) => {
       : "Bonjour " + first + ",\n\n" + (nTxt ? "Tes articles de la facture " : "Ton article de la facture ") + x.number + (nTxt ? " sont arrivés :\n" : " est arrivé :\n") + listTxt +
         "\n\nChoisis ton heure de cueillette : " + accountUrl + "\n\nCréation Audio\n" + SITE;
     cHtml = en
-      ? wrap("Création Audio", "Your items have arrived", '<p style="margin:0 0 14px">Hello ' + esc(first) + ', your items for invoice ' + esc(x.number) + ' are here.</p>' + listHtml + btn(accountUrl, "Pick my pickup time"))
-      : wrap("Création Audio", nTxt ? "Tes articles sont arrivés" : "Ton article est arrivé", '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', c\'est arrivé pour la facture ' + esc(x.number) + '.</p>' + listHtml + btn(accountUrl, "Choisir ma cueillette"));
+      ? wrap("Création Audio", "Your items have arrived", p('Hello ' + esc(first) + ', your items for invoice ' + esc(x.number) + ' are here.') + listHtml + btn(accountUrl, "Pick my pickup time"))
+      : wrap("Création Audio", nTxt ? "Tes articles sont arrivés" : "Ton article est arrivé", p('Bonjour ' + esc(first) + ', c\'est arrivé pour la facture ' + esc(x.number) + '.') + listHtml + btn(accountUrl, "Choisir ma cueillette"));
   } else if (event === "approved" || event === "confirmed") {
     if (!x.pickup_date) return json({ result: "skipped", reason: "aucune cueillette" });
     const pk = fmtPickup(x.pickup_date, x.pickup_start), pkE = fmtPickup(x.pickup_date, x.pickup_start, true);
@@ -181,11 +187,10 @@ Deno.serve(async (req) => {
     const tel = String(cfg?.value?.phone || "").trim() || "581 446-3858";
     const iac = String(cfg?.value?.interac || "").trim() || "contact@creationaudio.ca";
     const payTxt = en ? "Cash or Interac e-Transfer to " + iac : "Comptant ou virement Interac à " + iac;
-    const row = (k: string, v: string) => '<b>' + k + '</b><br>' + v;
-    const addrBox = '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#F3F3F0;color:#181A1F;line-height:1.5">' +
-      [addr ? row(en ? "Address" : "Adresse", esc(addr)) : "",
-       row(en ? "Phone" : "Téléphone", '<a href="tel:+1' + tel.replace(/\D/g, "").slice(-10) + '" style="color:#181A1F">' + esc(tel) + '</a>'),
-       row(en ? "Payment" : "Paiement", esc(payTxt))].filter(Boolean).join('<br><br>') + '</p>';
+    const addrBox = M.kv([
+      [en ? "Address" : "Adresse", addr ? esc(addr) : ""],
+      [en ? "Phone" : "Téléphone", '<a href="tel:+1' + tel.replace(/\D/g, "").slice(-10) + '" style="color:inherit">' + esc(tel) + '</a>'],
+      [en ? "Payment" : "Paiement", esc(payTxt)]]);
     const addrTxt = (addr ? (en ? "\nAddress: " : "\nAdresse : ") + addr : "") +
       (en ? "\nPhone: " : "\nTéléphone : ") + tel + (en ? "\nPayment: " : "\nPaiement : ") + payTxt + "\n";
     const ok = event === "confirmed";
@@ -193,8 +198,8 @@ Deno.serve(async (req) => {
     cText = en ? "Hello " + first + ",\n\n" + (ok ? "Your pickup is confirmed" : "Good news: your request is approved") + ". See you " + pkE + "." + addrTxt + "\n" + accountUrl + "\n\nCréation Audio\n" + SITE + "/en/"
       : "Bonjour " + first + ",\n\n" + (ok ? "Ta cueillette est confirmée" : "Bonne nouvelle : ta demande est approuvée") + ". On t'attend " + pk + "." + addrTxt + "\n" + accountUrl + "\n\nCréation Audio\n" + SITE;
     cHtml = en
-      ? wrap("Création Audio", ok ? "Pickup confirmed" : "Request approved", '<p style="margin:0 0 14px">Hello ' + esc(first) + ', for ' + esc(what.toLowerCase().replace("commande", "order").replace("réservation", "reservation").replace("facture", "invoice")) + '.</p>' + box("See you " + pkE + ".") + addrBox + btn(accountUrl, "See my order"))
-      : wrap("Création Audio", ok ? "Cueillette confirmée" : "Demande approuvée", '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', pour ' + esc(what.toLowerCase()) + '.</p>' + box("On t'attend " + pk + ".") + addrBox + btn(accountUrl, "Voir ma commande"));
+      ? wrap("Création Audio", ok ? "Pickup confirmed" : "Request approved", p('Hello ' + esc(first) + ', for ' + esc(what.toLowerCase().replace("commande", "order").replace("réservation", "reservation").replace("facture", "invoice")) + '.') + box("See you " + pkE + ".") + addrBox + btn(accountUrl, "See my order"))
+      : wrap("Création Audio", ok ? "Cueillette confirmée" : "Demande approuvée", p('Bonjour ' + esc(first) + ', pour ' + esc(what.toLowerCase()) + '.') + box("On t'attend " + pk + ".") + addrBox + btn(accountUrl, "Voir ma commande"));
   } else {
     if (!rq || rq.state !== "refused") return json({ result: "skipped", reason: "aucun refus" });
     const pk = fmtPickup(rq.d, rq.s), pkE = fmtPickup(rq.d, rq.s, true), cur = fmtPickup(x.pickup_date, x.pickup_start), curE = fmtPickup(x.pickup_date, x.pickup_start, true);
@@ -203,8 +208,8 @@ Deno.serve(async (req) => {
       ? "Hello " + first + ",\n\nWe can't do " + pkE + "." + (rq.reply ? "\n\n" + rq.reply : "") + "\n\nPick another time slot: " + accountUrl + "\n\nCréation Audio\n" + SITE + "/en/"
       : "Bonjour " + first + ",\n\nOn ne peut pas pour " + pk + "." + (rq.reply ? "\n\n" + rq.reply : "") + "\n\nChoisis une autre plage : " + accountUrl + "\n\nCréation Audio\n" + SITE;
     cHtml = en
-      ? wrap("Création Audio", "Request declined", '<p style="margin:0 0 14px">Hello ' + esc(first) + ', we can\'t do ' + esc(pkE) + '.</p>' + quote(rq.reply || "") + (curE ? box("Your pickup stays " + curE + ".", false) : "") + btn(accountUrl, "Pick another time"))
-      : wrap("Création Audio", "Demande refusée", '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', on ne peut pas pour ' + esc(pk) + '.</p>' + quote(rq.reply || "") + (cur ? box("Ta cueillette reste " + cur + ".", false) : "") + btn(accountUrl, "Choisir une autre plage"));
+      ? wrap("Création Audio", "Request declined", p('Hello ' + esc(first) + ', we can\'t do ' + esc(pkE) + '.') + quote(rq.reply || "") + (curE ? box("Your pickup stays " + curE + ".", false) : "") + btn(accountUrl, "Pick another time"))
+      : wrap("Création Audio", "Demande refusée", p('Bonjour ' + esc(first) + ', on ne peut pas pour ' + esc(pk) + '.') + quote(rq.reply || "") + (cur ? box("Ta cueillette reste " + cur + ".", false) : "") + btn(accountUrl, "Choisir une autre plage"));
   }
   try {
     await send(resendKey, from, { to: [x.email], reply_to: REPLY_TO, subject: cSubject, html: cHtml, text: cText });

@@ -27,6 +27,7 @@
 // Secrets : RESEND_API_KEY (déjà posé pour waitlist-notify) ; MAIL_FROM optionnel.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import * as M from "../_shared/mail.ts";
 
 const ADMIN_EMAIL = "creationaudio.ca@gmail.com";
 const SITE = "https://creationaudio.ca";
@@ -70,22 +71,22 @@ function mailContent(code: string, forMessage: boolean, en: boolean, forDealer =
     L("Il expire dans 10 minutes.", "It expires in 10 minutes.") + "\n\n" +
     ignore + "\n\n" +
     "Création Audio\n" + SITE + (en ? "/en/" : "");
-  const html =
-    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-    '<h1 style="font-size:22px;margin:0 0 14px">' + (forMessage ? L("Confirme ton courriel", "Confirm your email") : L("Ton code de connexion", "Your sign-in code")) + "</h1>" +
-    "<p>" + L("Bonjour,", "Hello,") + "</p>" +
-    "<p>" + (forMessage ? L("Voici ton code pour envoyer ton message", "Here is your code to send your message")
-                        : forDealer ? L("Voici ton code pour te connecter au portail revendeur", "Here is your code to sign in to the dealer portal")
-                        : L("Voici ton code pour te connecter à ton compte", "Here is your code to sign in to your account")) + L("&nbsp;:", ":") + "</p>" +
-    '<p style="margin:20px 0;font-size:34px;font-weight:700;letter-spacing:.18em;font-family:Consolas,Menlo,monospace;' +
-    'background:#F4F3EF;border-radius:12px;padding:14px 20px;display:inline-block">' + code + "</p>" +
-    "<p>" + L("Il expire dans <strong>10 minutes</strong>.", "It expires in <strong>10 minutes</strong>.") +
-    (forMessage ? L(" Tu retrouveras la conversation dans ton compte Création Audio.", " You'll find the conversation in your Création Audio account.") : "") + "</p>" +
-    '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-    '<p style="font-size:12px;color:#6C727C">' + ignore.replace(" : ", "&nbsp;: ") + ' ' +
-    '<a href="' + SITE + (en ? "/en/" : "") + '" style="color:#6C727C">creationaudio.ca</a></p>' +
-    "</div>";
+  const html = M.page({
+    lang: en ? "en" : "fr",
+    tag: forDealer ? L("Portail revendeur", "Dealer portal") : forMessage ? L("Messagerie", "Messages") : L("Mon compte", "My account"),
+    title: forMessage ? L("Confirme ton courriel", "Confirm your email") : L("Ton code de connexion", "Your sign-in code"),
+    preheader: L("Ton code : ", "Your code: ") + code + L(" · il expire dans 10 minutes.", " · it expires in 10 minutes."),
+    body:
+      M.text(L("Bonjour,", "Hello,")) +
+      M.text((forMessage ? L("Voici ton code pour envoyer ton message", "Here is your code to send your message")
+                         : forDealer ? L("Voici ton code pour te connecter au portail revendeur", "Here is your code to sign in to the dealer portal")
+                         : L("Voici ton code pour te connecter à ton compte", "Here is your code to sign in to your account")) + L("&nbsp;:", ":")) +
+      M.codeBox(code) +
+      M.text(L("Il expire dans <strong>10 minutes</strong>.", "It expires in <strong>10 minutes</strong>.") +
+        (forMessage ? L(" Tu retrouveras la conversation dans ton compte Création Audio.", " You'll find the conversation in your Création Audio account.") : "")) +
+      M.small(ignore.replace(" : ", "&nbsp;: "), 6),
+    foot: null,
+  });
   return { subject, text, html };
 }
 
@@ -125,6 +126,7 @@ Deno.serve(async (req) => {
     const { data: gate, error } = await db.rpc("compte_code_issue", { p_email: email, p_ip: ip, p_code: code });
     if (error || !gate) return json({ error: "unavailable" }, 503);
     if (!gate.allowed) return json({ error: "wait", retry_after: gate.retry_after }, 429);
+    await M.loadCompany(db);
     const mail = mailContent(code, body.purpose === "message", body.lang === "en", forDealer);
     try {
       const res = await fetch("https://api.resend.com/emails", {

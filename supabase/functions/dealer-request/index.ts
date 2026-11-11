@@ -15,6 +15,7 @@
 // SQL : schema-v2.sql « DEMANDES D'ACCÈS REVENDEUR ». Secrets : RESEND_API_KEY ; MAIL_FROM optionnel.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import * as M from "../_shared/mail.ts";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -33,17 +34,12 @@ const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) =>
 const str = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 /* ---------- courriels ---------- */
-function frame(title: string, inner: string) {
-  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:540px;margin:0 auto;color:#181A1F;line-height:1.55">' +
-    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">Création Audio</p>' +
-    '<h1 style="font-size:22px;margin:0 0 14px">' + title + "</h1>" + inner +
-    '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-    '<p style="font-size:12px;color:#6C727C">Création Audio · <a href="' + SITE + '" style="color:#6C727C">creationaudio.ca</a></p>' +
-    "</div>";
+// gabarit commun (même look que la facture) : voir ../_shared/mail.ts ; les <p> nus prennent le style du texte
+function frame(title: string, inner: string, en = false) {
+  return M.page({ lang: en ? "en" : "fr", tag: en ? "Dealer program" : "Programme revendeur", title,
+    body: inner.replace(/<p>/g, M.text("").replace("</p>", "")) });
 }
-const button = (href: string, label: string) =>
-  '<p style="margin:22px 0"><a href="' + href + '" style="display:inline-block;background:#FF6A2B;color:#fff;' +
-  'text-decoration:none;font-weight:700;padding:13px 22px;border-radius:12px">' + label + "</a></p>";
+const button = (href: string, label: string) => M.button(href, label, 6);
 
 function receivedMail(business: string, contact: string, en: boolean) {
   const L = (fr: string, eng: string) => (en ? eng : fr);
@@ -57,7 +53,7 @@ function receivedMail(business: string, contact: string, en: boolean) {
     L("L'équipe Création Audio", "The Création Audio team") + "\n" + SITE + (en ? "/en/" : "");
   const html = frame(L("Demande reçue", "Request received"),
     "<p>" + L("Bonjour ", "Hi ") + esc(first) + ",</p><p>" + p1 + "<strong>" + esc(business) + "</strong>.</p>" +
-    "<p>" + p2 + "</p><p>" + p3 + "</p>");
+    "<p>" + p2 + "</p>", en);
   return { subject, text, html };
 }
 
@@ -83,7 +79,7 @@ function welcomeMail(name: string, lang: "fr" | "en" | "both") {
     return {
       subject: en ? "Your dealer access is open" : "Ton accès revendeur est ouvert",
       text: b.text + "\n\n" + (en ? "The Création Audio team" : "L'équipe Création Audio"),
-      html: frame(en ? "Welcome aboard" : "Bienvenue parmi nos revendeurs", b.html),
+      html: frame(en ? "Welcome aboard" : "Bienvenue parmi nos revendeurs", b.html, en),
     };
   }
   const fr = welcomeBlock(false, ""), en = welcomeBlock(true, "");
@@ -91,8 +87,8 @@ function welcomeMail(name: string, lang: "fr" | "en" | "both") {
     subject: "Ton accès revendeur est ouvert · Your dealer access is open",
     text: fr.text + "\n\n— English —\n\n" + en.text + "\n\nL'équipe Création Audio",
     html: frame("Bienvenue parmi nos revendeurs", fr.html +
-      '<hr style="border:none;border-top:1px solid #E7E7E2;margin:22px 0">' +
-      '<h2 style="font-size:18px;margin:0 0 12px">Welcome aboard</h2>' + en.html),
+      '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:14px 0 18px"><tr class="rule"><td style="border-top:1px solid #E7E7E2;font-size:0;line-height:0;height:1px">&nbsp;</td></tr></table>' +
+      '<h2 class="ink" style="margin:0 0 12px;font-family:\'Space Grotesk\',Inter,Segoe UI,Roboto,Arial,sans-serif;font-size:20px;line-height:26px;font-weight:700;color:#181A1F">Welcome aboard</h2>' + en.html),
   };
 }
 

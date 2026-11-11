@@ -18,6 +18,7 @@
 // Secrets : RESEND_API_KEY ; MAIL_FROM et MESSAGE_NOTIFY_TO optionnels.
 // =========================================================
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import * as M from "../_shared/mail.ts";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -58,17 +59,11 @@ async function send(m: Mailer, msg: Record<string, unknown>) {
   if (!res.ok) throw new Error("Resend " + res.status + " : " + (await res.text()).slice(0, 200));
 }
 
-const box = (inner: string) =>
-  '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' + inner + "</div>";
-const eyebrow = (t: string) =>
-  '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">' + esc(t) + "</p>";
-const button = (href: string, label: string) =>
-  '<p style="margin:22px 0"><a href="' + href + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;' +
-  'padding:12px 22px;border-radius:100px;display:inline-block">' + esc(label) + "</a></p>";
+// gabarit commun (même look que la facture) : voir ../_shared/mail.ts
+const button = (href: string, label: string) => M.button(href, label, 18);
 const quote = (body: string, when = "") =>
-  '<div style="margin:0 0 8px;padding:14px 16px;background:#F4F3EF;border-radius:12px">' +
-  (when ? '<div style="font-size:12px;color:#6C727C;margin:0 0 4px">' + esc(when) + "</div>" : "") +
-  (body ? nl2br(body) : '<span style="color:#6C727C">(photo)</span>') + "</div>";
+  M.panel((when ? '<div class="soft" style="font-size:12px;line-height:16px;color:#6C727C;margin:0 0 4px">' + esc(when) + "</div>" : "") +
+    (body ? nl2br(body) : '<span class="soft" style="color:#6C727C">(photo)</span>'));
 // série de messages : l'heure n'est utile que s'il y en a plusieurs
 const quotes = (list: Msg[]) => list.map((x) => quote(String(x.body || "").trim(), list.length > 1 ? hour(x.created_at) : "")).join("");
 const asText = (list: Msg[]) => list.map((x) =>
@@ -92,10 +87,7 @@ async function mailAdmin(db: SupabaseClient, m: Mailer, conv: Conv) {
   let shots = "";
   if (photos.length) {
     const { data: signed } = await db.storage.from("messages").createSignedUrls(photos, 7 * 24 * 3600);
-    shots = '<p style="margin:10px 0 0">' + (signed || []).filter((s) => s.signedUrl).map((s, i) =>
-      '<a href="' + esc(s.signedUrl) + '" style="display:inline-block;margin:0 6px 6px 0">' +
-      '<img src="' + esc(s.signedUrl) + '" alt="Photo ' + (i + 1) + '" width="120" height="120" ' +
-      'style="width:120px;height:120px;object-fit:cover;border-radius:10px;border:1px solid #E7E7E2"></a>').join("") + "</p>";
+    shots = M.photoGrid((signed || []).filter((s) => s.signedUrl).map((s) => s.signedUrl as string));
   }
   const { count } = await db.from("messages").select("id", { count: "exact", head: true }).eq("conversation_id", conv.id);
   const isNew = (count || 0) <= list.length;   // toute la conversation est dans la série
@@ -110,14 +102,13 @@ async function mailAdmin(db: SupabaseClient, m: Mailer, conv: Conv) {
     asText(list) + "\n" +
     (photos.length ? "\n" + nPhotos(photos.length) + " jointe" + (photos.length > 1 ? "s" : "") + "\n" : "") +
     "\nRépondre dans l'admin : " + adminUrl + "\n";
-  const html = box(
-    eyebrow("Messagerie · " + about) +
-    '<h1 style="font-size:22px;margin:0 0 6px">' + esc(who) + "</h1>" +
-    '<p style="margin:0 0 16px;color:#3A3D45">' + esc(cust.email) + (cust.phone ? " · " + esc(cust.phone) : "") +
-      (conv.page ? '<br><span style="font-size:12px;color:#6C727C">Depuis ' + esc(conv.page) + "</span>" : "") + "</p>" +
-    quotes(list) + shots +
-    button(adminUrl, "Répondre") +
-    '<p style="font-size:12px;color:#6C727C">Un seul avis par série de messages restée non lue 5 min.</p>');
+  const html = M.page({
+    lang: "fr", admin: true, tag: "Messagerie", ref: TOPIC[conv.topic] || "Question", refSub: conv.ref || "", title: what,
+    preheader: who + " · " + (String(list[0]?.body || "").trim().slice(0, 90) || "photo"),
+    body: M.who(cust.name, cust.email, cust.phone, conv.page ? "Depuis " + esc(conv.page) : "") +
+      quotes(list) + shots + button(adminUrl, "Répondre") +
+      M.small("Un seul avis par série de messages restée non lue 5 min."),
+  });
   await send(m, { to: [to], reply_to: cust.email, subject: what + " — " + about + " — " + who, html, text });
 }
 
@@ -132,7 +123,7 @@ async function mailClient(db: SupabaseClient, m: Mailer, conv: Conv) {
   const photos = photosOf(list);
   const threadUrl = SITE + "/compte#/messages/" + conv.id;
   const photoNote = photos.length
-    ? '<p style="margin:8px 0 0;color:#6C727C;font-size:13px">' + nPhotos(photos.length) + " dans la conversation.</p>" : "";
+    ? M.small(nPhotos(photos.length) + " dans la conversation.") : "";
   // conversation lancée par l'admin (aucun message du client) : « message », pas « réponse »
   const { count: fromClient } = await db.from("messages").select("id", { count: "exact", head: true })
     .eq("conversation_id", conv.id).eq("sender", "client");
@@ -141,14 +132,11 @@ async function mailClient(db: SupabaseClient, m: Mailer, conv: Conv) {
     const text = asText(list) + "\n" +
       (photos.length ? "\n" + nPhotos(photos.length) + " dans la conversation.\n" : "") +
       "\nVoir et répondre : " + threadUrl + "\n\n" + SITE;
-    const html = box(
-      eyebrow("Création Audio") +
-      '<h1 style="font-size:22px;margin:0 0 14px">' + (list.length > 1 ? list.length + " nouveaux messages" : "Nouveau message") + "</h1>" +
-      quotes(list) + photoNote +
-      button(threadUrl, "Voir et répondre") +
-      '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-      '<p style="font-size:12px;color:#6C727C">Répondez dans la messagerie pour garder tout le fil au même endroit. ' +
-      '<a href="' + SITE + '" style="color:#6C727C">creationaudio.ca</a></p>');
+    const html = M.page({
+      lang: "fr", tag: "Messagerie", title: list.length > 1 ? list.length + " nouveaux messages" : "Nouveau message",
+      body: quotes(list) + photoNote + button(threadUrl, "Voir et répondre"),
+      foot: "Répondez dans la messagerie pour garder tout le fil au même endroit.",
+    });
     await send(m, { to: [cust.email], reply_to: REPLY_TO, subject: "Message de Création Audio", html, text });
     return;
   }
@@ -159,16 +147,12 @@ async function mailClient(db: SupabaseClient, m: Mailer, conv: Conv) {
     asText(list) + "\n" +
     (photos.length ? "\n" + nPhotos(photos.length) + " dans la conversation.\n" : "") +
     "\nVoir et répondre : " + threadUrl + "\n\nCréation Audio\n" + SITE;
-  const html = box(
-    eyebrow("Création Audio") +
-    '<h1 style="font-size:22px;margin:0 0 10px">On t\'a répondu</h1>' +
-    '<p style="margin:0 0 14px">Bonjour' + (first ? " " + esc(first) : "") + ", voici notre réponse à ta question <strong>" +
-      esc(about) + "</strong>&nbsp;:</p>" +
-    quotes(list) + photoNote +
-    button(threadUrl, "Voir et répondre") +
-    '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-    '<p style="font-size:12px;color:#6C727C">Réponds dans la messagerie pour garder tout le fil au même endroit. ' +
-    '<a href="' + SITE + '" style="color:#6C727C">creationaudio.ca</a></p>');
+  const html = M.page({
+    lang: "fr", tag: "Messagerie", ref: TOPIC[conv.topic] || "Question", refSub: conv.ref || "", title: "On t'a répondu",
+    body: M.text("Bonjour" + (first ? " " + esc(first) : "") + ", voici notre réponse à ta question <strong>" + esc(about) + "</strong>&nbsp;:") +
+      quotes(list) + photoNote + button(threadUrl, "Voir et répondre"),
+    foot: "Réponds dans la messagerie pour garder tout le fil au même endroit.",
+  });
   await send(m, { to: [cust.email], reply_to: REPLY_TO, subject: "Création Audio t'a répondu — " + about, html, text });
 }
 
@@ -181,18 +165,15 @@ async function mailClientEn(db: SupabaseClient, m: Mailer, conv: Conv, cust: { e
     const nPh = (n: number) => n + " photo" + (n > 1 ? "s" : "");
     const threadUrl = SITE + "/en/compte#/messages/" + conv.id;
     const photoNote = photos.length
-      ? '<p style="margin:8px 0 0;color:#6C727C;font-size:13px">' + nPh(photos.length) + " in the conversation.</p>" : "";
-    const foot = '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-      '<p style="font-size:12px;color:#6C727C">Reply in the messages to keep the whole thread in one place. ' +
-      '<a href="' + SITE + '/en/" style="color:#6C727C">creationaudio.ca</a></p>';
+      ? M.small(nPh(photos.length) + " in the conversation.") : "";
+    const foot = "Reply in the messages to keep the whole thread in one place.";
     const { count: fromClient } = await db.from("messages").select("id", { count: "exact", head: true })
       .eq("conversation_id", conv.id).eq("sender", "client");
     if (!fromClient) {
       const text = asText(list) + "\n" + (photos.length ? "\n" + nPh(photos.length) + " in the conversation.\n" : "") +
         "\nSee and reply: " + threadUrl + "\n\n" + SITE + "/en/";
-      const html = box(eyebrow("Création Audio") +
-        '<h1 style="font-size:22px;margin:0 0 14px">' + (list.length > 1 ? list.length + " new messages" : "New message") + "</h1>" +
-        quotes(list) + photoNote + button(threadUrl, "See and reply") + foot);
+      const html = M.page({ lang: "en", tag: "Messages", title: list.length > 1 ? list.length + " new messages" : "New message",
+        body: quotes(list) + photoNote + button(threadUrl, "See and reply"), foot });
       await send(m, { to: [cust.email], reply_to: REPLY_TO, subject: "Message from Création Audio", html, text });
       return;
     }
@@ -203,11 +184,9 @@ async function mailClientEn(db: SupabaseClient, m: Mailer, conv: Conv, cust: { e
       asText(list) + "\n" +
       (photos.length ? "\n" + nPh(photos.length) + " in the conversation.\n" : "") +
       "\nSee and reply: " + threadUrl + "\n\nCréation Audio\n" + SITE + "/en/";
-    const html = box(eyebrow("Création Audio") +
-      '<h1 style="font-size:22px;margin:0 0 10px">We replied</h1>' +
-      '<p style="margin:0 0 14px">Hello' + (first ? " " + esc(first) : "") + ", here is our reply to your question <strong>" +
-        esc(about) + "</strong>:</p>" +
-      quotes(list) + photoNote + button(threadUrl, "See and reply") + foot);
+    const html = M.page({ lang: "en", tag: "Messages", ref: TOPIC_EN[conv.topic] || "Question", refSub: conv.ref || "", title: "We replied",
+      body: M.text("Hello" + (first ? " " + esc(first) : "") + ", here is our reply to your question <strong>" + esc(about) + "</strong>:") +
+        quotes(list) + photoNote + button(threadUrl, "See and reply"), foot });
     await send(m, { to: [cust.email], reply_to: REPLY_TO, subject: "Création Audio replied — " + about, html, text });
   } finally { HOUR_LOC = "fr-CA"; }
 }
@@ -245,6 +224,7 @@ Deno.serve(async (req) => {
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: ok } = await db.rpc("reservation_cron_ok", { p_key: req.headers.get("x-cron-key") || "" });
   if (ok !== true) return json({ error: "Clé invalide." }, 401);
+  await M.loadCompany(db);
   const key = Deno.env.get("RESEND_API_KEY") || "";
   if (!key) return json({ error: "Envoi non configuré : secret RESEND_API_KEY manquant." }, 503);
   const m: Mailer = {

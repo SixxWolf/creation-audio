@@ -16,6 +16,7 @@
 // Secrets : RESEND_API_KEY ; MAIL_FROM et ORDER_NOTIFY_TO optionnels.
 // =========================================================
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import * as M from "../_shared/mail.ts";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -80,7 +81,8 @@ type Res = {
 };
 const pkOf = (r: Res, en = false) => fmtPickup(r.pickup_date, r.pickup_start, r.pickup_end, en);
 const pkLine = (r: Res, label = "Cueillette") => (pkOf(r) ? label + " : " + pkOf(r) + "\n" : "");
-type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number };
+type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number;
+  product_id?: string | null; kind?: string | null; thumb?: M.Thumb };
 
 type Mailer = { key: string; from: string; adminTo: string; db: SupabaseClient };
 // langue des courriels au client : customers.lang ('en' = version anglaise du site)
@@ -100,44 +102,38 @@ async function send(m: Mailer, msg: Record<string, unknown>) {
 function adminTo(m: Mailer, r: Res) { return /@resend\.dev$/i.test(r.email || "") ? "delivered@resend.dev" : m.adminTo; }
 
 // ---- gabarits ----
+// gabarit commun (même look que la facture). Le n° (R-0001) passe du titre à l'étiquette en haut
+// à droite ; la langue se lit dans le titre (versions anglaises : « Reservation… », « Your reservation… »).
 function shell(kicker: string, title: string, body: string) {
-  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">' + esc(kicker) + '</p>' +
-    '<h1 style="font-size:22px;margin:0 0 10px">' + esc(title) + '</h1>' + body + '</div>';
+  const admin = kicker !== "Création Audio";
+  const ref = (/\b[A-Z]+-\d+\b/.exec(title) || [""])[0];
+  const en = !admin && /^(Reservation|Your reservation)\b/.test(title);
+  return M.page({ lang: en ? "en" : "fr", admin, tag: en ? "Reservation" : "Réservation", ref,
+    title: ref ? title.replace(" " + ref, "") : title, body });
 }
-function box(text: string, tone: "ok" | "warn" | "info") {
-  const c = tone === "ok" ? "background:#E7F6EE;color:#16794A" : tone === "warn" ? "background:#FFF3EC;color:#9A4A0E" : "background:#F4F3EF;color:#3A3D45";
-  return '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;' + c + ';font-weight:700">' + esc(text) + '</p>';
-}
+function box(text: string, tone: "ok" | "warn" | "info") { return M.notice(esc(text), tone); }
 function table(L: Line[], total: number, en = false) {
-  return '<table style="width:100%;border-collapse:collapse;font-size:14px">' +
-    '<tr style="background:#F4F3EF"><th style="padding:8px 10px;text-align:left">' + (en ? "Item" : "Article") + '</th><th style="padding:8px 10px;text-align:right">' + (en ? "Qty" : "Qté") + '</th>' +
-    '<th style="padding:8px 10px;text-align:right">Total</th></tr>' +
-    L.map((l) => '<tr>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2"><strong>' + esc(l.name) + '</strong>' +
-        (l.meta ? '<br><span style="color:#6C727C;font-size:12px">' + esc(l.meta) + '</span>' : '') + '</td>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + esc(l.qty) + '</td>' +
-      '<td style="padding:8px 10px;border-bottom:1px solid #E7E7E2;text-align:right">' + money(l.line_total, en) + '</td></tr>').join("") +
-    '</table>' +
-    '<p style="margin:14px 0 0;text-align:right;font-size:16px"><strong>' + (en ? "Estimated total: " : "Total estimé : ") + money(total, en) + '</strong></p>';
+  return M.items(L.map((l) => ({ label: l.name, meta: l.meta, thumb: l.thumb,
+      sub: esc(l.qty) + " × " + esc(money(l.unit_price, en)), right: money(l.line_total, en) }))) +
+    M.totalBox(en ? "Estimated total" : "Total estimé", money(total, en));
 }
 function linesText(L: Line[], en = false) {
   return L.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + money(l.line_total, en)).join("\n");
 }
-function button(href: string, label: string) {
-  return '<p style="margin:22px 0"><a href="' + href + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' + esc(label) + '</a></p>';
-}
-const FOOT = '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-  '<p style="font-size:12px;color:#6C727C">Une question&nbsp;? Réponds simplement à ce courriel.</p>';
-const FOOT_EN = '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-  '<p style="font-size:12px;color:#6C727C">A question? Just reply to this email.</p>';
+function button(href: string, label: string) { return M.button(href, label, 18); }
+// le pied « Une question ? » est fourni par M.page
+const FOOT = "", FOOT_EN = "";
 const ACCOUNT_URL_EN = SITE + "/en/compte#/commandes";
 function first(r: Res) { return String(r.name || "").trim().split(/\s+/)[0] || ""; }
 
 async function linesOf(db: SupabaseClient, id: string) {
   const { data } = await db.from("customer_reservation_lines")
-    .select("name, meta, qty, unit_price, line_total").eq("reservation_id", id).order("sort_order");
-  return (data || []) as Line[];
+    .select("name, meta, qty, unit_price, line_total, product_id, kind").eq("reservation_id", id).order("sort_order");
+  const L = (data || []) as Line[];
+  await M.loadCompany(db);
+  const pics = await M.thumbs(db, L);
+  L.forEach((l, i) => { l.thumb = pics[i]; });
+  return L;
 }
 
 // ---- courriels ----
@@ -151,13 +147,13 @@ async function mailNew(m: Mailer, r: Res, L: Line[]) {
     "\nPasse avant l'échéance : après, les articles sont remis en vente et la réservation compte comme non récupérée " +
     "(2 non récupérées = réservations suspendues 60 jours). Un empêchement ? Annule-la dans ton compte : " + ACCOUNT_URL + "\n\nCréation Audio\n" + SITE;
   const html = shell("Création Audio", "Réservation " + r.number + " confirmée",
-    '<p style="margin:0 0 14px">Bonjour ' + esc(first(r)) + ', c\'est réservé&nbsp;!</p>' +
+    M.text('Bonjour ' + esc(first(r)) + ', c\'est réservé&nbsp;!') +
     box((pkOf(r) ? "Cueillette : " + pkOf(r) + ". " : "") + "On garde tes articles jusqu'au " + until + ".", "ok") + table(L, r.total) +
-    '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">Cueillette à Québec · tu paies à la cueillette.</p>' +
-    (r.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Ta note :</strong> ' + esc(r.note) + '</p>' : "") +
+    M.small('Cueillette à Québec · tu paies à la cueillette.') +
+    (r.note ? M.quote(r.note, 'Ta note :') : "") +
     button(ACCOUNT_URL, "Voir ma réservation") +
-    '<p style="font-size:13px;color:#3A3D45">Passe avant l\'échéance : après, les articles sont remis en vente et la réservation compte comme non récupérée ' +
-    '(2 non récupérées = réservations suspendues 60 jours). Un empêchement&nbsp;? Annule-la dans ton compte.</p>' + FOOT);
+    M.small('Passe avant l\'échéance : après, les articles sont remis en vente et la réservation compte comme non récupérée ' +
+    '(2 non récupérées = réservations suspendues 60 jours). Un empêchement&nbsp;? Annule-la dans ton compte.') + FOOT);
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
 }
 async function mailReminder(m: Mailer, r: Res, L: Line[]) {
@@ -168,9 +164,9 @@ async function mailReminder(m: Mailer, r: Res, L: Line[]) {
     linesText(L) + "\n\nTotal estimé : " + money(r.total) + "\n\nTu ne pourras pas passer ? Annule-la dans ton compte (" + ACCOUNT_URL +
     ") : elle ne comptera pas comme non récupérée.\n\nCréation Audio\n" + SITE;
   const html = shell("Création Audio", "Ta réservation " + r.number + " se termine bientôt",
-    '<p style="margin:0 0 14px">Bonjour ' + esc(first(r)) + ',</p>' +
+    M.text('Bonjour ' + esc(first(r)) + ',') +
     box((pkOf(r) ? "Ta cueillette : " + pkOf(r) + ". " : "") + "On la garde jusqu'au " + until + ".", "warn") + table(L, r.total) + button(ACCOUNT_URL, "Voir ma réservation") +
-    '<p style="font-size:13px;color:#3A3D45">Tu ne pourras pas passer&nbsp;? Annule-la dans ton compte : elle ne comptera pas comme non récupérée.</p>' + FOOT);
+    M.small('Tu ne pourras pas passer&nbsp;? Annule-la dans ton compte : elle ne comptera pas comme non récupérée.') + FOOT);
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
 }
 async function mailExpired(m: Mailer, r: Res, L: Line[], cust: { no_shows: number; reserve_suspended_until: string | null } | null) {
@@ -187,14 +183,14 @@ async function mailExpired(m: Mailer, r: Res, L: Line[], cust: { no_shows: numbe
       text: "Hello " + first(r) + ",\n\nYour reservation " + r.number + " has expired: the items are back on sale.\n\n" + statusEn +
         "\n\n" + linesText(L, true) + "\n\nSomething came up? Reply to this email.\n\nCréation Audio\n" + SITE + "/en/",
       html: shell("Création Audio", "Reservation " + r.number + " expired",
-        '<p style="margin:0 0 14px">Hello ' + esc(first(r)) + ', your reservation has expired: the items are back on sale.</p>' +
+        M.text('Hello ' + esc(first(r)) + ', your reservation has expired: the items are back on sale.') +
         box(statusEn, "warn") + table(L, r.total, true) + FOOT_EN.replace("A question?", "Something came up?")) });
   } else {
   const subject = "Réservation " + r.number + " expirée — Création Audio";
   const text = "Bonjour " + first(r) + ",\n\nTa réservation " + r.number + " a expiré : les articles sont remis en vente.\n\n" + status +
     "\n\n" + linesText(L) + "\n\nUn imprévu ? Réponds à ce courriel.\n\nCréation Audio\n" + SITE;
   const html = shell("Création Audio", "Réservation " + r.number + " expirée",
-    '<p style="margin:0 0 14px">Bonjour ' + esc(first(r)) + ', ta réservation a expiré : les articles sont remis en vente.</p>' +
+    M.text('Bonjour ' + esc(first(r)) + ', ta réservation a expiré : les articles sont remis en vente.') +
     box(status, "warn") + table(L, r.total) + FOOT.replace("Une question&nbsp;?", "Un imprévu&nbsp;?"));
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
   }
@@ -203,7 +199,7 @@ async function mailExpired(m: Mailer, r: Res, L: Line[], cust: { no_shows: numbe
   const aText = "Réservation " + r.number + " expirée (non récupérée)" + (susp ? " — réservations suspendues jusqu'au " + day(susp) : "") +
     "\n" + (r.name || "") + " · " + r.email + (r.phone ? " · " + r.phone : "") + "\n\n" + linesText(L) + "\n\nStock libéré. Admin : " + ADMIN_URL + "\n";
   const aHtml = shell("Réservation", "Réservation " + r.number + " expirée",
-    '<p style="margin:0 0 16px;color:#3A3D45">' + esc(r.name || "") + ' · ' + esc(r.email) + (r.phone ? ' · ' + esc(r.phone) : '') + '</p>' +
+    M.who(r.name || "", r.email, r.phone) +
     box("Non récupérée — stock libéré" + (susp ? " · réservations suspendues jusqu'au " + day(susp) : "") + ".", "warn") +
     table(L, r.total) + button(ADMIN_URL, "Ouvrir dans l'admin"));
   await send(m, { to: [adminTo(m, r)], reply_to: r.email, subject: aSubject, html: aHtml, text: aText });
@@ -215,14 +211,14 @@ async function mailAdminCancelled(m: Mailer, r: Res, L: Line[]) {
       text: "Hello " + first(r) + ",\n\nYour reservation " + r.number + " was cancelled by Création Audio. It doesn't count as not picked up.\n\n" +
         linesText(L, true) + "\n\nA question? Reply to this email.\n\nCréation Audio\n" + SITE + "/en/",
       html: shell("Création Audio", "Reservation " + r.number + " cancelled",
-        '<p style="margin:0 0 14px">Hello ' + esc(first(r)) + ',</p>' +
+        M.text('Hello ' + esc(first(r)) + ',') +
         box("Your reservation was cancelled by Création Audio. It doesn't count as not picked up.", "info") + table(L, r.total, true) + FOOT_EN) });
   }
   const subject = "Réservation " + r.number + " annulée — Création Audio";
   const text = "Bonjour " + first(r) + ",\n\nTa réservation " + r.number + " a été annulée par Création Audio. Elle ne compte pas comme non récupérée.\n\n" +
     linesText(L) + "\n\nUne question ? Réponds à ce courriel.\n\nCréation Audio\n" + SITE;
   const html = shell("Création Audio", "Réservation " + r.number + " annulée",
-    '<p style="margin:0 0 14px">Bonjour ' + esc(first(r)) + ',</p>' +
+    M.text('Bonjour ' + esc(first(r)) + ',') +
     box("Ta réservation a été annulée par Création Audio. Elle ne compte pas comme non récupérée.", "info") + table(L, r.total) + FOOT);
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
 }
@@ -238,12 +234,12 @@ async function mailNewEn(m: Mailer, r: Res, L: Line[]) {
     (r.note ? "\nYour note: " + r.note + "\n" : "") +
     "\n" + rule + ": " + ACCOUNT_URL_EN + "\n\nCréation Audio\n" + SITE + "/en/";
   const html = shell("Création Audio", "Reservation " + r.number + " confirmed",
-    '<p style="margin:0 0 14px">Hello ' + esc(first(r)) + ', it\'s reserved!</p>' +
+    M.text('Hello ' + esc(first(r)) + ', it\'s reserved!') +
     box((pk ? "Pickup: " + pk + ". " : "") + "We're holding your items until " + until + ".", "ok") + table(L, r.total, true) +
-    '<p style="margin:6px 0 0;text-align:right;color:#6C727C;font-size:13px">Pickup in Québec City · you pay at pickup.</p>' +
-    (r.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Your note:</strong> ' + esc(r.note) + '</p>' : "") +
+    M.small('Pickup in Québec City · you pay at pickup.') +
+    (r.note ? M.quote(r.note, 'Your note:') : "") +
     button(ACCOUNT_URL_EN, "See my reservation") +
-    '<p style="font-size:13px;color:#3A3D45">' + esc(rule) + '.</p>' + FOOT_EN);
+    M.small('' + esc(rule) + '.') + FOOT_EN);
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
 }
 async function mailReminderEn(m: Mailer, r: Res, L: Line[]) {
@@ -254,10 +250,10 @@ async function mailReminderEn(m: Mailer, r: Res, L: Line[]) {
     linesText(L, true) + "\n\nEstimated total: " + money(r.total, true) + "\n\nCan't make it? Cancel it in your account (" + ACCOUNT_URL_EN +
     "): it won't count as not picked up.\n\nCréation Audio\n" + SITE + "/en/";
   const html = shell("Création Audio", "Your reservation " + r.number + " ends soon",
-    '<p style="margin:0 0 14px">Hello ' + esc(first(r)) + ',</p>' +
+    M.text('Hello ' + esc(first(r)) + ',') +
     box((pk ? "Your pickup: " + pk + ". " : "") + "We're holding it until " + until + ".", "warn") + table(L, r.total, true) +
     button(ACCOUNT_URL_EN, "See my reservation") +
-    '<p style="font-size:13px;color:#3A3D45">Can\'t make it? Cancel it in your account: it won\'t count as not picked up.</p>' + FOOT_EN);
+    M.small('Can\'t make it? Cancel it in your account: it won\'t count as not picked up.') + FOOT_EN);
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
 }
 async function mailAdmin(m: Mailer, r: Res, L: Line[], event: "new" | "cancelled") {
@@ -269,10 +265,10 @@ async function mailAdmin(m: Mailer, r: Res, L: Line[], event: "new" | "cancelled
     (event === "new" ? "Gardée jusqu'au " + when(r.expires_at) + "\n" + pkLine(r) : "Stock libéré.\n") + "\n" + linesText(L) +
     "\n\nTotal : " + money(r.total) + "\n" + (r.note ? "\nNote du client : " + r.note + "\n" : "") + "\nOuvrir dans l'admin : " + ADMIN_URL + "\n";
   const html = shell("Réservation", label + " " + r.number,
-    '<p style="margin:0 0 16px;color:#3A3D45">' + esc(who) + ' · ' + esc(r.email) + (r.phone ? ' · ' + esc(r.phone) : '') + '</p>' +
+    M.who(who, r.email, r.phone) +
     box(event === "new" ? (pkOf(r) ? "Cueillette : " + pkOf(r) + ". " : "") + "Gardée jusqu'au " + when(r.expires_at) + "." : "Stock libéré.", event === "new" ? "ok" : "info") +
     table(L, r.total) +
-    (r.note ? '<p style="margin:16px 0 0;padding:10px 12px;background:#F4F3EF;border-radius:10px"><strong>Note :</strong> ' + esc(r.note) + '</p>' : "") +
+    (r.note ? M.quote(r.note, 'Note :') : "") +
     button(ADMIN_URL, "Ouvrir dans l'admin"));
   await send(m, { to: [adminTo(m, r)], reply_to: r.email, subject, html, text });
 }

@@ -10,6 +10,7 @@
 // Secrets : RESEND_API_KEY ; MAIL_FROM et MESSAGE_NOTIFY_TO optionnels.
 // =========================================================
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import * as M from "../_shared/mail.ts";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -47,18 +48,10 @@ async function send(m: Mailer, msg: Record<string, unknown>) {
   if (!res.ok) throw new Error("Resend " + res.status + " : " + (await res.text()).slice(0, 200));
 }
 
-const box = (inner: string) =>
-  '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' + inner + "</div>";
-const eyebrow = (t: string) =>
-  '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">' + esc(t) + "</p>";
-const button = (href: string, label: string) =>
-  '<p style="margin:22px 0"><a href="' + esc(href) + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;' +
-  'padding:12px 22px;border-radius:100px;display:inline-block">' + esc(label) + "</a></p>";
-const panel = (inner: string) =>
-  '<div style="margin:0 0 8px;padding:14px 16px;background:#F4F3EF;border-radius:12px">' + inner + "</div>";
-const foot = (en: boolean) =>
-  '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-  '<p style="font-size:12px;color:#6C727C"><a href="' + SITE + (en ? "/en/" : "") + '" style="color:#6C727C">creationaudio.ca</a></p>';
+// gabarit commun (même look que la facture) : voir ../_shared/mail.ts
+const button = (href: string, label: string) => M.button(href, label, 18);
+const panel = (inner: string) => M.panel(inner);
+const hi = (h: string) => M.text(h);
 
 const accountUrl = (r: Req) => SITE + (r.lang === "en" ? "/en" : "") + "/compte#/demandes/" + r.id;
 const first = (r: Req) => String(r.name || "").trim().split(/\s+/)[0] || "";
@@ -106,21 +99,15 @@ async function mailCreatedClient(m: Mailer, r: Req) {
   if (en) {
     const text = "Hello" + (f ? " " + f : "") + ",\n\nWe received your request " + r.number + " (" + kindEn(r) + ").\n" +
       "We'll get back to you as soon as possible.\n\nFollow your request: " + url + "\n\nCréation Audio\n" + SITE + "/en/";
-    const html = box(eyebrow("Création Audio") +
-      '<h1 style="font-size:22px;margin:0 0 10px">Request received · ' + esc(r.number) + "</h1>" +
-      '<p style="margin:0 0 14px">Hello' + (f ? " " + esc(f) : "") + ", we received your <strong>" + esc(kindEn(r)) +
-      "</strong> request. We'll get back to you as soon as possible.</p>" +
-      button(url, "Follow my request") + foot(true));
+    const html = M.page({ lang: "en", tag: "Request", ref: r.number, refSub: kindEn(r), title: "Request received",
+      body: hi("Hello" + (f ? " " + esc(f) : "") + ", we received your <strong>" + esc(kindEn(r)) + "</strong> request. We'll get back to you as soon as possible.") + button(url, "Follow my request") });
     await send(m, { to: [r.email], reply_to: REPLY_TO, subject: "Request received — " + r.number, html, text });
     return;
   }
   const text = "Bonjour" + (f ? " " + f : "") + ",\n\nOn a bien reçu ta demande " + r.number + " (" + kindFr(r) + ").\n" +
     "On te revient dans les plus brefs délais.\n\nSuivre ma demande : " + url + "\n\nCréation Audio\n" + SITE;
-  const html = box(eyebrow("Création Audio") +
-    '<h1 style="font-size:22px;margin:0 0 10px">Demande reçue · ' + esc(r.number) + "</h1>" +
-    '<p style="margin:0 0 14px">Bonjour' + (f ? " " + esc(f) : "") + ", on a bien reçu ta demande <strong>" + esc(kindFr(r)) +
-    "</strong>. On te revient dans les plus brefs délais.</p>" +
-    button(url, "Suivre ma demande") + foot(false));
+  const html = M.page({ lang: "fr", tag: "Demande", ref: r.number, refSub: kindFr(r), title: "Demande reçue",
+    body: hi("Bonjour" + (f ? " " + esc(f) : "") + ", on a bien reçu ta demande <strong>" + esc(kindFr(r)) + "</strong>. On te revient dans les plus brefs délais.") + button(url, "Suivre ma demande") });
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject: "Demande reçue — " + r.number, html, text });
 }
 
@@ -130,11 +117,8 @@ async function mailCreatedAdmin(m: Mailer, r: Req) {
   const lines = detailLines(r), url = ADMIN_URL + r.id, who = r.name || r.email;
   const text = "Nouvelle demande " + r.number + " (" + kindFr(r) + ")\n" + who + " · " + r.email + (r.phone ? " · " + r.phone : "") + "\n\n" +
     lines.map(([k, v]) => k + " : " + v).join("\n") + "\n\nOuvrir la fiche : " + url + "\n";
-  const html = box(eyebrow("Demande · " + kindFr(r)) +
-    '<h1 style="font-size:22px;margin:0 0 6px">' + esc(r.number) + " · " + esc(who) + "</h1>" +
-    '<p style="margin:0 0 16px;color:#3A3D45">' + esc(r.email) + (r.phone ? " · " + esc(r.phone) : "") + "</p>" +
-    panel(lines.map(([k, v]) => "<strong>" + esc(k) + "</strong>&nbsp;: " + nl2br(v)).join("<br>")) +
-    button(url, "Ouvrir la fiche"));
+  const html = M.page({ lang: "fr", admin: true, tag: "Demande", ref: r.number, refSub: kindFr(r), title: "Nouvelle demande",
+    body: M.who(r.name, r.email, r.phone) + M.kv(lines.map(([k, v]) => [k, nl2br(v)] as [string, string])) + button(url, "Ouvrir la fiche") });
   await send(m, { to: [adminTo(m, r)], reply_to: r.email, subject: "Nouvelle demande " + r.number + " — " + kindFr(r) + " — " + who, html, text });
 }
 
@@ -145,31 +129,26 @@ async function mailQuote(m: Mailer, r: Req) {
     const pl = price + (monthly ? " per month" : ""), dl = (monthly ? "First visit on " : "Ready on ") + date;
     const text = "Hello" + (f ? " " + f : "") + ",\n\nHere is our quote for your request " + r.number + ":\n" + pl + "\n" + dl + "\n" +
       (r.quote_note ? "\n" + r.quote_note + "\n" : "") + "\nAccept or decline: " + url + "\n\nCréation Audio\n" + SITE + "/en/";
-    const html = box(eyebrow("Création Audio · " + kindEn(r)) +
-      '<h1 style="font-size:22px;margin:0 0 10px">Your quote · ' + esc(r.number) + "</h1>" +
-      '<p style="margin:0 0 14px">Hello' + (f ? " " + esc(f) : "") + ", here is our quote.</p>" +
-      panel("<strong>" + esc(pl) + "</strong><br>" + esc(dl) + (r.quote_note ? "<br><br>" + nl2br(r.quote_note) : "")) +
-      button(url, "Accept or decline") + foot(true));
+    const html = M.page({ lang: "en", tag: "Quote", ref: r.number, refSub: kindEn(r), title: "Your quote",
+      body: hi("Hello" + (f ? " " + esc(f) : "") + ", here is our quote.") +
+        M.totalBox(monthly ? "Per month" : "Price", price, [esc(dl)]) + (r.quote_note ? M.quote(r.quote_note) : "") + button(url, "Accept or decline") });
     await send(m, { to: [r.email], reply_to: REPLY_TO, subject: "Your quote — " + r.number, html, text });
     return;
   }
   const pl = price + (monthly ? " par mois" : ""), dl = (monthly ? "Première visite le " : "Prête le ") + date;
   const text = "Bonjour" + (f ? " " + f : "") + ",\n\nVoici notre soumission pour ta demande " + r.number + " :\n" + pl + "\n" + dl + "\n" +
     (r.quote_note ? "\n" + r.quote_note + "\n" : "") + "\nAccepter ou refuser : " + url + "\n\nCréation Audio\n" + SITE;
-  const html = box(eyebrow("Création Audio · " + kindFr(r)) +
-    '<h1 style="font-size:22px;margin:0 0 10px">Ta soumission · ' + esc(r.number) + "</h1>" +
-    '<p style="margin:0 0 14px">Bonjour' + (f ? " " + esc(f) : "") + ", voici notre soumission.</p>" +
-    panel("<strong>" + esc(pl) + "</strong><br>" + esc(dl) + (r.quote_note ? "<br><br>" + nl2br(r.quote_note) : "")) +
-    button(url, "Accepter ou refuser") + foot(false));
+  const html = M.page({ lang: "fr", tag: "Soumission", ref: r.number, refSub: kindFr(r), title: "Ta soumission",
+    body: hi("Bonjour" + (f ? " " + esc(f) : "") + ", voici notre soumission.") +
+      M.totalBox(monthly ? "Par mois" : "Prix", price, [esc(dl)]) + (r.quote_note ? M.quote(r.quote_note) : "") + button(url, "Accepter ou refuser") });
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject: "Ta soumission — " + r.number, html, text });
 }
 
 async function mailDecision(m: Mailer, r: Req, accepted: boolean) {
   const what = accepted ? "Soumission acceptée" : "Soumission refusée", url = ADMIN_URL + r.id, who = r.name || r.email;
   const text = what + " — " + r.number + " (" + kindFr(r) + ")\n" + who + " · " + r.email + "\n\nOuvrir la fiche : " + url + "\n";
-  const html = box(eyebrow("Demande · " + kindFr(r)) +
-    '<h1 style="font-size:22px;margin:0 0 6px">' + esc(what) + " · " + esc(r.number) + "</h1>" +
-    '<p style="margin:0 0 16px;color:#3A3D45">' + esc(who) + " · " + esc(r.email) + "</p>" + button(url, "Ouvrir la fiche"));
+  const html = M.page({ lang: "fr", admin: true, tag: "Demande", ref: r.number, refSub: kindFr(r), title: what,
+    body: M.who(r.name, r.email) + M.notice(esc(what) + ".", accepted ? "ok" : "bad") + button(url, "Ouvrir la fiche") });
   await send(m, { to: [adminTo(m, r)], reply_to: r.email, subject: what + " — " + r.number + " — " + who, html, text });
 }
 
@@ -191,9 +170,8 @@ async function mailThreadAdmin(db: SupabaseClient, m: Mailer, r: Req) {
   const url = ADMIN_URL + r.id, who = r.name || r.email;
   const text = "Nouveau message — " + r.number + "\n" + who + " · " + r.email + "\n\n" + list.map((x) => msgText(x)).join("\n\n") +
     "\n\nRépondre : " + url + "\n";
-  const html = box(eyebrow("Demande " + r.number) + '<h1 style="font-size:22px;margin:0 0 6px">' + esc(who) + "</h1>" +
-    '<p style="margin:0 0 16px;color:#3A3D45">' + esc(r.email) + "</p>" +
-    list.map((x) => panel(nl2br(msgText(x)))).join("") + button(url, "Répondre"));
+  const html = M.page({ lang: "fr", admin: true, tag: "Demande", ref: r.number, refSub: kindFr(r), title: list.length > 1 ? list.length + " nouveaux messages" : "Nouveau message",
+    body: M.who(r.name, r.email) + list.map((x) => panel(nl2br(msgText(x)))).join("") + button(url, "Répondre") });
   await send(m, { to: [adminTo(m, r)], reply_to: r.email, subject: "Nouveau message — " + r.number + " — " + who, html, text });
 }
 
@@ -205,10 +183,9 @@ async function mailThreadClient(db: SupabaseClient, m: Mailer, r: Req) {
   const lead = en ? "We wrote to you about your request " + r.number + ":" : "On t'a écrit à propos de ta demande " + r.number + " :";
   const cta = en ? "See and reply" : "Voir et répondre";
   const text = hello + ",\n\n" + lead + "\n\n" + list.map((x) => msgText(x, en)).join("\n\n") + "\n\n" + cta + " : " + url + "\n\nCréation Audio\n" + SITE;
-  const html = box(eyebrow("Création Audio · " + r.number) +
-    '<h1 style="font-size:22px;margin:0 0 10px">' + (en ? "New message" : "Nouveau message") + "</h1>" +
-    '<p style="margin:0 0 14px">' + esc(hello) + ", " + esc(lead) + "</p>" +
-    list.map((x) => panel(nl2br(msgText(x, en)))).join("") + button(url, cta) + foot(en));
+  const html = M.page({ lang: en ? "en" : "fr", tag: en ? "Request" : "Demande", ref: r.number, title: en ? "New message" : "Nouveau message",
+    body: hi(esc(hello) + ", " + esc(lead)) + list.map((x) => panel(nl2br(msgText(x, en)))).join("") + button(url, cta),
+    foot: en ? "Reply in your account to keep the whole thread in one place." : "Réponds dans ton compte pour garder tout le fil au même endroit." });
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject: (en ? "New message — " : "Nouveau message — ") + r.number, html, text });
 }
 
@@ -285,6 +262,7 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* corps invalide */ }
 
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  await M.loadCompany(db);
   const { data: ok } = await db.rpc("reservation_cron_ok", { p_key: req.headers.get("x-cron-key") || "" });
   if (ok !== true) return json({ error: "Clé invalide." }, 401);
   const key = Deno.env.get("RESEND_API_KEY") || "";

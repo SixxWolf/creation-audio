@@ -10,6 +10,7 @@
 // Secrets : RESEND_API_KEY ; MAIL_FROM et ORDER_NOTIFY_TO optionnels.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
+import * as M from "../_shared/mail.ts";
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -55,15 +56,9 @@ async function send(key: string, from: string, msg: Record<string, unknown>) {
   if (!res.ok) throw new Error("Resend " + res.status + " : " + (await res.text()).slice(0, 200));
 }
 
-function wrap(kicker: string, title: string, body: string) {
-  return '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#181A1F;line-height:1.5">' +
-    '<p style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#FF6A2B;font-weight:700;margin:0 0 12px">' + esc(kicker) + '</p>' +
-    '<h1 style="font-size:22px;margin:0 0 10px">' + esc(title) + '</h1>' + body + "</div>";
-}
-const box = (t: string, ok = true) =>
-  '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:' + (ok ? "#E7F6EE;color:#16794A" : "#F3F3F0;color:#3A3D45") + ';font-weight:700">' + esc(t) + '</p>';
-const btn = (href: string, t: string) =>
-  '<p style="margin:22px 0"><a href="' + href + '" style="background:#FF6A2B;color:#181A1F;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:100px;display:inline-block">' + esc(t) + '</a></p>';
+// gabarit commun (même look que la facture) : tag / n° en haut à droite, encadré, bouton
+const box = (t: string, ok = true) => M.notice(esc(t), ok ? "ok" : "info");
+const btn = (href: string, t: string) => M.button(href, t);
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -120,6 +115,7 @@ Deno.serve(async (req) => {
   const accountUrl = SITE + "/compte#/cueillette/" + kslug + id;
   const adminUrl = SITE + "/coulisses-t6avzpe2#" + (kind === "invoice" ? "historique" : "commandes/" + (kind === "reservation" ? "reservations" : "clients"));
   const results: Record<string, string> = {};
+  await M.loadCompany(db);
 
   // ---- au client, dans sa langue ----
   const { data: cust } = await db.from("customers").select("lang").eq("id", uid).maybeSingle();
@@ -134,11 +130,9 @@ Deno.serve(async (req) => {
       "Got it: you picked " + pkE + " for " + whatE + ". We'll confirm by email shortly.\n\n" +
       "You can change it in your account: " + accE + "\n\n" +
       "Création Audio\n" + SITE + "/en/";
-    cHtml = wrap("Création Audio", "Pickup request received",
-      '<p style="margin:0 0 14px">Hello ' + esc(first) + ', got it for ' + esc(whatE) + '. We\'ll confirm by email shortly.</p>' +
-      box("Requested: " + pkE, false) + btn(accE, "See my order") +
-      '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-      '<p style="font-size:12px;color:#6C727C">You can change your time slot in your account. A question? Just reply to this email.</p>');
+    cHtml = M.page({ lang: "en", tag: "Pickup", ref: x.number, title: "Pickup request received", preheader: "Requested: " + pkE,
+      body: M.text("Hello " + esc(first) + ", got it for " + esc(whatE) + ". We'll confirm by email shortly.") +
+        box("Requested: " + pkE, false) + btn(accE, "See my order") + M.small("You can change your time slot in your account.") });
   } else {
     cSubject = "Demande de cueillette " + pk + " — Création Audio";
     cText =
@@ -146,11 +140,9 @@ Deno.serve(async (req) => {
     "C'est noté : tu as choisi " + pk + " pour " + what.toLowerCase() + ". On te confirme par courriel sous peu.\n\n" +
     "Tu peux la changer dans ton compte : " + accountUrl + "\n\n" +
     "Création Audio\n" + SITE;
-    cHtml = wrap("Création Audio", "Demande de cueillette reçue",
-    '<p style="margin:0 0 14px">Bonjour ' + esc(first) + ', c\'est noté pour ' + esc(what.toLowerCase()) + '. On te confirme par courriel sous peu.</p>' +
-    box("Demande : " + pk, false) + btn(accountUrl, "Voir ma commande") +
-    '<hr style="border:none;border-top:1px solid #E7E7E2;margin:24px 0 12px">' +
-    '<p style="font-size:12px;color:#6C727C">Tu peux changer ta plage dans ton compte. Une question&nbsp;? Réponds simplement à ce courriel.</p>');
+    cHtml = M.page({ lang: "fr", tag: "Cueillette", ref: x.number, title: "Demande de cueillette reçue", preheader: "Demande : " + pk,
+      body: M.text("Bonjour " + esc(first) + ", c'est noté pour " + esc(what.toLowerCase()) + ". On te confirme par courriel sous peu.") +
+        box("Demande : " + pk, false) + btn(accountUrl, "Voir ma commande") + M.small("Tu peux changer ta plage dans ton compte.") });
   }
   try {
     await send(resendKey, from, { to: [x.email], reply_to: REPLY_TO, subject: cSubject, html: cHtml, text: cText });
@@ -161,9 +153,8 @@ Deno.serve(async (req) => {
   const who = x.name || x.email;
   const aText = "Plage de cueillette choisie — " + what + "\n" + who + " · " + x.email + (x.phone ? " · " + x.phone : "") +
     "\n\nCueillette : " + pk + "\n\nOuvrir dans l'admin : " + adminUrl + "\n";
-  const aHtml = wrap("Cueillette", "À confirmer — " + what,
-    '<p style="margin:0 0 16px;color:#3A3D45">' + esc(who) + ' · ' + esc(x.email) + (x.phone ? ' · ' + esc(x.phone) : '') + '</p>' +
-    box("Cueillette : " + pk) + btn(adminUrl, "Confirmer dans l'admin"));
+  const aHtml = M.page({ lang: "fr", admin: true, tag: "Cueillette", ref: x.number, title: "Plage à confirmer", preheader: who + " · " + pk,
+    body: M.who(who, x.email, x.phone) + box("Cueillette : " + pk) + btn(adminUrl, "Confirmer dans l'admin") });
   try {
     await send(resendKey, from, { to: [adminTo], reply_to: x.email, subject: "Cueillette " + what + " — " + who + " · " + pk, html: aHtml, text: aText });
     results.admin = "sent";
