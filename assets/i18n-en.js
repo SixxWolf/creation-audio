@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 35;
+window.CA_EN_V = 36;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -596,14 +596,13 @@ window.CA_EN = (function (pairs) {
   [`Confirmer ma cueillette`, `Confirm my pickup`],
   [`<button class="acct-btn pkv-keep" type="button">Garder `, `<button class="acct-btn pkv-keep" type="button">Keep `],
   [`Choisis une date et une plage.`, `Choose a date and a time slot.`],
-  [`<div class="pkv-foot"><button class="acct-btn pkv-exc" type="button">Demander une exception</button></div>`, `<div class="pkv-foot"><button class="acct-btn pkv-exc" type="button">Request an exception</button></div>`],
-  [`<button class="acct-btn pkv-exc" type="button">Demander une exception</button>`, `<button class="acct-btn pkv-exc" type="button">Request an exception</button>`],
+  [`Demander une exception`, `Request an exception`],
+  [`Plus d'infos sur les exceptions`, `More about exceptions`],
+  [`Les plages ne te conviennent pas ? Propose ton jour et ton heure (un samedi, un dimanche, plus tôt ou plus tard) et on te confirme si c'est possible.`, `None of the time slots work for you? Suggest your own day and time (a Saturday, a Sunday, earlier or later) and we'll confirm if it's possible.`],
   [`<p class="pkv-req">Demande en attente : <b>`, `<p class="pkv-req">Request pending: <b>`],
   [`<p class="pkv-req is-no">Demande refusée : <b>`, `<p class="pkv-req is-no">Request declined: <b>`],
   [`<h2 class="pkv-h">Demander une exception</h2>`, `<h2 class="pkv-h">Request an exception</h2>`],
-  [`<div class="field"><label for="pkx-d">Jour</label><input type="date" id="pkx-d" min="`, `<div class="field"><label for="pkx-d">Day</label><input type="date" id="pkx-d" min="`],
-  [`<div class="field"><label for="pkx-t">Heure</label><input type="time" id="pkx-t" step="900"></div>`, `<div class="field"><label for="pkx-t">Time</label><input type="time" id="pkx-t" step="900"></div>`],
-  [`<div class="field pkv-ex-w"><label for="pkx-n">Mot (facultatif)</label><input type="text" id="pkx-n" maxlength="300"></div>`, `<div class="field pkv-ex-w"><label for="pkx-n">Note (optional)</label><input type="text" id="pkx-n" maxlength="300"></div>`],
+  [`Mot (facultatif)`, `Note (optional)`],
   [`Envoyer la demande`, `Send request`],
   [`Choisis un jour et une heure.`, `Choose a day and a time.`],
   [`<h2 class="pkv-h">Demande envoyée</h2>`, `<h2 class="pkv-h">Request sent</h2>`],

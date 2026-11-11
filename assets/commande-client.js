@@ -130,7 +130,7 @@ window.CA = window.CA || {};
       return res.data || {};
     });
   }
-  // demande d'exception : jour ouvrable + heure libre, l'admin approuve ou refuse (RPC customer_request_pickup)
+  // demande d'exception : jour et heure libres (fin de semaine incluse), l'admin approuve ou refuse (RPC customer_request_pickup)
   function requestPickup(kind, id, req) {
     var c = cli();
     if (!c) return Promise.reject(new Error(_t('Service indisponible pour le moment.')));
@@ -202,11 +202,11 @@ window.CA = window.CA || {};
           '" data-d="' + esc(g.d) + '" aria-selected="' + (g.d === day) + '"' + (g.open ? '' : ' aria-disabled="true"') + '>' +
           '<small>' + wd(x) + '</small><b>' + x.getDate() + '</b><small>' + mo(x) + '</small></button>';
       }).join('');
-      // heures aux 15 min ; un saut (ex. 14 h 45 → 16 h) = nouvelle rangée
-      var last = null;
+      // heures aux 15 min (opts.step) ; un saut (ex. 14 h 45 → 16 h) ou un passage de minuit = nouvelle rangée
+      var last = null, step = opts.step || 15;
       slotsEl.innerHTML = list.filter(function (x) { return x.d === day; }).map(function (x) {
         var on = !!(sel && sel.d === x.d && sel.s === x.s), m = mins(x.s);
-        var gap = last != null && m - last > 15 ? '<span class="pk-gap" aria-hidden="true"></span>' : '';
+        var gap = last != null && (m - last > step || m < last) ? '<span class="pk-gap" aria-hidden="true"></span>' : '';
         last = m;
         return gap + '<button type="button" role="option" class="pk-slot' + (on ? ' is-on' : '') + (x.full ? ' is-full' : '') +
           '" data-s="' + esc(x.s) + '" aria-selected="' + on + '"' + (x.full ? ' disabled title="' + _t('Complet') + '"' : '') + '>' +

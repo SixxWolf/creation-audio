@@ -171,10 +171,26 @@
 .pkv-foot { display:flex; align-items:center; flex-wrap:wrap; gap:10px 12px; margin-top:20px; }
 .pkv-foot .acct-submit { width:auto; text-decoration:none; }
 .pkv-foot .acct-btn { margin-top:0; height:46px; }
+.pkv-pick .pkv-foot { position:relative; }
+/* (i) à côté de « Demander une exception » : bulle au survol (souris) ou au clic */
+.pkv-info { flex:none; width:40px; height:40px; margin-left:-4px; display:grid; place-items:center; padding:0; font:inherit;
+  font-family:Georgia, 'Times New Roman', serif; font-style:italic; font-weight:700; font-size:1.05rem; line-height:1; color:var(--ink-2);
+  cursor:pointer; background:var(--paper); border:1.5px solid var(--line-2); border-radius:50%; }
+.pkv-info:hover, .pkv-info[aria-expanded="true"] { color:var(--ink); border-color:var(--ink); }
+.pkv-info:focus-visible { outline:3px solid var(--ember-dim); outline-offset:2px; }
+.pkv-tip { display:none; position:absolute; z-index:5; left:0; right:0; bottom:calc(100% + 10px); margin:0; padding:13px 15px;
+  font-size:.9rem; line-height:1.5; color:var(--ink-2); background:var(--paper); border:1px solid var(--line-2); border-radius:14px;
+  box-shadow:0 18px 40px -18px rgba(20,22,26,.45); }
+.pkv-info[aria-expanded="true"] + .pkv-tip { display:block; }
+@media (hover:hover) { .pkv-info:hover + .pkv-tip { display:block; } }
 .pkv-req { margin:14px 0 0; padding:10px 13px; background:var(--wash); border-radius:var(--radius-sm); font-size:.9rem; color:var(--ink-2); }
 .pkv-req.is-no { color:var(--bad); background:var(--bad-wash); }
-.pkv-ex { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0 14px; }
-.pkv-ex-w { grid-column:1 / -1; }
+/* « Demander une exception » : pastilles (CO.picker) + champ Mot au style des champs du compte */
+.pkv-ex-w { display:flex; flex-direction:column; gap:6px; margin:20px 0 0; min-width:0; }
+.pkv-ex-w label { font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.pkv-ex-w input { width:100%; min-width:0; box-sizing:border-box; padding:11px 12px; font:inherit; color:var(--ink); background:var(--paper);
+  border:1.5px solid var(--line); border-radius:var(--radius-sm); }
+.pkv-ex-w input:focus { outline:none; border-color:var(--ember); }
 .pkv-msg { flex-basis:100%; margin:0; min-height:1.3em; font-size:.88rem; color:var(--bad); }
 .pkv-msg:empty { display:none; }
 .pkv-done { display:flex; flex-direction:column; align-items:center; text-align:center; padding:12px 0 4px; }

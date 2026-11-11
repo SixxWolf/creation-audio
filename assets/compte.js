@@ -474,8 +474,8 @@
       if (!list.length) {
         side.innerHTML = _t('<h2 class="pkv-h">Ta cueillette</h2><p class="pkv-wait">Aucune plage offerte pour le moment. ') +
           askHtml(_t('Cueillette ') + x.number, _t('Bonjour, pour la cueillette de ') + x.number + ' : ') + '</p>' +
-          (isF ? '' : reqHtml() + _t('<div class="pkv-foot"><button class="acct-btn pkv-exc" type="button">Demander une exception</button></div>'));
-        if (!isF) $('.pkv-exc', side).addEventListener('click', exView);
+          (isF ? '' : reqHtml() + '<div class="pkv-foot">' + excHtml() + '</div>');
+        if (!isF) wireExc();
         return;
       }
       pickView(list);
@@ -488,26 +488,66 @@
       return q.state === 'pending' ? _t('<p class="pkv-req">Demande en attente : <b>') + t + '</b></p>'
         : _t('<p class="pkv-req is-no">Demande refusée : <b>') + t + '</b>' + (q.reply ? ' — ' + esc(q.reply) : '') + '</p>';
     }
-    // formulaire : jour ouvrable + heure libre, l'admin répond par courriel
+    // « Demander une exception » + (i) : bulle au survol (souris) ou au clic (tactile)
+    function excHtml() {
+      return '<button class="acct-btn pkv-exc" type="button">' + _t('Demander une exception') + '</button>' +
+        '<button class="pkv-info" type="button" aria-expanded="false" aria-label="' + _t('Plus d\'infos sur les exceptions') + '">i</button>' +
+        '<p class="pkv-tip" role="tooltip">' + _t('Les plages ne te conviennent pas ? Propose ton jour et ton heure (un samedi, un dimanche, plus tôt ou plus tard) et on te confirme si c\'est possible.') + '</p>';
+    }
+    function wireExc() {
+      $('.pkv-exc', side).addEventListener('click', exView);
+      var info = $('.pkv-info', side);
+      function shut(e) {
+        if (e && info.contains(e.target)) return;
+        info.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('click', shut);
+      }
+      info.addEventListener('click', function () {
+        var on = info.getAttribute('aria-expanded') !== 'true';
+        info.setAttribute('aria-expanded', on ? 'true' : 'false');
+        if (on) document.addEventListener('click', shut); else document.removeEventListener('click', shut);
+      });
+      info.addEventListener('keydown', function (e) { if (e.key === 'Escape') shut(); });
+    }
+    // formulaire : pastilles comme les plages — 14 jours (fin de semaine incluse), 10 h à 2 h aux 30 min.
+    // Les heures après minuit restent sous le jour choisi (la soirée) et partent au lendemain, à la vraie date.
     function exView() {
-      var now = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
-      var today = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+      var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+      var ymd = function (t) { return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate()); };
+      var at = function (d, s) { var p = d.split('-'), h = s.split(':'); return new Date(+p[0], +p[1] - 1, +p[2], +h[0], +h[1]); };
+      var night = function (s) { return +s.split(':')[0] < 10; };   // 0 h à 2 h = nuit du jour choisi
+      var real = function (v) { var t = at(v.d, v.s); if (night(v.s)) t.setDate(t.getDate() + 1); return t; };
+      var times = [];
+      for (var m = 10 * 60; m <= 26 * 60; m += 30) times.push(pad(Math.floor(m / 60) % 24) + ':' + pad(m % 60));
+      var now = new Date(), end = until ? new Date(until) : null, list = [];
+      for (var i = 0; i < 14; i++) {
+        var day = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
+        times.forEach(function (s) {
+          var v = { d: day, s: s }, t = real(v);
+          if (t > now && (!end || t < end)) list.push(v);
+        });
+      }
+      var q = x.pickup_req, cur = null;   // demande déjà faite : présélectionnée
+      if (q && q.d && q.s) {
+        cur = { d: q.d, s: String(q.s).slice(0, 5) };
+        if (night(cur.s)) { var b = at(cur.d, cur.s); b.setDate(b.getDate() - 1); cur.d = ymd(b); }
+      }
       side.innerHTML = _t('<h2 class="pkv-h">Demander une exception</h2>') +
-        '<div class="pkv-ex">' +
-          _t('<div class="field"><label for="pkx-d">Jour</label><input type="date" id="pkx-d" min="') + today + '"></div>' +
-          _t('<div class="field"><label for="pkx-t">Heure</label><input type="time" id="pkx-t" step="900"></div>') +
-          _t('<div class="field pkv-ex-w"><label for="pkx-n">Mot (facultatif)</label><input type="text" id="pkx-n" maxlength="300"></div>') +
-        '</div>' +
+        '<div class="pkv-cal"></div>' +
+        '<div class="field pkv-ex-w"><label for="pkx-n">' + _t('Mot (facultatif)') + '</label><input type="text" id="pkx-n" maxlength="300"></div>' +
         '<div class="pkv-foot"><button class="acct-submit pkv-ok" type="button">' + _t('Envoyer la demande') + '</button>' +
         '<button class="acct-btn pkv-back2" type="button">' + _t('Retour') + '</button>' +
         '<p class="pkv-msg" role="status"></p></div>';
       var msg = $('.pkv-msg', side), ok = $('.pkv-ok', side);
+      var p = CO.picker($('.pkv-cal', side), { big: true, step: 30, onChange: function () { msg.textContent = ''; } });
+      p.load(list, cur);
       $('.pkv-back2', side).addEventListener('click', function () { pkvFor = ''; renderPkv(); });
       ok.addEventListener('click', function () {
-        var d = $('#pkx-d', side).value, t = $('#pkx-t', side).value;
-        if (!d || !t) { msg.textContent = _t('Choisis un jour et une heure.'); return; }
+        var v = p.value();
+        if (!v) { msg.textContent = _t('Choisis un jour et une heure.'); return; }
+        var t = real(v), d = ymd(t);
         ok.disabled = true; msg.textContent = _t('Envoi…');
-        CO.requestPickup(kn, x.id,{ d: d, s: t, note: $('#pkx-n', side).value }).then(function (q) {
+        CO.requestPickup(kn, x.id,{ d: d, s: v.s, note: $('#pkx-n', side).value }).then(function (q) {
           x.pickup_req = q;
           side.innerHTML = '<div class="pkv-done"><span class="pkv-check" aria-hidden="true"></span>' +
             _t('<h2 class="pkv-h">Demande envoyée</h2>') +
@@ -526,10 +566,10 @@
         '<div class="pkv-cal"></div>' + reqHtml() +
         '<div class="pkv-foot"><button class="acct-submit pkv-ok" type="button">' + (had ? _t('Enregistrer') : _t('Confirmer ma cueillette')) + '</button>' +
         (had ? _t('<button class="acct-btn pkv-keep" type="button">Garder ') + esc(CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end, true)) + '</button>' : '') +
-        (isF ? '' : _t('<button class="acct-btn pkv-exc" type="button">Demander une exception</button>')) +
+        (isF ? '' : excHtml()) +
         '<p class="pkv-msg" role="status"></p></div>';
       var msg = $('.pkv-msg', side), ok = $('.pkv-ok', side), keep = $('.pkv-keep', side);
-      if (!isF) $('.pkv-exc', side).addEventListener('click', exView);
+      if (!isF) wireExc();
       var p = CO.picker($('.pkv-cal', side), { big: true, onChange: function () { msg.textContent = ''; } });
       p.load(list, had ? { d: x.pickup_date, s: x.pickup_start } : null);
       if (keep) keep.addEventListener('click', doneView);
