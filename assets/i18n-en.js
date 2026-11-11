@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 36;
+window.CA_EN_V = 37;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -94,6 +94,10 @@ window.CA_EN = (function (pairs) {
   [`Aucun filament disponible pour le moment.`, `No filament available for now.`],
   [`dès <b>`, `from <b>`],
   [` en quantité</small>`, ` in quantity</small>`],
+  [`les classiques de tous les jours`, `the everyday classics`],
+  [`les matériaux spéciaux à meilleur prix`, `specialty materials at better prices`],
+  [` : `, `: `],
+  [`Accessoires`, `Accessories`],
   [`<span class="pill out">Rupture</span>`, `<span class="pill out">Out of stock</span>`],
   [`<a href="#/">Filaments</a>`, `<a href="#/">Filaments</a>`],
   [`Recharge`, `Refill`],

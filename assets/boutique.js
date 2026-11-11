@@ -260,6 +260,14 @@
       .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
   var norm = function (s) { return s || _t('Autres'); };       // matériau/marque absent => « Autres »
+  // Logo de la marque (Admin › Marques) — rend la marque évidente partout : cartes, fiche, panier
+  function brandLogo(brand) { var b = brandInfo[brand]; return b && b.image_path ? publicUrl(b.image_path) : ''; }
+  function brandBadge(brand, cls) {
+    var u = brandLogo(brand);
+    return u ? '<span class="' + cls + '"><img src="' + esc(u) + '" alt="' + esc(brand) + '" loading="lazy"></span>' : '';
+  }
+  // Une phrase sous les puces : à quoi sert chaque marque (affichée seulement pour les marques présentes)
+  var BRAND_NOTE = { 'Bambu Lab': _t('les classiques de tous les jours'), 'Elegoo': _t('les matériaux spéciaux à meilleur prix') };
   function brandSlugName(brand) { var b = brandInfo[brand]; return (b && b.slug) || slugify(brand); }
   function matOf(brand, material) { var B = brandByName[brand]; return B ? B.mats[material] || null : null; }
   function matSlugFor(brand, material) {
@@ -500,6 +508,14 @@
           esc(B.name) + ' <span class="chip-n">' + count(B.items) + '</span></a>';
       }).join('');
     if (brands.length < 2) catChips.innerHTML = '';
+    var note = $('#cat-brandnote');
+    if (note) {
+      var parts = brands.filter(function (B) { return BRAND_NOTE[B.name]; }).map(function (B) {
+        return '<span><b>' + esc(B.name) + '</b>' + _t(' : ') + BRAND_NOTE[B.name] + '</span>';
+      });
+      note.innerHTML = parts.join('<i aria-hidden="true">·</i>');
+      note.hidden = parts.length < 2 || !!catBrand;
+    }
 
     var list = catBrand ? brands.filter(function (B) { return B.name === catBrand; }) : brands;
     var html = promoSectionHtml(list) + list.map(function (B) {
@@ -508,6 +524,7 @@
       var nStock = B.items.filter(anyStock).length, id = 'g-' + slugify(B.name);
       return '<section class="cat-group" aria-labelledby="' + id + '">' +
         '<header class="cat-ghead">' +
+          brandBadge(B.name, 'cat-glogo') +
           '<h2 class="cat-gtitle" id="' + id + '">' + esc(B.name) + '</h2>' +
           '<span class="cat-gmeta">' + plural(B.materials.length, 'matériau', 'matériaux') + ' · ' +
             plural(nStock, 'couleur', 'couleurs') + _t(' en stock</span>') +
@@ -565,9 +582,9 @@
                          : '<span class="mcard-sw" style="background:' + esc(swatchBg(m.rep)) + '"></span>';
     var pm = matPromo(m);
     return '<a class="mcard' + (out ? ' is-out' : '') + (pm ? ' is-promo' : '') + '" href="' + esc(routeFor(m.brand, m.name)) + '">' +
-      '<span class="mcard-media">' + media + (pm ? PR.ribbon(pm.pct) : '') + '</span>' +
+      '<span class="mcard-media">' + media + (pm ? PR.ribbon(pm.pct) : '') + brandBadge(m.brand, 'mcard-brand') + '</span>' +
       '<span class="mcard-body">' +
-        '<span class="mcard-name">' + esc(m.name) + '</span>' +
+        '<span class="mcard-name"><span class="mcard-bname">' + esc(m.brand) + '</span> ' + esc(m.name) + '</span>' +
         (pm ? '<span class="mcard-promo">' + plural(pm.n, 'couleur en promo', 'couleurs en promo') + '</span>' : '') +
         (tag && !pm ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +
         '<span class="mcard-dots" aria-hidden="true">' + dots + (extra > 0 ? '<em>+' + extra + '</em>' : '') + '</span>' +
@@ -787,7 +804,7 @@
       '<div class="pdp">' +
         '<div class="pdp-media">' + mediaHtml() + '</div>' +
         '<div class="pdp-panel">' +
-          '<p class="pdp-eyebrow">' + esc(m.brand) + ' · ' + esc(m.name) + '</p>' +
+          '<p class="pdp-eyebrow pdp-brand">' + brandBadge(m.brand, 'pdp-blogo') + '<span><b>' + esc(m.brand) + '</b> · ' + esc(m.name) + '</span></p>' +
           '<h1 class="pdp-name">' + esc(p.name) + '</h1>' +
           (p.code ? _t('<p class="pdp-ref">Réf. ') + esc(p.code) + '</p>' : '') +
           (promoOn(p, curType) ? PR.banner(p, pctOf(p, curType)) : '') +
@@ -1585,9 +1602,24 @@
     } else {
       cartItems.innerHTML = '';
       // accessoires en dernier
-      entries().slice().sort(function (a, b) { return (a.type === 'accessory' ? 1 : 0) - (b.type === 'accessory' ? 1 : 0); })
+      var bRank = function (it) {
+        if (it.type === 'accessory') return 1e6;
+        var p = byId[it.id], b = p && brandInfo[p.brand];
+        return b && b.sort_order != null ? b.sort_order : 9999;
+      };
+      var lastHead = null;
+      entries().map(function (it, i) { return { it: it, i: i }; })
+        .sort(function (a, b) { return (bRank(a.it) - bRank(b.it)) || (a.i - b.i); })
+        .map(function (x) { return x.it; })
         .forEach(function (it) {
           var m = metaOf(it); if (!m) return;
+          var head = it.type === 'accessory' ? _t('Accessoires') : (m.brand || _t('Autres'));
+          if (head !== lastHead) {
+            lastHead = head;
+            var h = document.createElement('div'); h.className = 'cgroup-h';
+            h.innerHTML = (it.type === 'accessory' ? '' : brandBadge(m.brand, 'cgroup-logo')) + '<span>' + esc(head) + '</span>';
+            cartItems.appendChild(h);
+          }
           var max = maxOf(it);
           var row = document.createElement('div'); row.className = 'citem';
           row.innerHTML =

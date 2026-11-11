@@ -868,3 +868,31 @@ body.cart-lock { overflow:hidden; }
   .promo-rib { top:8px; padding:5px 11px 5px 9px; font-size:.95rem; }
   .pb-badge { font-size:1.15rem; }
 }
+
+/* ---- Marque évidente partout (logo de la marque, Admin › Marques) ---- */
+.mcard-brand, .cat-glogo, .pdp-blogo, .cgroup-logo { display:inline-block; flex:none; overflow:hidden; background:#fff;
+  border:1px solid var(--line); border-radius:8px; }
+.mcard-brand img, .cat-glogo img, .pdp-blogo img, .cgroup-logo img { display:block; width:100%; height:100%; object-fit:cover; }
+.mcard-brand { position:absolute; top:10px; right:10px; z-index:2; width:84px; height:28px; box-shadow:0 2px 8px rgba(20,22,26,.12); }
+.mcard .mcard-media .mcard-brand img, .mcard:hover .mcard-media .mcard-brand img,
+.mcard.is-out .mcard-media .mcard-brand img { transform:none; opacity:1; filter:none; }
+.mcard-bname { color:var(--ink-2); }
+.cat-glogo { width:96px; height:32px; }
+.cat-brandnote:not([hidden]) { display:flex; flex-wrap:wrap; gap:4px 12px; margin:calc(clamp(24px, 3vw, 34px) * -1 + 12px) 0 clamp(24px, 3vw, 34px);
+  font-size:.9rem; color:var(--ink-2); }
+.cat-brandnote b { color:var(--ink); }
+.cat-brandnote i { font-style:normal; color:var(--muted); }
+.pdp-brand { display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:.86rem; }
+.pdp-brand b { font-weight:800; }
+.pdp-blogo { width:96px; height:32px; }
+.cgroup-h { display:flex; align-items:center; gap:8px; margin-top:6px; font-size:.78rem; font-weight:800; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--ink-2); }
+.cgroup-h:first-child { margin-top:0; }
+.cgroup-logo { width:60px; height:20px; border-radius:6px; }
+@media (max-width:720px) {
+  .cat-brandnote:not([hidden]) { margin:-12px 0 24px; flex-direction:column; }
+  .cat-brandnote i { display:none; }
+}
+@media (max-width:560px) {
+  .mcard-brand { top:8px; right:8px; width:66px; height:22px; border-radius:6px; }
+}
