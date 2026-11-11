@@ -177,8 +177,17 @@ Deno.serve(async (req) => {
     const pk = fmtPickup(x.pickup_date, x.pickup_start), pkE = fmtPickup(x.pickup_date, x.pickup_start, true);
     const { data: cfg } = await db.from("admin_settings").select("value").eq("key", "cueillette").maybeSingle();
     const addr = String(cfg?.value?.address || "").trim();
-    const addrBox = addr ? '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#F3F3F0;color:#181A1F"><b>' + (en ? "Address" : "Adresse") + '</b><br>' + esc(addr) + '</p>' : "";
-    const addrTxt = addr ? (en ? "\nAddress: " : "\nAdresse : ") + addr + "\n" : "";
+    // téléphone + modes de paiement sous l'adresse (Commandes › Cueillettes, 2026-11-11)
+    const tel = String(cfg?.value?.phone || "").trim() || "581 446-3858";
+    const iac = String(cfg?.value?.interac || "").trim() || "contact@creationaudio.ca";
+    const payTxt = en ? "Cash or Interac e-Transfer to " + iac : "Comptant ou virement Interac à " + iac;
+    const row = (k: string, v: string) => '<b>' + k + '</b><br>' + v;
+    const addrBox = '<p style="margin:0 0 16px;padding:12px 14px;border-radius:10px;background:#F3F3F0;color:#181A1F;line-height:1.5">' +
+      [addr ? row(en ? "Address" : "Adresse", esc(addr)) : "",
+       row(en ? "Phone" : "Téléphone", '<a href="tel:+1' + tel.replace(/\D/g, "").slice(-10) + '" style="color:#181A1F">' + esc(tel) + '</a>'),
+       row(en ? "Payment" : "Paiement", esc(payTxt))].filter(Boolean).join('<br><br>') + '</p>';
+    const addrTxt = (addr ? (en ? "\nAddress: " : "\nAdresse : ") + addr : "") +
+      (en ? "\nPhone: " : "\nTéléphone : ") + tel + (en ? "\nPayment: " : "\nPaiement : ") + payTxt + "\n";
     const ok = event === "confirmed";
     cSubject = en ? "Pickup confirmed " + pkE + " — Création Audio" : "Cueillette confirmée " + pk + " — Création Audio";
     cText = en ? "Hello " + first + ",\n\n" + (ok ? "Your pickup is confirmed" : "Good news: your request is approved") + ". See you " + pkE + "." + addrTxt + "\n" + accountUrl + "\n\nCréation Audio\n" + SITE + "/en/"

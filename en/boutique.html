@@ -29,14 +29,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../assets/site.css?v=29">
-<link rel="stylesheet" href="../assets/boutique.css?v=56">
+<link rel="stylesheet" href="../assets/boutique.css?v=57">
 <link rel="stylesheet" href="../assets/dialog.css?v=2">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="../assets/fetes.css?v=9">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
 <script src="../assets/look.js?v=5"></script>
 <script src="../assets/i18n.js?v=1"></script>
-<script src="../assets/i18n-en.js?v=34"></script>
+<script src="../assets/i18n-en.js?v=35"></script>
 </head>
 <body class="home-page shop-page">
 <a class="skip" href="#main">Skip to content</a>
@@ -177,6 +177,7 @@
   <div class="cart-items" id="cart-items"></div>
   <div class="cart-foot">
     <div class="cart-line cart-line-total"><span>Estimated total</span><span id="cart-total">0,00 $</span></div>
+    <p class="cart-pay"><b>Payment at pickup:</b> cash or Interac e-Transfer</p>
     <div class="cart-acct" id="cart-acct">
       <p class="cart-editbar" id="cart-editbar" hidden>Editing <b id="cart-edit-num"></b> <button type="button" id="cart-edit-cancel">Cancel</button></p>
       <textarea id="cart-note-in" class="cart-note-in" rows="2" maxlength="500" aria-label="Note for Création Audio" placeholder="Note (optional)" hidden></textarea>

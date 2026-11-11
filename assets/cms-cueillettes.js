@@ -44,7 +44,7 @@
   var STATUS = { 'new': 'Nouvelle', preparing: 'En préparation', ready: 'Prête' };
   var cfg = null, cfgLoading = null, listLoading = null;
 
-  function blank() { return { week: {}, closed: [], extra: [], off: [], cap: 0, notice: 24, days: 14, address: '' }; }
+  function blank() { return { week: {}, closed: [], extra: [], off: [], cap: 0, notice: 24, days: 14, address: '', phone: '', interac: '' }; }
 
   /* ---- horaire : lecture ---- */
   function loadCfg() {
@@ -98,6 +98,8 @@
     $('#cq-notice').value = cfg.notice != null ? cfg.notice : 24;
     $('#cq-days').value = cfg.days || 14;
     $('#cq-address').value = cfg.address || '';
+    $('#cq-phone').value = cfg.phone || '';
+    $('#cq-interac').value = cfg.interac || '';
     paintCal();
   }
   /* ---- dates précises : jours + heures fermés (cfg.off = [{ d, all:true } | { d, h:['16:00', …] }]) ---- */
@@ -276,7 +278,8 @@
       .sort(function (a, b) { return a.d < b.d ? -1 : 1; });
     var value = { week: week, closed: closed, extra: extra, off: off, cap: intOf('#cq-cap', 0, 0, 99),
                   notice: intOf('#cq-notice', 24, 0, 336), days: intOf('#cq-days', 14, 1, 60),
-                  address: $('#cq-address').value.trim().slice(0, 200), at: at };
+                  address: $('#cq-address').value.trim().slice(0, 200),
+                  phone: $('#cq-phone').value.trim().slice(0, 40), interac: $('#cq-interac').value.trim().slice(0, 120), at: at };
     saveBtn.disabled = true; if (statusEl) statusEl.textContent = 'Enregistrement…';
     sb.from('admin_settings').upsert({ key: KEY, value: value, updated_at: at }).then(function (res) {
       saveBtn.disabled = false;

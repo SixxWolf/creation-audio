@@ -2638,6 +2638,17 @@ revoke all on function public.customer_set_pickup(text, uuid, jsonb)       from 
 grant execute on function public.pickup_slots(timestamptz, uuid)           to authenticated;
 grant execute on function public.customer_set_pickup(text, uuid, jsonb)    to authenticated;
 
+-- Coordonnées de cueillette visibles dès la commande (Mon compte) : téléphone + courriel Interac,
+-- réglés dans Commandes › Cueillettes (admin_settings['cueillette'].phone / .interac). L'adresse reste
+-- donnée seulement après confirmation (pickup_address dans me_orders & co). (2026-11-11)
+create or replace function public.pickup_contact()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('phone', nullif(trim(s.value ->> 'phone'), ''), 'interac', nullif(trim(s.value ->> 'interac'), ''))
+    from public.admin_settings s where s.key = 'cueillette';
+$$;
+revoke all on function public.pickup_contact() from public, anon;
+grant execute on function public.pickup_contact() to authenticated;
+
 -- Demande d'exception : le client propose un jour (tous les jours, aujourd'hui ou plus tard) et
 -- une heure libre, hors plages, préavis et capacité. pickup_req = { d, s, note, at, state: 'pending' | 'refused', reply }.
 -- La plage déjà choisie reste valide tant que l'admin n'a pas répondu (admin_decide_pickup).

@@ -555,13 +555,31 @@
         '<p class="pkv-when">' + esc(CO.fmtPickup(x.pickup_date, x.pickup_start, x.pickup_end)) + '</p>' +
         (x.pickup_confirmed ? (x.pickup_address ? '<p class="pkv-addr"><span>' + _t('Adresse') + '</span>' + esc(x.pickup_address) + '</p>' : '')
           : _t('<p class="pkv-addr">On te confirme par courriel.</p>')) +
+        '<div class="pkv-contact"></div>' +
         _t('<div class="pkv-foot"><a class="acct-submit" href="#/commandes">Mes commandes</a>') +
         _t('<button class="acct-btn pkv-change" type="button">Changer</button></div></div>');
+      paintContact($('.pkv-contact', side));
       $('.pkv-change', side).addEventListener('click', function () {
         side.innerHTML = _t('<p class="acct-empty">Chargement des plages…</p>');
         CO.slots(until, x.id).then(function (l2) { if (pkvFor === key) pickView(l2); });
       });
     }
+  }
+  // Téléphone + modes de paiement sous l'adresse (visibles dès la commande) — RPC pickup_contact (Commandes › Cueillettes)
+  var contactP = null;
+  function paintContact(box) {
+    if (!box) return;
+    if (!contactP) contactP = sb.rpc('pickup_contact').then(function (r) { return (!r.error && r.data) || {}; }, function () { return {}; });
+    contactP.then(function (c) {
+      var tel = c.phone || '581 446-3858', mail = c.interac || 'contact@creationaudio.ca';
+      box.innerHTML = '<p class="pkv-addr"><span>' + _t('Téléphone') + '</span><a href="tel:+1' + tel.replace(/\D/g, '').slice(-10) + '">' + esc(tel) + '</a></p>' +
+        '<p class="pkv-addr"><span>' + _t('Paiement') + '</span>' + _t('Comptant ou virement Interac à') + ' ' +
+        '<b class="pkv-mail">' + esc(mail) + '</b> <button type="button" class="pkv-copy">' + _t('Copier') + '</button></p>';
+      $('.pkv-copy', box).addEventListener('click', function () {
+        var ok = function () { caDialog.toast(_t('Courriel copié')); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(mail).then(ok, function () {});
+      });
+    });
   }
   // facture « À venir » vue comme une commande : seulement les articles encore à remettre, ouverte une fois prévenue
   function invoiceView(inv) {

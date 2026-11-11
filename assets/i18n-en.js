@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 34;
+window.CA_EN_V = 35;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -504,6 +504,9 @@ window.CA_EN = (function (pairs) {
   [`Paiement`, `Payment`],
   [`Comptant`, `Cash`],
   [`Virement Interac`, `Interac e-Transfer`],
+  [`Téléphone`, `Phone`],
+  [`Comptant ou virement Interac à`, `Cash or Interac e-Transfer to`],
+  [`Courriel copié`, `Email copied`],
   [` reçu comptant le `, ` received in cash on `],
   [`Ta note`, `Your note`],
   [`<button type="button" class="dl-btn js-edit">Modifier</button>`, `<button type="button" class="dl-btn js-edit">Edit</button>`],

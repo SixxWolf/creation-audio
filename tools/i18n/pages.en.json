@@ -941,5 +941,7 @@
  "Cette section est en préparation. Les imprimantes 3D ne sont pas encore offertes en boutique, mais ça s'en vient.": "This section is being prepared. 3D printers aren't available in the shop yet, but they're on the way.",
  "Ton courriel": "Your email",
  "M'avertir quand c'est prêt": "Notify me when it's ready",
- "Ton courriel sert seulement à t'avertir de l'ouverture, puis il est supprimé (au plus tard après 60 jours).": "Your email is only used to let you know when it opens, then it's deleted (after 60 days at most)."
+ "Ton courriel sert seulement à t'avertir de l'ouverture, puis il est supprimé (au plus tard après 60 jours).": "Your email is only used to let you know when it opens, then it's deleted (after 60 days at most).",
+ "Paiement à la cueillette :": "Payment at pickup:",
+ "comptant ou virement Interac": "cash or Interac e-Transfer"
 }
