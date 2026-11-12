@@ -442,6 +442,7 @@ window.CA = window.CA || {};
           (tr ? '<div class="card-tierline">Recharge · ' + esc(tr) + '</div>' : '') +
         '</div>' +
         '<div class="mat-actions">' +
+          '<label class="mat-vis inline"><input type="checkbox" class="mat-vis-cb" disabled> Visible en boutique</label>' +
           '<button class="btn btn-ghost btn-sm mat-edit" type="button">Modifier</button>' +
           '<button class="btn btn-ghost btn-sm mat-del" type="button">Suppr.</button>' +
         '</div>' +
@@ -453,10 +454,45 @@ window.CA = window.CA || {};
       var row = CA.materialOf(CA.currentBrand, name);
       $('.mat-edit', el).addEventListener('click', function () { openEditor(row, el); });
       $('.mat-del', el).addEventListener('click', function () { del(row); });
+      $('.mat-vis-cb', el).addEventListener('change', function (e) { setVisible(name, e.target); });
       wireDrag(el);
     });
     buildNav();
+    refreshVis();
   }
+
+  /* ---- « Visible en boutique » du matériau : montre/cache toutes ses couleurs d'un coup ----
+     (le réglage couleur par couleur reste dans l'éditeur du filament) */
+  function refreshVis() {
+    var brand = CA.currentBrand;
+    if (!brand) return;
+    sb.from('products').select('material,active').eq('type', 'filament').eq('brand', brand).then(function (res) {
+      if (res.error || brand !== CA.currentBrand) return;
+      var by = {};
+      (res.data || []).forEach(function (p) {
+        var o = by[p.material] || (by[p.material] = { n: 0, on: 0 });
+        o.n++; if (p.active) o.on++;
+      });
+      $$('.mat-row', listEl).forEach(function (el) {
+        var cb = $('.mat-vis-cb', el); if (!cb) return;
+        var o = by[el.getAttribute('data-name')] || { n: 0, on: 0 };
+        cb.disabled = !o.n;
+        cb.checked = o.n > 0 && o.on === o.n;
+        cb.indeterminate = o.on > 0 && o.on < o.n;
+      });
+    });
+  }
+  function setVisible(name, cb) {
+    var on = !!cb.checked;
+    cb.disabled = true;
+    sb.from('products').update({ active: on, updated_at: new Date().toISOString() })
+      .eq('type', 'filament').eq('brand', CA.currentBrand).eq('material', name).select('id').then(function (res) {
+        if (res.error) { caDialog.error(res.error); refreshVis(); return; }
+        refreshVis();
+        document.dispatchEvent(new CustomEvent('ca:filaments-changed'));
+      }, function () { refreshVis(); });
+  }
+  document.addEventListener('ca:filaments-loaded', refreshVis);
 
   /* ---- glisser-déposer : réordonner les matériaux ----
      L'ordre des matériaux pilote aussi l'ordre des groupes de filaments

@@ -412,10 +412,12 @@
         }
         cache = res.data || [];
         render();
+        document.dispatchEvent(new CustomEvent('ca:filaments-loaded'));
         if (window.CA.loadHeldStock) window.CA.loadHeldStock();
       }, function () { listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; });
   }
   document.addEventListener('ca:held', function () { if (cache.length) render(); });
+  document.addEventListener('ca:filaments-changed', function () { load(true); });
 
   function cardHtml(r) {
     var url = publicUrl(r.image_path);

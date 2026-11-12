@@ -457,7 +457,9 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .mat-prices { display:flex; flex-wrap:wrap; gap:6px; font-size:.84rem; color:var(--muted); }
 .mat-prices span { padding:2px 9px; background:var(--wash); border:1px solid var(--line); border-radius:100px; }
 .mat-prices b { color:var(--ink); font-variant-numeric:tabular-nums; }
-.mat-actions { display:flex; gap:6px; flex:none; }
+.mat-actions { display:flex; gap:6px; flex:none; align-items:center; }
+.mat-vis { display:inline-flex; align-items:center; gap:7px; margin-right:8px; font-size:13px; white-space:nowrap; cursor:pointer; color:var(--ink); }
+.mat-vis input { width:auto; accent-color:var(--ember); }
 
 /* Groupes de filaments (par matériau) */
 .fil-groups { display:flex; flex-direction:column; gap:30px; }
