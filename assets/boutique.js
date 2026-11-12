@@ -525,7 +525,7 @@
       return '<section class="cat-group" aria-labelledby="' + id + '">' +
         '<header class="cat-ghead">' +
           brandBadge(B.name, 'cat-glogo') +
-          '<h2 class="cat-gtitle" id="' + id + '">' + esc(B.name) + '</h2>' +
+          '<h2 class="cat-gtitle' + (brandLogo(B.name) ? ' sr-only' : '') + '" id="' + id + '">' + esc(B.name) + '</h2>' +
           '<span class="cat-gmeta">' + plural(B.materials.length, 'matériau', 'matériaux') + ' · ' +
             plural(nStock, 'couleur', 'couleurs') + _t(' en stock</span>') +
           '<span class="cat-grule" aria-hidden="true"></span>' +
@@ -584,7 +584,7 @@
     return '<a class="mcard' + (out ? ' is-out' : '') + (pm ? ' is-promo' : '') + '" href="' + esc(routeFor(m.brand, m.name)) + '">' +
       '<span class="mcard-media">' + media + (pm ? PR.ribbon(pm.pct) : '') + brandBadge(m.brand, 'mcard-brand') + '</span>' +
       '<span class="mcard-body">' +
-        '<span class="mcard-name"><span class="mcard-bname">' + esc(m.brand) + '</span> ' + esc(m.name) + '</span>' +
+        '<span class="mcard-name">' + esc(m.name) + '</span>' +
         (pm ? '<span class="mcard-promo">' + plural(pm.n, 'couleur en promo', 'couleurs en promo') + '</span>' : '') +
         (tag && !pm ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +
         '<span class="mcard-dots" aria-hidden="true">' + dots + (extra > 0 ? '<em>+' + extra + '</em>' : '') + '</span>' +
@@ -804,7 +804,7 @@
       '<div class="pdp">' +
         '<div class="pdp-media">' + mediaHtml() + '</div>' +
         '<div class="pdp-panel">' +
-          '<p class="pdp-eyebrow pdp-brand">' + brandBadge(m.brand, 'pdp-blogo') + '<span><b>' + esc(m.brand) + '</b> · ' + esc(m.name) + '</span></p>' +
+          '<p class="pdp-eyebrow pdp-brand">' + brandBadge(m.brand, 'pdp-blogo') + '<span>' + (brandLogo(m.brand) ? '' : '<b>' + esc(m.brand) + '</b> · ') + esc(m.name) + '</span></p>' +
           '<h1 class="pdp-name">' + esc(p.name) + '</h1>' +
           (p.code ? _t('<p class="pdp-ref">Réf. ') + esc(p.code) + '</p>' : '') +
           (promoOn(p, curType) ? PR.banner(p, pctOf(p, curType)) : '') +
@@ -1627,7 +1627,7 @@
             '<div class="citem-main">' +
               '<div class="citem-name">' + esc(m.name) + '</div>' +
               '<div class="citem-type">' + (it.type === 'accessory' ? esc(m.cat || _t('Accessoire'))
-                : esc((m.brand ? m.brand + ' ' : '') + (m.material || '')) + ' · ' + typeLabel(it)) +
+                : esc(m.material || '') + ' · ' + typeLabel(it)) +
                 ' · <span class="citem-unit">' + money(unitOf(it)) + '/u</span>' + boTag(it) + '</div>' +
               '<div class="citem-qty">' +
                 _t('<button type="button" class="cq-minus" aria-label="Retirer un">&minus;</button>') +
