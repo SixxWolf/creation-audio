@@ -241,7 +241,7 @@
     if (document.visibilityState !== 'visible') return;
     if (document.querySelector('.co-pkedit')) return;
     if (tabOpen && (sub === 'clients' || isWide())) load(); else refreshBadge();
-  }, 60000);
+  }, 30000);
 
   /* ---- chargement ---- */
   function load() {

@@ -92,6 +92,10 @@
   CA.loadDemandes = load;
   CA.reloadDemandes = function () { if (rows.length || !wrap.hidden) load(); else refreshBadge(); };
   if (CA.onAdminReady) CA.onAdminReady(refreshBadge);
+  setInterval(function () {
+    if (document.visibilityState !== 'visible') return;
+    if (wrap.offsetParent !== null) load(); else refreshBadge();
+  }, 30000);
 
   /* ---- purge 12 mois : fichiers + photos, la fiche reste ---- */
   function purge() {

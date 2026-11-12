@@ -100,7 +100,7 @@
     lastPoll = Date.now();
     if (visible) load(); else refreshBadge();
   }
-  setInterval(poll, 60000);
+  setInterval(poll, 30000);
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - lastPoll > 10000) poll(); });
 
   /* ---- chargement ---- */

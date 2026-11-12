@@ -412,4 +412,9 @@
     if (!cfg) loadCfg().then(loadList); else loadList();
   };
   if (CA.onAdminReady) CA.onAdminReady(function () { loadList(); });
+  setInterval(function () {
+    if (document.visibilityState !== 'visible' || !cfg || document.querySelector('.co-pkedit')) return;
+    var l = $('#cc-list');
+    if (l && l.offsetParent !== null) loadList();
+  }, 60000);
 })();

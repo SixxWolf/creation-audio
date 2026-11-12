@@ -97,6 +97,11 @@ window.CA = window.CA || {};
   function reloadAll() {
     return Promise.all([CA.loadClients(), CA.loadAccounts().then(null, function () { return []; })]).then(render, renderError);
   }
+  // nouveaux comptes : relecture automatique toutes les 30 s (onglet visible, pas d'édition en cours)
+  setInterval(function () {
+    if (!loaded || document.visibilityState !== 'visible' || editingId || !editor.hidden || listEl.offsetParent === null) return;
+    reloadAll();
+  }, 30000);
   // se réaffiche si le cache change (ex. mémorisation depuis une facture)
   CA.onClientsChange(function () { if (loaded) render(); });
 
