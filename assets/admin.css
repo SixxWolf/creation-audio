@@ -1174,7 +1174,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .rv-rail .scan-learn-fil, .rv-rail .scan-learn-row .cpk { flex:1 1 100%; min-width:0; }
   .rv-rail .scan-learn-kind { flex:1; min-width:0; }
   .rv-rail .rv-bar { height:8px; }
-  .rv-rail .rv-date { justify-content:space-between; padding:10px 14px; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
+  .rv-rail .rv-num, .rv-rail .rv-date { justify-content:space-between; padding:10px 14px; background:var(--paper); border:1px solid var(--line); border-radius:14px; }
   .rv-rail .editor-actions { position:static; display:flex; flex-direction:column; align-items:stretch; gap:8px; padding:14px;
     background:var(--paper); border:1px solid var(--line); border-radius:14px; -webkit-backdrop-filter:none; backdrop-filter:none; }
   .rv-rail .editor-actions .btn { justify-content:center; }

@@ -309,7 +309,11 @@
             '<span class="po-prog">' + left + ' attendu' + (left > 1 ? 's' : '') + (got ? ' · ' + got + ' déjà reçu' + (got > 1 ? 's' : '') : '') + '</span>' +
           '</button>' +
           (isCur ? '<span class="rv-cur">En cours</span>'
-                 : '<button type="button" class="btn btn-accent btn-sm rv-go" data-ic="scan">Recevoir</button>') +
+                 : '<span class="po-acts">' +
+                     '<button type="button" class="btn btn-accent btn-sm rv-go" data-ic="scan">Recevoir</button>' +
+                     '<button type="button" class="btn btn-ghost btn-sm rv-edit" data-ic="edit" aria-label="Modifier la commande" title="Modifier"></button>' +
+                     '<button type="button" class="btn btn-ghost btn-sm rv-rm" data-ic="trash" aria-label="Supprimer la commande" title="Supprimer"></button>' +
+                   '</span>') +
         '</div>' +
         '<ul class="reorder-list po-lines"' + (open ? '' : ' hidden') + '>' + orderLinesHtml(o.lines) + '</ul>' +
       '</div>';
@@ -322,6 +326,10 @@
       });
       var goBtn = $('.rv-go', el);
       if (goBtn) goBtn.addEventListener('click', function () { receiveOrder(id); });
+      var er = window.CA.enRoute, ord = list.filter(function (x) { return String(x.id) === id; })[0];
+      var edBtn = $('.rv-edit', el), rmBtn = $('.rv-rm', el);
+      if (edBtn) edBtn.addEventListener('click', function () { leaveWork(function () { closeWork(); er.edit(ord); }); });
+      if (rmBtn) rmBtn.addEventListener('click', function () { er.remove(ord); });
     });
   }
   var openPicks = {};   // commandes dépliées (gardées au rafraîchissement)
@@ -374,6 +382,8 @@
     metaEl.textContent = rc ? [rc.order_number, rc.received_at].filter(Boolean).join(' · ')
       : current ? [current.supplier, current.ordered_at].filter(Boolean).join(' · ') : '';
     dateI.value = rc ? (rc.received_at || todayISO()) : todayISO();
+    var numWrap = $('#r-num-wrap'), numI = $('#r-num');
+    if (numWrap) { numWrap.hidden = !rc; if (numI) numI.value = rc ? (rc.order_number || '') : ''; }
     confirmBtn.textContent = rc ? 'Enregistrer les modifications' : 'Confirmer la réception';
     statusEl.textContent = '';
     feedback('', ''); closeLearn();
@@ -690,15 +700,30 @@
       });
     };
     var affected = uniq(oldLines.map(function (l) { return l.product_id; }).concat(valid.map(function (r) { return r.productId; })));
-    var ref = rc ? orderRefOf(rc) : (order ? { id: order.id } : null);
+    var oldRef = rc ? orderRefOf(rc) : null;
+    var ref = rc ? oldRef : (order ? { id: order.id } : null);
+    var numI = $('#r-num'), newNum = rc && numI ? numI.value.trim().replace(/^#/, '') : null;
+    var numChanged = rc && numI && newNum !== String(rc.order_number || '');
 
     confirmBtn.disabled = true;
     statusEl.textContent = 'Enregistrement…';
     var chain;
     if (rc) {
-      chain = applyStock(oldLines, -1)
+      // nouveau n° : on le relie à la commande qui le porte (sinon le lien est coupé)
+      var relink = numChanged && newNum
+        ? sb.from('supplier_orders').select('id').neq('status', 'cancelled').ilike('order_number', newNum).limit(1)
+            .then(function (r) { return r.data && r.data.length ? { id: r.data[0].id } : newNum; }, function () { return newNum; })
+        : Promise.resolve(numChanged ? null : oldRef);
+      chain = relink.then(function (nr) {
+        ref = nr;
+        return applyStock(oldLines, -1);
+      })
         .then(function () { return sb.from('receipt_lines').delete().eq('receipt_id', rc.id); })
-        .then(function () { return sb.from('receipts').update({ received_at: date }).eq('id', rc.id).select(); })
+        .then(function () {
+          var upd = { received_at: date };
+          if (numChanged) { upd.order_number = newNum || null; upd.supplier_order_id = ref && typeof ref === 'object' ? ref.id : null; }
+          return sb.from('receipts').update(upd).eq('id', rc.id).select();
+        })
         .then(function (res) {
           if (res.error || !res.data || !res.data.length) throw (res.error || new Error('Modification refusée (permissions).'));
           newLines = newLinesFor(rc.id);
@@ -716,8 +741,8 @@
     }
     // commande en route : la réception consomme ce qui était attendu (modification = on rend l'ancien d'abord)
     chain = chain.then(function () {
-      var er = window.CA.enRoute; if (!er || !ref) return;
-      return (rc ? er.allocate(oldLines, ref, -1) : Promise.resolve())
+      var er = window.CA.enRoute; if (!er || (!ref && !oldRef)) return;
+      return (rc ? er.allocate(oldLines, oldRef, -1) : Promise.resolve())
         .then(function () { return er.allocate(newLines, ref, +1); })
         .then(function () { if (dropRest && order) return er.dropRemaining(order.id); })
         .then(null, function (e) { console.warn('en route', e); });   // la réception est déjà enregistrée

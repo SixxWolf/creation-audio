@@ -363,7 +363,7 @@
         var k = (l.product_id || '') + '|' + kindOf(l.kind);
         editingReceived[k] = (editingReceived[k] || 0) + (l.qty_received | 0);
         return { label: l.label || '', productId: l.product_id ? String(l.product_id) : '', kind: kindOf(l.kind), qty: l.qty | 0,
-          unitCost: l.unit_cost != null ? +l.unit_cost : null, how: 'saisi', picked: false };
+          unitCost: l.unit_cost != null ? +l.unit_cost : null, how: 'saisi', picked: false, got: l.qty_received | 0 };
       });
       sortRows();
       renderRows();
@@ -486,16 +486,16 @@
         '<td class="po-read"><div class="po-read-in">' +
           (r.label ? '<span class="po-lbl">' + esc(r.label) + '</span>' : '<span class="muted">—</span>') +
           (how ? '<span class="po-how">' + how[1] + '</span>' : '') + '</div></td>' +
-        '<td class="rcp-fil"><select class="po-fil" aria-label="Article">' + options(r.productId) + '</select></td>' +
-        '<td>' + (acc ? '<span class="rcp-kind-item">Article</span>'
+        '<td class="rcp-fil"><select class="po-fil" aria-label="Article"' + (r.got ? ' disabled' : '') + '>' + options(r.productId) + '</select></td>' +
+        '<td>' + (r.got && !acc ? CA.kindPill(r.kind === 'refill' ? 'refill' : 'spool') : acc ? '<span class="rcp-kind-item">Article</span>'
           : CA.kindPill(r.kind === 'refill' ? 'refill' : 'spool') + '<select class="rcp-kind po-kind" aria-label="Format">' +
             '<option value="spool"' + (r.kind !== 'refill' ? ' selected' : '') + (hasS ? '' : ' disabled') + '>Avec bobine</option>' +
             '<option value="refill"' + (r.kind === 'refill' ? ' selected' : '') + (hasR ? '' : ' disabled') + '>Recharge</option>' +
           '</select>') + '</td>' +
-        '<td class="num"><input type="number" class="rcp-qty num po-qty" min="0" step="1" value="' + (r.qty || 0) + '" aria-label="Quantité"></td>' +
+        '<td class="num"><input type="number" class="rcp-qty num po-qty" min="' + (r.got || 0) + '" step="1" value="' + (r.qty || 0) + '" aria-label="Quantité"' + (r.got ? ' title="' + r.got + ' déjà reçu' + (r.got > 1 ? 's' : '') + ' : minimum"' : '') + '></td>' +
         '<td class="num"><input type="number" class="rcp-price num po-price" min="0" step="0.01" value="' + (r.unitCost != null ? (+r.unitCost).toFixed(2) : '') + '"' +
           ' placeholder="' + (ref != null ? ref.toFixed(2) : '') + '" aria-label="Prix payé par unité"></td>' +
-        '<td><button type="button" class="rcp-row-del po-del" aria-label="Retirer">✕</button></td>' +
+        '<td>' + (r.got ? '<span class="po-lock" title="Déjà reçu : verrouillé">🔒</span>' : '<button type="button" class="rcp-row-del po-del" aria-label="Retirer">✕</button>') + '</td>' +
       '</tr>';
     }).join('');
     $$('.po-row', rowsEl).forEach(function (tr) {
@@ -508,10 +508,12 @@
       });
       var k = $('.po-kind', tr);
       if (k) k.addEventListener('change', function () { r.kind = this.value; renderRows(); });
-      $('.po-qty', tr).addEventListener('input', function () { r.qty = Math.max(0, parseInt(this.value, 10) || 0); renderSum(); });
+      $('.po-qty', tr).addEventListener('input', function () { r.qty = Math.max(r.got || 0, parseInt(this.value, 10) || 0); renderSum(); });
+      if (r.got) $('.po-qty', tr).addEventListener('change', function () { this.value = r.qty; });
+      var del = $('.po-del', tr);
       $('.po-price', tr).addEventListener('input', function () { r.unitCost = this.value === '' ? null : Math.max(0, parseFloat(this.value) || 0); renderSum(); });
-      $('.po-del', tr).addEventListener('click', function () { rows.splice(i, 1); renderRows(); });
-      if (window.CA.pick) window.CA.pick($('.po-fil', tr));
+      if (del) del.addEventListener('click', function () { rows.splice(i, 1); renderRows(); });
+      if (window.CA.pick && !r.got) window.CA.pick($('.po-fil', tr));
     });
     renderSum();
   }
@@ -640,22 +642,41 @@
       $('.po-recv', el).addEventListener('click', function () {
         inv().receiveOrder(o.id);
       });
-      $('.po-edit', el).addEventListener('click', function () {
-        // grand écran : l'éditeur est dans la grande zone (CA.wideLayout), pas dans la carte En route
-        inv().ready().then(function () { openEditor(o); (card.closest('.is-wide') ? editorEl : card).scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+      $('.po-edit', el).addEventListener('click', function () { editOrder(o); });
+      $('.po-rm', el).addEventListener('click', function () { removeOrder(o); });
+    });
+  }
+
+  // modifier : l'éditeur vit dans « À commander » (depuis Réception, on y bascule)
+  function editOrder(o) {
+    var sub = window.CA.route && window.CA.route.goSub;
+    if (sub && !card.offsetParent) sub('commander');
+    // grand écran : l'éditeur est dans la grande zone (CA.wideLayout), pas dans la carte En route
+    inv().ready().then(function () { openEditor(o); setTimeout(function () { (card.closest('.is-wide') ? editorEl : card).scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60); });
+  }
+  // supprimer : une commande déjà en partie reçue garde ses réceptions → on retire seulement ce qui reste à venir
+  function removeOrder(o) {
+    var got = o.lines.reduce(function (s, l) { return s + (l.qty_received | 0); }, 0);
+    var name = o.order_number || 'sans n°';
+    if (got > 0) {
+      caDialog.confirm({ title: 'Retirer le reste de la commande ' + name + ' ?',
+        message: got + ' article' + (got > 1 ? 's' : '') + ' déjà reçu' + (got > 1 ? 's sont' : ' est') + ' en stock et le reste. Seul ce qui n\'est pas encore arrivé sera retiré.',
+        ok: 'Retirer le reste', danger: true, icon: 'trash' }).then(function (ok) {
+        if (ok) dropRemaining(o.id).then(null, function (e) { caDialog.error(e); });
       });
-      $('.po-rm', el).addEventListener('click', function () {
-        caDialog.confirm({ title: 'Supprimer la commande ' + (o.order_number || 'sans n°') + ' ?',
-          message: 'Ses articles ne seront plus comptés en route.', ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
-          if (!ok) return;
-          sb.from('supplier_orders').delete().eq('id', o.id).select().then(function (res) {
-            if (res.error || !res.data || !res.data.length) { caDialog.error(res.error || 'Suppression refusée (permissions).'); return; }
-            load();
-          });
-        });
+      return;
+    }
+    caDialog.confirm({ title: 'Supprimer la commande ' + name + ' ?',
+      message: 'Ses articles ne seront plus comptés en route.', ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
+      if (!ok) return;
+      sb.from('supplier_orders').delete().eq('id', o.id).select().then(function (res) {
+        if (res.error || !res.data || !res.data.length) { caDialog.error(res.error || 'Suppression refusée (permissions).'); return; }
+        load();
       });
     });
   }
+  window.CA.enRoute.edit = editOrder;
+  window.CA.enRoute.remove = removeOrder;
 
   /* ---- chargement : à chaque ouverture de l'Inventaire (une réception a pu fermer une commande) ---- */
   var prevOnTab = window.CA.onTab;
