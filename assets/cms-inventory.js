@@ -1290,12 +1290,36 @@
         sb.from('receipt_lines').select('*').in('receipt_id', ids).then(function (r2) {
           var byReceipt = {};
           (r2.data || []).forEach(function (l) { (byReceipt[l.receipt_id] = byReceipt[l.receipt_id] || []).push(l); });
-          renderHistory(receipts, byReceipt);
+          // excédent : ce qui dépasse la commande (ou n'y figurait pas), calculé à partir des réceptions + des lignes de la commande
+          var oids = uniq(receipts.map(function (r) { return r.supplier_order_id; }).filter(Boolean));
+          var done = function (ol) {
+            var surplus = {}, oq = {}, hasOrder = {};
+            (ol || []).forEach(function (l) { hasOrder[l.order_id] = 1; var k = l.order_id + '|' + l.product_id + '|' + (l.kind || 'spool'); oq[k] = (oq[k] || 0) + (l.qty | 0); });
+            var recv = {}, last = {};   // reçu par clé ; dernière réception (la plus récente) qui touche la clé
+            receipts.forEach(function (rc) {   // receipts est trié du plus récent au plus ancien
+              if (!rc.supplier_order_id || !hasOrder[rc.supplier_order_id]) return;
+              (byReceipt[rc.id] || []).forEach(function (l) {
+                var k = rc.supplier_order_id + '|' + l.product_id + '|' + (l.kind || 'spool');
+                recv[k] = (recv[k] || 0) + (l.qty | 0);
+                if (!last[k]) last[k] = rc.id;
+              });
+            });
+            Object.keys(recv).forEach(function (k) {
+              var over = recv[k] - (oq[k] || 0);
+              if (over > 0) { var s = surplus[last[k]] = surplus[last[k]] || {}; s[k.slice(k.indexOf('|') + 1)] = { n: over, off: !oq[k] }; }
+            });
+            renderHistory(receipts, byReceipt, surplus);
+          };
+          if (!oids.length) { done([]); return; }
+          sb.from('supplier_order_lines').select('order_id,product_id,kind,qty').in('order_id', oids)
+            .then(function (r3) { done(r3.error ? [] : r3.data); }, function () { done([]); });
         });
       });
   }
-  function renderHistory(receipts, byReceipt) {
-    histData = { receipts: receipts, by: byReceipt };
+  function renderHistory(receipts, byReceipt, surplus) {
+    if (surplus) histData = { receipts: receipts, by: byReceipt, surplus: surplus };
+    else histData = { receipts: receipts, by: byReceipt, surplus: histData.surplus };
+    surplus = histData.surplus || {};
     if ((invQEl && invQEl.value || '').trim()) {
       receipts = receipts.filter(function (rc) {
         return (byReceipt[rc.id] || []).some(function (l) {
@@ -1308,9 +1332,11 @@
     historyEl.innerHTML = receipts.map(function (rc) {
       var lines = byReceipt[rc.id] || [];
       var totalRolls = lines.reduce(function (s, l) { return s + (l.qty | 0); }, 0);
-      var totalCost = 0, hasAnyCost = false;
+      var totalCost = 0, hasAnyCost = false, over = surplus[rc.id] || {}, overTot = 0;
       var linesHtml = sortByProduct(lines, linePid, lineKind).map(function (l) {
         var q = l.qty | 0;
+        var ov = over[l.product_id + '|' + (l.kind || 'spool')];
+        if (ov) overTot += ov.n;
         var priced = (l.unit_cost != null && l.unit_cost !== '');
         var eff = priced ? +l.unit_cost : null;
         if (eff != null) { totalCost += eff * q; hasAnyCost = true; }
@@ -1318,14 +1344,16 @@
         var sw = p && !acc ? '<span class="ro-sw" style="background:' + esc(swOf(p)) + '"></span>' : '<span class="ro-sw ro-sw-none"></span>';
         return '<li>' + sw + '<span class="rcp-hist-nm">' + esc(p ? artName(p) : (l.label || '(produit supprimé)')) +
           (acc ? '' : ' ' + CA.kindPill(l.kind === 'refill' ? 'refill' : 'spool')) + '</span>' +
+          (ov ? '<span class="rcp-over">' + (ov.off ? 'Hors commande' : '+' + ov.n + ' de trop') + '</span>' : '') +
           '<span class="rcp-hist-q">×' + q + '</span>' +
           '<span class="rcp-hist-price' + (priced ? '' : ' muted') + '">' + (priced ? money(l.unit_cost) + '/u' : '—') + '</span></li>';
       }).join('');
       var costTxt = hasAnyCost ? ' · ' + money(totalCost) : '';
-      return '<div class="mat-row rcp-hist" data-id="' + esc(rc.id) + '">' +
+      return '<div class="mat-row rcp-hist' + (overTot ? ' has-over' : '') + '" data-id="' + esc(rc.id) + '">' +
         '<div class="mat-main">' +
           '<div class="rcp-hist-head">' +
             '<span class="rcp-hist-order">' + (rc.order_number ? esc(rc.order_number) : 'Commande sans n°') + '</span>' +
+            (overTot ? '<span class="rcp-over">+' + overTot + ' de trop</span>' : '') +
             '<span class="grow"></span>' +
             '<span class="rcp-hist-meta">' + esc(rc.received_at) + ' · ' + lines.length + ' ligne(s) · ' + totalRolls + ' article(s)' + costTxt + '</span>' +
           '</div>' +
