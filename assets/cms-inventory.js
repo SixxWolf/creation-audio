@@ -1329,7 +1329,21 @@
       });
       if (!receipts.length) { historyEl.innerHTML = '<p class="empty">Aucun résultat.</p>'; return; }
     }
-    historyEl.innerHTML = receipts.map(function (rc) {
+    // réceptions d'une même commande : rapprochées, reliées par un ruban de couleur (6 teintes qui tournent)
+    var gKey = function (rc) { return rc.supplier_order_id ? 'o' + rc.supplier_order_id : (rc.order_number ? 'n' + String(rc.order_number).trim().toLowerCase() : null); };
+    var gCount = {}, gFirst = {}, gIdx = {}, gSeen = {}, gN = 0;
+    receipts.forEach(function (rc) { var k = gKey(rc); if (k) gCount[k] = (gCount[k] || 0) + 1; });
+    var ordered = [];
+    receipts.forEach(function (rc) {
+      var k = gKey(rc);
+      if (!k || gCount[k] < 2) { ordered.push(rc); return; }
+      if (gFirst[k]) return;
+      gFirst[k] = rc.id; gIdx[k] = gN++;
+      receipts.forEach(function (x) { if (gKey(x) === k) ordered.push(x); });
+    });
+    historyEl.innerHTML = ordered.map(function (rc) {
+      var gk = gKey(rc), inGrp = gk && gCount[gk] > 1, gHead = inGrp && !gSeen[gk];
+      if (inGrp) gSeen[gk] = 1;
       var lines = byReceipt[rc.id] || [];
       var totalRolls = lines.reduce(function (s, l) { return s + (l.qty | 0); }, 0);
       var totalCost = 0, hasAnyCost = false, over = surplus[rc.id] || {}, overTot = 0;
@@ -1349,10 +1363,11 @@
           '<span class="rcp-hist-price' + (priced ? '' : ' muted') + '">' + (priced ? money(l.unit_cost) + '/u' : '—') + '</span></li>';
       }).join('');
       var costTxt = hasAnyCost ? ' · ' + money(totalCost) : '';
-      return '<div class="mat-row rcp-hist' + (overTot ? ' has-over' : '') + '" data-id="' + esc(rc.id) + '">' +
+      return '<div class="mat-row rcp-hist' + (overTot ? ' has-over' : '') + (inGrp ? ' in-grp g' + (gIdx[gk] % 6) : '') + '" data-id="' + esc(rc.id) + '">' +
         '<div class="mat-main">' +
           '<div class="rcp-hist-head">' +
             '<span class="rcp-hist-order">' + (rc.order_number ? esc(rc.order_number) : 'Commande sans n°') + '</span>' +
+            (gHead ? '<span class="rcp-grp">' + gCount[gk] + ' réceptions</span>' : '') +
             (overTot ? '<span class="rcp-over">+' + overTot + ' de trop</span>' : '') +
             '<span class="grow"></span>' +
             '<span class="rcp-hist-meta">' + esc(rc.received_at) + ' · ' + lines.length + ' ligne(s) · ' + totalRolls + ' article(s)' + costTxt + '</span>' +

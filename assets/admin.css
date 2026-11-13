@@ -847,6 +847,13 @@ td.num input { text-align:right; }
 .rcp-hist-nm { flex:1; min-width:0; }
 .rcp-over { flex:none; padding:2px 10px; font-size:.74rem; font-weight:700; border-radius:100px; color:var(--bad); background:var(--bad-wash); white-space:nowrap; }
 .rcp-hist.has-over { box-shadow:inset 3px 0 0 var(--bad); }
+/* réceptions d'une même commande : ruban + étiquette de la même teinte */
+.rcp-hist.g0 { --grp:#4f9cf5; } .rcp-hist.g1 { --grp:#3fbf7f; } .rcp-hist.g2 { --grp:#9b7cf0; }
+.rcp-hist.g3 { --grp:#ec6fa6; } .rcp-hist.g4 { --grp:#2fc4c4; } .rcp-hist.g5 { --grp:#d4b36a; }
+.rcp-hist.in-grp { box-shadow:inset 5px 0 0 var(--grp); }
+.rcp-hist.in-grp.has-over { box-shadow:inset 5px 0 0 var(--grp), inset 8px 0 0 var(--bad); }
+.rcp-grp { flex:none; padding:2px 10px; font-size:.74rem; font-weight:700; border-radius:100px; white-space:nowrap;
+  color:var(--grp); background:color-mix(in srgb, var(--grp) 16%, transparent); }
 .rcp-hist-q { flex:none; font-weight:700; font-variant-numeric:tabular-nums; }
 .rcp-hist-price { flex:none; min-width:78px; text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
 /* accessoire (pas de couleur) : garde l'alignement des noms */
