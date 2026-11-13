@@ -322,18 +322,27 @@
       bindDraft(draft);
       return;
     }
-    ordersEl.innerHTML = draftHtml + list.map(function (o) {
+    var stat = {};
+    list.forEach(function (o) {
       var left = 0, got = 0;
       o.lines.forEach(function (l) { left += orderRemaining(l); got += Math.min(l.qty | 0, l.qty_received | 0); });
+      stat[o.id] = { left: left, got: got, part: got > 0 && left > 0 };
+    });
+    // les commandes partiellement reçues remontent en premier (ordre gardé à l'intérieur de chaque groupe)
+    list = list.filter(function (o) { return stat[o.id].part; }).concat(list.filter(function (o) { return !stat[o.id].part; }));
+    ordersEl.innerHTML = draftHtml + list.map(function (o) {
+      var left = stat[o.id].left, got = stat[o.id].got, part = stat[o.id].part;
       var open = openPicks[o.id], isCur = !!curIds[String(o.id)];
-      return '<div class="po-order rv-order' + (open ? ' open' : '') + (isCur ? ' is-current' : '') + '" data-id="' + esc(o.id) + '">' +
+      return '<div class="po-order rv-order' + (open ? ' open' : '') + (isCur ? ' is-current' : '') + (part ? ' is-partial' : '') + '" data-id="' + esc(o.id) + '">' +
         '<div class="po-order-head">' +
           (working || editingReceipt ? '' : '<label class="rv-chk" title="Cocher pour recevoir ensemble"><input type="checkbox" class="rv-pk"' +
             (pickedIds[o.id] ? ' checked' : '') + ' aria-label="Cocher pour recevoir ensemble"></label>') +
           '<button type="button" class="po-toggle" aria-expanded="' + !!open + '">' +
             '<span class="po-num">' + esc(o.order_number || 'Sans n°') + '</span>' +
+            (part ? '<span class="po-partial">Partielle</span>' : '') +
             '<span class="po-meta">' + esc([o.supplier, o.ordered_at].filter(Boolean).join(' · ')) + '</span>' +
             '<span class="po-prog">' + left + ' attendu' + (left > 1 ? 's' : '') + (got ? ' · ' + got + ' déjà reçu' + (got > 1 ? 's' : '') : '') + '</span>' +
+            (part ? '<span class="po-bar" role="img" aria-label="' + got + ' sur ' + (got + left) + ' reçus"><i style="width:' + Math.round(got / (got + left) * 100) + '%"></i></span>' : '') +
           '</button>' +
           (isCur ? '<span class="rv-cur">En cours</span>'
                  : '<span class="po-acts">' +

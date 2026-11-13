@@ -1155,6 +1155,13 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 /* commande en cours de pointage (la liste reste visible à côté en grand écran) */
 .rv-cur { flex:none; padding:4px 12px; font-size:.8rem; font-weight:700; color:var(--on-ember); background:var(--ember); border-radius:100px; }
 .rv-order.is-current .po-num { color:var(--ember-ink); }
+/* commande partiellement reçue : bordure d'accent + pastille ambre + barre de progression */
+.rv-order.is-partial { position:relative; margin:4px 0; padding:0 0 0 12px; border-top:0; border-radius:10px;
+  background:color-mix(in srgb, var(--ember) 7%, transparent); box-shadow:inset 3px 0 0 var(--ember), 0 0 14px color-mix(in srgb, var(--ember) 22%, transparent); }
+.po-partial { flex:none; padding:2px 10px; font-size:.74rem; font-weight:700; letter-spacing:.02em; text-transform:uppercase; border-radius:100px;
+  color:#3d2a00; background:#f0b429; }
+.po-bar { flex:1 0 100%; height:6px; border-radius:100px; overflow:hidden; background:color-mix(in srgb, var(--muted) 25%, transparent); }
+.po-bar i { display:block; height:100%; border-radius:100px; background:#f0b429; }
 /* réception groupée : case à cocher, brouillon en pause, en-têtes de commande dans le tableau */
 .rv-chk { flex:none; display:flex; align-items:center; padding:6px 10px 6px 2px; cursor:pointer; }
 .rv-chk input { width:20px; height:20px; }
