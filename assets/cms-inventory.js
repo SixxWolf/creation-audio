@@ -49,7 +49,7 @@
       rowsEl = $('#r-rows'), emptyHint = $('#r-empty-hint'),
       confirmBtn = $('#r-confirm'), resetBtn = $('#r-reset'), statusEl = $('#r-status'),
       historyEl = $('#r-history'), refreshBtn = $('#r-refresh'),
-      pickEl = $('#rv-pick'), ordersEl = $('#rv-orders'), freeBtn = $('#rv-free'), workEl = $('#rv-work'),
+      pickEl = $('#rv-pick'), ordersEl = $('#rv-orders'), freeBtn = $('#rv-free'), multiBtn = $('#rv-multi'), workEl = $('#rv-work'),
       metaEl = $('#rv-meta'), barEl = $('#rv-bar'), barFill = $('#rv-bar-fill');
   // grand écran (≥ 1600 px) : chaque sous-onglet en colonnes (data-wide -> data-wide-slot, voir admin-core)
   if (window.CA.wideLayout) window.CA.wideLayout($('.tabpanel[data-panel="inventaire"]'));
@@ -242,7 +242,9 @@
               free (ligne ajoutée à la main : article au choix) }]
      ========================================================= */
   var rows = [];
-  var current = null;          // commande en route pointée ; null = sans commande
+  var current = null;          // 1re commande en route pointée ; null = sans commande
+  var orders = [];             // toutes les commandes pointées ensemble (réception groupée), de la plus ancienne à la plus récente
+  var pickedIds = {};          // cases cochées dans la liste « Commandes en route »
   var editingReceipt = null;   // réception de l'historique en cours de modification
   var editingOldLines = [];
 
@@ -291,18 +293,33 @@
   function renderPick() {
     if (!ordersEl) return;
     var list = enRouteList();
+    // commandes en cours de pointage (grand écran : la liste reste visible à gauche pendant la réception)
+    var working = !!(workEl && !workEl.hidden && !editingReceipt);
+    var curIds = {};
+    if (working) orders.forEach(function (o) { curIds[String(o.id)] = 1; });
+    Object.keys(pickedIds).forEach(function (k) { if (!list.some(function (x) { return String(x.id) === k; })) delete pickedIds[k]; });
+    var draft = !working && !editingReceipt ? readDraft() : null;
+    var draftHtml = draft ? '<div class="rv-draft"><span>Réception en pause · ' + draft.count + ' article' + (draft.count > 1 ? 's' : '') + '</span>' +
+      '<button type="button" class="btn btn-accent btn-sm rv-draft-go" data-ic="scan">Reprendre</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm rv-draft-del" data-ic="trash">Jeter</button></div>' : '';
+    var nPicked = Object.keys(pickedIds).length;
+    if (multiBtn) {
+      multiBtn.hidden = working || nPicked < 2;
+      multiBtn.textContent = 'Recevoir ensemble (' + nPicked + ')';
+    }
     if (!list.length) {
-      ordersEl.innerHTML = '<p class="po-none">Aucune commande en route. Ajoute-les dans « À commander ».</p>';
+      ordersEl.innerHTML = draftHtml + '<p class="po-none">Aucune commande en route. Ajoute-les dans « À commander ».</p>';
+      bindDraft(draft);
       return;
     }
-    // commande en cours de pointage (grand écran : la liste reste visible à gauche pendant la réception)
-    var curId = current && workEl && !workEl.hidden ? String(current.id) : null;
-    ordersEl.innerHTML = list.map(function (o) {
+    ordersEl.innerHTML = draftHtml + list.map(function (o) {
       var left = 0, got = 0;
       o.lines.forEach(function (l) { left += orderRemaining(l); got += Math.min(l.qty | 0, l.qty_received | 0); });
-      var open = openPicks[o.id], isCur = String(o.id) === curId;
+      var open = openPicks[o.id], isCur = !!curIds[String(o.id)];
       return '<div class="po-order rv-order' + (open ? ' open' : '') + (isCur ? ' is-current' : '') + '" data-id="' + esc(o.id) + '">' +
         '<div class="po-order-head">' +
+          (working || editingReceipt ? '' : '<label class="rv-chk" title="Cocher pour recevoir ensemble"><input type="checkbox" class="rv-pk"' +
+            (pickedIds[o.id] ? ' checked' : '') + ' aria-label="Cocher pour recevoir ensemble"></label>') +
           '<button type="button" class="po-toggle" aria-expanded="' + !!open + '">' +
             '<span class="po-num">' + esc(o.order_number || 'Sans n°') + '</span>' +
             '<span class="po-meta">' + esc([o.supplier, o.ordered_at].filter(Boolean).join(' · ')) + '</span>' +
@@ -310,7 +327,7 @@
           '</button>' +
           (isCur ? '<span class="rv-cur">En cours</span>'
                  : '<span class="po-acts">' +
-                     '<button type="button" class="btn btn-accent btn-sm rv-go" data-ic="scan">Recevoir</button>' +
+                     '<button type="button" class="btn btn-accent btn-sm rv-go" data-ic="' + (working ? 'plus' : 'scan') + '">' + (working ? 'Ajouter' : 'Recevoir') + '</button>' +
                      '<button type="button" class="btn btn-ghost btn-sm rv-edit" data-ic="edit" aria-label="Modifier la commande" title="Modifier"></button>' +
                      '<button type="button" class="btn btn-ghost btn-sm rv-rm" data-ic="trash" aria-label="Supprimer la commande" title="Supprimer"></button>' +
                    '</span>') +
@@ -325,14 +342,75 @@
         tg.setAttribute('aria-expanded', String(!ul.hidden)); el.classList.toggle('open', !ul.hidden);
       });
       var goBtn = $('.rv-go', el);
-      if (goBtn) goBtn.addEventListener('click', function () { receiveOrder(id); });
+      if (goBtn) goBtn.addEventListener('click', function () { if (working) addOrder(id); else receiveOrder(id); });
+      var pk = $('.rv-pk', el);
+      if (pk) pk.addEventListener('change', function () {
+        if (pk.checked) pickedIds[id] = 1; else delete pickedIds[id];
+        var n = Object.keys(pickedIds).length;
+        if (multiBtn) { multiBtn.hidden = n < 2; multiBtn.textContent = 'Recevoir ensemble (' + n + ')'; }
+      });
       var er = window.CA.enRoute, ord = list.filter(function (x) { return String(x.id) === id; })[0];
       var edBtn = $('.rv-edit', el), rmBtn = $('.rv-rm', el);
       if (edBtn) edBtn.addEventListener('click', function () { leaveWork(function () { closeWork(); er.edit(ord); }); });
       if (rmBtn) rmBtn.addEventListener('click', function () { er.remove(ord); });
     });
+    bindDraft(draft);
   }
   var openPicks = {};   // commandes dépliées (gardées au rafraîchissement)
+
+  /* ---- Brouillon : la réception en pause survit à un changement d'onglet / une fermeture de page ----
+     (dans ce navigateur seulement). On ne garde que les quantités comptées : à la reprise, « attendu »
+     est recalculé depuis les commandes en route actuelles. */
+  var DRAFT_KEY = 'ca_reception_draft_v1';
+  function rowKey(r) { return String(r.ord || '') + '|' + r.productId + '|' + r.kind; }
+  function readDraft() {
+    try {
+      var d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (!d || !d.rows || !d.rows.length) return null;
+      d.count = d.rows.reduce(function (s, r) { return s + (r.qty | 0); }, 0);
+      return d.count ? d : null;
+    } catch (e) { return null; }
+  }
+  function saveDraft() {
+    try {
+      if (editingReceipt || !workEl || workEl.hidden) return;
+      var keep = rows.filter(function (r) { return r.productId && (r.qty | 0) > 0; });
+      if (!keep.length) return;   // rien de compté : on laisse un brouillon existant tranquille
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        ids: orders.map(function (o) { return String(o.id); }),
+        date: dateI.value,
+        rows: keep.map(function (r) { return { ord: r.ord ? String(r.ord) : '', productId: String(r.productId), kind: r.kind,
+          qty: r.qty | 0, extra: !!(r.free || r.expected === 0), label: r.label || '' }; })
+      }));
+    } catch (e) {}
+  }
+  function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
+  function bindDraft(draft) {
+    if (!draft) return;
+    var go = $('.rv-draft-go', ordersEl), del = $('.rv-draft-del', ordersEl);
+    if (go) go.addEventListener('click', function () { resumeDraft(draft); });
+    if (del) del.addEventListener('click', function () {
+      caDialog.confirm({ title: 'Jeter la réception en pause ?', message: 'Les articles déjà comptés ne seront pas enregistrés.', ok: 'Jeter' })
+        .then(function (ok) { if (ok) { clearDraft(); renderPick(); } });
+    });
+  }
+  function resumeDraft(d) {
+    var list = enRouteList();
+    var os = (d.ids || []).map(function (id) { return list.filter(function (x) { return String(x.id) === id; })[0]; }).filter(Boolean);
+    leaveWork(function () {
+      startWork(os.length ? os : null);
+      var kept = {}; d.rows.forEach(function (r) { kept[rowKey(r)] = r; });
+      rows.forEach(function (r) { var s = kept[rowKey(r)]; if (s) { r.qty = s.qty; delete kept[rowKey(r)]; } });
+      Object.keys(kept).forEach(function (k) {   // lignes hors commande / ajoutées à la main
+        var s = kept[k]; if (!s.extra) return;
+        if (s.ord && !os.some(function (o) { return String(o.id) === s.ord; })) s.ord = os.length ? String(os[0].id) : '';
+        rows.push({ productId: s.productId, kind: s.kind, qty: s.qty, expected: os.length ? 0 : null, label: s.label, ord: s.ord || (os.length ? String(os[0].id) : undefined) });
+      });
+      if (d.date) dateI.value = d.date;
+      renderRows();
+      feedback('Réception reprise.', 'ok');
+    });
+  }
   document.addEventListener('ca:enroute', function () { if (loaded) renderPick(); });
   if (freeBtn) freeBtn.addEventListener('click', function () { leaveWork(function () { startWork(null); }); });
 
@@ -354,8 +432,31 @@
   }
 
   // ouvre le pointage : une commande (o), sans commande (null), ou la modification d'une réception (rc)
+  // o : une commande, un tableau de commandes (réception groupée) ou null (sans commande)
+  function ordersByAge(list) {
+    return list.slice().sort(function (a, b) {
+      var x = String(a.ordered_at || '') , y = String(b.ordered_at || '');
+      return x < y ? -1 : x > y ? 1 : String(a.created_at || '').localeCompare(String(b.created_at || ''));
+    });
+  }
+  // lignes « attendu » d'une commande : une ligne par article + format, au prix moyen de la commande
+  function rowsOfOrder(ord) {
+    var out = [], byKey = {};
+    ord.lines.forEach(function (l) {
+      var left = orderRemaining(l); if (!left || !l.product_id) return;
+      var p = bcProd(l.product_id), kind = fitKind(p, l.kind), k = l.product_id + '|' + kind;
+      var r = byKey[k];
+      if (!r) { r = byKey[k] = { productId: String(l.product_id), kind: kind, qty: 0, expected: 0, label: l.label || '', unitCost: null, sum: 0, priced: 0, ord: String(ord.id) }; out.push(r); }
+      r.expected += left;
+      if (l.unit_cost != null) { r.sum += (+l.unit_cost) * left; r.priced += left; }
+    });
+    out.forEach(function (r) { r.unitCost = r.priced ? round2(r.sum / r.priced) : null; delete r.sum; delete r.priced; });
+    return sortByProduct(out, linePid, lineKind);
+  }
+  function orderOfRow(r) { return orders.filter(function (o) { return String(o.id) === String(r.ord); })[0] || orders[0] || null; }
   function startWork(o, rc, oldLines) {
-    current = rc ? null : (o || null);
+    orders = rc ? [] : (o ? ordersByAge([].concat(o)) : []);
+    current = orders[0] || null;
     editingReceipt = rc || null;
     editingOldLines = oldLines || [];
     rows = [];
@@ -364,22 +465,16 @@
         return { productId: l.product_id ? String(l.product_id) : '', kind: l.kind === 'refill' ? 'refill' : (l.kind === 'item' ? 'item' : 'spool'),
           qty: l.qty | 0, expected: null, label: l.label || '', oldCost: l.unit_cost != null ? +l.unit_cost : null };
       });
-    } else if (current) {
-      // une ligne par article + format : ce qui reste à recevoir, au prix moyen de la commande
-      var byKey = {};
-      current.lines.forEach(function (l) {
-        var left = orderRemaining(l); if (!left || !l.product_id) return;
-        var p = bcProd(l.product_id), kind = fitKind(p, l.kind), k = l.product_id + '|' + kind;
-        var r = byKey[k];
-        if (!r) { r = byKey[k] = { productId: String(l.product_id), kind: kind, qty: 0, expected: 0, label: l.label || '', unitCost: null, sum: 0, priced: 0 }; rows.push(r); }
-        r.expected += left;
-        if (l.unit_cost != null) { r.sum += (+l.unit_cost) * left; r.priced += left; }
-      });
-      rows.forEach(function (r) { r.unitCost = r.priced ? round2(r.sum / r.priced) : null; delete r.sum; delete r.priced; });
+    } else {
+      orders.forEach(function (ord) { rows = rows.concat(rowsOfOrder(ord)); });   // les scans / ajouts suivants vont à la fin
     }
-    rows = sortByProduct(rows, linePid, lineKind);   // les scans / ajouts suivants vont à la fin
-    editorTitle.textContent = rc ? 'Modifier la réception' : (current ? 'Réception · ' + (current.order_number || 'commande sans n°') : 'Réception sans commande');
+    pickedIds = {};
+    var multi = orders.length > 1;
+    editorTitle.textContent = rc ? 'Modifier la réception'
+      : multi ? 'Réception groupée · ' + orders.length + ' commandes'
+      : (current ? 'Réception · ' + (current.order_number || 'commande sans n°') : 'Réception sans commande');
     metaEl.textContent = rc ? [rc.order_number, rc.received_at].filter(Boolean).join(' · ')
+      : multi ? orders.map(function (x) { return x.order_number || 'Sans n°'; }).join(' · ')
       : current ? [current.supplier, current.ordered_at].filter(Boolean).join(' · ') : '';
     dateI.value = rc ? (rc.received_at || todayISO()) : todayISO();
     var numWrap = $('#r-num-wrap'), numI = $('#r-num');
@@ -394,15 +489,49 @@
     setScanActive(true);
     setTimeout(function () { (workEl || editor).scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 40);
   }
+  // ajoute une commande au pointage en cours (rien de compté n'est perdu)
+  function addOrder(id) {
+    var o = enRouteList().filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!o || orders.some(function (x) { return String(x.id) === String(id); })) return;
+    var counted = {};
+    rows.forEach(function (r) { counted[rowKey(r)] = r.qty | 0; });
+    var extras = rows.filter(function (r) { return r.free || r.expected === 0 || r.expected == null; });
+    var oldIds = orders.map(function (x) { return String(x.id); });
+    var keepRows = rows.slice(), keepOrders = orders.slice();
+    // une réception sans commande (orders vide) devient groupée : ses lignes passent « hors commande » de la 1re commande
+    orders = ordersByAge(keepOrders.concat([o]));
+    current = orders[0];
+    var built = [];
+    orders.forEach(function (ord) { built = built.concat(rowsOfOrder(ord)); });
+    built.forEach(function (r) { if (counted[rowKey(r)]) r.qty = counted[rowKey(r)]; });
+    extras.forEach(function (r) {
+      r.ord = r.ord && oldIds.indexOf(String(r.ord)) >= 0 ? r.ord : String(current.id);
+      if (r.expected == null) r.expected = 0;
+      built.push(r);
+    });
+    // lignes attendues d'anciennes commandes qui n'existent plus dans « built » (déjà complètes) : on les garde si comptées
+    keepRows.forEach(function (r) { if (built.indexOf(r) < 0 && (r.qty | 0) > 0 && !built.some(function (b) { return rowKey(b) === rowKey(r); })) built.push(r); });
+    rows = built;
+    editorTitle.textContent = orders.length > 1 ? 'Réception groupée · ' + orders.length + ' commandes' : 'Réception · ' + (current.order_number || 'commande sans n°');
+    metaEl.textContent = orders.map(function (x) { return x.order_number || 'Sans n°'; }).join(' · ');
+    renderPick(); renderRows(); focusScan();
+  }
   function closeWork() {
     setScanActive(false);
-    rows = []; current = null; editingReceipt = null; editingOldLines = [];
+    rows = []; current = null; orders = []; editingReceipt = null; editingOldLines = [];
     statusEl.textContent = '';
     if (workEl) workEl.hidden = true;
     if (pickEl) pickEl.hidden = false;
     renderPick();
   }
-  if (resetBtn) resetBtn.addEventListener('click', closeWork);
+  if (resetBtn) resetBtn.addEventListener('click', function () { clearDraft(); closeWork(); });
+  if (multiBtn) multiBtn.addEventListener('click', function () {
+    var ids = Object.keys(pickedIds);
+    var os = enRouteList().filter(function (x) { return ids.indexOf(String(x.id)) >= 0; });
+    if (!os.length) return;
+    var go = function () { startWork(os); };
+    leaveWork(function () { if (!loaded) { ensureLoad(); setTimeout(go, 600); } else go(); });
+  });
 
   function stateOf(r) {
     if (r.expected == null) return null;
@@ -419,7 +548,34 @@
     if (table) table.classList.toggle('rv-noexp', !rows.some(function (r) { return r.expected != null; }));
     if (!rows.length) { rowsEl.innerHTML = ''; emptyHint.style.display = ''; updateScanCount(); return; }
     emptyHint.style.display = 'none';
-    rowsEl.innerHTML = rows.map(function (r, i) {
+    var multi = orders.length > 1;
+    // réception groupée : lignes regroupées sous l'en-tête de leur commande (data-i reste l'index dans rows)
+    var seq = rows.map(function (r, i) { return i; });
+    if (multi) {
+      seq = [];
+      orders.forEach(function (o) { rows.forEach(function (r, i) { if (String(orderOfRow(r).id) === String(o.id)) seq.push(i); }); });
+    }
+    var lastOrd = null;
+    rowsEl.innerHTML = seq.map(function (i) {
+      var r = rows[i];
+      var head = '';
+      if (multi) {
+        var og = orderOfRow(r);
+        if (!lastOrd || String(lastOrd) !== String(og.id)) {
+          lastOrd = og.id;
+          var exp = 0, got = 0;
+          rows.forEach(function (x) { if (x.expected > 0 && String(orderOfRow(x).id) === String(og.id)) { exp += x.expected; got += Math.min(x.qty | 0, x.expected); } });
+          head = '<tr class="rv-grp"><td colspan="6"><span class="rv-grp-num">' + esc(og.order_number || 'Sans n°') + '</span>' +
+            '<span class="rv-grp-meta">' + esc([og.supplier, og.ordered_at].filter(Boolean).join(' · ')) + '</span>' +
+            '<span class="rv-grp-prog' + (exp && got >= exp ? ' is-done' : '') + '">' + got + ' / ' + exp + ' reçus</span></td></tr>';
+        }
+      }
+      return head + rowHtml(r, i, flashIdx);
+    }).join('');
+    bindRows();
+  }
+  function rowHtml(r, i, flashIdx) {
+    {
       var f = bcProd(r.productId), acc = isAcc(f), st = stateOf(r);
       var art = r.free
         ? '<select class="rcp-fil-sel" aria-label="Article">' + filamentOptions(r.productId) + '</select>'
@@ -444,8 +600,9 @@
         '<td class="rv-stc">' + (st ? '<span class="rv-st is-' + st[0] + '">' + st[1] + '</span>' : '') + '</td>' +
         '<td>' + (removable ? '<button type="button" class="rcp-row-del" aria-label="Retirer la ligne">✕</button>' : '') + '</td>' +
       '</tr>';
-    }).join('');
-
+    }
+  }
+  function bindRows() {
     $$('.rcp-row', rowsEl).forEach(function (tr) {
       var i = +tr.getAttribute('data-i'), r = rows[i];
       var sel = $('.rcp-fil-sel', tr);
@@ -454,7 +611,7 @@
       var kindSel = $('.rcp-kind', tr);
       if (kindSel) kindSel.addEventListener('change', function () { r.kind = this.value; renderRows(); focusScan(); });
       var qty = $('.rcp-qty', tr);
-      qty.addEventListener('input', function () { r.qty = Math.max(0, parseInt(this.value, 10) || 0); updateScanCount(); });
+      qty.addEventListener('input', function () { r.qty = Math.max(0, parseInt(this.value, 10) || 0); updateScanCount(); saveDraft(); });
       qty.addEventListener('change', function () { renderRows(); focusScan(); });
       $('.rv-minus', tr).addEventListener('click', function () { r.qty = Math.max(0, (r.qty | 0) - 1); renderRows(); focusScan(); });
       $('.rv-plus', tr).addEventListener('click', function () { r.qty = (r.qty | 0) + 1; renderRows(i); focusScan(); });
@@ -462,11 +619,12 @@
       if (del) del.addEventListener('click', function () { rows.splice(i, 1); renderRows(); focusScan(); });
     });
     updateScanCount();
+    saveDraft();
   }
 
   // ligne vide : article imprévu, ou code-barres qui ne passe pas
   if (addLineBtn) addLineBtn.addEventListener('click', function () {
-    rows.push({ productId: '', kind: 'spool', qty: 1, expected: current ? 0 : null, label: '', free: true });
+    rows.push({ productId: '', kind: 'spool', qty: 1, expected: current ? 0 : null, label: '', free: true, ord: current ? String(current.id) : undefined });
     renderRows();
     var sel = rowsEl.querySelector('tr:last-child .rcp-fil-sel'); if (sel) sel.focus();
   });
@@ -557,12 +715,14 @@
     var same = rows.filter(function (r) { return String(r.productId) === String(f.id) && r.kind === kind; });
     var line = same.filter(function (r) { return r.expected > 0 && r.qty < r.expected; })[0] || same[0];
     if (line) line.qty = (line.qty | 0) + 1;
-    else { line = { productId: String(f.id), kind: kind, qty: 1, expected: current ? 0 : null, label: bcLabel(f) }; rows.push(line); }
+    else { line = { productId: String(f.id), kind: kind, qty: 1, expected: current ? 0 : null, label: bcLabel(f), ord: current ? String(current.id) : undefined }; rows.push(line); }
     renderRows(rows.indexOf(line));
     return line;
   }
   function scanNote(line, f, kind, prefix) {
     var name = scanLabel(f, kind);
+    // réception groupée : on dit à quelle commande l'article est allé
+    if (orders.length > 1) { var og = orderOfRow(line); if (og) name += ' → ' + (og.order_number || 'Sans n°'); }
     if (line.expected === 0) feedback('⚠ ' + prefix + 'Pas dans la commande : ' + name, 'warn');
     else if (line.expected > 0 && line.qty > line.expected) feedback('⚠ ' + prefix + name + ' : ' + (line.qty - line.expected) + ' de trop', 'warn');
     else feedback('✓ ' + prefix + name + (line.expected > 0 ? '  (' + line.qty + ' / ' + line.expected + ')' : '  (×' + line.qty + ')'), 'ok');
@@ -670,7 +830,13 @@
         .then(function (ok) { if (ok) onConfirm(true, skipMissing); });
       return;
     }
-    var missing = rows.reduce(function (s, r) { return s + (r.expected > 0 ? Math.max(0, r.expected - (r.qty | 0)) : 0); }, 0);
+    // réception groupée : une commande sans aucun article compté n'est pas arrivée, elle reste simplement en route
+    var touched = {};
+    valid.forEach(function (r) { var og = orderOfRow(r); if (og) touched[String(og.id)] = 1; });
+    var missing = rows.reduce(function (s, r) {
+      if (orders.length > 1) { var og = orderOfRow(r); if (!og || !touched[String(og.id)]) return s; }
+      return s + (r.expected > 0 ? Math.max(0, r.expected - (r.qty | 0)) : 0);
+    }, 0);
     if (current && missing && !skipMissing) {
       caDialog.confirm({ title: missing + ' article' + (missing > 1 ? 's' : '') + ' pas reçu' + (missing > 1 ? 's' : ''),
         message: 'Ils restent en route pour une prochaine livraison, ou tu les retires de la commande.',
@@ -681,7 +847,63 @@
     save(valid, false);
   }
 
+  // réception groupée : une réception enregistrée PAR commande (prix, CMP, historique et « en route » restent justes)
+  function saveMulti(valid, dropRest) {
+    var date = /^\d{4}-\d{2}-\d{2}$/.test(dateI.value.trim()) ? dateI.value.trim() : todayISO();
+    var groups = orders.map(function (o) {
+      return { o: o, rs: valid.filter(function (r) { return String(orderOfRow(r).id) === String(o.id); }) };
+    }).filter(function (g) { return g.rs.length; });
+    confirmBtn.disabled = true;
+    statusEl.textContent = 'Enregistrement…';
+    var affected = [], recv = [], done = 0;
+    var chain = Promise.resolve();
+    groups.forEach(function (g) {
+      chain = chain.then(function () {
+        var order = g.o, tax = +order.tax_rate || 0;
+        var sub = (order.lines || []).reduce(function (s, l) { return s + (l.unit_cost != null ? l.qty * l.unit_cost : 0); }, 0);
+        var disc = Math.min(+order.discount || 0, sub), share = sub > 0 ? 1 - disc / sub : 1;
+        var newLines = null;
+        statusEl.textContent = 'Enregistrement… (' + (done + 1) + ' / ' + groups.length + ')';
+        return sb.from('receipts').insert({ order_number: order.order_number || null, received_at: date, note: null,
+            supplier: order.supplier || null, supplier_order_id: order.id }).select()
+          .then(function (res) {
+            if (res.error || !res.data || !res.data.length) throw (res.error || new Error('Réception refusée (permissions).'));
+            newLines = g.rs.map(function (r) {
+              var f = bcProd(r.productId), kind = fitKind(f, r.kind);
+              var cost = r.unitCost != null ? r.unitCost * share * (1 + tax / 100) : costOf(f, kind);
+              return { receipt_id: res.data[0].id, product_id: r.productId, label: f ? bcLabel(f) : null, kind: kind, qty: r.qty,
+                unit_cost: cost != null ? round2(cost) : null };
+            });
+            return sb.from('receipt_lines').insert(newLines).then(function (r2) { if (r2.error) throw r2.error; return applyStock(newLines, +1); });
+          })
+          .then(function () {
+            done++;
+            rows = rows.filter(function (r) { return g.rs.indexOf(r) < 0; });   // déjà enregistrée : un réessai ne la recompte pas
+            g.rs.forEach(function (r) { affected.push(r.productId); recv.push({ productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind) }); });
+            var er = window.CA.enRoute; if (!er) return;
+            return er.allocate(newLines, { id: order.id }, +1)
+              .then(function () { if (dropRest) return er.dropRemaining(order.id); })
+              .then(null, function (e) { console.warn('en route', e); });   // la réception est déjà enregistrée
+          });
+      });
+    });
+    chain.then(function () { return recomputeAvgCosts(uniq(affected)); }).then(function () {
+      confirmBtn.disabled = false;
+      if (window.CA.waitlist) window.CA.waitlist.onReceived(recv);
+      if (window.CA.reserved) window.CA.reserved.onReceived(recv);
+      if (window.caDialog && caDialog.toast) caDialog.toast(groups.length + ' réception' + (groups.length > 1 ? 's enregistrées' : ' enregistrée'));
+      clearDraft(); closeWork();
+      Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
+      loadHistory();
+    }, function (err) {
+      confirmBtn.disabled = false;
+      // les commandes déjà enregistrées sont à jour : on garde le reste en brouillon pour reprendre
+      statusEl.textContent = 'Erreur : ' + (err && err.message ? err.message : err) + (done ? ' · ' + done + ' commande(s) déjà enregistrée(s), vérifie l\'historique avant de réessayer.' : '');
+    });
+  }
+
   function save(valid, dropRest) {
+    if (orders.length > 1 && !editingReceipt) { saveMulti(valid, dropRest); return; }
     var date = /^\d{4}-\d{2}-\d{2}$/.test(dateI.value.trim()) ? dateI.value.trim() : todayISO();
     var order = current, rc = editingReceipt, oldLines = editingOldLines;
     var tax = order ? (+order.tax_rate || 0) : 0;
@@ -755,7 +977,7 @@
       if (window.CA.waitlist) window.CA.waitlist.onReceived(recv);
       if (window.CA.reserved) window.CA.reserved.onReceived(recv);
       if (window.caDialog && caDialog.toast) caDialog.toast(rc ? 'Réception modifiée' : 'Réception enregistrée');
-      closeWork();
+      clearDraft(); closeWork();
       Promise.all([loadFilaments(), loadAccessories()]).then(function () { renderReorder(); });
       loadHistory();
     }, function (err) {

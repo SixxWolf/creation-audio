@@ -1149,6 +1149,17 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 /* commande en cours de pointage (la liste reste visible à côté en grand écran) */
 .rv-cur { flex:none; padding:4px 12px; font-size:.8rem; font-weight:700; color:var(--on-ember); background:var(--ember); border-radius:100px; }
 .rv-order.is-current .po-num { color:var(--ember-ink); }
+/* réception groupée : case à cocher, brouillon en pause, en-têtes de commande dans le tableau */
+.rv-chk { flex:none; display:flex; align-items:center; padding:6px 10px 6px 2px; cursor:pointer; }
+.rv-chk input { width:20px; height:20px; }
+.rv-draft { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 12px; margin-bottom:10px; border:1px dashed var(--ember); border-radius:10px; font-weight:600; }
+.rv-draft span { flex:1 1 auto; }
+.rv-grp td { padding:10px 8px 6px; border-bottom:2px solid var(--ember); background:color-mix(in srgb, var(--ember) 8%, transparent); }
+.rv-grp td > span { display:inline-block; vertical-align:baseline; }
+.rv-grp-num { font-weight:700; color:var(--ember-ink); margin-right:10px; }
+.rv-grp-meta { opacity:.7; font-size:.9rem; }
+.rv-grp-prog { float:right; font-weight:700; font-size:.9rem; }
+.rv-grp-prog.is-done { color:var(--ember-ink); }
 @media screen and (min-width:1600px) {
   /* Réception : commandes en route (collées à gauche) | pointage, ou l'historique si rien n'est en cours */
   #inv-sub-reception:not([hidden]) { display:grid; grid-template-columns:340px minmax(0, 1fr); gap:20px; align-items:start; }
