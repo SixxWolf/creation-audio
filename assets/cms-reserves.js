@@ -138,7 +138,9 @@
   /* ---------- alerte au poste de scan ---------- */
   function renderAlert() {
     var el = $('#res-alert'); if (!el) return;
-    var groups = alerted.map(function (a) { return matchFor(a.pid, a.kind); }).filter(function (g) { return g.length; });
+    // pas d'alerte si le stock déjà en main (avant cette réception) couvre ce que les clients attendent
+    var groups = alerted.filter(function (a) { return a.before == null || a.before < count(a.pid, a.kind); })
+      .map(function (a) { return matchFor(a.pid, a.kind); }).filter(function (g) { return g.length; });
     if (!groups.length) { el.hidden = true; el.innerHTML = ''; return; }
     var clients = {};
     groups.forEach(function (g) { g.forEach(function (x) { clients[x.src.type + x.src.id] = 1; }); });
@@ -191,10 +193,22 @@
     });
     return out;
   }
-  function flag(pid, kind) {
-    if (!pid) return;
-    alerted = alerted.filter(function (a) { return !(String(a.pid) === String(pid) && a.kind === kind); });
-    alerted.unshift({ pid: pid, kind: kind });
+  // stock en main d'un produit (bobine / recharge / unité), lu frais dans la base
+  function stockNow(pid, kind) {
+    return sb.from('products').select('qty,qty_2').eq('id', pid).then(function (res) {
+      var p = res.data && res.data[0];
+      if (res.error || !p) return null;
+      return (kind === 'refill' ? p.qty_2 : p.qty) | 0;
+    }, function () { return null; });
+  }
+  // recvQty : quantité qui vient d'entrer (0 au scan : le stock n'est pas encore touché)
+  function flag(pid, kind, recvQty) {
+    if (!pid || !matchFor(pid, kind).length) return Promise.resolve();
+    return stockNow(pid, kind).then(function (n) {
+      var before = n == null ? null : Math.max(0, n - (recvQty | 0));
+      alerted = alerted.filter(function (a) { return !(String(a.pid) === String(pid) && a.kind === kind); });
+      alerted.unshift({ pid: pid, kind: kind, before: before });
+    });
   }
 
   /* ---------- chargement : à chaque ouverture de l'Inventaire ---------- */
@@ -207,13 +221,16 @@
   /* ---------- API (cms-inventory.js, cms-facturation.js, cms-historique.js) ---------- */
   window.CA.reserved = {
     // un article vient d'être scanné -> alerte s'il est réservé
-    onScan: function (pid, kind) { ensure().then(function () { flag(pid, kind); renderAlert(); }); },
+    onScan: function (pid, kind) { ensure().then(function () { return flag(pid, kind, 0); }).then(renderAlert); },
     // réception confirmée -> alerte pour tous les articles reçus réservés
     onReceived: function (lines) {
       ensure().then(function () {
-        (lines || []).forEach(function (l) { flag(l.productId || l.product_id, l.kind); });
-        renderAlert();
-      });
+        var tot = {};   // quantité reçue par produit + format
+        (lines || []).forEach(function (l) { var k = (l.productId || l.product_id) + '|' + l.kind; tot[k] = (tot[k] || 0) + (l.qty | 0); });
+        return Promise.all(Object.keys(tot).map(function (k) {
+          var i = k.lastIndexOf('|'); return flag(k.slice(0, i), k.slice(i + 1), tot[k]);
+        }));
+      }).then(renderAlert);
     },
     count: count,
     // clients qui attendent ce produit (infobulle de la pastille « réservés »)

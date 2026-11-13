@@ -890,7 +890,7 @@
           .then(function () {
             done++;
             rows = rows.filter(function (r) { return g.rs.indexOf(r) < 0; });   // déjà enregistrée : un réessai ne la recompte pas
-            g.rs.forEach(function (r) { affected.push(r.productId); recv.push({ productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind) }); });
+            g.rs.forEach(function (r) { affected.push(r.productId); recv.push({ productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind), qty: r.qty }); });
             var er = window.CA.enRoute; if (!er) return;
             return er.allocate(newLines, { id: order.id }, +1)
               .then(function () { if (dropRest) return er.dropRemaining(order.id); })
@@ -984,7 +984,7 @@
     chain.then(function () { return recomputeAvgCosts(affected); }).then(function () {
       confirmBtn.disabled = false;
       // liste d'attente / réservés : alerte pour TOUT ce qui vient d'entrer
-      var recv = valid.map(function (r) { return { productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind) }; });
+      var recv = valid.map(function (r) { return { productId: r.productId, kind: fitKind(bcProd(r.productId), r.kind), qty: r.qty }; });
       if (window.CA.waitlist) window.CA.waitlist.onReceived(recv);
       if (window.CA.reserved) window.CA.reserved.onReceived(recv);
       if (window.caDialog && caDialog.toast) caDialog.toast(rc ? 'Réception modifiée' : 'Réception enregistrée');
