@@ -289,11 +289,21 @@
   function orderRemaining(l) { return Math.max(0, (l.qty | 0) - (l.qty_received | 0)); }
   function enRouteList() { return window.CA.enRoute && window.CA.enRoute.list ? window.CA.enRoute.list() : []; }
 
+  // grand écran : pendant un pointage la liste des commandes se replie en rail ; le bouton la rouvre par-dessus
+  function foldPick(open) {
+    var b = $('#rv-fold');
+    if (!pickEl || !b) return;
+    pickEl.classList.toggle('rv-open', !!open);
+    b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  (function () { var b = $('#rv-fold'); if (b) b.addEventListener('click', function () { foldPick(!pickEl.classList.contains('rv-open')); }); })();
+
   // choix de la commande à recevoir
   function renderPick() {
     if (!ordersEl) return;
     var list = enRouteList();
     // commandes en cours de pointage (grand écran : la liste reste visible à gauche pendant la réception)
+    var nFold = $('#rv-fold-n'); if (nFold) nFold.textContent = list.length || '';
     var working = !!(workEl && !workEl.hidden && !editingReceipt);
     var curIds = {};
     if (working) orders.forEach(function (o) { curIds[String(o.id)] = 1; });
@@ -484,6 +494,7 @@
     feedback('', ''); closeLearn();
     if (pickEl) pickEl.hidden = true;
     if (workEl) workEl.hidden = false;
+    foldPick(false);   // grand écran : la liste se replie en rail pendant le pointage
     renderPick();   // grand écran : la liste (restée visible) marque la commande « En cours »
     renderRows();
     setScanActive(true);

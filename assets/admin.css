@@ -1151,7 +1151,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
    CA.wideLayout (admin-core) range les blocs data-wide dans leurs colonnes ; sous 1600 px tout reprend sa
    place et ces règles ne s'appliquent pas. Réception « comme la Facturation » (commandes | pointage |
    scanner collé), À commander (liste collée | cibles sur 2 colonnes), Codes-barres et Liste d'attente en colonnes. */
-.rv-rail, .ro-left, .ro-main { display:none; }
+.rv-rail, .ro-left, .ro-main, .rv-pick .rv-fold { display:none; }
 /* commande en cours de pointage (la liste reste visible à côté en grand écran) */
 .rv-cur { flex:none; padding:4px 12px; font-size:.8rem; font-weight:700; color:var(--on-ember); background:var(--ember); border-radius:100px; }
 .rv-order.is-current .po-num { color:var(--ember-ink); }
@@ -1178,7 +1178,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-hist { display:none; }
   .rv-hist > .panel-head { margin-top:0 !important; }   /* marge en ligne prévue pour le bas de page */
   /* pointage : tableau | scanner, progression, alertes, date et Confirmer collés à droite */
-  #r-editor { display:grid; grid-template-columns:minmax(0, 1fr) 360px; gap:20px; align-items:start;
+  #r-editor { display:grid; grid-template-columns:minmax(0, 1fr) clamp(300px, 18vw, 360px); gap:20px; align-items:start;
     margin:0; padding:0; background:none; border:0; border-radius:0; box-shadow:none; }
   #r-editor > .rv-main { min-width:0; padding:22px 24px; background:var(--paper); border:1px solid var(--line); border-radius:16px;
     box-shadow:0 22px 44px -30px rgba(20,22,26,.4); }
@@ -1251,6 +1251,22 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
   .tabpanel.is-wide #rv-pick[hidden] { display:none !important; }
   #inv-sub-reception:has(> .rv-work:not([hidden])) { grid-template-columns:minmax(0, 1fr); }
   #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-work { grid-column:1; }
+}
+
+/* ≥ 1800 px : pendant un pointage, la liste des commandes devient un rail de 64 px (le bouton la rouvre par-dessus le tableau) */
+@media screen and (min-width:1800px) {
+  #inv-sub-reception:has(> .rv-work:not([hidden])):not([hidden]) { grid-template-columns:64px minmax(0, 1fr); }
+  #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-pick { padding:10px 6px; overflow:visible; }
+  #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-pick .rv-fold { display:flex; flex-direction:column; align-items:center; gap:10px; width:100%;
+    padding:6px 0; font:inherit; font-weight:700; color:var(--ink); cursor:pointer; background:none; border:0; }
+  .rv-fold b { min-width:24px; padding:2px 7px; font-size:.8rem; text-align:center; color:var(--on-ember); background:var(--ember); border-radius:100px; }
+  .rv-fold b:empty { display:none; }
+  .rv-fold span { writing-mode:vertical-rl; }
+  #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-pick:not(.rv-open) > :not(.rv-fold) { display:none; }
+  #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-pick.rv-open { position:sticky; z-index:30; width:440px; padding:14px 18px;
+    box-shadow:0 30px 60px -20px rgba(0,0,0,.55); overflow-y:auto; }
+  #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-pick.rv-open .rv-fold { flex-direction:row; justify-content:flex-start; margin-bottom:6px; }
+  #inv-sub-reception:has(> .rv-work:not([hidden])) > .rv-pick.rv-open .rv-fold span { writing-mode:horizontal-tb; }
 }
 
 /* =========================================================
