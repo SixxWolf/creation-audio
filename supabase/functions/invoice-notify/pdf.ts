@@ -24,10 +24,10 @@ const MONTHS = ["January", "February", "March", "April", "May", "June", "July", 
 
 const STR = {
   fr: { invoice: "FACTURE", no: "N°", from: "De", to: "Facturé à", desc: "Description", qty: "Qté", unit: "Prix unitaire", total: "Total",
-        sub: "Sous-total", gst: "TPS", qst: "TVQ", note: "Note", pay: "Paiement", cash: "Comptant", interac: "Virement Interac",
+        sub: "Sous-total", gst: "TPS", qst: "TVQ", note: "Note", pay: "Paiement", cash: "Comptant", interac: "Virement Interac", credit: "Crédit boutique", due: "À payer",
         thanks: "Merci pour ta commande !", page: "Page", of: "sur", cont: "suite" },
   en: { invoice: "INVOICE", no: "No.", from: "From", to: "Billed to", desc: "Description", qty: "Qty", unit: "Unit price", total: "Total",
-        sub: "Subtotal", gst: "GST", qst: "QST", note: "Note", pay: "Payment", cash: "Cash", interac: "Interac e-Transfer",
+        sub: "Subtotal", gst: "GST", qst: "QST", note: "Note", pay: "Payment", cash: "Cash", interac: "Interac e-Transfer", credit: "Store credit", due: "Amount due",
         thanks: "Thank you for your order!", page: "Page", of: "of", cont: "continued" },
 };
 
@@ -35,7 +35,7 @@ export type Company = Record<string, unknown>;
 export type InvoiceHead = {
   number: string; invoice_date: string; client_name?: string | null; client_address?: string | null; client_city?: string | null;
   client_contact?: string | null; tax_enabled: boolean; subtotal: number; tax_gst: number; tax_qst: number; total: number; note?: string | null;
-  pay_method?: "cash" | "interac" | null;
+  pay_method?: "cash" | "interac" | "credit" | null; credit_used?: number | null;
 };
 // img : photo de l'article (PNG ou JPEG, déjà réduite par index.ts) ; absente = pas de vignette
 export type InvoiceLine = { label?: string | null; meta?: string | null; qty: number; unit_price: number; line_total: number; img?: Uint8Array | null };
@@ -241,12 +241,16 @@ export async function buildInvoicePdf(o: { company: Company; invoice: InvoiceHea
   const rows: [string, number][] = inv.tax_enabled ? [[T.sub, inv.subtotal], [T.gst, inv.tax_gst], [T.qst, inv.tax_qst]] : [];
   const noteLines = inv.note ? wrap(inv.note, reg, 9, 250) : [];
   // bloc de gauche, à côté du total : mode de paiement puis note
-  const payTxt = inv.pay_method === "cash" ? T.cash : inv.pay_method === "interac" ? T.interac : "";
+  // crédit boutique dealer (invoices.credit_used) : déduit du total ; le reste est payé comptant/Interac
+  const credit = Math.round((Number(inv.credit_used) || 0) * 100) / 100;
+  const due = Math.max(0, Math.round((Number(inv.total) - credit) * 100) / 100);
+  const base = inv.pay_method === "cash" ? T.cash : inv.pay_method === "interac" ? T.interac : inv.pay_method === "credit" ? T.credit : "";
+  const payTxt = credit > 0 && inv.pay_method !== "credit" ? T.credit + (base ? " + " + base : "") : base;
   const blocks: { label: string; lines: string[] }[] = [];
   if (payTxt) blocks.push({ label: T.pay, lines: [payTxt] });
   if (noteLines.length) blocks.push({ label: T.note, lines: noteLines });
   const leftH = blocks.reduce((h, b) => h + 22 + b.lines.length * 13, 0);
-  const need = rows.length * 17 + 70 + Math.max(0, leftH - 48) + 40;
+  const need = rows.length * 17 + 70 + Math.max(0, leftH - 48) + 40 + (credit > 0 ? 40 : 0);
   if (y - need < BOTTOM) newPage(false);
   y -= 10;
   const tx = W - M - 190;
@@ -261,6 +265,15 @@ export async function buildInvoicePdf(o: { company: Company; invoice: InvoiceHea
   text(money(inv.total, en), W - M - 8, y - 1, { font: disp, size: 15, color: WHITE, align: "right" });
   page.drawRectangle({ x: tx - 10, y: y - 10, width: 3, height: 32, color: C.ember });
   let after = y - 40;
+  if (credit > 0) {
+    let cy = y - 32;
+    text(T.credit, tx, cy, { size: 9.5, color: C.soft });
+    text("-" + money(credit, en), W - M - 8, cy, { size: 9.5, align: "right" });
+    cy -= 17;
+    text(T.due, tx, cy, { font: semi, size: 10 });
+    text(money(due, en), W - M - 8, cy, { font: semi, size: 10.5, align: "right" });
+    after = cy - 26;
+  }
   if (blocks.length) {
     let ny = y + 6 + rows.length * 17;
     blocks.forEach((b) => {

@@ -596,7 +596,7 @@ alter table public.invoices add column if not exists client_address text;
 alter table public.invoices add column if not exists client_city    text;
 alter table public.invoices add column if not exists cancelled_at   timestamptz;   -- Phase 5 : annulation
 -- mode de paiement (obligatoire à l'enregistrement dans Facturation, sauf usage interne) ; null = anciennes factures
-alter table public.invoices add column if not exists pay_method text check (pay_method in ('cash', 'interac'));   -- 'cash' = comptant, 'interac' = virement Interac
+alter table public.invoices add column if not exists pay_method text check (pay_method in ('cash', 'interac', 'credit'));   -- 'cash' = comptant, 'interac' = virement Interac, 'credit' = tout payé par le crédit dealer (section CRÉDIT DEALER)
 -- Usage interne (client_type = 'internal'), 2026-10-29 : 'production' = filament pris pour imprimer des spacers (le stock baisse ici, plus de bobines assignées en Production) | 'other' = perso, autres projets
 alter table public.invoices add column if not exists internal_use text;
 -- Cueillette des articles « À venir » (2026-10-31) : pickup_ready_at = « tes articles sont arrivés » envoyé (admin_invoice_ready) ;
@@ -1000,6 +1000,9 @@ begin
     note           = p_invoice ->> 'note',
     pay_method     = case when p_invoice ? 'pay_method' then nullif(p_invoice ->> 'pay_method', '') else pay_method end,
     internal_use   = case when p_invoice ? 'internal_use' then nullif(p_invoice ->> 'internal_use', '') else internal_use end,
+    -- crédit dealer (section CRÉDIT DEALER) : le trigger invoices_credit_sync ajuste le registre
+    credit_used    = case when p_invoice ? 'credit_used' then coalesce((p_invoice ->> 'credit_used')::numeric, 0) else credit_used end,
+    credit_email   = case when p_invoice ? 'credit_email' then nullif(lower(trim(p_invoice ->> 'credit_email')), '') else credit_email end,
     tax_enabled    = coalesce((p_invoice ->> 'tax_enabled')::boolean, false),
     subtotal       = coalesce((p_invoice ->> 'subtotal')::numeric, 0),
     tax_gst        = coalesce((p_invoice ->> 'tax_gst')::numeric, 0),
@@ -3954,6 +3957,7 @@ begin
       'id', i.id, 'number', i.number, 'invoice_date', i.invoice_date, 'status', i.status,
       'client_name', i.client_name, 'client_contact', i.client_contact,
       'client_address', i.client_address, 'client_city', i.client_city, 'note', i.note, 'pay_method', i.pay_method,
+      'credit_used', i.credit_used,
       'tax_enabled', i.tax_enabled, 'subtotal', i.subtotal, 'tax_gst', i.tax_gst, 'tax_qst', i.tax_qst, 'total', i.total,
       'lines', coalesce((select jsonb_agg(jsonb_build_object(
           'label', l.label, 'meta', l.meta, 'qty', l.qty, 'unit_price', l.unit_price, 'line_total', l.line_total)
@@ -5288,3 +5292,224 @@ begin
 end $$;
 revoke all on function public.admin_merge_clients(uuid, uuid, jsonb) from public, anon;
 grant execute on function public.admin_merge_clients(uuid, uuid, jsonb) to authenticated;
+
+-- ------------------------------------------------------------
+-- CRÉDIT DEALER (2026-11-13) — « carte-cadeau » réservée aux dealers
+-- Règles de Théo : n'expire jamais · ni remboursable ni échangeable · utilisable sur
+-- tout article (promo comprise) · dealers seulement.
+-- Registre public.dealer_credit = AJOUT SEULEMENT (aucune modification ni suppression,
+-- même pour l'admin) ; le solde = somme des lignes.
+--   grant  (+)  admin_credit_add : motif debt | gesture | refund, reçu C-0001 ; exige le NIP admin
+--   adjust (−)  admin_credit_add montant négatif, motif correction ; exige le NIP admin
+--   use    (−)  / return (+) : écrits par le trigger invoices_credit_sync à partir de
+--               invoices.credit_used / credit_email (facture créée, modifiée, annulée, supprimée)
+-- Le solde ne peut jamais devenir négatif (vérifié sous verrou par dealer).
+-- NIP admin : private.admin_pin (bcrypt), 5 essais puis 15 min de blocage. Les RPC répondent
+-- { ok:false, error:'pin' } SANS lever d'exception, sinon le compteur d'essais serait annulé.
+-- ------------------------------------------------------------
+alter table public.invoices drop constraint if exists invoices_pay_method_check;
+alter table public.invoices add constraint invoices_pay_method_check check (pay_method in ('cash', 'interac', 'credit'));
+alter table public.invoices add column if not exists credit_used numeric(10,2) not null default 0;
+alter table public.invoices add column if not exists credit_email text;   -- dealer dont le crédit paie (une partie de) la facture
+alter table public.invoices drop constraint if exists invoices_credit_used_chk;
+alter table public.invoices add constraint invoices_credit_used_chk check (credit_used >= 0 and (credit_used = 0 or credit_used <= total));
+
+-- le dealer peut demander que son crédit soit appliqué à la facture de sa commande (coché par défaut)
+alter table public.dealer_orders add column if not exists use_credit boolean not null default true;
+
+create table if not exists public.dealer_credit (
+  id             uuid primary key default gen_random_uuid(),
+  dealer_email   text not null,                         -- pas de FK : retirer un dealer garde l'historique
+  amount         numeric(10,2) not null check (amount <> 0),
+  kind           text not null check (kind in ('grant', 'adjust', 'use', 'return')),
+  reason         text check (reason in ('debt', 'gesture', 'refund', 'correction')),
+  note           text,
+  receipt_no     text unique,                           -- C-0001 (ajouts et corrections)
+  invoice_id     uuid references public.invoices(id) on delete set null,
+  invoice_number text,
+  created_at     timestamptz not null default now()
+);
+create index if not exists dealer_credit_email_idx on public.dealer_credit (dealer_email, created_at);
+create index if not exists dealer_credit_invoice_idx on public.dealer_credit (invoice_id);
+create sequence if not exists public.dealer_credit_receipt_seq;
+alter table public.dealer_credit enable row level security;
+drop policy if exists dealer_credit_admin_read on public.dealer_credit;
+create policy dealer_credit_admin_read on public.dealer_credit for select to authenticated using ( (select public.is_admin()) );
+revoke all on public.dealer_credit from anon;
+revoke insert, update, delete, truncate on public.dealer_credit from authenticated;
+revoke all on sequence public.dealer_credit_receipt_seq from public, anon, authenticated;
+
+create or replace function private.dealer_credit_balance(p_email text)
+returns numeric language sql stable security definer set search_path = '' as $$
+  select coalesce(sum(amount), 0) from public.dealer_credit where dealer_email = lower(trim(p_email));
+$$;
+revoke all on function private.dealer_credit_balance(text) from public, anon, authenticated;
+
+-- registre suivi depuis la facture : écrit la différence (use / return), jamais d'effacement
+create or replace function private.invoices_credit_sync()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare r record; v_email text; v_want numeric; v_have numeric; v_delta numeric; v_bal numeric; v_id uuid; v_num text;
+begin
+  if tg_op = 'DELETE' then v_id := old.id; v_num := old.number; v_email := null;
+  else
+    v_id := new.id; v_num := new.number;
+    v_email := case when new.client_type = 'dealer' and new.status <> 'cancelled' and coalesce(new.credit_used, 0) > 0
+                    then nullif(lower(trim(new.credit_email)), '') end;
+  end if;
+  -- crédit remis aux autres dealers (ou à tous : annulée, supprimée, crédit retiré)
+  for r in select dealer_email, sum(amount) s from public.dealer_credit
+            where invoice_id = v_id and dealer_email is distinct from v_email
+            group by dealer_email having sum(amount) <> 0 loop
+    insert into public.dealer_credit (dealer_email, amount, kind, invoice_id, invoice_number)
+    values (r.dealer_email, -r.s, case when -r.s > 0 then 'return' else 'use' end,
+            case when tg_op = 'DELETE' then null else v_id end, v_num);
+  end loop;
+  if v_email is not null then
+    if not exists (select 1 from public.dealers where email = v_email) then
+      raise exception 'Crédit : % n''est pas un dealer.', v_email;
+    end if;
+    perform pg_advisory_xact_lock(hashtext('dealer_credit:' || v_email));
+    select coalesce(sum(amount), 0) into v_have from public.dealer_credit where invoice_id = v_id and dealer_email = v_email;
+    v_want  := -round(new.credit_used, 2);
+    v_delta := v_want - v_have;
+    if v_delta <> 0 then
+      insert into public.dealer_credit (dealer_email, amount, kind, invoice_id, invoice_number)
+      values (v_email, v_delta, case when v_delta < 0 then 'use' else 'return' end, v_id, v_num);
+    end if;
+    v_bal := private.dealer_credit_balance(v_email);
+    if v_bal < 0 then
+      raise exception 'Crédit insuffisant : il manque % $.', replace(to_char(-v_bal, 'FM999990.00'), '.', ',');
+    end if;
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end $$;
+revoke all on function private.invoices_credit_sync() from public, anon, authenticated;
+-- BEFORE DELETE : sinon la FK (on delete set null) vide invoice_id avant qu'on retrouve les lignes
+drop trigger if exists invoices_credit_sync_del on public.invoices;
+create trigger invoices_credit_sync_del before delete on public.invoices
+  for each row execute function private.invoices_credit_sync();
+drop trigger if exists invoices_credit_sync_upd on public.invoices;
+create trigger invoices_credit_sync_upd after insert or update of status, client_type, credit_used, credit_email, number on public.invoices
+  for each row execute function private.invoices_credit_sync();
+
+-- ---- NIP admin (ajout / correction de crédit) ----
+create table if not exists private.admin_pin (
+  id           int primary key default 1 check (id = 1),
+  hash         text not null,
+  fails        int not null default 0,
+  locked_until timestamptz,
+  updated_at   timestamptz not null default now()
+);
+revoke all on private.admin_pin from public, anon, authenticated;
+
+-- null = bon NIP ; sinon { ok:false, error:'pin'|'locked'|'no_pin', left, until }
+create or replace function private.admin_pin_verify(p_pin text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare p private.admin_pin;
+begin
+  select * into p from private.admin_pin where id = 1 for update;
+  if not found then return jsonb_build_object('ok', false, 'error', 'no_pin'); end if;
+  if p.locked_until is not null and p.locked_until > now() then
+    return jsonb_build_object('ok', false, 'error', 'locked', 'until', p.locked_until);
+  end if;
+  if p_pin is not null and p.hash = extensions.crypt(p_pin, p.hash) then
+    update private.admin_pin set fails = 0, locked_until = null where id = 1;
+    return null;
+  end if;
+  if p.fails + 1 >= 5 then
+    update private.admin_pin set fails = 0, locked_until = now() + interval '15 minutes' where id = 1;
+    return jsonb_build_object('ok', false, 'error', 'locked', 'until', now() + interval '15 minutes');
+  end if;
+  update private.admin_pin set fails = p.fails + 1 where id = 1;
+  return jsonb_build_object('ok', false, 'error', 'pin', 'left', 5 - (p.fails + 1));
+end $$;
+revoke all on function private.admin_pin_verify(text) from public, anon, authenticated;
+
+create or replace function public.admin_pin_status()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare p private.admin_pin;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  select * into p from private.admin_pin where id = 1;
+  return jsonb_build_object('set', p.id is not null,
+    'locked_until', case when p.locked_until > now() then p.locked_until end, 'updated_at', p.updated_at);
+end $$;
+revoke all on function public.admin_pin_status() from public, anon;
+grant execute on function public.admin_pin_status() to authenticated;
+
+-- premier NIP : p_old ignoré ; changement : l'ancien NIP est exigé
+create or replace function public.admin_pin_set(p_new text, p_old text default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_err jsonb;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  if p_new is null or p_new !~ '^[0-9]{4,8}$' then return jsonb_build_object('ok', false, 'error', 'format'); end if;
+  if exists (select 1 from private.admin_pin where id = 1) then
+    v_err := private.admin_pin_verify(p_old);
+    if v_err is not null then return v_err; end if;
+    update private.admin_pin set hash = extensions.crypt(p_new, extensions.gen_salt('bf', 10)),
+           fails = 0, locked_until = null, updated_at = now() where id = 1;
+  else
+    insert into private.admin_pin (id, hash) values (1, extensions.crypt(p_new, extensions.gen_salt('bf', 10)));
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function public.admin_pin_set(text, text) from public, anon;
+grant execute on function public.admin_pin_set(text, text) to authenticated;
+
+-- ajout (> 0) ou correction (< 0, motif correction) ; renvoie { ok, id, receipt_no, balance } ou une erreur sans exception
+create or replace function public.admin_credit_add(p_email text, p_amount numeric, p_reason text, p_note text, p_pin text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_err jsonb; v_email text := lower(trim(p_email)); v_amt numeric := round(coalesce(p_amount, 0), 2);
+        v_note text := nullif(left(btrim(coalesce(p_note, '')), 300), ''); v_bal numeric; v_row public.dealer_credit;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  v_err := private.admin_pin_verify(p_pin);
+  if v_err is not null then return v_err; end if;
+  if not exists (select 1 from public.dealers where email = v_email) then return jsonb_build_object('ok', false, 'error', 'not_dealer'); end if;
+  if v_amt = 0 or abs(v_amt) > 100000 then return jsonb_build_object('ok', false, 'error', 'amount'); end if;
+  if v_amt > 0 and coalesce(p_reason, '') not in ('debt', 'gesture', 'refund') then return jsonb_build_object('ok', false, 'error', 'reason'); end if;
+  if v_amt < 0 and coalesce(p_reason, '') <> 'correction' then return jsonb_build_object('ok', false, 'error', 'reason'); end if;
+  if v_note is null and p_reason in ('debt', 'correction') then return jsonb_build_object('ok', false, 'error', 'note'); end if;
+  perform pg_advisory_xact_lock(hashtext('dealer_credit:' || v_email));
+  v_bal := private.dealer_credit_balance(v_email);
+  if v_bal + v_amt < 0 then return jsonb_build_object('ok', false, 'error', 'balance', 'balance', v_bal); end if;
+  insert into public.dealer_credit (dealer_email, amount, kind, reason, note, receipt_no)
+  values (v_email, v_amt, case when v_amt > 0 then 'grant' else 'adjust' end, p_reason, v_note,
+          'C-' || lpad(nextval('public.dealer_credit_receipt_seq')::text, 4, '0'))
+  returning * into v_row;
+  return jsonb_build_object('ok', true, 'id', v_row.id, 'receipt_no', v_row.receipt_no, 'balance', v_bal + v_amt);
+end $$;
+revoke all on function public.admin_credit_add(text, numeric, text, text, text) from public, anon;
+grant execute on function public.admin_credit_add(text, numeric, text, text, text) to authenticated;
+
+-- portail dealer : solde + historique du compte connecté
+create or replace function public.dealer_credit_me()
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare v_email text := lower((select auth.jwt()) ->> 'email');
+begin
+  if not public.is_dealer() then raise exception 'Accès refusé.' using errcode = '42501'; end if;
+  return jsonb_build_object(
+    'balance', private.dealer_credit_balance(v_email),
+    'rows', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'created_at', c.created_at, 'amount', c.amount, 'kind', c.kind,
+              'reason', c.reason, 'note', c.note, 'receipt_no', c.receipt_no, 'invoice_number', c.invoice_number)
+              order by c.created_at desc) from public.dealer_credit c where c.dealer_email = v_email), '[]'::jsonb),
+    'dealer', (select jsonb_build_object('name', d.name, 'email', d.email, 'address', d.address, 'city', d.city)
+                 from public.dealers d where lower(d.email) = v_email),
+    'company', public.company_public());
+end $$;
+revoke all on function public.dealer_credit_me() from public, anon;
+grant execute on function public.dealer_credit_me() to authenticated;
+
+-- portail dealer : appliquer (ou non) le crédit à la facture d'une de ses commandes
+create or replace function public.dealer_order_use_credit(p_id uuid, p_use boolean)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare v_email text := lower((select auth.jwt()) ->> 'email');
+begin
+  if not public.is_dealer() then raise exception 'Accès refusé.' using errcode = '42501'; end if;
+  update public.dealer_orders set use_credit = coalesce(p_use, true)
+   where id = p_id and lower(dealer_email) = v_email and status in ('new', 'preparing', 'ready');
+  return found;
+end $$;
+revoke all on function public.dealer_order_use_credit(uuid, boolean) from public, anon;
+grant execute on function public.dealer_order_use_credit(uuid, boolean) to authenticated;

@@ -42,8 +42,8 @@
     try { return d.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' }); } catch (e) { return fmtDateFR(ts); }
   }
   var CAT_LABEL = { filament: 'Filament', spacer: 'Spacer', accessory: 'Accessoire', mixte: 'Mixte' };
-  var PAY_LABEL = { cash: 'Comptant', interac: 'Virement Interac' };   // factures d'avant : pay_method vide, rien d'affiché
-  var PAY_CHIP = { cash: 'payé comptant', interac: 'payé par Interac' };
+  var PAY_LABEL = { cash: 'Comptant', interac: 'Virement Interac', credit: 'Crédit boutique' };   // factures d'avant : pay_method vide, rien d'affiché
+  var PAY_CHIP = { cash: 'payé comptant', interac: 'payé par Interac', credit: 'payé en crédit' };
 
   var DEFAULT_CO = {
     name: 'Création Audio', tagline: 'Audio automobile & impression 3D — Québec',
@@ -250,6 +250,7 @@
       '</tr>';
     }).join('');
     var stockNote = PAY_CHIP[inv.pay_method] ? '<span class="hd-stock">' + PAY_CHIP[inv.pay_method] + '</span>' : '';
+    if (+inv.credit_used > 0 && inv.pay_method !== 'credit') stockNote += '<span class="hd-stock">crédit ' + money(inv.credit_used) + '</span>';
     stockNote += inv.stock_deducted ? '<span class="hd-stock">stock déduit</span>' : (cancelled ? '<span class="hd-stock ok">stock remis</span>' : '');
     if (inv.updated_at) stockNote += '<span class="hd-stock">modifiée le ' + esc(fmtStampFR(inv.updated_at)) + '</span>';
     var mailable = !cancelled && inv.client_type !== 'internal';
@@ -473,6 +474,7 @@
 
     var cancelled = inv.status === 'cancelled'
       ? '<div class="inv-cancelled">FACTURE ANNULÉE</div>' : '';
+    var credit = Math.round((+inv.credit_used || 0) * 100) / 100;   // crédit boutique dealer
 
     return '<div class="inv-top">' +
         '<div class="inv-co">' + (co.logo ? '<img class="inv-logo" src="' + co.logo + '" alt="">' : '') +
@@ -486,8 +488,11 @@
       '<div class="inv-tot">' +
         '<div class="line"><span>Sous-total</span><span>' + money(inv.subtotal) + '</span></div>' + taxLines +
         '<div class="line grand"><span>Total</span><span>' + money(inv.total) + '</span></div>' +
+        (credit > 0 ? '<div class="line"><span>Crédit boutique</span><span>−' + money(credit) + '</span></div>' +
+          '<div class="line grand"><span>À payer</span><span>' + money(Math.max(0, (+inv.total || 0) - credit)) + '</span></div>' : '') +
       '</div>' +
-      (!internal && PAY_LABEL[inv.pay_method] ? '<div class="inv-pay"><span class="lbl">Paiement</span>' + PAY_LABEL[inv.pay_method] + '</div>' : '') +
+      (!internal && PAY_LABEL[inv.pay_method] ? '<div class="inv-pay"><span class="lbl">Paiement</span>' +
+        (credit > 0 && inv.pay_method !== 'credit' ? 'Crédit boutique + ' : '') + PAY_LABEL[inv.pay_method] + '</div>' : '') +
       (inv.note ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(inv.note) + '</div>' : '') +
       (internal ? '' : '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
   }

@@ -189,6 +189,10 @@ Deno.serve(async (req) => {
     const { data } = await db.from("customers").select("lang").ilike("email", to).limit(1);
     langRow = data?.[0] || null;
   }
+  if (!langRow && inv.client_type === "dealer") {   // facture dealer : langue de la fiche dealer
+    const { data } = await db.from("dealers").select("lang").ilike("email", to).limit(1);
+    langRow = data?.[0] || null;
+  }
   const lang: "fr" | "en" = langRow?.lang === "en" ? "en" : "fr";
   const en = lang === "en";
   const T = (fr: string, e: string) => (en ? e : fr);
@@ -212,8 +216,11 @@ Deno.serve(async (req) => {
     const first = String(inv.client_name || "").trim().split(/\s+/)[0] || "";
     const m = (n: unknown) => money(n, en);
     const dateStr = dateTxt(inv.invoice_date, en);
-    const payTxt = inv.pay_method === "cash" ? T("Comptant", "Cash") : inv.pay_method === "interac" ? T("Virement Interac", "Interac e-Transfer") : "";
-    const accUrl = SITE + (en ? "/en" : "") + "/compte#/commandes";
+    const credit = Math.round((Number(inv.credit_used) || 0) * 100) / 100;   // crédit boutique dealer
+    const basePay = inv.pay_method === "cash" ? T("Comptant", "Cash") : inv.pay_method === "interac" ? T("Virement Interac", "Interac e-Transfer")
+      : inv.pay_method === "credit" ? T("Crédit boutique", "Store credit") : "";
+    const payTxt = credit > 0 && inv.pay_method !== "credit" ? T("Crédit boutique", "Store credit") + (basePay ? " + " + basePay : "") : basePay;
+    const accUrl = SITE + (en ? "/en" : "") + (inv.client_type === "dealer" ? "/dealer#/commandes" : "/compte#/commandes");
     const subject = T("Ta facture ", "Your invoice ") + inv.number + " — Création Audio";
     const text =
       T("Bonjour ", "Hello ") + first + ",\n\n" +
@@ -221,6 +228,7 @@ Deno.serve(async (req) => {
       L.map((l) => "- " + (l.label || "") + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + m(l.line_total)).join("\n") + "\n\n" +
       (inv.tax_enabled ? T("Sous-total : ", "Subtotal: ") + m(inv.subtotal) + "\n" + T("TPS : ", "GST: ") + m(inv.tax_gst) + "\n" + T("TVQ : ", "QST: ") + m(inv.tax_qst) + "\n" : "") +
       "Total" + T(" : ", ": ") + m(inv.total) + "\n" +
+      (credit > 0 ? T("Crédit boutique : -", "Store credit: -") + m(credit) + "\n" + T("À payer : ", "Amount due: ") + m(Math.max(0, Number(inv.total) - credit)) + "\n" : "") +
       (payTxt ? T("Paiement : ", "Payment: ") + payTxt + "\n" : "") + "\n" +
       T("Tu retrouves aussi tes factures dans ton compte : ", "You can also find your invoices in your account: ") + accUrl + "\n\n" +
       "Création Audio\n" + SITE + (en ? "/en/" : "/");

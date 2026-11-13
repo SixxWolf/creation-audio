@@ -17,11 +17,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=161">
+<link rel="stylesheet" href="assets/admin.css?v=163">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
-<link rel="stylesheet" href="assets/facture.css?v=42">
+<link rel="stylesheet" href="assets/facture.css?v=44">
 <link rel="stylesheet" href="assets/autoloop.css?v=30">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
 <link rel="stylesheet" href="assets/boites.css?v=8">
@@ -1767,6 +1767,14 @@
           <!-- Résumé marge (privé, non imprimé) — masqué par défaut, bouton pour afficher -->
           <div class="fx-margin no-print" id="fx-margin" hidden data-wide="fx-right" data-wide-order="4"></div>
 
+          <!-- Crédit boutique du dealer choisi (cms-facturation.js + cms-credit.js) : déduit du total, le reste se paie -->
+          <div class="fx-seg fx-pay-seg fx-credit no-print" id="fx-credit" role="group" aria-label="Crédit boutique" data-wide="fx-right" data-wide-order="4" hidden>
+            <span class="fx-pay-lbl">Crédit</span>
+            <span class="fx-credit-av" id="fx-credit-av"></span>
+            <span class="unit unit-sm fx-credit-w" data-unit="$"><input type="number" id="fx-credit-amt" min="0" step="0.01" inputmode="decimal" aria-label="Crédit appliqué" disabled></span>
+            <button type="button" class="fx-pay-btn" id="fx-credit-btn">Appliquer</button>
+          </div>
+
           <div class="fx-seg fx-pay-seg no-print" id="fx-pay" role="group" aria-label="Mode de paiement" data-wide="fx-right" data-wide-order="4">
             <span class="fx-pay-lbl">Paiement</span>
             <button type="button" class="fx-pay-btn" data-pay="cash">Comptant</button>
@@ -2944,6 +2952,12 @@
         </div>
         <div class="sec-actions"><button class="btn btn-ghost btn-sm" id="sec-new" type="button" data-ic="plus">Ajouter un appareil</button></div>
       </div>
+      <!-- NIP demandé à chaque ajout de crédit dealer (cms-credit.js, RPC admin_pin_status / admin_pin_set) -->
+      <div class="set-card">
+        <div class="set-head"><b>NIP du crédit</b> <span class="set-msg" id="pin-msg" aria-live="polite"></span></div>
+        <p class="sec-note">Demandé à chaque ajout de crédit à un dealer.</p>
+        <div class="sec-actions"><button class="btn btn-ghost btn-sm" id="pin-set" type="button" data-ic="edit" hidden>Choisir un NIP</button></div>
+      </div>
     </section>
 
 <!-- ---------------- RÉGLAGES › AIDE ---------------- -->
@@ -3034,18 +3048,19 @@
 <script src="assets/cms-attente.js?v=7"></script>
 <script src="assets/cms-reserves.js?v=4"></script>
 <script src="assets/cms-en-route.js?v=9"></script>
-<script src="assets/cms-dealers.js?v=11"></script>
+<script src="assets/cms-credit.js?v=1"></script>
+<script src="assets/cms-dealers.js?v=12"></script>
 <script src="assets/cms-clients.js?v=13"></script>
 <script src="assets/cms-messages.js?v=9"></script>
-<script src="assets/cms-facturation.js?v=65"></script>
-<script src="assets/cms-historique.js?v=21"></script>
+<script src="assets/cms-facturation.js?v=66"></script>
+<script src="assets/cms-historique.js?v=22"></script>
 <script src="assets/commande-client.js?v=13"></script>
 <script src="assets/cms-commandes-clients.js?v=28"></script>
 <script src="assets/cms-reservations.js?v=9"></script>
 <script src="assets/cms-cueillettes.js?v=9"></script>
 <script src="assets/demande-fil.js?v=2"></script>
 <script src="assets/cms-demandes.js?v=4"></script>
-<script src="assets/doc-print.js?v=2"></script>
+<script src="assets/doc-print.js?v=3"></script>
 <script src="assets/cms-commandes.js?v=20"></script>
 <script src="assets/cms-statistiques.js?v=13"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>

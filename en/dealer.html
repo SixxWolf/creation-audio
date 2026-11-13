@@ -17,11 +17,12 @@
 <link rel="stylesheet" href="../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../assets/site.css?v=29">
 <link rel="stylesheet" href="../assets/boutique.css?v=58">
-<link rel="stylesheet" href="../assets/dealer.css?v=23">
+<link rel="stylesheet" href="../assets/dealer.css?v=24">
+<link rel="stylesheet" href="../assets/doc-print.css?v=3">
 <link rel="stylesheet" href="../assets/dialog.css?v=2">
 <script src="../assets/look.js?v=5"></script>
 <script src="../assets/i18n.js?v=1"></script>
-<script src="../assets/i18n-en.js?v=37"></script>
+<script src="../assets/i18n-en.js?v=38"></script>
 </head>
 <body class="home-page shop-page dealer-page">
 
@@ -115,6 +116,7 @@
     <nav class="dl-tabs" aria-label="Dealer portal">
       <a class="dl-tab" href="#/" data-view="catalog">Catalogue</a>
       <a class="dl-tab" href="#/commandes" data-view="orders">My orders <span class="dl-tab-n" id="dl-orders-n" hidden>0</span></a>
+      <a class="dl-tab" href="#/credit" data-view="credit" id="dl-credit-tab" hidden>Credit</a>
       <a class="dl-tab" href="#/apparence" data-view="look">Appearance</a>
     </nav>
   </div>
@@ -152,6 +154,21 @@
     </div>
     <div id="dl-orders-flash" role="status"></div>
     <div id="dl-orders-list"><p class="muted">Loading…</p></div>
+  </section>
+
+  <!-- Crédit boutique (#/credit) : RPC dealer_credit_me (dealer.js), reçus par doc-print.js -->
+  <section id="dl-credit" hidden aria-labelledby="dl-credit-title">
+    <div class="shop-head">
+      <div class="shop-eyebrow">Store credit</div>
+      <h1 id="dl-credit-title">My credit</h1>
+    </div>
+    <div class="dl-credit-card">
+      <span>Available balance</span>
+      <b id="dl-credit-bal">0,00 $</b>
+      <p>Usable on every item, sales included. Never expires. Not refundable or exchangeable for cash.</p>
+    </div>
+    <h2 class="dl-credit-h">History</h2>
+    <div id="dl-credit-list"></div>
   </section>
 
   <!-- Apparence (#/apparence) : assets/look.js -->
@@ -194,6 +211,13 @@
     <div class="cart-line cart-line-sub" id="cart-sub-line" hidden><span>Subtotal</span><span id="cart-sub"></span></div>
     <div class="cart-line cart-line-sub" id="cart-fee-line" hidden><span>Shipping</span><span id="cart-fee"></span></div>
     <div class="cart-line cart-line-total"><span>Dealer total</span><span id="cart-total">0,00 $</span></div>
+    <label class="cart-credit" id="cart-credit" hidden>
+      <input type="checkbox" id="cart-credit-use" checked>
+      <span>Use my credit</span>
+      <b id="cart-credit-av"></b>
+    </label>
+    <div class="cart-line cart-line-sub" id="cart-credit-line" hidden><span>Store credit</span><span id="cart-credit-amt"></span></div>
+    <div class="cart-line cart-line-total" id="cart-due-line" hidden><span>Amount due</span><span id="cart-due"></span></div>
     <label class="cart-note-lbl" for="cart-note">Note for Création Audio <span>(optional)</span></label>
     <textarea id="cart-note" rows="2" maxlength="1000" placeholder="E.g. needed Friday · customer Civic 2008 · call me first"></textarea>
     <button type="button" class="cart-order" id="cart-send">Send my order</button>
@@ -222,6 +246,7 @@
 <script src="../assets/spacer-catalog.js?v=20"></script>
 <script src="../assets/auth-gate.js?v=3"></script>
 <script src="../assets/ca-pick.js?v=2"></script>
-<script src="../assets/dealer.js?v=24"></script>
+<script src="../assets/doc-print.js?v=3"></script>
+<script src="../assets/dealer.js?v=25"></script>
 </body>
 </html>

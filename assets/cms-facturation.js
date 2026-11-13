@@ -70,7 +70,10 @@
   var taxEnabled = false;
   var internalUse = null;        // usage interne : 'production' (filament pour imprimer des spacers) | 'other' (perso, projets) ; obligatoire en « Interne »
   var payMethod = null;          // 'cash' (comptant) | 'interac' (virement) | null ; obligatoire à l'enregistrement, sauf usage interne
-  var PAY_LABEL = { cash: 'Comptant', interac: 'Virement Interac' };
+  var PAY_LABEL = { cash: 'Comptant', interac: 'Virement Interac', credit: 'Crédit boutique' };
+  // Crédit boutique dealer (cms-credit.js) : montant appliqué ; Infinity = « le maximum » (suit le total).
+  // En modification, le crédit déjà pris par CETTE facture redevient disponible (creditBack).
+  var creditUsed = 0, creditBack = 0, creditBackEmail = '';
   var pickerKind = 'spool';      // filament : bobine | recharge
   var brandFilter = 'all';       // filtre marque (catalogue filament)
   var brandInit = false;         // défaut Bambu Lab appliqué une fois
@@ -413,11 +416,58 @@
   }
   // refuse l'enregistrement tant que le mode manque (usage interne : aucun paiement)
   function payMissing() {
-    if (isInternal() || payMethod) return false;
+    if (isInternal() || payMethod || creditCovers(totals())) return false;
     if (elPay) { elPay.classList.add('is-missing'); elPay.scrollIntoView({ block: 'nearest' }); }
     elStatus.textContent = 'Choisis le mode de paiement.';
     return true;
   }
+
+  /* ---------- crédit boutique (dealer) ---------- */
+  var elCredit = $('#fx-credit'), elCreditAv = $('#fx-credit-av'), elCreditAmt = $('#fx-credit-amt'), elCreditBtn = $('#fx-credit-btn');
+  function creditEmail() {
+    if (!isDealer()) return '';
+    return norm((elDealerSelect && elDealerSelect.value) || elCliEmail.value).toLowerCase();
+  }
+  function creditAvail() {
+    var e = creditEmail();
+    if (!e || !window.CA.credit) return 0;
+    return round2(window.CA.credit.balance(e) + (e === creditBackEmail ? creditBack : 0));
+  }
+  function creditNow(t) {
+    if (!isDealer() || !(creditUsed > 0)) return 0;
+    return round2(Math.max(0, Math.min(creditUsed, creditAvail(), round2(t.total))));
+  }
+  function creditCovers(t) { var c = creditNow(t); return c > 0 && c >= round2(t.total) - 0.005; }
+  function paintCredit(t) {
+    if (!elCredit) return;
+    var av = creditAvail(), c = creditNow(t), covers = creditCovers(t);
+    elCredit.hidden = !(isDealer() && (av > 0 || creditUsed > 0));
+    if (elCreditAv) elCreditAv.textContent = money(av) + ' dispo';
+    if (elCreditBtn) { elCreditBtn.classList.toggle('is-active', creditUsed > 0); elCreditBtn.textContent = creditUsed > 0 ? 'Appliqué' : 'Appliquer'; }
+    if (elCreditAmt) {
+      elCreditAmt.disabled = !(creditUsed > 0);
+      if (document.activeElement !== elCreditAmt) elCreditAmt.value = creditUsed > 0 ? c.toFixed(2) : '';
+    }
+    if (elPay) {
+      elPay.hidden = isInternal() || covers;
+      if (covers) elPay.classList.remove('is-missing');
+    }
+  }
+  if (elCreditBtn) elCreditBtn.addEventListener('click', function () {
+    creditUsed = creditUsed > 0 ? 0 : Infinity;
+    if (saved) unlock();
+    render();
+  });
+  if (elCreditAmt) {
+    elCreditAmt.addEventListener('input', function () {
+      var v = parseFloat(String(this.value).replace(',', '.'));
+      creditUsed = v > 0 ? round2(v) : 0.0001;   // vide/0 : reste appliqué, 0 $ (ne referme pas le champ en cours de frappe)
+      if (saved) unlock();
+      render();
+    });
+    elCreditAmt.addEventListener('change', function () { if (!(creditUsed >= 0.01)) creditUsed = 0; this.blur(); render(); });
+  }
+  if (window.CA.credit) window.CA.credit.onChange(function () { render(); });
 
   /* ---------- carnet clients / dealers ---------- */
   function clientFields() {
@@ -874,6 +924,7 @@
   /* ---------- rendu de la facture ---------- */
   function render() {
     repriceLines();   // applique le rabais quantité (cumulé par marque pour les filaments)
+    paintCredit(totals());
     if (!lines.length) {
       elInvoice.innerHTML = '<p class="inv-empty">Ajoute des articles depuis le catalogue (ou une ligne libre).</p>';
       elMargin.hidden = true;
@@ -942,7 +993,13 @@
     }
 
     var noteVal = elNote.value.trim();
-    var payVal = !internal && payMethod ? PAY_LABEL[payMethod] : '';
+    var cr = creditNow(t), covers = creditCovers(t);
+    var payVal = internal ? '' : covers ? PAY_LABEL.credit
+      : (cr > 0 ? PAY_LABEL.credit + (payMethod ? ' + ' + PAY_LABEL[payMethod] : '') : (payMethod ? PAY_LABEL[payMethod] : ''));
+    var creditLines = cr > 0
+      ? '<div class="line"><span>Crédit boutique</span><span>−' + money(cr) + '</span></div>' +
+        '<div class="line grand"><span>À payer</span><span>' + money(round2(t.total - cr)) + '</span></div>'
+      : '';
     elInvoice.innerHTML =
       '<div class="inv-top">' +
         '<div class="inv-co">' + (co.logo ? '<img class="inv-logo" src="' + co.logo + '" alt="' + esc(co.name) + '">' : '') +
@@ -960,6 +1017,7 @@
         '<div class="line"><span>Sous-total</span><span>' + money(t.sub) + '</span></div>' +
         taxLines +
         '<div class="line grand"><span>Total</span><span>' + money(t.total) + '</span></div>' +
+        creditLines +
       '</div>' +
       (payVal ? '<div class="inv-pay"><span class="lbl">Paiement</span>' + esc(payVal) + '</div>' : '') +
       (noteVal ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(noteVal) + '</div>' : '') +
@@ -1074,7 +1132,9 @@
       category: currentCategory(),
       invoice_date: /^\d{4}-\d{2}-\d{2}$/.test(elDate.value) ? elDate.value : todayISO(),
       note: elNote.value.trim() || null,
-      pay_method: isInternal() ? null : payMethod,
+      pay_method: isInternal() ? null : creditCovers(t) ? 'credit' : payMethod,
+      credit_used: creditNow(t),
+      credit_email: creditNow(t) > 0 ? creditEmail() : null,
       internal_use: isInternal() ? internalUse : null,
       tax_enabled: taxEnabled,
       subtotal: round2(t.sub), tax_gst: round2(t.gst), tax_qst: round2(t.qst),
@@ -1092,6 +1152,7 @@
     if (window.CA.reloadHistorique) window.CA.reloadHistorique();
     if (window.CA.reloadStatistiques) window.CA.reloadStatistiques();
     if (window.CA.reserved) window.CA.reserved.reload();   // « réservés » (À commander, alerte au scan)
+    if (window.CA.credit) window.CA.credit.reload();       // solde de crédit dealer (trigger invoices_credit_sync)
   }
   function refreshStock() { catalogLoaded.filament = false; catalogLoaded.spacer = false; loadCatalog(cat); }
   window.CA.refreshFacturationStock = refreshStock;   // appelé par l'Historique après une remise
@@ -1254,6 +1315,7 @@
     elNote.value = '';
     elDate.value = todayISO(); elStatus.textContent = '';
     payMethod = null; $$('.fx-pay-btn').forEach(function (b) { b.classList.remove('is-active'); }); if (elPay) elPay.classList.remove('is-missing');
+    creditUsed = 0; creditBack = 0; creditBackEmail = '';
     setUse(null);
     setClientType('client');   // vide les champs client (le profil dealer reste mémorisé)
     loadNextNumberHint();
@@ -1360,6 +1422,9 @@
       address: inv.client_address || '', city: inv.client_city || '' });
     if (elDealerSelect) { var d = dealer ? dealerByEmail(ct.email) : null; elDealerSelect.value = d ? d.email : ''; }
     elNote.value = inv.note || '';
+    creditBack = inv.status === 'cancelled' ? 0 : round2(inv.credit_used);
+    creditBackEmail = String(inv.credit_email || '').toLowerCase();
+    creditUsed = creditBack > 0 ? creditBack : 0;
     setPay(inv.pay_method);
     setUse(inv.internal_use);
     elNumber.value = inv.number || '';
@@ -1545,6 +1610,7 @@
           label: fee ? (en ? 'Shipping' : 'Livraison') : (en ? 'Free shipping' : 'Livraison gratuite'), meta: '', hex: null,
           qty: 1, base: 0, tiers: [], cost: +order.ship_rate || 0, tierKey: null, price: fee, manual: true, sp: null });
       }
+      creditUsed = order.use_credit === false ? 0 : Infinity;   // le dealer a coché « Utiliser mon crédit » (par défaut)
       elNote.value = 'Commande dealer ' + order.number + (order.delivery === 'ship' ? ' — Livraison : ' + (order.ship_address || '') : '') + (order.note ? ' — ' + order.note : '');
       setCat('spacer');
       unlock();
@@ -1579,7 +1645,11 @@
     L.push('Sous-total : ' + money(t.sub));
     if (taxEnabled) { L.push('TPS : ' + money(t.gst)); L.push('TVQ : ' + money(t.qst)); }
     L.push('TOTAL : ' + money(t.total));
-    if (payMethod && !isInternal()) { L.push(''); L.push('Paiement : ' + PAY_LABEL[payMethod]); }
+    var cr = creditNow(t);
+    if (cr > 0) { L.push('Crédit boutique : −' + money(cr)); L.push('À PAYER : ' + money(round2(t.total - cr))); }
+    if (!isInternal() && (payMethod || cr > 0)) {
+      L.push(''); L.push('Paiement : ' + (creditCovers(t) ? PAY_LABEL.credit : (cr > 0 ? PAY_LABEL.credit + (payMethod ? ' + ' + PAY_LABEL[payMethod] : '') : PAY_LABEL[payMethod])));
+    }
     var note = elNote.value.trim(); if (note) { L.push(''); L.push('Note : ' + note); }
     return L.join('\n');
   }

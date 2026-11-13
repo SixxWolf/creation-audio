@@ -56,7 +56,10 @@ export function buildInvoiceEmail(o: { company: Company; invoice: InvoiceHead; l
   const m = (n: unknown) => esc(money(n, en));
   const first = String(inv.client_name || "").trim().split(/\s+/)[0] || "";
   const dateStr = dateTxt(inv.invoice_date, en);
-  const payTxt = inv.pay_method === "cash" ? T("Comptant", "Cash") : inv.pay_method === "interac" ? T("Virement Interac", "Interac e-Transfer") : "";
+  const credit = Math.round((Number(inv.credit_used) || 0) * 100) / 100;   // crédit boutique dealer
+  const basePay = inv.pay_method === "cash" ? T("Comptant", "Cash") : inv.pay_method === "interac" ? T("Virement Interac", "Interac e-Transfer")
+    : inv.pay_method === "credit" ? T("Crédit boutique", "Store credit") : "";
+  const payTxt = credit > 0 && inv.pay_method !== "credit" ? T("Crédit boutique", "Store credit") + (basePay ? " + " + basePay : "") : basePay;
   const coName = String(co.name || "Création Audio");
   const siteLabel = o.site.replace(/^https?:\/\//, "");
 
@@ -155,6 +158,9 @@ export function buildInvoiceEmail(o: { company: Company; invoice: InvoiceHead; l
               '<td align="right" style="font-family:' + DISP + ';font-size:22px;line-height:26px;font-weight:700;color:#FFFFFF;white-space:nowrap">' + m(inv.total) + '</td>' +
               '</tr></table></td>' +
           '</tr></table>' +
+          (credit > 0 ? '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:8px 0 0">' +
+            sumRow(T("Crédit boutique", "Store credit"), "-" + m(credit)) +
+            sumRow('<strong>' + T("À payer", "Amount due") + '</strong>', '<strong>' + m(Math.max(0, Number(inv.total) - credit)) + '</strong>') + '</table>' : '') +
           (payTxt ? '<div class="soft" style="padding-top:8px;text-align:right;font-family:' + SANS + ';font-size:13px;line-height:18px;color:' + SOFT + '">' + T("Paiement : ", "Payment: ") + esc(payTxt) + '</div>' : '') +
           '</td></tr></table>' +
       '</td></tr>' +

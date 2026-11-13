@@ -144,7 +144,8 @@
       return '<div class="mat-row person" data-email="' + esc(d.email) + '">' +
         CA.avatar(d.name || d.email) +
         '<div class="mat-main">' +
-          '<div class="mat-name">' + esc(d.name || d.email) + ' <span class="person-tag">Portail dealer</span></div>' +
+          '<div class="mat-name">' + esc(d.name || d.email) + ' <span class="person-tag">Portail dealer</span>' +
+            (CA.credit ? CA.credit.chip(d.email) : '') + '</div>' +
           '<div class="person-meta">' +
             '<span class="pm pm-mail">' + CA.pv(d.email) + '</span>' +
             (d.phone ? '<span class="pm pm-tel">' + CA.pv(d.phone) + '</span>' : '') +
@@ -152,6 +153,7 @@
           '</div>' +
         '</div>' +
         '<div class="mat-actions">' +
+          (CA.credit ? '<button class="btn btn-ghost btn-sm dl-credit" type="button" data-ic="receipt">Crédit</button>' : '') +
           '<button class="btn btn-ghost btn-sm dl-invite" type="button" data-ic="mail">Inviter</button>' +
           '<button class="btn btn-ghost btn-sm dl-edit" type="button">Modifier</button>' +
           '<button class="btn btn-ghost btn-sm dl-del" type="button">Retirer</button>' +
@@ -167,8 +169,14 @@
       });
       $('.dl-edit', el).addEventListener('click', function () { openEditor(d); });
       $('.dl-del', el).addEventListener('click', function () { del(d); });
+      var cr = $('.dl-credit', el);
+      if (cr) cr.addEventListener('click', function () { CA.credit.open(d, el); });
     });
+    if (CA.credit && CA.credit.afterDealersRender) CA.credit.afterDealersRender(listEl);
   }
+  // le crédit vient de changer : pastilles à jour sans recharger les dealers
+  CA.dealersRepaint = function () { if (loaded && cache.length) render(); };
+  if (CA.credit) CA.credit.onChange(CA.dealersRepaint);
 
   /* ---- demandes d'accès (revendeur) ---- */
   function paintBadge(n) {

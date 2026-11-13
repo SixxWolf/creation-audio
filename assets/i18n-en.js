@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 37;
+window.CA_EN_V = 38;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -1125,5 +1125,28 @@ window.CA_EN = (function (pairs) {
   [`Demande introuvable.`, `Request not found.`],
   [`Message trop long (4000 caractères max).`, `Message too long (4000 characters max).`],
   [`Trop de messages envoyés en peu de temps. Réessaie plus tard.`, `Too many messages sent in a short time. Try again later.`],
-  [`Cette soumission n'attend plus de réponse.`, `This quote no longer needs a reply.`]
+  [`Cette soumission n'attend plus de réponse.`, `This quote no longer needs a reply.`],
+  // crédit boutique dealer (2026-11-13)
+  [`Mon crédit — Portail dealer · Création Audio`, `My credit — Dealer portal · Création Audio`],
+  [`Règlement de dette`, `Debt settlement`],
+  [`Geste commercial`, `Goodwill credit`],
+  [`Remboursement`, `Refund`],
+  [`Correction`, `Correction`],
+  [`Crédit ajouté`, `Credit added`],
+  [`Utilisé · facture `, `Used · invoice `],
+  [`Rendu · facture `, `Returned · invoice `],
+  [`Aucun mouvement pour l'instant.`, `No activity yet.`],
+  [`Crédit boutique`, `Store credit`],
+  [`À payer`, `Amount due`],
+  [` en crédit boutique`, ` in store credit`],
+  [` reçu comptant`, ` received in cash`],
+  [` reçu par virement`, ` received by transfer`],
+  [` le `, ` on `],
+  [`CRÉDIT BOUTIQUE`, `STORE CREDIT`],
+  [`Crédit au compte de`, `Credited to`],
+  [`Solde de crédit`, `Credit balance`],
+  [`Conditions`, `Terms`],
+  [`Utilisable sur tous les articles de la boutique, promotions comprises. N'expire pas. Ni remboursable ni échangeable contre de l'argent.`, `Usable on every item in the store, sales included. Never expires. Not refundable or exchangeable for cash.`],
+  [`Merci de votre confiance !`, `Thank you for your business!`],
+  [`Crédit`, `Credit`]
 ]);

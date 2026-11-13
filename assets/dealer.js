@@ -109,7 +109,7 @@
   function checkDealer(email) {
     sb.rpc('is_dealer').then(function (res) {
       if (res.error) { show('gate'); return; }
-      if (res.data === true) { show('app', email); syncLook(); load(); loadOrders(); loadShip(); loadDisc(); }
+      if (res.data === true) { show('app', email); syncLook(); load(); loadOrders(); loadShip(); loadDisc(); loadCredit(); }
       else show('gate');
     }, function () { show('gate'); });
   }
@@ -299,6 +299,13 @@
       view = 'orders'; document.title = _t('Mes commandes — Portail dealer · Création Audio');
       return;
     }
+    if (/^#\/credit/.test(h)) {
+      sc.hide(); ordersEl.hidden = true; lookEl.hidden = true; creditEl.hidden = false; setTab('credit');
+      if (view !== 'credit') { window.scrollTo(0, 0); loadCredit(); }
+      view = 'credit'; document.title = _t('Mon crédit — Portail dealer · Création Audio');
+      return;
+    }
+    creditEl.hidden = true;
     if (/^#\/apparence/.test(h)) {
       sc.hide(); ordersEl.hidden = true; lookEl.hidden = false; setTab('look');
       if (view !== 'look') { window.scrollTo(0, 0); if (window.caLook) mountLook(); }
@@ -543,6 +550,7 @@
     animateTiers();
     renderDisc();
     renderShip(n);
+    renderCreditCart(n);
     sendBtn.textContent = editing ? _t('Enregistrer les modifications') : _t('Envoyer ma commande');
     sendBtn.classList.toggle('is-disabled', n === 0 || sending);
     renderMbar(n);
@@ -649,6 +657,68 @@
     });
   });
 
+  /* ---------- crédit boutique (RPC dealer_credit_me ; onglet #/credit + case du panier) ----------
+     Aperçu seulement : le crédit est déduit à la facturation (invoices.credit_used), sur le total réel. */
+  var CREDIT_KEY = 'ca_v2_dealer_credit';
+  var creditBal = 0, creditRows = [], creditInfo = null, useCredit = loadJSON(CREDIT_KEY) !== false;
+  var creditEl = $('#dl-credit'), creditTab = $('#dl-credit-tab'), creditUseI = $('#cart-credit-use');
+  var C_REASON = { debt: _t('Règlement de dette'), gesture: _t('Geste commercial'), refund: _t('Remboursement'), correction: _t('Correction') };
+  function loadCredit() {
+    if (!sb) return;
+    sb.rpc('dealer_credit_me').then(function (res) {
+      if (res.error || !res.data) return;
+      creditInfo = res.data;
+      creditBal = Math.round((+res.data.balance || 0) * 100) / 100;
+      creditRows = res.data.rows || [];
+      creditTab.hidden = !creditRows.length;
+      renderCredit();
+      if (!focusedIn(cartPanel)) renderCart(); else renderCreditCart(count());
+    }, function () {});
+  }
+  function creditLabel(r) {
+    if (r.kind === 'grant') return _t('Crédit ajouté') + ' · ' + (C_REASON[r.reason] || '');
+    if (r.kind === 'adjust') return _t('Correction');
+    if (r.kind === 'use') return _t('Utilisé · facture ') + (r.invoice_number || '');
+    return _t('Rendu · facture ') + (r.invoice_number || '');
+  }
+  function renderCredit() {
+    $('#dl-credit-bal').textContent = money(creditBal);
+    var list = $('#dl-credit-list');
+    list.innerHTML = creditRows.length ? creditRows.map(function (r) {
+      var amt = +r.amount || 0;
+      return '<div class="dl-credit-row">' +
+        '<span class="dcr-date">' + esc(fmtDay(r.created_at)) + '</span>' +
+        '<span class="dcr-what"><b>' + esc(creditLabel(r)) + '</b>' + (r.note ? '<small>' + esc(r.note) + '</small>' : '') + '</span>' +
+        (r.receipt_no ? '<button type="button" class="dl-btn dcr-print" data-id="' + esc(r.id) + '">' + esc(r.receipt_no) + '</button>' : '<span></span>') +
+        '<span class="dcr-amt' + (amt > 0 ? ' is-plus' : '') + '">' + (amt > 0 ? '+' : '−') + money(Math.abs(amt)) + '</span>' +
+      '</div>';
+    }).join('') : '<p class="muted">' + _t('Aucun mouvement pour l\'instant.') + '</p>';
+    $$('.dcr-print', list).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-id'), r = creditRows.filter(function (x) { return x.id === id; })[0];
+        if (!r || !window.CA.creditPrint) return;
+        // solde juste après ce mouvement
+        var after = creditRows.filter(function (x) { return x.created_at <= r.created_at; })
+          .reduce(function (s, x) { return s + (+x.amount || 0); }, 0);
+        window.CA.creditPrint({ row: r, balance: Math.round(after * 100) / 100, dealer: (creditInfo && creditInfo.dealer) || { email: me },
+          company: (creditInfo && creditInfo.company) || {} });
+      });
+    });
+  }
+  function renderCreditCart(n) {
+    var box = $('#cart-credit'), show = creditBal > 0 && n > 0;
+    box.hidden = !show;
+    creditUseI.checked = useCredit;
+    $('#cart-credit-av').textContent = money(creditBal);
+    var use = show && useCredit ? Math.min(creditBal, grandTotal()) : 0;
+    $('#cart-credit-line').hidden = $('#cart-due-line').hidden = !(use > 0);
+    if (use > 0) {
+      $('#cart-credit-amt').textContent = '−' + money(use);
+      $('#cart-due').textContent = money(Math.max(0, grandTotal() - use));
+    }
+  }
+  creditUseI.addEventListener('change', function () { useCredit = creditUseI.checked; saveJSON(CREDIT_KEY, useCredit); renderCreditCart(count()); });
+
   /* ---------- envoi ---------- */
   function notify(orderId, event) {
     if (!sb.functions || !orderId) return;
@@ -682,6 +752,8 @@
       var o = Array.isArray(res.data) ? res.data[0] : res.data;
       if (!o || !o.id) throw new Error(_t('Réponse inattendue du serveur.'));
       sending = false;
+      // crédit boutique : appliqué (ou non) à la facture de cette commande
+      if (creditBal > 0 || !useCredit) sb.rpc('dealer_order_use_credit', { p_id: o.id, p_use: useCredit }).then(null, function () {});
       notify(o.id, wasEditing ? 'updated' : 'new');
       stopEditing(); clearCart(); resetNote(); cartMsg.textContent = '';
       closeCart();
@@ -830,6 +902,7 @@
         rate: o.ship_rate == null ? null : +o.ship_rate, threshold: o.ship_threshold == null ? null : +o.ship_threshold };
       shipMode = editing.delivery;
       shipAddr = copyAddr(editing.addr || (shipCfg && shipCfg.addr));
+      useCredit = o.use_credit !== false; saveJSON(CREDIT_KEY, useCredit);
       saveJSON(EDIT_KEY, editing); saveCart();
       noteI.value = o.note || ''; try { localStorage.setItem(NOTE_KEY, noteI.value); } catch (e) {}
       cartMsg.className = 'cart-msg';
@@ -870,6 +943,7 @@
       if (!focusedIn(cartItems)) renderCart();
     }, function () { refreshing = false; });
     if (view === 'orders') loadOrders();
+    loadCredit();
     loadShip();
     loadDisc();
   }

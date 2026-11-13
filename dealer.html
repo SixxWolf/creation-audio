@@ -17,7 +17,8 @@
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=29">
 <link rel="stylesheet" href="assets/boutique.css?v=58">
-<link rel="stylesheet" href="assets/dealer.css?v=23">
+<link rel="stylesheet" href="assets/dealer.css?v=24">
+<link rel="stylesheet" href="assets/doc-print.css?v=3">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
 <script src="assets/look.js?v=5"></script>
 <script src="assets/i18n.js?v=1"></script>
@@ -114,6 +115,7 @@
     <nav class="dl-tabs" aria-label="Portail dealer">
       <a class="dl-tab" href="#/" data-view="catalog">Catalogue</a>
       <a class="dl-tab" href="#/commandes" data-view="orders">Mes commandes <span class="dl-tab-n" id="dl-orders-n" hidden>0</span></a>
+      <a class="dl-tab" href="#/credit" data-view="credit" id="dl-credit-tab" hidden>Crédit</a>
       <a class="dl-tab" href="#/apparence" data-view="look">Apparence</a>
     </nav>
   </div>
@@ -151,6 +153,21 @@
     </div>
     <div id="dl-orders-flash" role="status"></div>
     <div id="dl-orders-list"><p class="muted">Chargement…</p></div>
+  </section>
+
+  <!-- Crédit boutique (#/credit) : RPC dealer_credit_me (dealer.js), reçus par doc-print.js -->
+  <section id="dl-credit" hidden aria-labelledby="dl-credit-title">
+    <div class="shop-head">
+      <div class="shop-eyebrow">Crédit boutique</div>
+      <h1 id="dl-credit-title">Mon crédit</h1>
+    </div>
+    <div class="dl-credit-card">
+      <span>Solde disponible</span>
+      <b id="dl-credit-bal">0,00 $</b>
+      <p>Utilisable sur tous les articles, promotions comprises. N'expire pas. Ni remboursable ni échangeable contre de l'argent.</p>
+    </div>
+    <h2 class="dl-credit-h">Historique</h2>
+    <div id="dl-credit-list"></div>
   </section>
 
   <!-- Apparence (#/apparence) : assets/look.js -->
@@ -193,6 +210,13 @@
     <div class="cart-line cart-line-sub" id="cart-sub-line" hidden><span>Sous-total</span><span id="cart-sub"></span></div>
     <div class="cart-line cart-line-sub" id="cart-fee-line" hidden><span>Livraison</span><span id="cart-fee"></span></div>
     <div class="cart-line cart-line-total"><span>Total dealer</span><span id="cart-total">0,00 $</span></div>
+    <label class="cart-credit" id="cart-credit" hidden>
+      <input type="checkbox" id="cart-credit-use" checked>
+      <span>Utiliser mon crédit</span>
+      <b id="cart-credit-av"></b>
+    </label>
+    <div class="cart-line cart-line-sub" id="cart-credit-line" hidden><span>Crédit boutique</span><span id="cart-credit-amt"></span></div>
+    <div class="cart-line cart-line-total" id="cart-due-line" hidden><span>À payer</span><span id="cart-due"></span></div>
     <label class="cart-note-lbl" for="cart-note">Note pour Création Audio <span>(facultatif)</span></label>
     <textarea id="cart-note" rows="2" maxlength="1000" placeholder="Ex. pour vendredi · client Civic 2008 · appelle-moi avant"></textarea>
     <button type="button" class="cart-order" id="cart-send">Envoyer ma commande</button>
@@ -221,6 +245,7 @@
 <script src="assets/spacer-catalog.js?v=20"></script>
 <script src="assets/auth-gate.js?v=3"></script>
 <script src="assets/ca-pick.js?v=2"></script>
-<script src="assets/dealer.js?v=24"></script>
+<script src="assets/doc-print.js?v=3"></script>
+<script src="assets/dealer.js?v=25"></script>
 </body>
 </html>

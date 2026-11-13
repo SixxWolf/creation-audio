@@ -572,6 +572,42 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .person-tag { display:inline-block; white-space:nowrap; margin-left:6px; padding:2px 8px; font-family:var(--font); font-size:.66rem; font-weight:700; letter-spacing:.06em;
   text-transform:uppercase; vertical-align:2px; color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 13%, transparent); border-radius:100px; }
 .person-meta { display:flex; flex-wrap:wrap; gap:4px 16px; font-size:.84rem; color:var(--muted); }
+/* Crédit dealer (cms-credit.js) : pastille, panneau sous la ligne, formulaire dans caDialog */
+.person-tag.cr-tag { color:var(--good); background:color-mix(in srgb, var(--good) 13%, transparent); }
+.cr-panel { margin:-4px 0 12px 56px; padding:14px 16px; background:var(--wash); border:1px solid var(--line); border-radius:12px; }
+.cr-head { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.cr-head .grow { flex:1; }
+.cr-bal { display:flex; align-items:baseline; gap:10px; }
+.cr-bal span { font-size:.8rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+.cr-bal b { font-family:var(--display); font-size:1.5rem; font-variant-numeric:tabular-nums; }
+.cr-list { margin-top:12px; border-top:1px solid var(--line); }
+.cr-row { display:grid; grid-template-columns:110px minmax(0,1fr) auto 110px; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); font-size:.9rem; }
+.cr-row:last-child { border-bottom:0; }
+.cr-date { color:var(--muted); white-space:nowrap; }
+.cr-what { min-width:0; }
+.cr-what b { font-weight:600; }
+.cr-what small { display:block; color:var(--muted); font-size:.82rem; overflow-wrap:anywhere; }
+.cr-amt { text-align:right; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cr-amt.is-plus { color:var(--good); }
+.cr-empty { margin:12px 0 0; }
+.cr-form { grid-column:1 / -1; display:grid; gap:12px; margin-top:16px; }
+.cr-f { display:grid; gap:6px; }
+.cr-f > span:first-child { font-size:.82rem; font-weight:600; color:var(--muted); }
+.cr-seg { display:flex; }
+.cr-seg .fx-pay-btn { flex:1; padding:0 10px; }
+.cr-err { grid-column:1 / -1; margin:10px 0 0; font-size:.88rem; font-weight:600; color:var(--bad); }
+.cr-form .dlg-field { margin:0; }
+.cr-pin { letter-spacing:.3em; text-align:center; font-size:1.2rem; }
+.cr-pin::placeholder { letter-spacing:normal; font-size:1rem; }
+@media (max-width:700px) {
+  .cr-panel { margin-left:0; }
+  #dl-list .mat-row .mat-actions { flex-wrap:wrap; }
+  .cr-row { grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; }
+  .cr-date { grid-column:1 / -1; font-size:.8rem; }
+  .cr-row > span:empty { display:none; }
+  .cr-row .btn { grid-column:1; justify-self:start; grid-row:3; }
+  .cr-amt { grid-column:2; grid-row:2; }
+}
 .pm { display:inline-flex; align-items:center; gap:6px; min-width:0; overflow-wrap:anywhere; }
 .pm::before { content:''; width:15px; height:15px; flex:none; opacity:.75; background:center / contain no-repeat; }
 .pm-mail::before { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236C727C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Cpath d='m3.5 6.5 8.5 6.5 8.5-6.5'/%3E%3C/svg%3E"); }

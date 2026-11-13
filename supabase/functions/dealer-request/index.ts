@@ -12,6 +12,8 @@
 //     -> 200 { ok, mailed }
 //  POST { action: 'invite', email }         ADMIN — dealer ajouté à la main : courriel de bienvenue (FR + EN)
 //     -> 200 { ok }
+//  POST { action: 'credit', id }            ADMIN — crédit boutique ajouté/corrigé (ligne dealer_credit) : avis au dealer (FR/EN selon dealers.lang)
+//     -> 200 { ok } · 403 · 502 { error: 'mail' }
 // SQL : schema-v2.sql « DEMANDES D'ACCÈS REVENDEUR ». Secrets : RESEND_API_KEY ; MAIL_FROM optionnel.
 // =========================================================
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -92,6 +94,37 @@ function welcomeMail(name: string, lang: "fr" | "en" | "both") {
   };
 }
 
+// crédit boutique ajouté (ou corrigé) par l'admin : montant, motif, note, n° de reçu, nouveau solde
+const REASON: Record<string, [string, string]> = {
+  debt: ["Règlement de dette", "Debt settlement"], gesture: ["Geste commercial", "Goodwill credit"],
+  refund: ["Remboursement", "Refund"], correction: ["Correction", "Correction"],
+};
+function creditMail(o: { name: string; amount: number; reason: string; note: string; receipt: string; balance: number }, en: boolean) {
+  const L = (fr: string, eng: string) => (en ? eng : fr);
+  const plus = o.amount > 0, amt = M.money(Math.abs(o.amount), en), bal = M.money(o.balance, en);
+  const first = o.name.trim();   // nom de l'entreprise du dealer
+  const portal = SITE + (en ? "/en/" : "/") + "dealer#/credit";
+  const subject = plus ? L("Crédit ajouté à ton compte : ", "Store credit added to your account: ") + amt
+    : L("Correction de ton crédit boutique", "Store credit correction");
+  const lead = plus ? L(amt + " de crédit boutique ont été ajoutés à ton compte.", amt + " in store credit was added to your account.")
+    : L("Ton crédit boutique a été corrigé de −" + amt + ".", "Your store credit was corrected by −" + amt + ".");
+  const reason = (REASON[o.reason] || ["", ""])[en ? 1 : 0];
+  const terms = L("Ton crédit s'applique à tes prochaines commandes, sur tous les articles, promotions comprises. Il n'expire pas. Il n'est ni remboursable ni échangeable contre de l'argent.",
+    "Your credit applies to your next orders, on every item, sales included. It never expires. It can't be refunded or exchanged for cash.");
+  const btn = L("Voir mon crédit", "View my credit");
+  const text = L("Bonjour", "Hi") + (first ? " " + first : "") + ",\n\n" + lead + "\n\n" +
+    L("Motif : ", "Reason: ") + reason + "\n" + (o.note ? L("Note : ", "Note: ") + o.note + "\n" : "") +
+    L("Reçu : ", "Receipt: ") + o.receipt + "\n" + L("Nouveau solde : ", "New balance: ") + bal + "\n\n" +
+    terms + "\n\n" + btn + " : " + portal + "\n\n" + L("L'équipe Création Audio", "The Création Audio team");
+  const html = M.page({ lang: en ? "en" : "fr", tag: L("Crédit boutique", "Store credit"), ref: o.receipt,
+    title: plus ? L("Crédit ajouté", "Credit added") : L("Crédit corrigé", "Credit corrected"), preheader: lead,
+    body: M.text(L("Bonjour", "Hi") + (first ? " " + esc(first) : "") + ",") + M.notice(esc(lead), plus ? "ok" : "info") +
+      M.kv([[L("Motif", "Reason"), esc(reason)], [L("Note", "Note"), o.note ? M.nl2br(o.note) : ""],
+        [L("Nouveau solde", "New balance"), "<strong>" + esc(bal) + "</strong>"]]) +
+      M.small(esc(terms)) + button(portal, btn) });
+  return { subject, text, html };
+}
+
 async function sendMail(to: string, mail: { subject: string; text: string; html: string }) {
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return false;
@@ -167,6 +200,21 @@ Deno.serve(async (req) => {
     const { data: d, error } = await user.from("dealers").select("email").eq("email", email).maybeSingle();
     if (error || !d) return json({ error: "forbidden" }, 403);
     const ok = await sendMail(email, welcomeMail("", "both"));
+    return ok ? json({ ok: true }) : json({ error: "mail" }, 502);
+  }
+
+  if (action === "credit") {
+    const id = String(body.id ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "bad_request" }, 400);
+    // RLS : dealer_credit et dealers lisibles par l'admin seulement -> ligne trouvée = appel de l'admin
+    const { data: r, error } = await user.from("dealer_credit").select("dealer_email, amount, kind, reason, note, receipt_no").eq("id", id).maybeSingle();
+    if (error || !r || (r.kind !== "grant" && r.kind !== "adjust")) return json({ error: "forbidden" }, 403);
+    const { data: d } = await user.from("dealers").select("name, lang").eq("email", r.dealer_email).maybeSingle();
+    const { data: all } = await user.from("dealer_credit").select("amount").eq("dealer_email", r.dealer_email);
+    const balance = Math.round((all || []).reduce((s: number, x: { amount: number }) => s + Number(x.amount || 0), 0) * 100) / 100;
+    await M.loadCompany(user);
+    const ok = await sendMail(r.dealer_email, creditMail({ name: String(d?.name || ""), amount: Number(r.amount), reason: String(r.reason || ""),
+      note: String(r.note || ""), receipt: String(r.receipt_no || ""), balance }, d?.lang === "en"));
     return ok ? json({ ok: true }) : json({ error: "mail" }, 502);
   }
 
