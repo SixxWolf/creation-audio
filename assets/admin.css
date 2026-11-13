@@ -615,6 +615,12 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
   -webkit-mask:var(--ic) center / contain no-repeat; mask:var(--ic) center / contain no-repeat; --ic:var(--ic-refresh); }
 .kind-pill.is-spool::before { --ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E"); }
 .cc-meta { display:block; font-size:.78rem; font-weight:500; color:var(--muted); }
+.cl-mg-h { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:10px 0 6px; }
+.cl-mg-cmp { display:flex; flex-direction:column; }
+.cl-mg-opt { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding:10px 14px; border:1px solid var(--line); border-radius:12px; margin-bottom:6px; cursor:pointer; }
+.cl-mg-opt:hover { background:var(--wash); }
+.cl-mg-opt input { width:auto; flex:none; }
+.cl-mg-opt .pm { color:var(--muted); }
 .cpt-invs-h { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
 .cpt-inv-list { display:flex; flex-direction:column; margin-top:6px; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
 .cpt-inv { display:flex; align-items:center; gap:12px; padding:10px 14px; font-size:.9rem; cursor:pointer; border-bottom:1px solid var(--line); }

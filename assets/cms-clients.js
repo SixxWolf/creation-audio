@@ -192,6 +192,7 @@ window.CA = window.CA || {};
   function renderError() { listEl.innerHTML = '<p class="empty">Impossible de charger les clients.<br>As-tu relancé <strong>schema-v2.sql</strong> dans Supabase ?</p>'; }
   function render() {
     moveEditorHome();
+    closeMerger();
     renderAccounts();
     var list = CA.clients.list || [];
     if (!list.length) {
@@ -206,10 +207,12 @@ window.CA = window.CA || {};
       return '<article class="mat-row person" data-id="' + esc(c.id) + '">' +
         CA.avatar(c.name) +
         '<div class="mat-main">' +
-          '<div class="mat-name">' + esc(c.name) + (accOf(c.id) ? '<span class="person-tag">Compte</span>' : '') + '</div>' +
+          '<div class="mat-name">' + esc(c.name) + (accOf(c.id) ? '<span class="person-tag">Compte</span>' : '') +
+          (dupsOf(c).length ? '<span class="person-tag">Doublon possible</span>' : '') + '</div>' +
           '<div class="person-meta">' + (meta || '<span class="pm pm-none">Aucune coordonnée</span>') + '</div>' +
         '</div>' +
         '<div class="mat-actions">' +
+          '<button class="btn ' + (dupsOf(c).length ? 'btn-accent' : 'btn-ghost') + ' btn-sm cl-merge" type="button">Fusionner</button>' +
           '<button class="btn btn-ghost btn-sm cl-edit" type="button">Modifier</button>' +
           '<button class="btn btn-ghost btn-sm cl-del" type="button">Suppr.</button>' +
         '</div>' +
@@ -219,7 +222,82 @@ window.CA = window.CA || {};
       var c = list.filter(function (x) { return String(x.id) === el.getAttribute('data-id'); })[0];
       $('.cl-edit', el).addEventListener('click', function () { openEditor(c, el); });
       $('.cl-del', el).addEventListener('click', function () { del(c); });
+      $('.cl-merge', el).addEventListener('click', function () { openMerger(c, el); });
     });
+  }
+
+  /* ---- doublons probables + fusion de deux fiches ----
+     Même nom (casse, accents, espaces ignorés) ou même téléphone. RPC admin_merge_clients :
+     la fiche gardée reçoit factures + compte en ligne + coordonnées manquantes ; l'autre est supprimée. */
+  function digits(s) { return String(s == null ? '' : s).replace(/\D/g, ''); }
+  function dupsOf(c) {
+    var n = nk(c.name), t = digits(c.phone);
+    return (CA.clients.list || []).filter(function (o) {
+      if (o.id === c.id) return false;
+      return (!!n && nk(o.name) === n) || (t.length >= 10 && digits(o.phone) === t);
+    });
+  }
+  function closeMerger() { $$('.cl-merger').forEach(function (f) { if (f.parentNode) f.parentNode.removeChild(f); }); }
+  function openMerger(c, rowEl) {
+    closeMerger();
+    var list = CA.clients.list || [], dupIds = {};
+    dupsOf(c).forEach(function (o) { dupIds[o.id] = true; });
+    var others = list.filter(function (o) { return o.id !== c.id; })
+      .sort(function (a, b) { return (dupIds[b.id] ? 1 : 0) - (dupIds[a.id] ? 1 : 0); });
+    if (!others.length) { caDialog.error('Aucune autre fiche à fusionner.'); return; }
+    var form = document.createElement('form');
+    form.className = 'editor is-inline cl-merger';
+    form.innerHTML = '<h2>Fusionner « ' + esc(c.name) + ' » avec</h2>' +
+      '<div class="field"><label class="lbl" for="cl-mg-other">Autre fiche</label><select id="cl-mg-other">' +
+        others.map(function (o, i) { return '<option value="' + esc(o.id) + '"' + (i === 0 ? ' selected' : '') + '>' + esc(o.name) +
+          (o.email ? ' — ' + esc(o.email) : '') + '</option>'; }).join('') + '</select></div>' +
+      '<div class="cl-mg-cmp"></div>' +
+      '<div class="editor-actions">' +
+        '<button class="btn btn-accent" type="submit" data-ic="check">Fusionner</button>' +
+        '<button class="btn btn-ghost cl-mg-cancel" type="button">Annuler</button>' +
+        '<span class="status cl-mg-st"></span>' +
+      '</div>';
+    rowEl.insertAdjacentElement('afterend', form);
+    var sel = $('#cl-mg-other', form), cmp = $('.cl-mg-cmp', form), submit = $('button[type=submit]', form);
+    if (CA.pick) CA.pick(sel);
+    function other() { return clientOf(sel.value); }
+    function draw(invs) {
+      var o = other(); if (!o) return;
+      var both = !!accOf(c.id) && !!accOf(o.id);
+      var def = accOf(o.id) && !accOf(c.id) ? o : c;   // par défaut : celle qui a le compte en ligne
+      cmp.innerHTML = '<div class="cl-mg-h">Fiche à garder</div>' + [c, o].map(function (x) {
+        var n = invs.filter(function (i) { return String(i.client_id) === String(x.id); }).length;
+        return '<label class="cl-mg-opt"><input type="radio" name="cl-mg-keep" value="' + esc(x.id) + '"' + (x === def ? ' checked' : '') + '>' +
+          '<b>' + esc(x.name) + '</b>' +
+          '<span class="pm">' + n + ' facture' + (n > 1 ? 's' : '') + '</span>' +
+          (accOf(x.id) ? '<span class="person-tag">Compte</span>' : '') +
+          (x.email ? '<span class="pm pm-mail">' + esc(x.email) + '</span>' : '') +
+          (x.phone ? '<span class="pm pm-tel">' + esc(x.phone) + '</span>' : '') + '</label>';
+      }).join('') + (both ? '<p class="muted">Les deux ont un compte en ligne : délie-en un d\'abord.</p>' : '');
+      submit.disabled = both;
+    }
+    function fill() { loadClientInvoices().then(draw, function () { draw([]); }); }
+    sel.addEventListener('change', fill);
+    fill();
+    $('.cl-mg-cancel', form).addEventListener('click', closeMerger);
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var o = other(), keepId = ($('input[name=cl-mg-keep]:checked', form) || {}).value;
+      if (!o || !keepId) return;
+      var keep = clientOf(keepId), drop = keep === c ? o : c;
+      caDialog.confirm({ title: 'Fusionner ces deux fiches ?',
+        message: '« ' + drop.name + ' » sera supprimée. Ses factures et son compte en ligne passent à « ' + keep.name + ' ». Impossible à annuler.',
+        ok: 'Fusionner', danger: true, icon: 'link' }).then(function (ok) {
+        if (!ok) return;
+        var st = $('.cl-mg-st', form); submit.disabled = true; st.textContent = 'Fusion…';
+        sb.rpc('admin_merge_clients', { p_keep: keep.id, p_drop: drop.id }).then(function (res) {
+          if (res.error) { submit.disabled = false; st.textContent = ''; caDialog.error(res.error); return; }
+          clientInvs = null;
+          reloadAll().then(function () { focusRow(keep.id, true); });
+        }, function (err) { submit.disabled = false; st.textContent = ''; caDialog.error(err); });
+      });
+    });
+    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   /* =========================================================

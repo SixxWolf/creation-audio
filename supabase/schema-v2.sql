@@ -5251,3 +5251,40 @@ begin
 end $$;
 revoke all on function public.waitlist_topic_subscribe(text, text, text, text) from public;
 grant execute on function public.waitlist_topic_subscribe(text, text, text, text) to anon, authenticated;
+
+-- ---- Fusion de deux fiches clients (admin) ----
+-- p_keep reçoit tout : factures, compte en ligne relié, coordonnées manquantes. p_drop est supprimée.
+-- p_fields (facultatif) = coordonnées choisies à la main {name,email,phone,address,city}.
+-- Refusé si les deux fiches ont chacune un compte en ligne (un compte = une fiche).
+create or replace function public.admin_merge_clients(p_keep uuid, p_drop uuid, p_fields jsonb default '{}'::jsonb)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare k public.clients; d public.clients; v_name text; v_n int;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  if p_keep is null or p_drop is null or p_keep = p_drop then raise exception 'Choisis deux fiches différentes.'; end if;
+  select * into k from public.clients where id = p_keep for update;
+  select * into d from public.clients where id = p_drop for update;
+  if k.id is null or d.id is null then raise exception 'Fiche introuvable.'; end if;
+  if exists (select 1 from public.customers where client_id = k.id)
+     and exists (select 1 from public.customers where client_id = d.id) then
+    raise exception 'Les deux fiches ont chacune un compte en ligne : délie-en un d''abord.';
+  end if;
+  p_fields := coalesce(p_fields, '{}'::jsonb);
+  v_name := coalesce(nullif(btrim(p_fields->>'name'), ''), k.name);
+  -- le compte en ligne de la fiche supprimée passe à la fiche gardée
+  update public.customers set client_id = k.id where client_id = d.id;
+  update public.invoices set client_id = k.id, client_name = v_name where client_id in (k.id, d.id);
+  get diagnostics v_n = row_count;
+  delete from public.clients where id = d.id;   -- libère son courriel (index unique) avant la mise à jour
+  update public.clients set
+    name    = v_name,
+    email   = case when p_fields ? 'email'   then nullif(btrim(p_fields->>'email'), '')   else coalesce(nullif(k.email, ''), d.email) end,
+    phone   = case when p_fields ? 'phone'   then nullif(btrim(p_fields->>'phone'), '')   else coalesce(nullif(k.phone, ''), d.phone) end,
+    address = case when p_fields ? 'address' then nullif(btrim(p_fields->>'address'), '') else coalesce(nullif(k.address, ''), d.address) end,
+    city    = case when p_fields ? 'city'    then nullif(btrim(p_fields->>'city'), '')    else coalesce(nullif(k.city, ''), d.city) end,
+    updated_at = now()
+   where id = k.id;
+  return jsonb_build_object('ok', true, 'client_id', k.id, 'invoices', v_n);
+end $$;
+revoke all on function public.admin_merge_clients(uuid, uuid, jsonb) from public, anon;
+grant execute on function public.admin_merge_clients(uuid, uuid, jsonb) to authenticated;
