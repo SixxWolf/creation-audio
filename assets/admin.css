@@ -1168,7 +1168,9 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .rv-grp-prog.is-done { color:var(--ember-ink); }
 @media screen and (min-width:1600px) {
   /* Réception : commandes en route (collées à gauche) | pointage, ou l'historique si rien n'est en cours */
-  #inv-sub-reception:not([hidden]) { display:grid; grid-template-columns:340px minmax(0, 1fr); gap:20px; align-items:start; }
+  #inv-sub-reception:not([hidden]) { display:grid; grid-template-columns:minmax(440px, 36%) minmax(0, 1fr); gap:20px; align-items:start; }
+  #rv-pick .po-toggle { flex:1 1 240px; }   /* numéro lisible ; les boutons passent dessous si trop étroit */
+  .rv-hist { max-width:820px; }
   #inv-sub-reception > .rv-pick { position:sticky; top:calc(var(--top-h, 60px) + 16px); max-height:calc(100vh - var(--top-h, 60px) - 32px);
     margin:0; overflow-y:auto; scrollbar-width:thin; }
   .tabpanel.is-wide #rv-pick[hidden] { display:block !important; }   /* reste visible pendant un pointage (bat [hidden] !important de tokens.css) */
