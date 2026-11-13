@@ -553,7 +553,7 @@
   //         goal, type: auto|sealed|slot|round, max: { w, h, d }, vehicle, fc, t, layers, side, brace }
   function propose(inp) {
     var ts = inp.ts, rec = inp.rec || {}, n = inp.n || 1, G = GOALS[inp.goal] || GOALS.daily;
-    var why = [], watts = inp.watts || (ts.rms || 500) * n;
+    var why = [], watts = inp.watts || (ts.rms || 500) * n, mk = (rec.brand || 'Le fabricant').replace(/ Audio$/, '');
     var fc = inp.vehicle === 'custom' ? (inp.fc || 0) : ((VEHICLES.filter(function (v) { return v.id === inp.vehicle; })[0] || {}).fc || 0);
     var sealedRec = parseVol(rec.recSealed), portedRec = parseVol(rec.recPorted);
     var sealedNo = rec.recSealed != null && /not/i.test(rec.recSealed);
@@ -564,7 +564,7 @@
       else if (sealedNo) type = 'slot';
       else if (inp.goal === 'sq' && ts.ebp && ts.ebp < 70) type = 'sealed';
       else type = 'slot';
-      why.push(type === 'sealed' ? (portedNo ? 'Sundown ne recommande pas d\'évent' : 'EBP ' + Math.round(ts.ebp) + ' : bon candidat scellé') : (sealedNo ? 'Scellée non recommandée par le fabricant' : 'Évent fente : le plus efficace en auto'));
+      why.push(type === 'sealed' ? (portedNo ? mk + ' ne recommande pas d\'évent' : 'EBP ' + Math.round(ts.ebp) + ' : bon candidat scellé') : (sealedNo ? 'Scellée non recommandée par le fabricant' : 'Évent fente : le plus efficace en auto'));
     }
     var t = inp.t || 0.75 * IN, layers = inp.layers || 1, max = inp.max || {};
     var od = ts.od || (ts.cutout || 0.28) * 1.1, depth = ts.depth || 0.15;
@@ -575,10 +575,10 @@
     if (type === 'sealed') {
       var vPhys = ts.Qts < G.qtc ? ts.Vas / (Math.pow(G.qtc / ts.Qts, 2) - 1) : null;
       vRef = sealedRec ? sealedRec * FT3 * G.sealed : (vPhys || 1 * FT3);
-      if (sealedRec) why.push('Sundown : ' + fr(sealedRec) + ' ft³ scellée');
+      if (sealedRec) why.push(mk + ' : ' + fr(sealedRec) + ' ft³ scellée');
     } else {
       vRef = portedRec ? portedRec * FT3 : 15 * ts.Vas * Math.pow(ts.Qts, 2.87);
-      if (portedRec) why.push('Sundown : ' + fr(portedRec) + ' ft³ à ' + (rec.recTune || 35) + ' Hz');
+      if (portedRec) why.push(mk + ' : ' + fr(portedRec) + ' ft³ à ' + (rec.recTune || 35) + ' Hz');
     }
     vRef *= n;
 

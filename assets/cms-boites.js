@@ -467,6 +467,7 @@
     if (tsc.missing.length) items.push('<li class="is-bad">Manque : ' + esc(tsc.missing.join(', ')) + '</li>');
     tsc.notes.forEach(function (n) { items.push('<li>' + esc(n.t) + '</li>'); });
     (r.fix || []).forEach(function (t) { items.push('<li>Corrigé : ' + esc(t) + '</li>'); });
+    (r.est || []).forEach(function (t) { items.push('<li>Estimé : ' + esc(t) + '</li>'); });
     el.tsNotes.innerHTML = items.join('');
     el.tsN.textContent = tsc.missing.length ? 'incomplets' : '';
     if (tsc.missing.length) el.tsBox.open = true;
