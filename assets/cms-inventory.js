@@ -680,6 +680,47 @@
     }, 40);
   });
 
+  // Scanner toujours à l'écoute : une touche imprimable tapée ailleurs que dans un champ de saisie
+  // (bouton, menu, fond de page, ligne du tableau) redonne d'abord le focus à la case de scan,
+  // de sorte que le code scanné y arrive en entier.
+  document.addEventListener('keydown', function (e) {
+    if (!scanActive || !scanInput || e.defaultPrevented) return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || e.key === ' ') return;
+    if (!scanStation || !scanStation.offsetParent) return;           // onglet Réception pas affiché
+    var t = e.target;
+    if (t === scanInput) return;
+    if (t && (t.isContentEditable || (t.closest && t.closest('textarea, select')) ||
+        (t.tagName === 'INPUT' && !/^(button|checkbox|radio|submit|reset|file|color|range)$/i.test(t.type)))) return;
+    if (document.querySelector('dialog[open], .ca-dlg')) return;   // fenêtre caDialog ouverte
+    focusScan();
+  }, true);
+
+  /* ---- bips : OK (aigu, court) / erreur (grave, rugueux, double) ---- */
+  var audioCtx = null;
+  function getAudio() {
+    try {
+      if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) audioCtx = new AC(); }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    } catch (e) {}
+    return audioCtx;
+  }
+  ['click', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { if (scanActive) getAudio(); }, true); });
+  function tone(freq, start, dur, type, vol) {
+    var ac = getAudio(); if (!ac) return;
+    try {
+      var o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime + start;
+      o.type = type; o.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+      g.gain.setValueAtTime(vol, t0 + dur - 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(ac.destination);
+      o.start(t0); o.stop(t0 + dur + 0.02);
+    } catch (e) {}
+  }
+  function beepOk() { tone(1320, 0, 0.09, 'sine', 0.35); tone(1760, 0.09, 0.09, 'sine', 0.35); }
+  function beepBad() { tone(180, 0, 0.22, 'sawtooth', 0.4); tone(140, 0.26, 0.38, 'sawtooth', 0.4); }
+
   // Entrée = fin d'un code scanné.
   if (scanInput) scanInput.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' && e.key !== 'Tab') return;
@@ -734,9 +775,9 @@
     var name = scanLabel(f, kind);
     // réception groupée : on dit à quelle commande l'article est allé
     if (orders.length > 1) { var og = orderOfRow(line); if (og) name += ' → ' + (og.order_number || 'Sans n°'); }
-    if (line.expected === 0) feedback('⚠ ' + prefix + 'Pas dans la commande : ' + name, 'warn');
-    else if (line.expected > 0 && line.qty > line.expected) feedback('⚠ ' + prefix + name + ' : ' + (line.qty - line.expected) + ' de trop', 'warn');
-    else feedback('✓ ' + prefix + name + (line.expected > 0 ? '  (' + line.qty + ' / ' + line.expected + ')' : '  (×' + line.qty + ')'), 'ok');
+    if (line.expected === 0) { beepBad(); feedback('⚠ ' + prefix + 'Pas dans la commande : ' + name, 'warn'); }
+    else if (line.expected > 0 && line.qty > line.expected) { beepBad(); feedback('⚠ ' + prefix + name + ' : ' + (line.qty - line.expected) + ' de trop', 'warn'); }
+    else beepOk(), feedback('✓ ' + prefix + name + (line.expected > 0 ? '  (' + line.qty + ' / ' + line.expected + ')' : '  (×' + line.qty + ')'), 'ok');
   }
 
   // compteur : « reçus / attendus » + barre pour une commande, sinon le nombre d'articles
@@ -773,6 +814,7 @@
     var pk = window.CA.pick ? window.CA.pick(scanLearnFil) : null;
     scanLearnKind.value = 'spool'; scanLearnKind.hidden = false;
     scanLearn.hidden = false;
+    beepBad();
     feedback('⚠ Code-barres inconnu — associe-le ci-dessous.', 'warn');
     try { if (pk) pk.focus(); else scanLearnFil.focus(); } catch (e) {}
   }
@@ -806,7 +848,7 @@
     } })
       .then(function (res) {
         scanLearnSave.disabled = false;
-        if (res.error || !res.data || !res.data.length) { feedback('Échec de l\'association (permissions ?).', 'bad'); return; }
+        if (res.error || !res.data || !res.data.length) { beepBad(); feedback('Échec de l\'association (permissions ?).', 'bad'); return; }
         f.attrs = res.data[0].attrs || f.attrs;   // maj en mémoire -> reconnu immédiatement ensuite
         closeLearn();
         scanNote(addScanUnit(f, kind), f, kind, 'Associé · ');
@@ -816,6 +858,7 @@
         focusScan();
       }, function (err) {
         scanLearnSave.disabled = false;
+        beepBad();
         feedback('Erreur : ' + (err && err.message ? err.message : err), 'bad');
       });
   });
