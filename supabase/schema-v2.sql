@@ -4660,6 +4660,20 @@ update public.products p
  where p.type = 'spacer' and jsonb_typeof(p.tiers) = 'array'
    and exists (select 1 from jsonb_array_elements(p.tiers) t where (t ->> 'min')::int = 18);
 
+-- 2026-11-13 : rabais 15/25/30 → 10/20/30 (6 → 10 %, 12 → 20 %) ; Toyota/Ford-002 (10/20/25) inchangés.
+update public.products p
+   set tiers = (select jsonb_agg(case
+                  when (t ->> 'min')::int = 6  and (t ->> 'pct')::numeric = 15
+                    then t || jsonb_build_object('pct', 10, 'price', round(p.dealer_price * 0.90, 2))
+                  when (t ->> 'min')::int = 12 and (t ->> 'pct')::numeric = 25
+                    then t || jsonb_build_object('pct', 20, 'price', round(p.dealer_price * 0.80, 2))
+                  else t end order by (t ->> 'min')::int)
+                  from jsonb_array_elements(p.tiers) t)
+ where p.type = 'spacer' and jsonb_typeof(p.tiers) = 'array' and p.dealer_price > 0
+   and exists (select 1 from jsonb_array_elements(p.tiers) t
+                where ((t ->> 'min')::int = 6 and (t ->> 'pct')::numeric = 15)
+                   or ((t ->> 'min')::int = 12 and (t ->> 'pct')::numeric = 25));
+
 -- ------------------------------------------------------------
 -- DEMANDES DE SERVICE (Impression 3D, Entretien) — 2026-11-06
 -- Une demande n'est ni un message ni une commande d'articles : fiche numérotée D-0001,
