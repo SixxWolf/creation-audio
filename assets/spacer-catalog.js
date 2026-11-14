@@ -38,6 +38,66 @@
   function spPct(p) { return spPromo(p) ? PR.pct(p.reg_price, p.sell_price) : 0; }
   var tr = CA0.tr || function (r, f) { return (r.attrs || {})[f] || ''; };
   var trs = CA0.trs || function (r, s) { return s; };
+
+  /* ---------- « En production » en direct (2026-11-14) ----------
+     RPC production_live (anon) : spacers qu'une imprimante de l'atelier imprime en ce moment
+     + heure prévue (null = en pause). Relu chaque minute ; badge posé sur chaque carte
+     (.sp-card[data-id]) et sur la fiche (.pdp[data-id]), reposé après chaque rendu.
+     Coupé dans l'admin (Production › Badge public) : la RPC ne renvoie alors rien. */
+  var LIVE = {}, liveOn = false;
+  function liveWhen(eta) {
+    var d = eta ? new Date(eta) : null;
+    if (!d || isNaN(d.getTime())) return '';
+    var now = new Date();
+    if (d - now < 45 * 60000) return _t('presque prêt');
+    var r = new Date(d.getTime() + 30 * 60000); r.setMinutes(0, 0, 0);   // heure la plus proche
+    var day = Math.round((new Date(r.getFullYear(), r.getMonth(), r.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
+    var h = EN ? r.toLocaleTimeString('en-US', { hour: 'numeric' }) : r.getHours() + ' h';
+    if (day <= 0) return _t('prêt vers {h}', { h: h });
+    if (day === 1) return _t('demain vers {h}', { h: h });
+    return _t('{d} vers {h}', { d: r.toLocaleDateString(EN ? 'en-US' : 'fr-CA', { weekday: 'long' }), h: h });
+  }
+  function liveHtml(id) {
+    if (!Object.prototype.hasOwnProperty.call(LIVE, id)) return '';
+    var w = liveWhen(LIVE[id]);
+    return '<p class="sp-live" data-live="' + esc(id) + '"><i aria-hidden="true"></i><b>' + esc(_t('En production')) + '</b>' +
+      (w ? '<span>' + esc(w) + '</span>' : '') + '</p>';
+  }
+  function paintLive() {
+    $$('.sp-card[data-id], .pdp[data-id]').forEach(function (box) {
+      var id = box.getAttribute('data-id'), cur = box.querySelector('.sp-live'), html = liveHtml(id);
+      if (!html) { if (cur) cur.parentNode.removeChild(cur); return; }
+      if (cur && cur.outerHTML === html) return;
+      if (cur) { cur.outerHTML = html; return; }
+      var pdp = box.classList.contains('pdp');
+      var at = pdp ? box.querySelector('.pdp-priceline') : box.querySelector('.sp-body h3');
+      if (at) at.insertAdjacentHTML(pdp ? 'afterend' : 'beforebegin', html);
+    });
+  }
+  function pollLive() {
+    var c = window.CA_SUPABASE;
+    if (!c || document.hidden) return;
+    fetch(c.url + '/rest/v1/rpc/production_live', {
+      method: 'POST', body: '{}',
+      headers: { apikey: c.anonKey, Authorization: 'Bearer ' + c.anonKey, 'Content-Type': 'application/json' }
+    }).then(function (res) { return res.ok ? res.json() : null; }).then(function (rows) {
+      if (!Array.isArray(rows)) return;
+      LIVE = {}; rows.forEach(function (x) { if (x && x.spacer_id) LIVE[x.spacer_id] = x.eta || null; });
+      paintLive();
+    }, function () {});
+  }
+  function startLive() {
+    if (liveOn || typeof fetch !== 'function' || typeof MutationObserver !== 'function' || !document.body) return;
+    liveOn = true;
+    pollLive();
+    setInterval(pollLive, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) pollLive(); });
+    var queued = false;   // les grilles se refont (filtres, recherche) : badge reposé au prochain cadre
+    new MutationObserver(function () {
+      if (queued || !Object.keys(LIVE).length) return;
+      queued = true; requestAnimationFrame(function () { queued = false; paintLive(); });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
   function plural(n, one, many) { return n + ' ' + _t((EN ? n !== 1 : n > 1) ? many : one); }
   function norm(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
   function slugify(s) {
@@ -183,6 +243,7 @@
     var q = '', size = 'all', catScrollY = 0, screen = null, shellBuilt = false, firstShow = true;
     var curP = null, curQty = 1, curImg = 0, curImgs = [], fitOpen = false;
     var rootHref = o.rootHref || '#/';
+    if (!o.staticRender) startLive();   // badge « En production » (imprimantes de l'atelier)
 
     function publicUrl(path) {
       if (!path || !sb) return '';
@@ -674,7 +735,7 @@
       var desc = String(tr(p, 'description') || '');
       return _t('<nav class="crumbs" aria-label="Fil d\'Ariane"><a href="') + esc(rootHref) + '">' + esc(o.rootLabel || _t('Spacers')) + '</a>' + IC.chev +
           '<span aria-current="page">' + esc(p.name) + '</span></nav>' +
-        '<div class="pdp">' +
+        '<div class="pdp" data-id="' + esc(p.id) + '">' +
           '<div class="pdp-media">' + mediaHtml() + '</div>' +
           '<div class="pdp-panel">' +
             _t('<p class="pdp-eyebrow">Spacer') + (sz ? ' · ' + esc(sz) : '') + _t(' · vendu par paire</p>') +

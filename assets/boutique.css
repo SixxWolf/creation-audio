@@ -903,3 +903,16 @@ body.cart-lock { overflow:hidden; }
 @media (max-width:560px) {
   .mcard-brand { top:8px; right:8px; width:66px; height:22px; border-radius:6px; }
 }
+
+/* ---------- « En production » en direct (spacer-catalog.js, RPC production_live) ---------- */
+.sp-live { display:inline-flex; align-items:center; flex-wrap:wrap; gap:4px 8px; align-self:flex-start; margin:0; padding:5px 11px 5px 9px;
+  border-radius:100px; font-size:.76rem; line-height:1.2; color:var(--ink-2); background:color-mix(in srgb, #e11d2e 9%, var(--paper, #fff));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, #e11d2e 24%, transparent); }
+.sp-live i { position:relative; width:8px; height:8px; flex:none; border-radius:50%; background:#e11d2e; }
+.sp-live i::after { content:''; position:absolute; inset:0; border-radius:50%; background:#e11d2e; animation:liveRing 1.6s ease-out infinite; }
+.sp-live b { font-weight:800; font-size:.7rem; letter-spacing:.08em; text-transform:uppercase; color:#c01826; }
+.sp-live span { font-weight:600; }
+.pdp .sp-live { margin-top:14px; font-size:.86rem; padding:7px 14px 7px 11px; }
+.pdp .sp-live b { font-size:.76rem; }
+@keyframes liveRing { 0% { transform:scale(1); opacity:.7; } 100% { transform:scale(2.8); opacity:0; } }
+@media (prefers-reduced-motion:reduce) { .sp-live i::after { animation:none; opacity:0; } }

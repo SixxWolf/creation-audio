@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const mqtt = require('mqtt');
+const { findJob } = require('./job');
 
 const CONFIG = process.env.RELAY_CONFIG ||
   path.join(os.homedir(), 'Documents', 'Création Audio - Imprimantes', 'config.json');
@@ -19,6 +20,7 @@ const rnd = (v) => (num(v) === null ? null : Math.round(v));
 
 const printers = cfg.printers.map((p) => ({
   ...p, raw: {}, lastMsg: 0, connected: false, sentKey: '', sentAt: 0, client: null,
+  job: null, jobKey: '', jobTry: 0, jobBusy: false,
 }));
 
 function connect(p) {
@@ -46,10 +48,31 @@ function connect(p) {
   setInterval(() => c.connected && ask(), 60000); // état complet de temps en temps
 }
 
+// Batch en cours : fichier lu une fois par tâche (job.js) ; nouvel essai aux 2 min tant qu'il est introuvable
+const JOB_RETRY = 120000;
+function trackJob(p) {
+  const r = p.raw, task = r.subtask_name || '';
+  const key = (r.task_id || '') + '|' + task;
+  if (!task || !['RUNNING', 'PREPARE', 'PAUSE', 'FINISH', 'FAILED'].includes(r.gcode_state)) return;
+  const ended = r.gcode_state === 'FINISH' || r.gcode_state === 'FAILED';   // fini : un seul essai
+  if (p.jobKey === key && (p.job || p.jobBusy || ended || Date.now() - p.jobTry < JOB_RETRY)) return;
+  if (p.jobKey !== key) { p.jobKey = key; p.job = null; }
+  p.jobBusy = true; p.jobTry = Date.now();
+  const plate = +(/plate_(\d+)/.exec(r.gcode_file || '') || [])[1] || 1;
+  findJob(p, task, plate, cfg.jobDirs).then((j) => {
+    if (p.jobKey !== key) return;
+    p.job = j;
+    log(p.name, j ? `batch lu (${j.src}) : ${j.loops} loops, ${j.minutes} min` : 'batch introuvable : ' + task);
+  }, (e) => log(p.name, 'lecture du batch', e.message)).finally(() => { p.jobBusy = false; });
+}
+
 function status(p) {
   const r = p.raw;
   const online = p.connected && Date.now() - p.lastMsg < STALE;
+  trackJob(p);
   return {
+    task: r.task_id || null,
+    job: p.job || null,
     online,
     state: r.gcode_state || null,                       // IDLE | PREPARE | RUNNING | PAUSE | FINISH | FAILED
     file: r.subtask_name || r.gcode_file || null,

@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=165">
+<link rel="stylesheet" href="assets/admin.css?v=167">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
@@ -1022,11 +1022,27 @@
       <div class="panel-head">
         <div>
           <h1>Production</h1>
-          <p class="muted">Envoie le batch depuis AutoLoop : le stock et le coût des spacers suivent. Le filament se retire en Facturation › Interne › Production.</p>
+          <p class="fm-summary" id="pr-summary"></p>
         </div>
+        <span class="grow"></span>
+        <label class="pr-pub" title="Badge « En production » sur Spacers et le portail revendeur"><input type="checkbox" id="pr-public" checked> <span>Badge public</span></label>
+        <button class="btn btn-ghost btn-sm" id="pr-farm-refresh" type="button" data-ic="refresh">Actualiser</button>
       </div>
 
-      <div class="al-cols pr-cols">
+      <div class="pf-grid" id="pr-farm"><p class="muted fm-empty">Chargement…</p></div>
+
+      <div class="al-card pr-todo">
+        <div class="al-card-head">À enregistrer <span class="al-note" id="pr-queue-n"></span></div>
+        <div class="pr-queue" id="pr-queue" hidden></div>
+        <p class="muted pr-empty" id="pr-queue-empty">Les batchs finis arrivent ici tout seuls.</p>
+        <div class="al-drop pr-drop-sm" id="pr-drop" role="button" tabindex="0">
+          <p class="al-drop-t">Ajouter un batch à la main (<b>.gcode.3mf</b> ou <b>.gcode</b>)</p>
+        </div>
+        <input type="file" id="pr-file" accept=".3mf,.gcode,.txt,.g,text/plain" multiple hidden>
+        <p class="al-caution" id="pr-file-warn" role="status" hidden></p>
+      </div>
+
+      <div class="al-cols pr-cols" id="pr-form" hidden>
         <div class="al-main">
           <div class="al-card">
             <div class="al-card-head"><span class="al-ic al-step">1</span> En impression <span class="al-note" id="pr-queue-n"></span></div>
@@ -1041,7 +1057,7 @@
           </div>
 
           <div class="al-card">
-            <div class="al-card-head"><span class="al-ic al-step">2</span> Production</div>
+            <div class="al-card-head">Valider <span class="al-note pr-form-src" id="pr-form-src"></span><span class="grow"></span><button class="pr-q-x" id="pr-form-close" type="button" title="Fermer" aria-label="Fermer">✕</button></div>
             <div class="grid pr-grid">
               <div class="field col-2">
                 <label class="lbl" id="pr-spacer-l">Spacer</label>
@@ -1084,7 +1100,7 @@
             <div class="al-run">
               <button class="btn btn-accent" id="pr-save" type="button" disabled data-ic="check">Enregistrer la production</button>
             </div>
-            <div id="pr-report"><p class="muted">Glisse un G-code pour commencer.</p></div>
+            <div id="pr-report"></div>
             <p class="status" id="pr-status" aria-live="polite"></p>
           </div>
         </aside>
@@ -3100,7 +3116,7 @@
 <script src="assets/box-engine.js?v=16"></script>
 <script src="assets/box-subs.js?v=4"></script>
 <script src="assets/cms-boites.js?v=23"></script>
-<script src="assets/cms-production.js?v=13"></script>
+<script src="assets/cms-production.js?v=14"></script>
 <script src="assets/cms-imprimantes.js?v=8"></script>
 <script src="assets/cms-entretien.js?v=9"></script>
 <script src="assets/cms-aujourdhui.js?v=2"></script>

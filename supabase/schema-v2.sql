@@ -4190,24 +4190,140 @@ revoke all on public.printer_tokens from anon, authenticated;
 create or replace function public.printer_push(p_token text, p_rows jsonb)
 returns int
 language plpgsql security definer set search_path = public as $$
-declare r jsonb; n int := 0;
+declare r jsonb; s jsonb; j jsonb; n int := 0; v_old text; v_had boolean; v_key text;
+        v_sp record; v_loops int; v_plan int; v_per int; v_min int; v_layers numeric;
 begin
   if not exists (select 1 from public.printer_tokens
                  where hash = encode(sha256(convert_to(coalesce(p_token, ''), 'utf8')), 'hex')) then
     raise exception 'jeton invalide' using errcode = '42501';
   end if;
   for r in select * from jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) loop
+    s := coalesce(r->'status', '{}'::jsonb);
+    v_old := null; v_had := false;
+    select last_logged, true into v_old, v_had from public.printers where id = r->>'id';
     insert into public.printers (id, name, model, serial, cam_src, sort, status, seen_at)
     values (r->>'id', coalesce(r->>'name', r->>'id'), coalesce(r->>'model', 'P2S'), r->>'serial', r->>'cam',
-            coalesce((r->>'sort')::int, 0), coalesce(r->'status', '{}'::jsonb), now())
+            coalesce((r->>'sort')::int, 0), s, now())
     on conflict (id) do update
       set status = excluded.status, seen_at = now(), serial = excluded.serial, cam_src = excluded.cam_src;
     n := n + 1;
+
+    -- fin d'un batch (voir PRODUCTION ↔ IMPRIMANTES plus bas) : notée une seule fois par tâche
+    -- (l'imprimante reste en FINISH tant que le plateau n'est pas vidé)
+    if s->>'state' in ('FINISH', 'FAILED') and coalesce(s->>'file', '') <> '' then
+      v_key := coalesce(s->>'task', '') || '|' || (s->>'file');
+      if v_old is distinct from v_key then
+        update public.printers set last_logged = v_key where id = r->>'id';
+        j := s->'job';
+        if v_had and jsonb_typeof(j) = 'object' and (j->>'loops') is not null then
+          select * into v_sp from private.prod_spacer_for(s->>'file');
+          v_plan := greatest(1, (j->>'loops')::int);
+          v_loops := v_plan;
+          if s->>'state' = 'FAILED' then   -- arrêté avant la fin : loops complétés d'après la couche
+            v_layers := nullif((s->>'layers')::numeric, 0);
+            v_loops := case when v_layers is null then 0
+                            else least(v_plan, floor(coalesce((s->>'layer')::numeric, 0) / (v_layers / v_plan))::int) end;
+          end if;
+          if v_loops >= 1 and not (v_sp.mapped and v_sp.spacer_id is null)
+             and (v_sp.spacer_id is not null or coalesce((j->>'isAuto')::boolean, false)) then
+            v_per := null;
+            select pr.per_plate into v_per from public.productions pr
+             where pr.spacer_id = v_sp.spacer_id order by pr.created_at desc limit 1;
+            v_per := greatest(1, coalesce(v_per, nullif((j->>'objects')::int, 0), 1));
+            v_min := round(coalesce((j->>'minutes')::numeric, 0) * v_loops / v_plan);
+            -- le même batch envoyé à la main (AutoLoop › Envoyer à la production) : remplacé par celui de l'imprimante
+            delete from public.production_queue q
+             where q.id = (select q2.id from public.production_queue q2
+                            where q2.printer_id is null and public.prod_file_key(q2.file_name) = public.prod_file_key(s->>'file')
+                            order by q2.started_at limit 1);
+            insert into public.production_queue (file_name, spacer_id, loops, per_plate, pieces, minutes, info,
+                                                 printer_id, finished_at, started_at)
+            values (s->>'file', v_sp.spacer_id, v_loops, v_per, v_loops * v_per, v_min,
+                    j || jsonb_build_object('printer', coalesce(r->>'name', r->>'id'), 'state', s->>'state', 'planned', v_plan),
+                    r->>'id', now(), now());
+          end if;
+        end if;
+      end if;
+    end if;
   end loop;
   return n;
 end $$;
 revoke all on function public.printer_push(text, jsonb) from public;
 grant execute on function public.printer_push(text, jsonb) to anon, authenticated;
+
+-- ------------------------------------------------------------
+-- PRODUCTION ↔ IMPRIMANTES (2026-11-14) — Stock › Production lit la ferme en direct.
+-- Le relais lit le batch en cours (carte microSD par FTPS, sinon le .gcode.3mf dans Téléchargements) et pousse
+-- status.job = { isAuto, loops, minutes, objects, fils:[{type,hex,perLoop}], src } + status.task (n° de tâche Bambu).
+-- Fichier → spacer : production_files (mémorisé au 1er choix dans l'onglet ; spacer_id null = « hors production »),
+-- sinon devinette par nom/slug/pièce remplacée/ancien nom (même règle que detectSpacer de cms-production.js).
+-- Fin d'un batch (FINISH, ou FAILED après ≥ 1 loop) : printer_push (plus haut) crée UNE ligne production_queue
+-- « à enregistrer » (printers.last_logged = tâche déjà notée). Public : production_live() = spacers en impression
+-- + heure prévue (badge « En production » de spacer-catalog.js), coupé par admin_settings « production » { public:false }.
+-- ------------------------------------------------------------
+alter table public.printers add column if not exists last_logged text;
+alter table public.production_queue add column if not exists printer_id text;
+alter table public.production_queue add column if not exists finished_at timestamptz;
+
+create table if not exists public.production_files (
+  file_key   text primary key,
+  spacer_id  uuid references public.products(id) on delete cascade,
+  updated_at timestamptz not null default now()
+);
+alter table public.production_files enable row level security;
+drop policy if exists production_files_admin_all on public.production_files;
+create policy production_files_admin_all on public.production_files for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+revoke all on public.production_files from anon;
+
+-- « 6.5_20MM_1.0_3MF_AutoLoop_x20.gcode.3mf » -> « 6520mm103mf » : même clé pour x10, x20… (prodKey de cms-production.js)
+create or replace function public.prod_file_key(p text)
+returns text language sql immutable set search_path = '' as $$
+  select regexp_replace(regexp_replace(regexp_replace(lower(coalesce(p, '')),
+           '(\.gcode)?(\.3mf)?$', ''), '[ _-]*autoloop.*$', ''), '[^a-z0-9]', '', 'g')
+$$;
+
+-- spacer d'un fichier : production_files d'abord (spacer null = hors production), sinon le nom le plus long contenu dans le fichier
+create or replace function private.prod_spacer_for(p_file text, out spacer_id uuid, out mapped boolean)
+language plpgsql stable set search_path = '' as $$
+declare v_fn text := upper(regexp_replace(coalesce(p_file, ''), '[^A-Za-z0-9]', '', 'g'));
+begin
+  select f.spacer_id, true into spacer_id, mapped from public.production_files f where f.file_key = public.prod_file_key(p_file);
+  if found then return; end if;
+  mapped := false;
+  select p.id into spacer_id
+    from public.products p,
+         lateral unnest(array[p.name, p.slug]
+           || coalesce(array(select r->>'ref' from jsonb_array_elements(case when jsonb_typeof(p.attrs->'replaces') = 'array' then p.attrs->'replaces' else '[]'::jsonb end) r), '{}')
+           || coalesce(array(select a from jsonb_array_elements_text(case when jsonb_typeof(p.attrs->'aliases') = 'array' then p.attrs->'aliases' else '[]'::jsonb end) a), '{}')) c(x),
+         lateral (select upper(regexp_replace(coalesce(c.x, ''), '[^A-Za-z0-9]', '', 'g')) as n) k
+   where p.type = 'spacer' and length(k.n) >= 4 and position(k.n in v_fn) > 0
+   order by length(k.n) desc limit 1;
+end $$;
+revoke all on function private.prod_spacer_for(text) from public, anon, authenticated;
+
+-- public : spacers en impression en ce moment + heure prévue (null = en pause) ; jamais l'imprimante ni la quantité
+create or replace function public.production_live()
+returns table (spacer_id uuid, eta timestamptz)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if coalesce((select (s.value->>'public')::boolean from public.admin_settings s where s.key = 'production'), true) = false then
+    return;
+  end if;
+  return query
+    select x.sp, min(x.eta)
+      from (select (private.prod_spacer_for(p.status->>'file')).spacer_id as sp,
+                   case when p.status->>'state' = 'PAUSE' or coalesce(p.status->>'left', '') = '' then null
+                        else p.seen_at + make_interval(mins => round((p.status->>'left')::numeric)::int) end as eta
+              from public.printers p
+             where p.seen_at > now() - interval '3 minutes'
+               and coalesce((p.status->>'online')::boolean, false)
+               and p.status->>'state' in ('RUNNING', 'PREPARE', 'PAUSE')) x
+      join public.products pr on pr.id = x.sp and pr.active
+     group by x.sp;
+end $$;
+revoke all on function public.production_live() from public;
+grant execute on function public.production_live() to anon, authenticated;
 
 -- ------------------------------------------------------------
 -- VISITES DU SITE (Statistiques › Visites) — compteurs agrégés, sans témoin, sans IP, sans identifiant

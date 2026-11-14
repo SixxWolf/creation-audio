@@ -2,7 +2,7 @@
    Création Audio V2 — Stock › Production (spacers imprimés)
    1) EN IMPRESSION → PRODUCTION : le batch sorti d'AutoLoop (.gcode.3mf ou .gcode)
       entre dans la file production_queue (AutoLoop › « Envoyer à la production »
-      ou glissé ici) ; « Terminé » le charge dans le formulaire.
+      ou glissé ici) ; « Valider » le charge dans le formulaire.
       Lu dans l'en-tête : loops (« ; === LOOP 1 OF N === »), durée du batch
       (« Durée estimée du batch », cooldown compris), grammes par filament
       (déjà × loops), type + couleur de chaque filament (pré-choix du filament).
@@ -167,7 +167,9 @@
     timeH: $('#pr-time-h'), timeM: $('#pr-time-m'), date: $('#pr-date'),
     uses: $('#pr-uses'), useAdd: $('#pr-use-add'),
     save: $('#pr-save'), report: $('#pr-report'), status: $('#pr-status'),
-    history: $('#pr-history'), refresh: $('#pr-refresh')
+    history: $('#pr-history'), refresh: $('#pr-refresh'),
+    farm: $('#pr-farm'), summary: $('#pr-summary'), pub: $('#pr-public'), farmRefresh: $('#pr-farm-refresh'),
+    form: $('#pr-form'), formSrc: $('#pr-form-src'), qEmpty: $('#pr-queue-empty')
   };
   if (!el.uses) return;
 
@@ -175,15 +177,15 @@
   var prevOnTab = window.CA.onTab;
   window.CA.onTab = function (name) {
     if (typeof prevOnTab === 'function') prevOnTab(name);
-    if (name !== 'production') return;
+    if (name !== 'production') { farmStop(); return; }
     if (!loaded) { loaded = true; el.date.value = todayISO(); }
-    loadAll();   // à chaque visite : une réception a pu changer les coûts moyens entre-temps
+    loadAll().then(farmStart);   // à chaque visite : une réception a pu changer les coûts moyens entre-temps
   };
 
   function loadAll() {
     return Promise.all([
       window.CA.loadMaterials ? window.CA.loadMaterials() : null,
-      loadSpacers(), loadFilaments(), loadProds(), loadRates(), loadBrandOrder(), loadQueue()
+      loadSpacers(), loadFilaments(), loadProds(), loadRates(), loadBrandOrder(), loadQueue(), loadFileMap(), loadPublic()
     ]).then(function () {
       sortAll();
       renderSpacerOptions(); renderRows(); recalc(); renderHistory(); renderQueue();
@@ -254,7 +256,7 @@
      2) EN IMPRESSION — file des batchs lancés : AutoLoop › « Envoyer à la
         production » (CA.prodQueue) ou glissés ici, plusieurs d'un coup.
         Seulement les infos de l'en-tête (aucun fichier stocké) ; progression
-        = temps écoulé depuis l'envoi / durée du batch. « Terminé » charge le
+        = temps écoulé depuis l'envoi / durée du batch. « Valider » charge le
         batch dans le formulaire ; l'enregistrement le retire de la file.
      ========================================================= */
   var queue = [];           // production_queue, plus ancien d'abord
@@ -346,10 +348,17 @@
     if (pct >= 1) return { pct: 1, txt: 'Fini', end: true };
     return { pct: pct, txt: Math.floor(pct * 100) + ' % · reste ' + fmtHm(Math.ceil((tot - done) / 60000)) };
   }
+  // batch fini noté par l'imprimante (printer_push) ou envoyé à la main (AutoLoop / glissé : progression au chrono)
+  function isEnded(j) { return !!j.printer_id || !!qProgress(j).end; }
+  function hm(iso) { try { return new Date(iso).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
   function queueItem(j) {
-    var sp = spacerById(j.spacer_id), fils = (j.info && j.info.fils) || [], pr = qProgress(j);
+    var info = j.info || {}, sp = spacerById(j.spacer_id), fils = info.fils || [];
+    var pr = j.printer_id
+      ? { pct: null, end: true, txt: info.state === 'FAILED' ? 'Arrêté · ' + j.loops + ' / ' + (info.planned || j.loops) + ' loops'
+                                   : 'Fini ' + shortDay(String(j.finished_at || '').slice(0, 10)) + ' à ' + hm(j.finished_at) }
+      : qProgress(j);
     var g = fils.reduce(function (s, f) { return s + (+f.perLoop || 0) * (j.loops || 1); }, 0);
-    var sub = [sp ? sp.name : 'Spacer à choisir', j.loops + ' loop' + (j.loops > 1 ? 's' : ''), grams(g)];
+    var sub = [sp ? sp.name : 'Spacer à choisir', (info.printer || 'À la main'), j.loops + ' loop' + (j.loops > 1 ? 's' : ''), grams(g)];
     var sw = fils.map(function (f) { return swatch(f.hex); }).join('');
     var on = String(fromQueue) === String(j.id);
     return '<div class="pr-q' + (pr.end ? ' is-end' : '') + (on ? ' is-on' : '') + '" data-id="' + esc(j.id) + '">' +
@@ -359,8 +368,8 @@
       '<div class="pr-q-bar"' + (pr.pct == null ? ' hidden' : '') + '><i style="width:' + ((pr.pct || 0) * 100).toFixed(1) + '%"></i></div>' +
       '<div class="pr-q-foot"><span class="pr-q-t">' + esc(pr.txt) + '</span><span class="grow"></span>' +
         (on ? '<span class="pr-q-on">Dans le formulaire</span>'
-            : (j.loops > 1 ? '<button class="btn btn-ghost btn-sm" type="button" data-act="stop">Arrêter à…</button>' : '') +
-              '<button class="btn btn-ghost btn-sm" type="button" data-act="done" data-ic="check">Terminé</button>') +
+            : (!j.printer_id && j.loops > 1 ? '<button class="btn btn-ghost btn-sm" type="button" data-act="stop">Arrêter à…</button>' : '') +
+              '<button class="btn ' + (pr.end ? 'btn-accent' : 'btn-ghost') + ' btn-sm" type="button" data-act="done" data-ic="check">Valider</button>') +
         '<button class="pr-q-x" type="button" data-act="del" title="Retirer de la file" aria-label="Retirer de la file">✕</button></div>' +
     '</div>';
   }
@@ -368,12 +377,13 @@
     el.qN.textContent = queue.length ? '(' + queue.length + ')' : '';
     el.queue.innerHTML = queue.map(queueItem).join('');
     el.queue.hidden = !queue.length;
+    if (el.qEmpty) el.qEmpty.hidden = !!queue.length;
     paintBadge();
   }
   // pastille de la barre latérale : impressions finies, pas encore enregistrées
   function paintBadge() {
     var navN = $('#nav-prod-n'); if (!navN) return;
-    var n = queue.filter(function (j) { return qProgress(j).end; }).length;
+    var n = queue.filter(isEnded).length;
     navN.textContent = n; navN.hidden = !n;
     var tab = navN.closest('.tab');
     if (tab) tab.setAttribute('aria-label', 'Production' + (n ? ' (' + n + (n > 1 ? ' finies' : ' finie') + ')' : ''));
@@ -404,12 +414,12 @@
       sb.from('production_queue').delete().eq('id', j.id).then(function (res) {
         if (res.error) { caDialog.error(res.error); return; }
         queue = queue.filter(function (x) { return x !== j; });
-        if (String(fromQueue) === String(j.id)) fromQueue = null;
+        if (String(fromQueue) === String(j.id)) { fromQueue = null; closeForm(); }
         renderQueue();
       });
     });
   });
-  // « Terminé » : le batch passe dans le formulaire (pièces bonnes, bobines) avant l'enregistrement
+  // « Valider » : le batch passe dans le formulaire (pièces bonnes, bobines) avant l'enregistrement
   // « Arrêter à… » : batch coupé avant la fin -> n loops faits, durée et grammes au prorata
   function stopJob(j) {
     var per = j.loops > 0 && j.minutes > 0 ? j.minutes / j.loops : 0;
@@ -427,11 +437,12 @@
     var info = j.info || {}, n = stopAt && stopAt < j.loops ? stopAt : j.loops;
     var per = j.loops > 0 && j.minutes > 0 ? j.minutes / j.loops : 0;
     fromQueue = j.id;
+    openForm(info.printer ? info.printer + ' · ' + j.file_name : j.file_name);
     useFile(j.file_name, { isAuto: info.isAuto !== false, loops: n, minutes: per ? Math.round(per * n) : j.minutes, perLoopMin: per, fils: info.fils || [] }, info.objects || 0);
     if (j.spacer_id && spacerById(j.spacer_id)) spacerPk.set(j.spacer_id);
     el.perPlate.value = Math.max(1, j.per_plate | 0);
     syncGood(); recalc(); renderQueue();   // pièces bonnes = loops × pièces par plateau
-    var form = el.spacer.closest('.al-card'); if (form && form.scrollIntoView) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el.form.scrollIntoView) el.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   // Nombre d'objets du plateau (slice_info.config) : pièces par plateau à défaut d'historique
   function countObjects(u8, plateN) {
@@ -705,7 +716,7 @@
     else if (r.unknown.length) problem = 'Aucun coût connu : ' + r.unknown.join(', ') + '.';
     el.save.disabled = !r.sp || !r.used.length || !!r.missing || !!r.unknown.length || saving;
     el.status.textContent = problem;
-    if (!file && !rows.length) { el.report.innerHTML = '<p class="muted">« Terminé » sur un batch en impression pour commencer.</p>'; return; }
+    if (!file && !rows.length) { el.report.innerHTML = '<p class="muted">« Valider » sur un batch à enregistrer pour commencer.</p>'; return; }
     var html = '';
     html += srow('Filament <em>' + grams(r.g) + '</em>', money(r.fil));
     html += srow('Électricité + usure <em>' + fmtHm(r.minutes) + ' × ' + money(r.rate) + '/h</em>', money(r.mach));
@@ -740,6 +751,7 @@
       if (res.error) { el.status.textContent = 'Erreur : ' + res.error.message; el.save.disabled = false; return; }
       var d = res.data || {};
       toast('Production enregistrée · ' + (d.pairs | 0) + ' paire' + ((d.pairs | 0) > 1 ? 's' : ''));
+      if (file && file.name && !hasMap(file.name)) saveMap(file.name, r.sp.id);   // la prochaine fois, ce fichier = ce spacer
       file = null; rows = []; edited = { good: false, perPlate: false };
       el.fileWarn.hidden = true;
       // batch confirmé : sort de la file « En impression »
@@ -748,7 +760,7 @@
         queue = queue.filter(function (x) { return String(x.id) !== String(qid); }); renderQueue();
         sb.from('production_queue').delete().eq('id', qid).then(function (r2) { if (r2.error) toast('File : ' + r2.error.message, 'bad'); });
       }
-      el.timeH.value = 0; el.timeM.value = 0; el.loops.value = 1; lastLoops = 1; perLoopMin = 0;
+      el.timeH.value = 0; el.timeM.value = 0; el.loops.value = 1; lastLoops = 1; perLoopMin = 0; closeForm();
       reloadAfterChange();
     }, function (err) { saving = false; el.save.disabled = false; el.status.textContent = 'Erreur : ' + errText(err); });
   });
@@ -756,6 +768,234 @@
   function reloadAfterChange() {
     loadAll().then(function () { if (window.CA.reloadSpacers) window.CA.reloadSpacers(); });
   }
+
+  /* =========================================================
+     IMPRIMANTES EN DIRECT — table printers (relais de l'atelier, tools/farm-relay) :
+     une carte par imprimante, mini caméra (PC de l'atelier seulement), spacer reconnu,
+     loop en cours, pièces faites. Fichier → spacer : production_files (choisi une fois
+     ici, null = hors production), sinon devinette par le nom (detectSpacer, même règle
+     que private.prod_spacer_for). La fin d'un batch crée la ligne « À enregistrer »
+     côté base (printer_push) : rien à faire ici.
+     ========================================================= */
+  var GO2RTC = 'http://127.0.0.1:1984', RELAY = 'http://127.0.0.1:1985';
+  var FARM_POLL = 5000, QUEUE_POLL = 30000, RELAY_STALE = 45000;
+  var printers = [], fileMap = {}, farmCards = {}, farmTimer = null, queueTimer = null, camOk = null, farmBusy = false;
+  var picking = {};   // id d'imprimante -> menu « C'est quel spacer ? » ouvert à la main
+  var FSTATES = {
+    RUNNING: { t: 'En impression', k: 'run' }, PREPARE: { t: 'Préparation', k: 'run' }, PAUSE: { t: 'En pause', k: 'warn' },
+    FINISH: { t: 'Terminée', k: 'good' }, FAILED: { t: 'Arrêtée', k: 'bad' }, IDLE: { t: 'Libre', k: 'idle' }
+  };
+
+  // « 6.5_20MM_1.0_3MF_AutoLoop_x20.gcode.3mf » -> « 6520mm103mf » (= public.prod_file_key)
+  function prodKey(f) {
+    return String(f || '').toLowerCase().replace(/(\.gcode)?(\.3mf)?$/, '').replace(/[ _-]*autoloop.*$/, '').replace(/[^a-z0-9]/g, '');
+  }
+  function hasMap(f) { return Object.prototype.hasOwnProperty.call(fileMap, prodKey(f)); }
+  function spacerOfFile(f) {
+    if (hasMap(f)) { var id = fileMap[prodKey(f)]; return { sp: id ? spacerById(id) : null, none: !id }; }
+    return { sp: detectSpacer(f), none: false };
+  }
+  function loadFileMap() {
+    return sb.from('production_files').select('file_key,spacer_id').then(function (res) {
+      if (res.error) return;
+      fileMap = {}; (res.data || []).forEach(function (m) { fileMap[m.file_key] = m.spacer_id || null; });
+    }, function () {});
+  }
+  function saveMap(fname, spId) {
+    var key = prodKey(fname); if (!key) return Promise.resolve();
+    fileMap[key] = spId || null;
+    return sb.from('production_files').upsert({ file_key: key, spacer_id: spId || null, updated_at: new Date().toISOString() })
+      .then(function (res) {
+        if (res.error) { toast('Erreur : ' + res.error.message, 'bad'); return; }
+        // batchs déjà finis du même fichier, sans spacer : complétés
+        var todo = queue.filter(function (j) { return !j.spacer_id && spId && prodKey(j.file_name) === key; });
+        todo.forEach(function (j) { j.spacer_id = spId; sb.from('production_queue').update({ spacer_id: spId }).eq('id', j.id).then(function () {}); });
+        if (todo.length) renderQueue();
+      });
+  }
+
+  /* ---- badge public (admin_settings « production » { public }) ---- */
+  function loadPublic() {
+    return sb.from('admin_settings').select('value').eq('key', 'production').maybeSingle().then(function (res) {
+      if (!res.error && el.pub) el.pub.checked = !(res.data && res.data.value && res.data.value.public === false);
+    }, function () {});
+  }
+  if (el.pub) el.pub.addEventListener('change', function () {
+    var on = el.pub.checked;
+    sb.from('admin_settings').upsert({ key: 'production', value: { public: on }, updated_at: new Date().toISOString() }).then(function (res) {
+      if (res.error) { el.pub.checked = !on; caDialog.error(res.error); return; }
+      toast(on ? 'Badge « En production » affiché' : 'Badge « En production » caché');
+    });
+  });
+
+  /* ---- cartes ---- */
+  function fmtLeft(min) {
+    if (min == null || min < 0) return '—';
+    var h = Math.floor(min / 60), m = Math.round(min % 60);
+    return h ? h + ' h ' + (m < 10 ? '0' : '') + m : m + ' min';
+  }
+  function fmtEnd(min) {
+    if (min == null || min <= 0) return '—';
+    var d = new Date(Date.now() + min * 60000), t = d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
+    var days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(new Date().setHours(0, 0, 0, 0))) / 864e5);
+    return days === 0 ? t : days === 1 ? 'demain ' + t : d.toLocaleDateString('fr-CA', { weekday: 'short' }) + ' ' + t;
+  }
+  function probeCam() {
+    var ping = function (url) { return fetch(url, { mode: 'no-cors' }).then(function () { return true; }, function () { return false; }); };
+    return Promise.all([ping(GO2RTC + '/api/streams'), ping(RELAY + '/')]).then(function (r) { return { g: r[0], r: r[1] }; });
+  }
+  function makeFarmCard(p) {
+    var c = document.createElement('article');
+    c.className = 'pf-card'; c.setAttribute('data-id', p.id);
+    c.innerHTML = '<header class="fm-head"><h2 class="fm-name"></h2><span class="fm-chip"></span></header>' +
+      '<div class="pf-row"><div class="fm-cam pf-cam"><span class="fm-cam-off">Caméra à l\'atelier</span></div><div class="pf-info"></div></div>';
+    c._cam = false; c._sig = '';
+    return c;
+  }
+  function attachCam(c, p) {
+    var box = $('.pf-cam', c), jpeg = /^mjpeg:/.test(p.cam_src || ''), ok = !!p.cam_src && !!camOk && (jpeg ? camOk.r : camOk.g) && !c._off;
+    if (ok && !c._cam) {
+      var f;
+      if (jpeg) { f = document.createElement('img'); f.alt = 'Caméra ' + p.name; f.src = RELAY + '/cam/' + encodeURIComponent(p.cam_src.slice(6)) + '.mjpg'; }
+      else { f = document.createElement('iframe'); f.setAttribute('allow', 'autoplay'); f.src = GO2RTC + '/stream.html?src=' + encodeURIComponent(p.cam_src) + '&mode=mse'; }
+      f.className = 'fm-frame'; f.setAttribute('title', 'Caméra ' + p.name);
+      box.appendChild(f); box.classList.add('is-on'); c._cam = true;
+    } else if (!ok && c._cam) dropCam(c);
+  }
+  function dropCam(c) { var f = $('.fm-frame', c); if (f) { f.src = 'about:blank'; f.remove(); } $('.pf-cam', c).classList.remove('is-on'); c._cam = false; }
+
+  // pièces par plateau d'un spacer : dernière production, sinon les objets du plateau du batch
+  function perOf(sp, job) {
+    var last = sp ? prods.filter(function (x) { return String(x.spacer_id) === String(sp.id); })[0] : null;
+    return Math.max(1, (last ? last.per_plate : (job && job.objects > 0 ? job.objects : 1)) | 0);
+  }
+  function farmView(p) {
+    var s = p.status || {}, age = p.seen_at ? Date.now() - new Date(p.seen_at).getTime() : Infinity;
+    var relayOff = age > RELAY_STALE, offline = relayOff || s.online === false;
+    var st = offline ? { t: relayOff ? 'Relais éteint' : 'Hors ligne', k: 'off' } : (FSTATES[s.state] || { t: s.state || '—', k: 'idle' });
+    var active = !offline && (s.state === 'RUNNING' || s.state === 'PAUSE' || s.state === 'PREPARE');
+    var done = !offline && s.state === 'FINISH';
+    var job = s.job || null, f = (active || done || (!offline && s.state === 'FAILED')) ? (s.file || '') : '';
+    var m = f ? spacerOfFile(f) : { sp: null, none: false };
+    var kind = !f ? 'idle' : m.sp ? 'spacer' : (m.none || !(job && job.isAuto)) ? 'other' : 'ask';
+    if (picking[p.id] && f) kind = 'ask';
+    return { s: s, st: st, offline: offline, active: active, done: done, job: job, file: f, sp: m.sp, kind: kind };
+  }
+  function farmInfo(p, v) {
+    var s = v.s, job = v.job, h = '';
+    if (!v.file) return '<p class="pf-idle">' + esc(v.offline ? 'Aucune donnée' : 'Rien en impression') + '</p>';
+    if (v.kind === 'spacer') h += '<div class="pf-sp"><b>' + esc(v.sp.name) + '</b><button class="pf-chg" type="button" data-act="pick">Changer</button></div>';
+    else if (v.kind === 'ask') h += '<div class="pf-ask"><span>C\'est quel spacer ?</span><div class="pf-pick"></div></div>';
+    else h += '<div class="pf-sp is-other"><b>Hors production</b><button class="pf-chg" type="button" data-act="pick">C\'est un spacer ?</button></div>';
+    h += '<p class="pf-file" title="' + esc(v.file) + '">' + esc(v.file) + '</p>';
+    var pct = v.done ? 100 : Math.max(0, Math.min(100, +s.pct || 0));
+    var loops = job && job.loops > 1 ? job.loops : 0, cur = 0;
+    if (loops && s.layers > 0) cur = v.done ? loops : Math.min(loops, Math.floor((+s.layer || 0) / (s.layers / loops)) + 1);
+    h += '<div class="pf-loop"><span>' + (loops ? 'Loop ' + cur + ' / ' + loops : (v.done ? 'Terminé' : 'Avancement')) + '</span><span>' + pct + ' %</span></div>';
+    h += '<div class="fm-bar' + (v.done ? ' is-done' : '') + (!v.active && !v.done ? ' is-off' : '') + '" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>';
+    var rows = [];
+    if (v.kind === 'spacer' && loops) {
+      var per = perOf(v.sp, job), made = (v.done ? loops : Math.max(0, cur - 1)) * per;
+      rows.push(['Pièces', made + ' / ' + loops * per]);
+    }
+    if (v.active) { rows.push(['Reste', fmtLeft(s.left)]); rows.push(['Fin vers', s.state === 'PAUSE' ? 'en pause' : fmtEnd(s.left)]); }
+    if (job && job.fils && job.fils.length && v.kind !== 'other') {
+      var g = job.fils.reduce(function (t, x) { return t + (+x.perLoop || 0) * (job.loops || 1); }, 0);
+      rows.push(['Filament', '<span class="pf-sws">' + job.fils.map(function (x) { return swatch(x.hex); }).join('') + '</span>' + esc(grams(g))]);
+    } else if (!job && v.kind !== 'other' && v.active) rows.push(['Fichier', 'introuvable']);
+    if (rows.length) h += '<dl class="pf-stats">' + rows.map(function (r) { return '<div><dt>' + r[0] + '</dt><dd>' + (r[0] === 'Filament' ? r[1] : esc(r[1])) + '</dd></div>'; }).join('') + '</dl>';
+    return h;
+  }
+  function spacerPickItems() {
+    return spacers.map(function (sp) { var refs = refsOf(sp); return { id: sp.id, label: sp.name, meta: refs.join(', '), find: ((sp.attrs && sp.attrs.aliases) || []).join(' ') + ' ' + (sp.slug || '') }; })
+      .concat([{ id: '__none', label: 'Aucun', meta: 'hors production' }]);
+  }
+  function fillFarm(c, p) {
+    var v = farmView(p);
+    $('.fm-name', c).textContent = p.name;
+    var chip = $('.fm-chip', c); chip.textContent = v.st.t; chip.setAttribute('data-k', v.st.k);
+    c.setAttribute('data-k', v.st.k);
+    c.classList.toggle('is-other', v.kind === 'other' || v.kind === 'idle');
+    var sig = JSON.stringify([v.s.state, v.s.pct, v.s.layer, v.s.left, v.file, v.kind, v.sp && v.sp.id, v.job && v.job.loops, v.offline, Math.floor(Date.now() / 60000)]);
+    var info = $('.pf-info', c), pkOpen = openPk && info.contains(openPk.root);
+    if (sig !== c._sig && !pkOpen) {
+      c._sig = sig; info.innerHTML = farmInfo(p, v);
+      var box = $('.pf-pick', info);
+      if (box) {
+        var pk = new Picker(box, { placeholder: 'Choisir le spacer', search: true, items: spacerPickItems, onPick: function (id) {
+          delete picking[p.id];
+          saveMap(v.file, id === '__none' ? null : id).then(function () { c._sig = ''; renderFarm(); });
+        } });
+        pk.btn.setAttribute('aria-label', 'Spacer de ' + p.name);
+        if (picking[p.id] === 'open') { picking[p.id] = true; pk.open(); }
+      }
+    }
+    var was = c._off; c._off = v.offline;
+    if (was && !v.offline) dropCam(c);   // l'imprimante revient : flux à rouvrir
+    attachCam(c, p);
+    return v;
+  }
+  function renderFarm() {
+    if (!el.farm) return;
+    if (!printers.length) { el.farm.innerHTML = '<p class="muted fm-empty">Aucune imprimante. Lance le relais de l\'atelier.</p>'; farmCards = {}; el.summary.textContent = ''; return; }
+    var empty = $('.fm-empty', el.farm); if (empty) empty.remove();
+    var n = { run: 0, idle: 0, other: 0, off: 0, warn: 0 };
+    printers.forEach(function (p, i) {
+      var c = farmCards[p.id];
+      if (!c) { c = farmCards[p.id] = makeFarmCard(p); el.farm.appendChild(c); }
+      c.style.order = i;   // ordre en CSS : déplacer une carte recharge sa caméra
+      var v = fillFarm(c, p);
+      if (v.offline) n.off++;
+      else if (v.active && v.kind !== 'other') n.run++;
+      else if (v.active) n.other++;
+      else if (v.st.k === 'bad' || v.st.k === 'warn') n.warn++;
+      else n.idle++;
+    });
+    Object.keys(farmCards).forEach(function (id) { if (!printers.some(function (p) { return p.id === id; })) { farmCards[id].remove(); delete farmCards[id]; } });
+    var parts = [];
+    if (n.run) parts.push(n.run + ' en production');
+    if (n.other) parts.push(n.other + ' hors production');
+    if (n.idle) parts.push(n.idle + (n.idle > 1 ? ' libres' : ' libre'));
+    if (n.warn) parts.push(n.warn + ' à voir');
+    if (n.off) parts.push(n.off + ' hors ligne');
+    el.summary.textContent = parts.join(' · ');
+  }
+  el.farm.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act="pick"]'); if (!b) return;
+    var c = b.closest('.pf-card'); if (!c) return;
+    picking[c.getAttribute('data-id')] = 'open'; c._sig = ''; renderFarm();
+  });
+  function loadFarm() {
+    if (farmBusy) return Promise.resolve(); farmBusy = true;
+    var cam = camOk ? Promise.resolve() : probeCam().then(function (ok) { camOk = ok; });
+    return cam.then(function () { return sb.from('printers').select('id,name,model,cam_src,sort,status,seen_at').order('sort').order('name'); })
+      .then(function (res) {
+        farmBusy = false;
+        if (res.error) { el.farm.innerHTML = '<p class="muted fm-empty">Lecture impossible : ' + esc(res.error.message) + '</p>'; farmCards = {}; return; }
+        printers = res.data || []; renderFarm();
+      }, function () { farmBusy = false; });
+  }
+  function farmStart() {
+    farmStop(); camOk = null; loadFarm();
+    farmTimer = setInterval(function () { if (!document.hidden) loadFarm(); }, FARM_POLL);
+    queueTimer = setInterval(function () { if (!document.hidden) loadQueue().then(renderQueue); }, QUEUE_POLL);
+  }
+  function farmStop() {
+    if (farmTimer) { clearInterval(farmTimer); farmTimer = null; }
+    if (queueTimer) { clearInterval(queueTimer); queueTimer = null; }
+    Object.keys(farmCards).forEach(function (id) { dropCam(farmCards[id]); });   // l'A1 n'accepte que peu de spectateurs
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (!farmTimer) return;
+    if (document.hidden) Object.keys(farmCards).forEach(function (id) { dropCam(farmCards[id]); });
+    else { camOk = null; loadFarm(); }
+  });
+  if (el.farmRefresh) el.farmRefresh.addEventListener('click', function () { camOk = null; loadAll().then(loadFarm); });
+
+  /* ---- formulaire « Valider » : visible seulement avec un batch chargé ---- */
+  function openForm(src) { el.form.hidden = false; if (el.formSrc) { el.formSrc.textContent = src || ''; el.formSrc.title = src || ''; } }
+  function closeForm() { el.form.hidden = true; fromQueue = null; renderQueue(); }
+  var formX = $('#pr-form-close'); if (formX) formX.addEventListener('click', closeForm);
 
   /* =========================================================
      2) HISTORIQUE

@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 39;
+window.CA_EN_V = 40;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -47,6 +47,12 @@ window.CA_EN = (function (pairs) {
   [`À découvrir`, `Worth a look`],
   [`Rang {n}`, `Rank {n}`],
   [`En stock`, `In stock`],
+  // ---- spacer-catalog.js : badge « En production » (imprimantes de l'atelier)
+  [`En production`, `In production`],
+  [`presque prêt`, `almost ready`],
+  [`prêt vers {h}`, `ready around {h}`],
+  [`demain vers {h}`, `tomorrow around {h}`],
+  [`{d} vers {h}`, `{d} around {h}`],
   [`Épuisé`, `Sold out`],
   [`dès <b>{p}</b> la paire`, `from <b>{p}</b> a pair`],
   [`Catalogue momentanément indisponible — <a href="boutique">ouvrir la boutique</a> ou <a class="ask" href="/compte#/messages" data-msg="filaments">nous écrire</a>.`, `Catalogue temporarily unavailable — <a href="boutique">open the shop</a> or <a class="ask" href="/en/compte#/messages" data-msg="filaments">write to us</a>.`],

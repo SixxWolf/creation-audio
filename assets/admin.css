@@ -1914,6 +1914,41 @@ a.ms-b-file:hover { border-color:var(--ink); }
 .pr-q-x:hover { background:var(--wash-2); color:var(--bad); }
 .pr-drop-sm { padding:16px 12px; }
 .pr-sw { display:inline-block; flex:none; width:16px; height:16px; border-radius:50%; border:1px solid color-mix(in srgb, var(--ink) 18%, transparent); vertical-align:-3px; }
+/* Production › imprimantes en direct (cartes de la ferme, 2026-11-14) : mini caméra + batch reconnu */
+.pf-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap:var(--gap); align-items:start; margin-bottom:var(--gap); }
+@media (min-width:2200px) { .pf-grid { grid-template-columns:repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap:22px; } }
+@media (min-width:3000px) { .pf-grid { grid-template-columns:repeat(auto-fit, minmax(min(100%, 680px), 1fr)); gap:26px; } }
+.pf-card { display:flex; flex-direction:column; min-width:0; background:var(--paper); border:1px solid var(--line); border-radius:var(--radius); }
+.pf-card[data-k="run"]:not(.is-other) { border-color:color-mix(in srgb, var(--ember) 45%, var(--line)); }
+.pf-card[data-k="off"] { opacity:.65; }
+.pf-card[data-k="bad"] { border-color:var(--bad); }
+.pf-card.is-other .pf-info { opacity:.62; }
+.pf-card.is-other .fm-chip[data-k="run"] { color:var(--muted); background:var(--wash); }
+.pf-row { display:grid; grid-template-columns:minmax(0, 44%) minmax(0, 1fr); gap:14px; padding:0 14px 14px; align-items:start; }
+.pf-cam { border-radius:8px; overflow:hidden; }
+.pf-info { display:flex; flex-direction:column; gap:7px; min-width:0; }
+.pf-sp { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; min-width:0; }
+.pf-sp b { font-size:1.06rem; overflow-wrap:anywhere; }
+.pf-chg { padding:0; border:0; background:none; font:inherit; font-size:.8rem; color:var(--muted); text-decoration:underline; cursor:pointer; }
+.pf-chg:hover { color:var(--ember-ink, var(--ember)); }
+.pf-ask { display:flex; flex-direction:column; gap:6px; }
+.pf-ask > span { font-weight:700; color:var(--ember-ink, var(--ember)); }
+.pf-file { margin:0; font-size:.82rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pf-loop { display:flex; justify-content:space-between; gap:10px; font-weight:600; font-variant-numeric:tabular-nums; }
+.pf-stats { display:grid; grid-template-columns:minmax(0, 1fr); gap:5px; margin:2px 0 0; }
+.pf-stats div { display:flex; justify-content:space-between; align-items:baseline; gap:8px; min-width:0; }
+.pf-stats dt { font-size:.8rem; color:var(--muted); }
+.pf-stats dd { display:flex; align-items:center; gap:5px; margin:0; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.pf-sws { display:inline-flex; gap:2px; }
+.pf-sws .pr-sw { width:12px; height:12px; }
+.pf-idle { margin:4px 0 0; color:var(--muted); font-size:.9rem; }
+.pr-pub { display:inline-flex; align-items:center; gap:6px; margin-right:6px; font-size:.9rem; font-weight:600; white-space:nowrap; cursor:pointer; }
+.pr-pub input { width:auto; margin:0; accent-color:var(--ember); }
+.pr-todo { margin-bottom:var(--gap); }
+.pr-form-src { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:400; }
+@media (max-width:560px) {
+  .pf-row { grid-template-columns:1fr; }
+}
 
 /* bobines en production */
 /* colonne fixe (Terminer · Retirer · chevron) : jauges alignées quels que soient les boutons */
