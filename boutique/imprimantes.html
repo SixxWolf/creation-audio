@@ -30,7 +30,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../assets/site.css?v=29">
-<link rel="stylesheet" href="../assets/boutique.css?v=60">
+<link rel="stylesheet" href="../assets/boutique.css?v=61">
 <link rel="stylesheet" href="../assets/dialog.css?v=2">
 <link rel="stylesheet" href="../assets/boutique-imprimantes.css?v=1">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
@@ -56,10 +56,10 @@
     <div class="nav-dd">
       <a class="nav-dd-t is-active" href="../boutique" aria-haspopup="true" aria-expanded="false">Boutique <svg class="nav-dd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
       <div class="nav-dd-m">
-        <a href="../boutique?promo=1">Promotions</a>
-        <a href="../boutique">Filaments</a>
+        <a href="../boutique/promotions">Promotions</a>
+        <a href="../boutique/filaments">Filaments</a>
         <a href="../boutique/spacers">Spacers</a>
-        <a href="../boutique#/accessoires">Accessoires</a>
+        <a href="../boutique/accessoires">Accessoires</a>
         <a href="../boutique/imprimantes" class="is-active">Imprimantes 3D <span class="nav-soon">Bientôt</span></a>
       </div>
     </div>
@@ -105,7 +105,7 @@
       <p class="ip3-legal">Ton courriel sert seulement à t'avertir de l'ouverture, puis il est supprimé (au plus tard après 60 jours). <a href="../confidentialite#liste-attente">Confidentialité</a></p>
     </div>
     <p class="ip3-ask">Une question ? <a class="ask" href="/compte#/messages" data-msg="Imprimantes 3D">Écris-nous</a></p>
-    <a class="ip3-back" href="../boutique">Voir les filaments</a>
+    <a class="ip3-back" href="../boutique/filaments">Voir les filaments</a>
   </section>
 </main>
 
@@ -161,9 +161,9 @@
     </div>
     <nav class="foot-col" aria-label="Boutique">
       <h4>Boutique</h4>
-      <a href="../boutique">Filaments</a>
+      <a href="../boutique/filaments">Filaments</a>
       <a href="../boutique/spacers">Spacers &amp; adaptateurs</a>
-      <a href="../boutique#/accessoires">Accessoires</a>
+      <a href="../boutique/accessoires">Accessoires</a>
       <a href="../impression">Impression 3D sur mesure</a>
       <a href="../entretien">Entretien d'imprimantes</a>
     </nav>
@@ -203,10 +203,10 @@
     <a href="../">Accueil</a>
     <a class="drawer-parent" href="../boutique">Boutique</a>
     <div class="drawer-sub">
-      <a href="../boutique?promo=1">Promotions</a>
-      <a href="../boutique">Filaments</a>
+      <a href="../boutique/promotions">Promotions</a>
+      <a href="../boutique/filaments">Filaments</a>
       <a href="../boutique/spacers">Spacers</a>
-      <a href="../boutique#/accessoires">Accessoires</a>
+      <a href="../boutique/accessoires">Accessoires</a>
       <a href="../boutique/imprimantes" class="is-active">Imprimantes 3D <span class="nav-soon">Bientôt</span></a>
     </div>
     <a href="../impression">Impression 3D</a>
@@ -215,7 +215,7 @@
     <a href="../en/boutique/imprimantes" data-lang-switch="en" hreflang="en" lang="en">English</a>
   </nav>
   <div class="drawer-cta">
-    <a class="primary" href="../boutique">Magasiner les filaments</a>
+    <a class="primary" href="../boutique/filaments">Magasiner les filaments</a>
     <a class="secondary" href="../compte">Mon compte</a>
     <a class="secondary" href="../dealer">Programme revendeur</a>
   </div>

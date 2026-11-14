@@ -123,7 +123,7 @@
   /* logo de marque en coin (comme les cartes de la boutique) : le titre reste le matériau seul */
   function brandBadge(brand) { var u = brandImg[brand] ? publicUrl(brandImg[brand]) : ''; return u ? '<span class="pop-brand"><img src="' + esc(u) + '" alt="' + esc(brand) + '" loading="lazy"></span>' : ''; }
   function brandSeg(brand) { return brandSlug[brand] || slugify(brand || 'Autres'); }
-  function matUrl(p) { return 'boutique#/m/' + brandSeg(p.brand) + '/' + (p.material_slug || slugify(p.material || 'Autres')); }
+  function matUrl(p) { return 'boutique/filaments#/m/' + brandSeg(p.brand) + '/' + (p.material_slug || slugify(p.material || 'Autres')); }
   function filUrl(p) { return matUrl(p) + '/' + (p.slug || slugify(p.name)); }
 
   /* =========================================================
@@ -232,7 +232,7 @@
   var FALLBACK = [
     ['Rouge', '#C12E1F'], ['Orange', '#FF6A13'], ['Jaune', '#FCE300'], ['Vert', '#00AE42'], ['Turquoise', '#00B1B7'],
     ['Bleu', '#0056B8'], ['Violet', '#8671CB'], ['Rose', '#F5547C'], ['Blanc', '#FFFFFF'], ['Gris', '#8E9089'], ['Noir', '#1B1B1B']
-  ].map(function (c) { return { name: _t(c[0]), material: 'PLA', brand: '', hex: c[1], _cs: [c[1]], _url: 'boutique' }; });
+  ].map(function (c) { return { name: _t(c[0]), material: 'PLA', brand: '', hex: c[1], _cs: [c[1]], _url: 'boutique/filaments' }; });
 
   /* =========================================================
      Sections alimentées par la base
@@ -275,7 +275,7 @@
           '<span class="mat-brand-meta">' + tn(list.length, '{n} matériau', '{n} matériaux') + ' · ' +
             tn(nCol, '{n} couleur en stock', '{n} couleurs en stock') + '</span>' +
           '<span class="mat-brand-rule" aria-hidden="true"></span>' +
-          '<a class="mat-brand-link" href="boutique#/m/' + esc(brandSeg(b)) + '" aria-label="' + esc(_t('Voir tous les filaments {b}', { b: b })) + '">' +
+          '<a class="mat-brand-link" href="boutique/filaments#/m/' + esc(brandSeg(b)) + '" aria-label="' + esc(_t('Voir tous les filaments {b}', { b: b })) + '">' +
             _t('Voir la marque') + ' ' + ARROW + '</a>' +
         '</header>' +
         '<div class="mat-grid">' + list.map(matCard).join('') + '</div>' +
@@ -386,7 +386,7 @@
       var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
       var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
       var title = isF ? esc(p.material || _t('Filament')) : esc(p.name);
-      var href = p.type === 'spacer' ? 'boutique/spacers' : 'boutique?promo=1';
+      var href = p.type === 'spacer' ? 'boutique/spacers' : 'boutique/promotions';
       var sub = isF ? tn(g.n, '{n} couleur', '{n} couleurs') : esc(P.nameOf(p));
       var end = P.endText(p.promo_ends);
       return '<a class="pop-card promo-card" href="' + esc(href) + '">' + P.ribbon(g.pc) +
@@ -422,7 +422,7 @@
       var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
       var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
       var title = isF ? esc(p.material || _t('Filament')) : esc(p.name);
-      var href = isF ? matUrl(p) : p.type === 'spacer' ? 'boutique/spacers' : 'boutique';
+      var href = isF ? matUrl(p) : p.type === 'spacer' ? 'boutique/spacers' : 'boutique/accessoires#/a/' + encodeURIComponent(p.slug || slugify(p.name));
       var sub = isF ? tn(g.n, '{n} couleur', '{n} couleurs') : '';
       return '<a class="pop-card new-card" href="' + esc(href) + '">' +
         '<span class="pop-media">' + media + P.newTag() + (isF ? brandBadge(p.brand) : '') + '</span><span class="pop-body">' +

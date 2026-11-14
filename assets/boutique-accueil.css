@@ -1,0 +1,56 @@
+/* =========================================================
+   Accueil de la boutique (boutique.html, 2026-11-14)
+   « Que cherchez-vous aujourd'hui ? » : grandes tuiles photo par
+   rayon, puis promos + nouveautés (cartes .mcard de boutique.css).
+   Onglet maison de la barre des rayons : .shop-tab-home (boutique.css).
+   ========================================================= */
+.bq-hero { padding:clamp(30px, 4.4vw, 56px) 0 clamp(22px, 2.8vw, 32px); text-align:center; }
+.bq-hero h1 { font-size:clamp(2rem, 4.6vw, 3.4rem); line-height:1.04; letter-spacing:-.03em; }
+.bq-perks { display:flex; flex-wrap:wrap; justify-content:center; gap:8px 10px; margin:18px 0 0; padding:0; list-style:none; }
+.bq-perks li { display:inline-flex; align-items:center; gap:7px; padding:6px 13px; border-radius:100px;
+  font-size:.9rem; font-weight:600; color:var(--ink-2); background:var(--wash); border:1px solid var(--line); }
+.bq-perks svg { width:16px; height:16px; flex:none; color:var(--ember-ink); }
+
+/* ---- tuiles des rayons ---- */
+.bq-tiles { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:18px; }
+.bq-tile {
+  position:relative; display:flex; flex-direction:column; min-width:0; overflow:hidden; text-decoration:none; color:var(--ink);
+  background:var(--paper); border:1px solid var(--line); border-radius:20px; transition:transform .2s, box-shadow .2s, border-color .2s;
+}
+.bq-tile:hover { transform:translateY(-4px); border-color:var(--line-2); box-shadow:0 26px 48px -28px rgba(20,22,26,.42); }
+.bq-tile:focus-visible { outline:3px solid var(--ember-dim); outline-offset:3px; }
+.bq-media { position:relative; aspect-ratio:1; display:grid; place-items:center; overflow:hidden;
+  background:var(--thumb-bg); border-bottom:1px solid var(--line); }
+.bq-media img { width:100%; height:100%; object-fit:contain; transition:transform .45s cubic-bezier(.2,.7,.2,1); }
+.bq-tile:hover .bq-media img { transform:scale(1.05); }
+.bq-media:empty::before { content:''; width:46%; aspect-ratio:1; border-radius:50%; background:var(--wash); }
+.bq-printer svg { width:56%; height:auto; color:var(--muted); transition:transform .45s cubic-bezier(.2,.7,.2,1); }
+.bq-tile:hover .bq-printer svg { transform:scale(1.05); }
+.bq-soon { position:absolute; top:12px; left:12px; padding:4px 10px; border-radius:100px; font-size:.72rem; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--on-ember); background:var(--ember); }
+.bq-body { display:flex; flex-direction:column; gap:4px; padding:16px 56px 18px 18px; }
+.bq-name { font-family:var(--display); font-weight:700; font-size:1.42rem; line-height:1.1; letter-spacing:-.02em; }
+.bq-meta { font-size:.9rem; line-height:1.35; color:var(--muted); }
+.bq-go { position:absolute; right:16px; bottom:18px; width:34px; height:34px; display:grid; place-items:center; border-radius:50%;
+  color:var(--ink); background:var(--wash); border:1px solid var(--line); transition:background .2s, color .2s, transform .2s; }
+.bq-go svg { width:16px; height:16px; }
+.bq-tile:hover .bq-go { color:var(--on-ember); background:var(--ember); border-color:var(--ember); transform:translateX(2px); }
+
+/* ---- promos + nouveautés ---- */
+.bq-sec { margin-top:clamp(40px, 5vw, 64px); }
+.bq-all { display:inline-flex; align-items:center; gap:6px; font-weight:600; font-size:.92rem; color:var(--ink); text-decoration:none; white-space:nowrap; }
+.bq-all svg { width:15px; height:15px; transition:transform .2s; }
+.bq-all:hover { color:var(--ember-ink); }
+.bq-all:hover svg { transform:translateX(2px); }
+
+@media (max-width:860px) { .bq-tiles { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width:720px) {
+  .bq-tiles { gap:12px; }
+  .bq-body { padding:12px 46px 14px 14px; }
+  .bq-name { font-size:1.12rem; }
+  .bq-meta { font-size:.8rem; }
+  .bq-go { right:10px; bottom:12px; width:28px; height:28px; }
+  .bq-go svg { width:14px; height:14px; }
+  .bq-soon { top:8px; left:8px; font-size:.64rem; padding:3px 8px; }
+  .bq-perks li { font-size:.82rem; padding:5px 11px; }
+}

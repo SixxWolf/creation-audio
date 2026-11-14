@@ -30,7 +30,7 @@
 
 /* ---- Colonne de page ---- */
 .shop { max-width:var(--maxw); margin:0 auto; padding:0 var(--gutter) clamp(64px, 8vw, 110px); }
-/* Rayons de la boutique : Filaments · Spacers · Accessoires · Promotions */
+/* Rayons de la boutique : ⌂ · Filaments · Spacers · Accessoires · Imprimantes 3D · Promotions (tools/build-boutique-pages.js → tabs()) */
 .shop-tabs { display:flex; gap:4px; margin-top:18px; border-bottom:1px solid var(--line); overflow-x:auto; scrollbar-width:none; }
 .shop-tabs::-webkit-scrollbar { display:none; }
 .shop-tabs[hidden] { display:none; }
@@ -39,6 +39,8 @@
   font-weight:600; font-size:.95rem; color:var(--ink-2); transition:color .15s;
 }
 .shop-tabs a:hover { color:var(--ink); }
+.shop-tabs a.shop-tab-home { display:inline-flex; align-items:center; padding-inline:10px; }
+.shop-tabs a.shop-tab-home svg { width:19px; height:19px; }
 .shop-tabs a.is-active { color:var(--ink); }
 .shop-tabs a.is-active::after { content:''; position:absolute; left:12px; right:12px; bottom:0; height:2px; border-radius:2px 2px 0 0; background:var(--ember); }
 @media (max-width:420px) { .shop-tabs { gap:0; } .shop-tabs a { padding:10px 6px; font-size:.9rem; } .shop-tabs a.is-active::after { left:6px; right:6px; } }

@@ -16,6 +16,21 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://creationaudio.ca/boutique/filaments</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/boutique/accessoires</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/boutique/promotions</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://creationaudio.ca/revendeur</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
@@ -59,6 +74,21 @@
     <loc>https://creationaudio.ca/en/boutique/spacers</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/en/boutique/filaments</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/en/boutique/accessoires</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://creationaudio.ca/en/boutique/promotions</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>
   <!-- spacers:urls — une page par spacer, généré par tools/build-spacer-pages.js -->
   <url>

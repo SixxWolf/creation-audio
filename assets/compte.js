@@ -410,7 +410,7 @@
         localStorage.setItem('ca_v2_order_edit', JSON.stringify({ id: o.id, number: o.number, at: Date.now(),
           pickup: o.pickup_date ? { d: o.pickup_date, s: o.pickup_start } : null }));
       } catch (e) {}
-      location.href = spacersOnly ? 'boutique/spacers' : 'boutique#/';
+      location.href = spacersOnly ? 'boutique/spacers' : 'boutique/filaments';
     }
   }
   /* ---- cueillette : date + plage (commande ouverte, réservation gardée) — CA.custOrder (commande-client.js) ---- */
@@ -869,8 +869,8 @@
   var KIND = { spool: _t('avec bobine'), refill: 'recharge' };
   function productHref(a) {
     if (a.type === 'spacer') return 'boutique/spacers';
-    if (a.type === 'accessory') return 'boutique#/a/' + encodeURIComponent(a.slug || slugify(a.name));
-    return 'boutique#/m/' + (a.brand_slug || slugify(a.brand || _t('Autres'))) + '/' +
+    if (a.type === 'accessory') return 'boutique/accessoires#/a/' + encodeURIComponent(a.slug || slugify(a.name));
+    return 'boutique/filaments#/m/' + (a.brand_slug || slugify(a.brand || _t('Autres'))) + '/' +
       (a.material_slug || slugify(a.material || _t('Autres'))) + '/' + (a.slug || slugify(a.name));
   }
   function loadAlerts() {
@@ -885,7 +885,7 @@
     alertsN.hidden = !alerts.length; alertsN.textContent = alerts.length;
     if (!alerts.length) {
       alertsEl.innerHTML = _t('<p class="acct-empty">Aucune alerte. Sur une couleur en rupture, «&nbsp;M\'aviser&nbsp;» t\'ajoute ici. ') +
-        _t('<a href="boutique">Voir les filaments</a></p>');
+        _t('<a href="boutique">Voir les filaments</a></p>').replace('href="boutique"', 'href="boutique/filaments"');
       return;
     }
     alertsEl.innerHTML = '<ul class="al-list">' + alerts.map(function (a) {

@@ -6,7 +6,12 @@
    « en stock seulement ») → fiche couleur (photo, format,
    pastilles dans l'ordre de l'admin, onglets) → panier → commande par
    Messenger ou courriel (aucun paiement en ligne).
-   Adresses : #/ · #/m/<marque> · #/m/<marque>/<matériau>[/<couleur>]
+   Trois pages, un seul script (body[data-shop]) :
+   boutique/filaments   #/ · #/m/<marque> · #/m/<marque>/<matériau>[/<couleur>]
+   boutique/accessoires #/ · #/c/<catégorie> · #/a/<accessoire>
+   boutique/promotions  #/ (filaments + accessoires + spacers en promo)
+   Un lien d'un autre rayon pointe vers sa page (« accessoires#/a/x ») ;
+   un ancien lien (#/accessoires…) arrivé sur la mauvaise page y est renvoyé.
    ========================================================= */
 (function () {
   'use strict';
@@ -18,14 +23,18 @@
   var BUCKET = 'products';
   var CART_KEY = 'ca_v2_cart';
   var STOCK_KEY = 'ca_shop_only_stock';
-  var BASE_TITLE = _t('Création Audio — Filaments');
+  var ROOT = window.CA.siteRoot || '';   // racine du dépôt (assets) — FR même sur /en/
+  var UP = '../';                         // les trois pages vivent dans boutique/ (FR et /en/) : liens vers les autres pages, langue gardée
+  var PAGE = document.body.getAttribute('data-shop') || 'filaments';
+  var FIL_PRE = PAGE === 'filaments' ? '' : 'filaments', ACC_PRE = PAGE === 'accessoires' ? '' : 'accessoires';
+  var BASE_TITLE = PAGE === 'promotions' ? _t('Création Audio — Promotions') : _t('Création Audio — Filaments');
 
   // Accessoires « bobine vide réutilisable » (repli si aucun accessoire dans l'admin).
   var ACC = {
     spool:   { id: 'spool',   name: _t('Bobine vide réutilisable'), price: 10,
-               desc: _t('En supplément — pour vos recharges · température max 70 °C'), img: 'assets/img/spool-reusable.png' },
+               desc: _t('En supplément — pour vos recharges · température max 70 °C'), img: ROOT + 'assets/img/spool-reusable.png' },
     spoolht: { id: 'spoolht', name: _t('Bobine vide réutilisable — haute température'), price: 10,
-               desc: _t('Pour matériaux techniques (ABS…) · température max 90 °C'), img: 'assets/img/spool-reusable-ht.png' }
+               desc: _t('Pour matériaux techniques (ABS…) · température max 90 °C'), img: ROOT + 'assets/img/spool-reusable-ht.png' }
   };
 
   var IC = {
@@ -204,18 +213,22 @@
       crumbsEl = $('#crumbs'), configEl = $('#config');
   var screenAccs = $('#screen-accs'), screenAcc = $('#screen-acc'),
       accGroupsEl = $('#acc-groups'), accChipsEl = $('#acc-chips'), accCrumbsEl = $('#acc-crumbs'), accConfigEl = $('#acc-config');
+  var screenPromo = $('#screen-promo');
+  // écran de la page en attendant les données (accessoires / promotions : pas de flash du catalogue filaments)
+  if (PAGE !== 'filaments') showScreen(PAGE === 'accessoires' ? 'accs' : 'promo');
   // un seul écran visible à la fois ; l'onglet du menu suit (Filaments / Accessoires)
   function showScreen(name) {
     screenCatalog.hidden = name !== 'catalog';
     screenProduct.hidden = name !== 'product';
     screenAccs.hidden = name !== 'accs';
     screenAcc.hidden = name !== 'acc';
+    if (screenPromo) screenPromo.hidden = name !== 'promo';
     var acc = name === 'accs' || name === 'acc';
     // onglets des rayons : visibles sur les listes, pas sur une fiche
     var tabs = $('#shop-tabs');
     if (tabs) {
       tabs.hidden = name === 'product' || name === 'acc';
-      var cur = acc ? 'accessoires' : (/[?&]promo=1/.test(location.search) ? 'promo' : 'filaments');
+      var cur = name === 'promo' ? 'promo' : acc ? 'accessoires' : 'filaments';
       $$('a', tabs).forEach(function (a) {
         var on = a.getAttribute('data-tab') === cur;
         a.classList.toggle('is-active', on);
@@ -224,7 +237,7 @@
     }
     $$('.nav-dd-m a, .drawer-sub a').forEach(function (a) {
       var h = a.getAttribute('href') || '';
-      var on = acc ? /#\/accessoires$/.test(h) : /^boutique(#\/)?$/.test(h);
+      var on = new RegExp('(^|/)' + (name === 'promo' ? 'promotions' : acc ? 'accessoires' : 'filaments') + '$').test(h);
       a.classList.toggle('is-active', on);
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -240,6 +253,7 @@
     if (!screenCatalog.hidden) renderCatalog();
     if (!screenProduct.hidden && curColor) renderConfig();
     if (!screenAccs.hidden) renderAccs();
+    if (screenPromo && !screenPromo.hidden) renderPromoPage();
   }
   document.addEventListener('change', function (e) {
     if (e.target && e.target.classList && e.target.classList.contains('js-only-stock')) setOnlyStock(e.target.checked);
@@ -276,8 +290,8 @@
   }
   function prodSlugFor(colorId) { var p = byId[colorId]; return p ? (p.slug || slugify(p.name)) : slug(colorId); }
   function routeFor(brand, material, colorId) {
-    if (!brand) return '#/';
-    var h = '#/m/' + brandSlugName(brand);
+    if (!brand) return FIL_PRE + '#/';
+    var h = FIL_PRE + '#/m/' + brandSlugName(brand);
     if (material) h += '/' + matSlugFor(brand, material);
     if (material && colorId) h += '/' + prodSlugFor(colorId);
     return h;
@@ -303,9 +317,10 @@
     })[0];
     return hit ? hit.id : null;
   }
-  // Accessoires : #/accessoires · #/accessoires/<catégorie> · #/a/<accessoire> (slug perso ou auto, ou ancien id)
-  function accRouteFor(cat) { return '#/accessoires' + (cat ? '/' + cat.slug : ''); }
-  function accHref(a) { return '#/a/' + encodeURIComponent(a.slug); }
+  // Accessoires (page boutique/accessoires) : #/ · #/c/<catégorie> · #/a/<accessoire> (slug perso ou auto, ou ancien id)
+  // anciens liens : #/accessoires[/<catégorie>]
+  function accRouteFor(cat) { return ACC_PRE + '#/' + (cat ? 'c/' + cat.slug : ''); }
+  function accHref(a) { return ACC_PRE + '#/a/' + encodeURIComponent(a.slug); }
   function resolveAccCat(seg) {
     var dec = unslug(seg);
     return accCats.filter(function (c) { return c.slug === seg || c.name === dec; })[0] || null;
@@ -316,11 +331,12 @@
   }
   function currentRoute() {
     var parts = location.hash.replace(/^#\/?/, '').split('/');
-    if (parts[0] === 'accessoires') {
+    if (parts[0] === 'accessoires' || parts[0] === 'c' || (!parts[0] && PAGE === 'accessoires')) {
       var cat = parts[1] ? resolveAccCat(parts[1]) : null;
       return { accs: true, cat: cat, badCat: !!parts[1] && !cat };
     }
     if (parts[0] === 'a') return { acc: parts[1] ? resolveAcc(parts[1]) : null, accRoute: true };
+    if (!parts[0] && PAGE === 'promotions') return { promo: true };
     if (parts[0] !== 'm' || !parts[1]) return { brand: null };
     var brand = resolveBrand(parts[1]);
     if (!brand) return { brand: null, bad: true };
@@ -341,9 +357,16 @@
   var catBrand = null, catScrollY = null, lastScreen = null;
   function applyRoute() {
     if (!dataReady) return;                         // rejoué une fois les données chargées
+    // lien d'un autre rayon (ancien lien, favori) : on va sur la bonne page, même adresse interne
+    var h = location.hash, seg = h.replace(/^#\/?/, '').split('/')[0];
+    var want = seg === 'm' ? 'filaments' : (seg === 'a' || seg === 'c' || seg === 'accessoires') ? 'accessoires' : null;
+    if (seg === 'accessoires') h = '#/' + (h.split('/')[2] ? 'c/' + h.split('/')[2] : '');
+    if (want && want !== PAGE) { location.replace(want + h); return; }
+    if (h !== location.hash) { history.replaceState(null, '', h); }
     var r = currentRoute();
-    if (r.accs) { if (r.badCat) { replaceRoute('#/accessoires'); return; } showAccs(r.cat); return; }
-    if (r.accRoute) { if (!r.acc) { replaceRoute('#/accessoires'); return; } showAcc(r.acc); return; }
+    if (r.promo) { showPromo(); return; }
+    if (r.accs) { if (r.badCat) { replaceRoute('#/'); return; } showAccs(r.cat); return; }
+    if (r.accRoute) { if (!r.acc) { replaceRoute('#/'); return; } showAcc(r.acc); return; }
     if (r.bad) { replaceRoute('#/'); return; }
     if (r.badMat) { replaceRoute(routeFor(r.brand)); return; }
     if (r.material) { showProduct(matOf(r.brand, r.material), r.colorId); return; }
@@ -355,9 +378,12 @@
     Promise.all([
       sb.from('products_public').select('*').eq('type', 'filament').order('sort_order', { ascending: true }).order('name', { ascending: true }),
       sb.from('brands').select('*'),
-      sb.from('products_public').select('*').eq('type', 'accessory').order('sort_order', { ascending: true })
+      sb.from('products_public').select('*').eq('type', 'accessory').order('sort_order', { ascending: true }),
+      // page Promotions seulement : les spacers en promo (leur fiche et leur panier sont sur boutique/spacers)
+      PAGE === 'promotions' ? sb.from('products_public').select('*').eq('type', 'spacer').order('sort_order', { ascending: true }) : Promise.resolve({ data: [] })
     ]).then(function (res) {
       var pr = res[0], br = res[1], ac = res[2];
+      spacers = (res[3] && !res[3].error && res[3].data) || [];
       if (pr.error) { failCatalog(_t('Impossible de charger la boutique.')); return; }
       products = pr.data || [];
       byId = {};
@@ -380,15 +406,17 @@
       buildCatalog();
       dataReady = true;
       applyRoute();          // honore l'URL courante (lien direct / retour navigateur)
-      if (/[?&]promo=1/.test(location.search)) { var ps = $('#promos'); if (ps) setTimeout(function () { ps.scrollIntoView({ block: 'start' }); }, 60); }
       renderCart();
       if (canBackorder() && window.CA.custOrder.editing()) openCart();
       if (window.CA.panierCompte.resume()) openCart();   // code en attente (retour de l'appli courriel)
     }, function () { failCatalog(_t('Erreur réseau — recharge la page.')); });
   }
   function failCatalog(msg) {
-    catGroups.removeAttribute('aria-busy');
-    catGroups.innerHTML = '<p class="empty">' + esc(msg) + '</p>';
+    // le message va dans la liste de la page (filaments, accessoires ou promotions)
+    var el = PAGE === 'accessoires' ? accGroupsEl : PAGE === 'promotions' ? $('#promo-groups') : catGroups;
+    if (PAGE === 'accessoires') showScreen('accs'); else if (PAGE === 'promotions') showScreen('promo');
+    el.removeAttribute('aria-busy');
+    el.innerHTML = '<p class="empty">' + esc(msg) + '</p>';
   }
 
   /* ---------- modèle : marques → matériaux → couleurs ---------- */
@@ -568,6 +596,79 @@
       '</header>' +
       '<div class="cat-grid">' + mats.map(matCard).join('') + accs.map(accCard).join('') + '</div>' +
     '</section>';
+  }
+
+  /* =========================================================
+     PAGE PROMOTIONS (boutique/promotions) : tout ce qui est en promo,
+     par rayon — filaments (par matériau), accessoires, spacers.
+     ========================================================= */
+  var spacers = [];
+  function spacerPromoPct(p) {
+    var on1 = p.promo_on && p.reg_price != null;
+    return on1 ? PR.pct(+p.reg_price, +p.sell_price) : 0;
+  }
+  function spacerCard(p) {
+    var pc = spacerPromoPct(p), img = publicUrl(p.image_path), out = (p.qty | 0) <= 0;
+    return '<a class="mcard is-promo' + (out ? ' is-out' : '') + '" href="' + esc('spacers#/s/' + encodeURIComponent(p.slug || p.id)) + '">' +
+      '<span class="mcard-media">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy">' : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') +
+        PR.ribbon(pc) + (PR.isNew(p) ? PR.newTag() : '') + '</span>' +
+      '<span class="mcard-body">' +
+        '<span class="mcard-name">' + esc(p.name) + '</span>' +
+        '<span class="mcard-foot">' +
+          '<span class="mcard-price"><s>' + money(+p.reg_price) + '</s> <b>' + money(+p.sell_price) + '</b></span>' +
+        '</span>' +
+      '</span>' +
+    '</a>';
+  }
+  function showPromo() {
+    renderPromoPage();
+    showScreen('promo');
+    curMat = null; curColor = null; curAcc = null; updateBuybar();
+    document.title = BASE_TITLE;
+    if (lastScreen !== 'promo') window.scrollTo(0, 0);
+    lastScreen = 'promo';
+  }
+  function renderPromoPage() {
+    var el = $('#promo-groups');
+    if (!el) return;
+    var mats = [];
+    brands.forEach(function (B) {
+      B.materials.forEach(function (m) {
+        if (!matPromo(m)) return;
+        if (onlyStock && !m.items.some(function (p) { return anyStock(p) && (promoOn(p, 'spool') || promoOn(p, 'refill')); })) return;
+        mats.push(m);
+      });
+    });
+    mats.sort(function (a, b) { return matPromo(b).pct - matPromo(a).pct; });
+    var accs = accessories.filter(function (a) { return a.promoOn && !(onlyStock && accOut(a)); });
+    var sps = spacers.filter(function (p) { return spacerPromoPct(p) > 0 && !(onlyStock && (p.qty | 0) <= 0); });
+    function group(id, title, cards, n) {
+      if (!cards) return '';
+      return '<section class="cat-group" aria-labelledby="' + id + '">' +
+        '<header class="cat-ghead">' +
+          '<h2 class="cat-gtitle" id="' + id + '">' + title + '</h2>' +
+          '<span class="cat-gmeta">' + n + '</span>' +
+          '<span class="cat-grule" aria-hidden="true"></span>' +
+        '</header>' +
+        '<div class="cat-grid">' + cards + '</div>' +
+      '</section>';
+    }
+    var html =
+      group('pg-fil', window.CA.lang === 'en' ? 'Filament' : 'Filaments', mats.map(matCard).join(''), plural(mats.length, 'matériau', 'matériaux')) +
+      group('pg-acc', _t('Accessoires'), accs.map(accCard).join(''), plural(accs.length, 'article', 'articles')) +
+      group('pg-spa', _t('Spacers'), sps.map(spacerCard).join(''), plural(sps.length, 'modèle', 'modèles'));
+    $('#pr-st-items').textContent = mats.length + accs.length + sps.length;
+    var best = 0;
+    mats.forEach(function (m) { best = Math.max(best, matPromo(m).pct); });
+    accs.forEach(function (a) { best = Math.max(best, accPromoPct(a)); });
+    sps.forEach(function (p) { best = Math.max(best, spacerPromoPct(p)); });
+    $('#pr-st-best').textContent = best ? PR.pctText(best) : '—';
+    el.removeAttribute('aria-busy');
+    el.innerHTML = html || '<p class="empty">' + (onlyStock
+      ? _t('Aucune promotion en stock pour le moment. ') + _t('<button type="button" class="js-show-all">Voir aussi les ruptures</button>')
+      : _t('Aucune promotion en ce moment.') + ' <a href="' + esc(UP + 'boutique') + '">' + _t('Voir toute la boutique') + '</a>') + '</p>';
+    var sa = $('.js-show-all', el);
+    if (sa) sa.addEventListener('click', function () { setOnlyStock(false); });
   }
 
   function matCard(m) {
@@ -786,7 +887,7 @@
     var accTitle = accCatsHere.length === 1 ? accCatsHere[0] : _t('Accessoires suggérés');
     var accHtml = accDisp.length ? '<div class="pdp-accs" id="pdp-accs">' +
       '<div class="pdp-accs-head"><h2>' + esc(accTitle) + '</h2>' +
-        _t('<a class="pdp-accs-all" href="#/accessoires">Tous les accessoires ') + IC.arrow + '</a></div>' +
+        '<a class="pdp-accs-all" href="' + esc(accRouteFor()) + '">' + _t('Tous les accessoires') + ' ' + IC.arrow + '</a></div>' +
       accDisp.map(function (a) {
       var o = accOut(a), best = accBestTier(a);
       return '<div class="acc">' +
@@ -964,7 +1065,7 @@
       '<p class="cfg-notify-msg" aria-live="polite"></p>' +
       _t('<p class="cfg-notify-legal">On utilise ton courriel <strong>uniquement</strong> pour t\'aviser de l\'arrivée de ce produit (') +
         esc(o.what) + _t('), puis il est supprimé. ') +
-        _t('<a href="confidentialite#liste-attente">Politique de confidentialité</a></p>')) +
+        _t('<a href="confidentialite#liste-attente">Politique de confidentialité</a></p>').replace('href="', 'href="' + UP)) +
     '</div>';
   }
   function wireNotify(root, o, rerender) {
@@ -1077,7 +1178,7 @@
   }
 
   /* =========================================================
-     ACCESSOIRES — catalogue par catégorie (#/accessoires[/<catégorie>])
+     ACCESSOIRES — catalogue par catégorie (boutique/accessoires #/ ou #/c/<catégorie>)
      puis fiche (#/a/<slug>). Même panier que les filaments.
      ========================================================= */
   var accCat = null, accsScrollY = null, curAcc = null, accQty = 1, accImg = 0, accTab = null;
@@ -1105,7 +1206,7 @@
     $('#acc-st-cats').textContent = accCats.length;
     var shown = function (items) { return onlyStock ? items.filter(function (a) { return !accOut(a); }) : items; };
     accChipsEl.innerHTML = accCats.length < 2 ? '' :
-      '<a class="chip" href="#/accessoires"' + (!accCat ? ' aria-current="true"' : '') + _t('>Toutes <span class="chip-n">') + shown(accessories).length + '</span></a>' +
+      '<a class="chip" href="' + esc(accRouteFor()) + '"' + (!accCat ? ' aria-current="true"' : '') + _t('>Toutes <span class="chip-n">') + shown(accessories).length + '</span></a>' +
       accCats.map(function (c) {
         return '<a class="chip" href="' + esc(accRouteFor(c)) + '"' + (accCat === c ? ' aria-current="true"' : '') + '>' +
           esc(c.name) + ' <span class="chip-n">' + shown(c.items).length + '</span></a>';
@@ -1169,7 +1270,7 @@
   }
   function renderAccCrumbs() {
     var c = accCatOf(curAcc);
-    accCrumbsEl.innerHTML = _t('<a href="#/accessoires">Accessoires</a>') + IC.chev +
+    accCrumbsEl.innerHTML = '<a href="' + esc(accRouteFor()) + '">' + _t('Accessoires') + '</a>' + IC.chev +
       (c && accCats.length > 1 ? '<a href="' + esc(accRouteFor(c)) + '">' + esc(c.name) + '</a>' + IC.chev : '') +
       '<span aria-current="page">' + esc(curAcc.name) + '</span>';
   }
@@ -1733,7 +1834,7 @@
       editBar = $('#cart-editbar'), editNum = $('#cart-edit-num'), editCancel = $('#cart-edit-cancel'), loginP = $('#cart-login'),
       resvBtn = $('#cart-resv'), resvWhy = $('#cart-resv-why'), resvInfo = null, infoBtn = $('#cart-info');
   // Cueillette : choisie APRÈS l'envoi, sur l'écran « Ma cueillette » de Mon compte (compte.js)
-  function goPickup(kind, id) { location.href = 'compte#/cueillette/' + kind + '/' + encodeURIComponent(id); }
+  function goPickup(kind, id) { location.href = UP + 'compte#/cueillette/' + kind + '/' + encodeURIComponent(id); }
   // Réservation 72 h (client approuvé) : articles EN STOCK seulement -> lignes au-delà du stock listées
   function overStock() {
     return entries().filter(function (it) {
@@ -1888,6 +1989,7 @@
       }
       if (trimmed.length || !focusedIn(cartItems)) renderCart();
       if (!screenCatalog.hidden && !focusedIn(catGroups)) renderCatalog();
+      if (screenPromo && !screenPromo.hidden) renderPromoPage();
       // fiche : rafraîchit stock / ruptures, sans interrompre une saisie
       if (curColor && !screenProduct.hidden && !focusedIn(configEl)) {
         var st = stockOf(curColor, curType);

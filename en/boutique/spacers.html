@@ -29,7 +29,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../../assets/site.css?v=29">
-<link rel="stylesheet" href="../../assets/boutique.css?v=60">
+<link rel="stylesheet" href="../../assets/boutique.css?v=61">
 <link rel="stylesheet" href="../../assets/dialog.css?v=2">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="../../assets/fetes.css?v=9">
@@ -40,7 +40,7 @@
 <!-- /spacers:head -->
 <script src="../../assets/look.js?v=5"></script>
 <script src="../../assets/i18n.js?v=1"></script>
-<script src="../../assets/i18n-en.js?v=40"></script>
+<script src="../../assets/i18n-en.js?v=41"></script>
 </head>
 <body class="home-page shop-page">
 <a class="skip" href="#main">Skip to content</a>
@@ -58,10 +58,10 @@
     <div class="nav-dd">
       <a class="nav-dd-t is-active" href="../boutique" aria-haspopup="true" aria-expanded="false">Shop <svg class="nav-dd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
       <div class="nav-dd-m">
-        <a href="../boutique?promo=1">Promotions</a>
-        <a href="../boutique">Filament</a>
+        <a href="../boutique/promotions">Promotions</a>
+        <a href="../boutique/filaments">Filament</a>
         <a href="../boutique/spacers" class="is-active">Spacers</a>
-        <a href="../boutique#/accessoires">Accessories</a>
+        <a href="../boutique/accessoires">Accessories</a>
         <a href="../boutique/imprimantes">3D Printers <span class="nav-soon">Coming soon</span></a>
       </div>
     </div>
@@ -92,10 +92,12 @@
   <!-- Catalogue (#/) -->
   <div id="sp-catalog">
     <nav class="shop-tabs" id="shop-tabs" aria-label="Shop departments">
-      <a href="../boutique#/" data-tab="filaments">Filament</a>
+      <a href="../boutique" data-tab="home" class="shop-tab-home" aria-label="Shop home" title="Shop home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.2 12 4.5l8 6.7"/><path d="M6.2 9.6V19.5h11.6V9.6"/><path d="M10 19.5v-5h4v5"/></svg></a>
+      <a href="../boutique/filaments" data-tab="filaments">Filament</a>
       <a href="../boutique/spacers" data-tab="spacers" class="is-active" aria-current="page">Spacers</a>
-      <a href="../boutique#/accessoires" data-tab="accessoires">Accessories</a>
-      <a href="../boutique?promo=1" data-tab="promo">Promotions</a>
+      <a href="../boutique/accessoires" data-tab="accessoires">Accessories</a>
+      <a href="../boutique/imprimantes" data-tab="imprimantes">3D Printers</a>
+      <a href="../boutique/promotions" data-tab="promo">Promotions</a>
     </nav>
     <div class="shop-head">
       <div class="shop-eyebrow">3D printing</div>
@@ -164,9 +166,9 @@
     </div>
     <nav class="foot-col" aria-label="Shop">
       <h4>Shop</h4>
-      <a href="../boutique">Filament</a>
+      <a href="../boutique/filaments">Filament</a>
       <a href="../boutique/spacers">Spacers &amp; adapters</a>
-      <a href="../boutique#/accessoires">Accessories</a>
+      <a href="../boutique/accessoires">Accessories</a>
       <a href="../impression">Custom 3D printing</a>
       <a href="../entretien">Printer maintenance</a>
     </nav>
@@ -206,10 +208,10 @@
     <a href="../">Home</a>
     <a class="drawer-parent" href="../boutique">Shop</a>
     <div class="drawer-sub">
-      <a href="../boutique?promo=1">Promotions</a>
-      <a href="../boutique">Filament</a>
+      <a href="../boutique/promotions">Promotions</a>
+      <a href="../boutique/filaments">Filament</a>
       <a href="../boutique/spacers" class="is-active">Spacers</a>
-      <a href="../boutique#/accessoires">Accessories</a>
+      <a href="../boutique/accessoires">Accessories</a>
       <a href="../boutique/imprimantes">3D Printers <span class="nav-soon">Coming soon</span></a>
     </div>
     <a href="../impression">3D printing</a>
@@ -218,7 +220,7 @@
     <a href="../../boutique/spacers" hreflang="fr" lang="fr" data-lang-switch="fr">Français</a>
   </nav>
   <div class="drawer-cta">
-    <a class="primary" href="../boutique">Shop filament</a>
+    <a class="primary" href="../boutique/filaments">Shop filament</a>
     <a class="secondary" href="../compte">My account</a>
     <a class="secondary" href="../dealer">Dealer program</a>
   </div>

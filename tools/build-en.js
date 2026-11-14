@@ -28,7 +28,9 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const SITE = 'https://creationaudio.ca/';
 const PAGES = ['index.html', 'boutique.html', 'compte.html', 'dealer.html', 'aide.html',
-  'conditions.html', 'confidentialite.html', 'retours.html', '404.html', 'revendeur.html', 'entretien.html', 'impression.html', 'boutique/imprimantes.html'];
+  'conditions.html', 'confidentialite.html', 'retours.html', '404.html', 'revendeur.html', 'entretien.html', 'impression.html', 'boutique/imprimantes.html',
+  // rayons de la boutique (2026-11-14) : accessoires + promotions tirés de filaments par tools/build-boutique-pages.js
+  'boutique/filaments.html', 'boutique/accessoires.html', 'boutique/promotions.html'];
 const DICT_FILE = path.join(ROOT, 'tools/i18n/pages.en.json');
 const MISSING_FILE = path.join(ROOT, 'tools/i18n/missing.json');
 
@@ -182,6 +184,7 @@ function reportMissing(tag) {
 }
 
 if (require.main === module) {
+  require('./build-boutique-pages.js').run();   // d'abord les pages de rayon FR (tirées de boutique/filaments.html)
   let n = 0;
   PAGES.forEach((p) => {
     const src = fs.readFileSync(path.join(ROOT, p), 'utf8');
