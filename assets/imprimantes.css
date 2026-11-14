@@ -3,8 +3,14 @@
 /* Pleine largeur à toutes les tailles d'écran : les cartes se partagent toute la place (auto-fit = pas de colonne vide à droite) */
 body[data-tab="imprimantes"] main { max-width:none; }
 .fm-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap:var(--gap); align-items:start; }
-@media (min-width:2200px) { .fm-grid { grid-template-columns:repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap:22px; } }
-@media (min-width:3000px) { .fm-grid { grid-template-columns:repeat(auto-fit, minmax(min(100%, 600px), 1fr)); gap:26px; } }
+/* Ordi : 4 gros carrés en 2 × 2 qui remplissent l'écran — la caméra prend toute la hauteur libre de la carte */
+@media (min-width:1025px) {
+  .fm-grid { --fm-gap:18px; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--fm-gap); align-items:stretch;
+    grid-auto-rows:max(440px, calc((100dvh - 230px - var(--fm-gap)) / 2)); }
+  .fm-grid .fm-card { height:100%; }
+  .fm-grid .fm-cam { aspect-ratio:auto; flex:1 1 0; min-height:0; }
+}
+@media (min-width:2200px) { .fm-grid { --fm-gap:24px; } }
 @media (max-width:640px) {
   body[data-tab="imprimantes"] main { padding-left:10px; padding-right:10px; }
   .fm-grid { gap:12px; }
