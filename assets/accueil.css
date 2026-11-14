@@ -492,6 +492,22 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
   .promo-rib { top:8px; padding:5px 11px 5px 9px; font-size:.95rem; }
 }
 
+/* ---- Nouveautés (promo.js newTag) ---- */
+:root { --new:#0b8a5c; --new-2:#18b37e; --on-new:#fff; }
+.new-tag { display:inline-block; padding:5px 11px; color:var(--on-new); background:linear-gradient(135deg, var(--new-2), var(--new)); border-radius:100px;
+  font-family:var(--display); font-weight:800; font-size:.78rem; line-height:1; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; box-shadow:0 6px 14px -5px rgba(11,138,92,.6); }
+.new-tag.is-abs { position:absolute; left:10px; bottom:10px; z-index:3; }
+.mat-name .new-tag { margin-left:8px; padding:4px 9px; font-size:.66rem; vertical-align:.18em; }
+.pop-media { position:relative; }
+.new-sec .pop-grid { grid-template-columns:repeat(4, minmax(0, 1fr)); }
+.new-card { border-color:color-mix(in srgb, var(--new) 45%, var(--line)); }
+@media (max-width:1024px) { .new-sec .pop-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+@media (max-width:760px) {
+  .new-sec .pop-grid { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; gap:12px; padding-bottom:6px; }
+  .new-sec .pop-card { flex:0 0 clamp(190px, 60vw, 240px); scroll-snap-align:start; }
+  .new-tag { padding:4px 9px; font-size:.7rem; } .new-tag.is-abs { left:8px; bottom:8px; }
+}
+
 /* une seule promo : carte large horizontale (image à gauche, détails à droite) */
 .promo-sec .pop-grid.is-solo { display:grid; grid-template-columns:minmax(0, 1fr); }
 .is-solo .promo-card { flex-direction:row; max-width:820px; }

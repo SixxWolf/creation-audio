@@ -8,6 +8,8 @@
    CA.promo.nameOf(row)             -> nom de la promo dans la langue de la page
    CA.promo.ribbon(n)               -> ruban « −20 % » (coin de la photo)
    CA.promo.banner(row, n)          -> bandeau de la fiche (grand, bien visible)
+   CA.promo.isNew(row)              -> true si attrs.new_until est dans le futur
+   CA.promo.newTag(inline)          -> pastille « Nouveau » (coin bas-gauche de la photo, ou en ligne)
    ========================================================= */
 (function () {
   'use strict';
@@ -39,5 +41,15 @@
       (end ? '<span class="pb-end">' + esc(end) + '</span>' : '') +
     '</div>';
   }
-  CA.promo = { pct: pct, pctText: pctText, endText: endText, nameOf: nameOf, ribbon: ribbon, banner: banner };
+  /* « Nouveau » : attrs.new_until (ISO, posé par Admin › Nouveautés, exposé par les vues) tant que la date n'est pas passée */
+  function isNew(row) {
+    var u = row && row.attrs && row.attrs.new_until;
+    if (!u) return false;
+    var t = Date.parse(u);
+    return !isNaN(t) && t > Date.now();
+  }
+  function newTag(inline) {
+    return '<span class="new-tag' + (inline ? '' : ' is-abs') + '" aria-hidden="' + (inline ? 'false' : 'true') + '">' + _t('Nouveau') + '</span>';
+  }
+  CA.promo = { pct: pct, pctText: pctText, endText: endText, nameOf: nameOf, ribbon: ribbon, banner: banner, isNew: isNew, newTag: newTag };
 })();

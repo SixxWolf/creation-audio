@@ -2160,6 +2160,9 @@ a.ms-b-file:hover { border-color:var(--ink); }
 .pm-mode .pr-seg { width:min(100%, 320px); }
 .pm-pct { display:inline-flex; align-items:center; gap:6px; font-weight:700; }
 .pm-pct input { width:84px; }
+.nv-quick { display:flex; flex-wrap:wrap; gap:6px; }
+#nv-box { display:block; margin-bottom:16px; }
+#nv-box .actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:16px; }
 .pm-sec { margin-top:18px; }
 .pm-sec h3 { margin:0 0 8px; font-size:.95rem; }
 .pm-q { min-width:200px; margin-bottom:8px; }

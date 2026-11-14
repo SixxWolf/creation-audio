@@ -582,7 +582,7 @@
                          : '<span class="mcard-sw" style="background:' + esc(swatchBg(m.rep)) + '"></span>';
     var pm = matPromo(m);
     return '<a class="mcard' + (out ? ' is-out' : '') + (pm ? ' is-promo' : '') + '" href="' + esc(routeFor(m.brand, m.name)) + '">' +
-      '<span class="mcard-media">' + media + (pm ? PR.ribbon(pm.pct) : '') + brandBadge(m.brand, 'mcard-brand') + '</span>' +
+      '<span class="mcard-media">' + media + (pm ? PR.ribbon(pm.pct) : '') + (m.items.some(PR.isNew) ? PR.newTag() : '') + brandBadge(m.brand, 'mcard-brand') + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(m.name) + '</span>' +
         (pm ? '<span class="mcard-promo">' + plural(pm.n, 'couleur en promo', 'couleurs en promo') + '</span>' : '') +
@@ -1141,7 +1141,7 @@
     if (tag.length > 90) tag = tag.slice(0, 88).replace(/\s+\S*$/, '') + '…';
     return '<a class="mcard acard' + (out ? ' is-out' : '') + (a.promoOn ? ' is-promo' : '') + '" href="' + esc(accHref(a)) + '">' +
       '<span class="mcard-media">' + (a.img ? '<img src="' + esc(a.img) + '" alt="" loading="lazy">'
-        : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') + (a.promoOn ? PR.ribbon(accPromoPct(a)) : '') + '</span>' +
+        : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') + (a.promoOn ? PR.ribbon(accPromoPct(a)) : '') + (PR.isNew(a.promoRow) ? PR.newTag() : '') + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(a.name) + '</span>' +
         (tag ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +

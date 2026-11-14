@@ -33,7 +33,7 @@
   var _t = CA0.t || function (s, v) { return v ? String(s).replace(/\{(\w+)\}/g, function (m, k) { return v[k] == null ? m : v[k]; }) : s; };
   var money = CA0.money || function (n) { return (Math.round((+n || 0) * 100) / 100).toFixed(2).replace('.', ',') + ' $'; };
   // promotions (promo.js) : le prix promo est déjà dans sell_price ; reg_price = prix normal à barrer
-  var PR = CA0.promo || { pct: function () { return 0; }, ribbon: function () { return ''; }, banner: function () { return ''; } };
+  var PR = CA0.promo || { pct: function () { return 0; }, ribbon: function () { return ''; }, banner: function () { return ''; }, isNew: function () { return false; }, newTag: function () { return ''; } };
   function spPromo(p) { return !!(p && p.promo_id && p.promo_on); }
   function spPct(p) { return spPromo(p) ? PR.pct(p.reg_price, p.sell_price) : 0; }
   var tr = CA0.tr || function (r, f) { return (r.attrs || {})[f] || ''; };
@@ -399,7 +399,7 @@
         '<a class="sp-card-link" href="' + esc(hrefOf(p)) + '">' +
           '<div class="mat-media">' +
             (url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="sp-noimg">' + IC.photo + '</span>') +
-            (spPromo(p) ? PR.ribbon(spPct(p)) : '') +
+            (spPromo(p) ? PR.ribbon(spPct(p)) : '') + (PR.isNew(p) ? PR.newTag() : '') +
           '</div>' +
           '<div class="sp-body">' +
             (tags ? '<div class="sp-tags">' + tags + '</div>' : '') +

@@ -296,7 +296,7 @@
       '<span class="mat-band" aria-hidden="true">' + band + '</span>' +
       '<span class="mat-go" aria-hidden="true">' + ARROW + '</span>' +
       '<span class="mat-body">' +
-        '<span class="mat-name">' + esc(g.material) + '</span>' +
+        '<span class="mat-name">' + esc(g.material) + (window.CA.promo && g.all.some(window.CA.promo.isNew) ? ' ' + window.CA.promo.newTag(true) : '') + '</span>' +
         (tag ? '<span class="mat-tag">' + esc(tag) + '</span>' : '') +
         '<span class="mat-foot"><span>' + tn(n, '<b>{n}</b> couleur en stock', '<b>{n}</b> couleurs en stock') + '</span>' +
           (min != null ? '<span class="mat-price">' + _t('dès <b>{p}</b>', { p: priceShort(min) }) + '</span>' : '') + '</span>' +
@@ -399,6 +399,40 @@
     stripe();
   }
 
+  /* ---- Nouveautés : produits dont attrs.new_until est dans le futur ; filaments groupés par marque + matériau ---- */
+  function renderNew(rows) {
+    var sec = $('#nouveautes'), grid = $('#new-grid'), P = (window.CA || {}).promo;
+    if (!sec || !grid || !P) return;
+    var groups = {}, order = [];
+    rows.forEach(function (p) {
+      if (!P.isNew(p)) return;
+      var key = p.type === 'filament' ? 'f|' + (p.brand || '') + '|' + (p.material || '') : 'i|' + p.id;
+      var g = groups[key];
+      if (!g) { g = groups[key] = { p: p, n: 0, min: null, until: p.attrs.new_until }; order.push(key); }
+      g.n++;
+      var v = p.type === 'filament' ? fromPrice(p) : (p.sell_price != null ? +p.sell_price : null);
+      if (v != null && (g.min == null || v < g.min)) g.min = v;
+      if (!g.p.image_path && p.image_path) g.p = p;
+    });
+    var list = order.map(function (k) { return groups[k]; }).slice(0, 8);
+    if (!list.length) { sec.hidden = true; stripe(); return; }
+    grid.innerHTML = list.map(function (g) {
+      var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
+      var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
+      var title = isF ? esc((p.brand ? p.brand + ' ' : '') + (p.material || _t('Filament'))) : esc(p.name);
+      var href = isF ? matUrl(p) : p.type === 'spacer' ? 'boutique/spacers' : 'boutique';
+      var sub = isF ? tn(g.n, '{n} couleur', '{n} couleurs') : '';
+      return '<a class="pop-card new-card" href="' + esc(href) + '">' +
+        '<span class="pop-media">' + media + P.newTag() + '</span><span class="pop-body">' +
+        '<span class="pop-name">' + title + '</span>' +
+        (sub ? '<span class="pop-meta"><span>' + sub + '</span></span>' : '') +
+        '<span class="pop-foot">' + (g.min != null ? '<span>' + (isF ? _t('dès') + ' ' : '') + '<b>' + money(g.min) + '</b></span>' : '<span></span>') + '</span>' +
+        '</span></a>';
+    }).join('');
+    sec.hidden = false;
+    stripe();
+  }
+
   /* bandes alternées : une section visible sur deux (après le héros) en crème */
   function stripe() {
     var n = 0;
@@ -459,6 +493,7 @@
       var nMats = renderMaterials(fils);
       renderPopular(fils, pop);
       renderExtras(rows);
+      renderNew(rows);
       renderPromos(rows);
       renderStats(fils, nMats);
     }, fail);

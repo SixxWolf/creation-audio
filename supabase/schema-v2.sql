@@ -353,6 +353,8 @@ with (security_invoker = off) as
       'speakers',     p.attrs -> 'speakers',
       -- spacers : anciens noms (renommés en code maison) -> anciens liens, recherche, fichiers AutoLoop
       'aliases',      p.attrs -> 'aliases',
+      -- ruban « Nouveau » : fin d'affichage (ISO), posée par Admin › Nouveautés
+      'new_until',    p.attrs -> 'new_until',
       -- accessoires : catégorie (puces + rabais cumulé), affichage sur la fiche filament (+ marques visées)
       'category',     p.attrs -> 'category',
       'on_filament',  p.attrs -> 'on_filament',
@@ -720,7 +722,8 @@ create view public.products_dealer with (security_invoker = off) as
            'gallery',      p.attrs -> 'gallery',
            'replaces',     p.attrs -> 'replaces',
            'speakers',     p.attrs -> 'speakers',
-           'aliases',      p.attrs -> 'aliases'
+           'aliases',      p.attrs -> 'aliases',
+           'new_until',    p.attrs -> 'new_until'
          )) as attrs,
          p.image_path,
          case when pb.on1 then pb.p1 else coalesce(p.dealer_price, p.sell_price) end as sell_price,

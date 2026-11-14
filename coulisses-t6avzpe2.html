@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=164">
+<link rel="stylesheet" href="assets/admin.css?v=165">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
@@ -112,6 +112,7 @@
       <button class="tab" type="button" data-tab="spacers" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5.5"/><path d="M12 2.5v1.5M12 20v1.5M2.5 12H4M20 12h1.5"/></svg><span>Spacers</span></button>
       <button class="tab" type="button" data-tab="accessoires" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.3V4.5a1 1 0 0 1 1-1h7.8l8.2 8.2a1 1 0 0 1 0 1.4l-6.9 6.9a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.5"/></svg><span>Accessoires</span></button>
       <button class="tab" type="button" data-tab="promotions" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5L5 19"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg><span>Promotions</span></button>
+      <button class="tab" type="button" data-tab="nouveautes" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 5.3 5.3.5-4 3.6 1.2 5.4L12 15l-4.7 2.8 1.2-5.4-4-3.6 5.3-.5z"/></svg><span>Nouveautés</span></button>
 
       <p class="side-group" aria-hidden="true">Stock</p>
       <button class="tab" type="button" data-tab="inventaire" data-group="Stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg><span>Inventaire</span></button>
@@ -380,6 +381,50 @@
       <div class="pm-list" id="pm-list"><p class="muted">Chargement…</p></div>
      </div><!-- /.dock-main -->
      <aside class="dock" data-dock aria-label="Éditeur"></aside>
+    </section>
+
+    <!-- ---------------- NOUVEAUTÉS (cms-nouveautes.js, products.attrs.new_until) ----------------
+         Le ruban « Nouveau » est lu par promo.js (isNew) sur boutique, spacers, dealer et accueil ; fin = attrs.new_until exposé par les vues. -->
+    <section class="tabpanel" data-panel="nouveautes" role="tabpanel" hidden>
+      <div class="panel-head">
+        <div>
+          <h1>Nouveautés</h1>
+          <p class="muted">Ruban « Nouveau » sur des produits, pour une durée choisie.</p>
+        </div>
+        <span class="grow"></span>
+        <a class="btn btn-ghost btn-sm" href="./boutique" target="_blank" rel="noopener" data-ic="link">Voir la boutique</a>
+        <button class="btn btn-ghost btn-sm" id="nv-refresh" type="button" data-ic="refresh">Rafraîchir</button>
+      </div>
+
+      <div class="editor" id="nv-box">
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="nv-days">Durée (jours)</label>
+            <input type="number" id="nv-days" min="1" max="365" step="1" value="14" inputmode="numeric">
+          </div>
+          <div class="field">
+            <span class="lbl">Raccourcis</span>
+            <div class="nv-quick" id="nv-quick">
+              <button type="button" class="btn btn-ghost btn-sm" data-d="7">7 j</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-d="14">14 j</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-d="30">30 j</button>
+              <button type="button" class="btn btn-ghost btn-sm" data-d="60">60 j</button>
+            </div>
+          </div>
+        </div>
+        <div class="pm-sec">
+          <h3>Articles</h3>
+          <input type="search" id="nv-q" class="pm-q" placeholder="Chercher" autocomplete="off">
+          <div class="pm-pick" id="nv-pick"></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-accent" type="button" id="nv-apply" data-ic="check">Marquer nouveau</button>
+          <button class="btn btn-ghost" type="button" id="nv-remove" data-ic="trash">Retirer le ruban</button>
+          <span class="status" id="nv-status"></span>
+        </div>
+      </div>
+
+      <div class="pm-list" id="nv-list"><p class="muted">Chargement…</p></div>
     </section>
 
     <section class="tabpanel" data-panel="filaments" role="tabpanel">
@@ -3061,6 +3106,7 @@
 <script src="assets/cms-aujourdhui.js?v=2"></script>
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-promotions.js?v=8"></script>
+<script src="assets/cms-nouveautes.js?v=1"></script>
 <script src="assets/cms-recherche.js?v=3"></script>
 <script src="assets/aide.js?v=4"></script>
 <script src="assets/cms-aide.js?v=8"></script>

@@ -869,6 +869,13 @@ body.cart-lock { overflow:hidden; }
   .pb-badge { font-size:1.15rem; }
 }
 
+/* ---------- « Nouveau » (promo.js newTag) : pastille bas-gauche de la photo, ne gêne ni le ruban de promo ni le logo de marque ---------- */
+:root { --new:#0b8a5c; --new-2:#18b37e; --on-new:#fff; }
+.new-tag { display:inline-block; padding:5px 11px; color:var(--on-new); background:linear-gradient(135deg, var(--new-2), var(--new)); border-radius:100px;
+  font-family:var(--display); font-weight:800; font-size:.78rem; line-height:1; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; box-shadow:0 6px 14px -5px rgba(11,138,92,.6); }
+.new-tag.is-abs { position:absolute; left:10px; bottom:10px; z-index:3; }
+@media (max-width:640px) { .new-tag { padding:4px 9px; font-size:.7rem; } .new-tag.is-abs { left:8px; bottom:8px; } }
+
 /* ---- Marque évidente partout (logo de la marque, Admin › Marques) ---- */
 .mcard-brand, .cat-glogo, .pdp-blogo, .cgroup-logo { display:inline-block; flex:none; overflow:hidden; background:#fff;
   border:1px solid var(--line); border-radius:8px; }
