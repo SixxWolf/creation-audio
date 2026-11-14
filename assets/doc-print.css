@@ -3,6 +3,8 @@
 @media print {
   body.doc-printing > *:not(.doc-print) { display:none !important; }
   body.doc-printing { background:#fff !important; }
+  /* l'admin charge facture.css, qui masque tout sauf #fx-invoice (visibility) : on rend le document visible */
+  body.doc-printing .doc-print, body.doc-printing .doc-print * { visibility:visible !important; }
   body.doc-printing .doc-print { display:block; color:#181A1F; font-size:12pt; font-family:system-ui, -apple-system, "Segoe UI", sans-serif; padding:14mm; }
   /* marge 0 : le navigateur n'imprime plus date, titre, adresse ni n° de page ; le recul vient du padding */
   @page { margin:0; }
