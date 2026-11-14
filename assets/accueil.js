@@ -119,7 +119,9 @@
     return s && r ? _t('Bobine + recharge') : s ? _t('Bobine en stock') : r ? _t('Recharge en stock') : '';
   }
 
-  var brandSlug = {}, brandOrder = {};
+  var brandSlug = {}, brandOrder = {}, brandImg = {};
+  /* logo de marque en coin (comme les cartes de la boutique) : le titre reste le matériau seul */
+  function brandBadge(brand) { var u = brandImg[brand] ? publicUrl(brandImg[brand]) : ''; return u ? '<span class="pop-brand"><img src="' + esc(u) + '" alt="' + esc(brand) + '" loading="lazy"></span>' : ''; }
   function brandSeg(brand) { return brandSlug[brand] || slugify(brand || 'Autres'); }
   function matUrl(p) { return 'boutique#/m/' + brandSeg(p.brand) + '/' + (p.material_slug || slugify(p.material || 'Autres')); }
   function filUrl(p) { return matUrl(p) + '/' + (p.slug || slugify(p.name)); }
@@ -383,12 +385,12 @@
     grid.innerHTML = list.map(function (g) {
       var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
       var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
-      var title = isF ? esc((p.brand ? p.brand + ' ' : '') + (p.material || _t('Filament'))) : esc(p.name);
+      var title = isF ? esc(p.material || _t('Filament')) : esc(p.name);
       var href = p.type === 'spacer' ? 'boutique/spacers' : 'boutique?promo=1';
       var sub = isF ? tn(g.n, '{n} couleur', '{n} couleurs') : esc(P.nameOf(p));
       var end = P.endText(p.promo_ends);
       return '<a class="pop-card promo-card" href="' + esc(href) + '">' + P.ribbon(g.pc) +
-        '<span class="pop-media">' + media + '</span><span class="pop-body">' +
+        '<span class="pop-media">' + media + (isF ? brandBadge(p.brand) : '') + '</span><span class="pop-body">' +
         '<span class="pop-name">' + title + '</span>' +
         '<span class="pop-meta"><span>' + sub + (end ? ' · ' + esc(end) : '') + '</span></span>' +
         '<span class="pop-foot"><span>' + (isF ? _t('dès') + ' ' : '') + '<b>' + money(g.min) + '</b> <s class="promo-was">' + money(g.reg) + '</s></span></span>' +
@@ -419,11 +421,11 @@
     grid.innerHTML = list.map(function (g) {
       var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
       var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
-      var title = isF ? esc((p.brand ? p.brand + ' ' : '') + (p.material || _t('Filament'))) : esc(p.name);
+      var title = isF ? esc(p.material || _t('Filament')) : esc(p.name);
       var href = isF ? matUrl(p) : p.type === 'spacer' ? 'boutique/spacers' : 'boutique';
       var sub = isF ? tn(g.n, '{n} couleur', '{n} couleurs') : '';
       return '<a class="pop-card new-card" href="' + esc(href) + '">' +
-        '<span class="pop-media">' + media + P.newTag() + '</span><span class="pop-body">' +
+        '<span class="pop-media">' + media + P.newTag() + (isF ? brandBadge(p.brand) : '') + '</span><span class="pop-body">' +
         '<span class="pop-name">' + title + '</span>' +
         (sub ? '<span class="pop-meta"><span>' + sub + '</span></span>' : '') +
         '<span class="pop-foot">' + (g.min != null ? '<span>' + (isF ? _t('dès') + ' ' : '') + '<b>' + money(g.min) + '</b></span>' : '<span></span>') + '</span>' +
@@ -463,7 +465,7 @@
     var cols = 'id,type,name,brand,material,hex,attrs,image_path,slug,material_slug,material_desc,material_en,material_sort,sell_price,sell_price_2,qty,qty_2,sort_order,promo_id,promo_name,promo_name_en,promo_ends,promo_on,promo_on_2,reg_price,reg_price_2';
     Promise.all([
       sb.from('products_public').select(cols).in('type', ['filament', 'spacer', 'accessory']).limit(2000),
-      sb.from('brands').select('name,sort_order,slug'),
+      sb.from('brands').select('name,sort_order,slug,image_path'),
       sb.from('product_popularity').select('product_id,qty_sold')
     ]).then(function (res) {
       var pr = res[0], br = res[1], po = res[2];
@@ -471,6 +473,7 @@
       ((br && br.data) || []).forEach(function (b) {
         brandOrder[b.name] = b.sort_order || 0;
         brandSlug[b.name] = b.slug || slugify(b.name);
+        if (b.image_path) brandImg[b.name] = b.image_path;
       });
       var pop = {};
       ((po && !po.error && po.data) || []).forEach(function (r) { pop[r.product_id] = +r.qty_sold || 0; });
