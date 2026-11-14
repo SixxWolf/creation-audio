@@ -192,7 +192,7 @@
     // public + client connecté (o.backorder) : rupture commandable, comme le portail dealer
     function bo() { return !isDealer && !!(o.backorder && o.backorder()); }
     function unit(p, qty) { return isDealer ? tierPrice(p.sell_price, p.tiers, qty) : (+p.sell_price || 0); }
-    function tierExtra() { return isDealer && o.tierExtra ? o.tierExtra() : 0; }   // commande découverte : paires déjà au panier
+    function tierExtra() { return isDealer && o.tierExtra ? o.tierExtra() : 0; }   // mix and match dealer : paires déjà au panier
     function tiersFor(p) { return isDealer ? normalizeTiers(p.tiers).filter(function (t) { return t.min > 1; }) : []; }
 
     // pastille de stock : dealer = tout commandable (« Sur commande ») ; public = rupture

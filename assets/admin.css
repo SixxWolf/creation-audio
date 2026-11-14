@@ -2136,10 +2136,6 @@ a.ms-b-file:hover { border-color:var(--ink); }
 .pm-ship-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)) auto; gap:12px 14px; align-items:end; }
 .pm-ship-grid input { min-width:0; }
 .pm-ship-act { display:flex; align-items:center; gap:10px; }
-.pm-disc-note { margin:0 0 10px; }
-.pm-disc-grid { display:grid; grid-template-columns:minmax(0, 220px) auto; gap:12px 14px; align-items:end; justify-content:start; }
-.pm-disc-grid input { min-width:0; }
-@media (max-width:560px) { .pm-disc-grid { grid-template-columns:minmax(0, 1fr); } }
 @media (max-width:760px) {
   .pm-ship-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
   .pm-ship-act { grid-column:1 / -1; }

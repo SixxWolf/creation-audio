@@ -4537,58 +4537,23 @@ grant execute on function public.dealer_update_order(uuid, jsonb, text, text, js
 grant execute on function public.admin_save_dealer_order(uuid, text, jsonb, text, text, jsonb) to authenticated;
 
 -- =========================================================
--- COMMANDE DÉCOUVERTE (dealers) : sur la 1re commande d'un nouveau compte, les paliers
--- se comptent sur le total des paires de tous les modèles. Réglage : admin_settings
--- « dealer_discovery » (carte de l'onglet Promotions). Nouveau compte = dealers.created_at >= since.
--- Le drapeau dealer_orders.discovery est figé à la création de la commande.
+-- PALIERS DEALER « MIX AND MATCH » (2026-11-13) : les paliers se comptent toujours sur le
+-- total des paires de la commande, tous modèles confondus. Remplace la « commande découverte »
+-- (1re commande des nouveaux comptes seulement), retirée. La colonne dealer_orders.discovery
+-- reste pour l'historique ; plus rien ne l'écrit ni ne la lit.
 -- =========================================================
 alter table public.dealer_orders add column if not exists discovery boolean not null default false;
 
-insert into public.admin_settings (key, value)
-values ('dealer_discovery', '{"enabled": false, "ends": null, "since": null}'::jsonb)
-on conflict (key) do nothing;
-
-create or replace function public._dealer_discovery_ok(p_email text)
-returns boolean language plpgsql stable security definer set search_path = 'public' as $$
-declare
-  v jsonb; v_e date; v_since timestamptz; v_created timestamptz;
-begin
-  select value into v from public.admin_settings where key = 'dealer_discovery';
-  if coalesce(v ->> 'enabled', 'false') <> 'true' then return false; end if;
-  v_since := case when coalesce(v ->> 'since', '') <> '' then (v ->> 'since')::timestamptz end;
-  if v_since is null then return false; end if;
-  v_e := case when (v ->> 'ends') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then (v ->> 'ends')::date end;
-  if v_e is not null and (now() at time zone 'America/Toronto')::date > v_e then return false; end if;
-  select created_at into v_created from public.dealers where lower(email) = lower(btrim(coalesce(p_email, '')));
-  if v_created is null or v_created < v_since then return false; end if;
-  return not exists (select 1 from public.dealer_orders
-                      where lower(dealer_email) = lower(btrim(p_email)) and status <> 'cancelled');
-end $$;
-
--- portail : p_email ignoré (le dealer connecté) ; admin : le dealer choisi dans l'éditeur
-create or replace function public.dealer_discovery(p_email text default null)
-returns jsonb language plpgsql stable security definer set search_path = 'public' as $$
-declare
-  v_email text;
-begin
-  if public.is_admin() then
-    v_email := coalesce(p_email, (select auth.jwt()) ->> 'email');
-  elsif public.is_dealer() then
-    v_email := (select auth.jwt()) ->> 'email';
-  else
-    raise exception 'Réservé aux comptes dealer.' using errcode = '42501';
-  end if;
-  return jsonb_build_object('eligible', public._dealer_discovery_ok(v_email),
-    'ends', (select value ->> 'ends' from public.admin_settings where key = 'dealer_discovery'));
-end $$;
+drop function if exists public.dealer_discovery(text);
+drop function if exists public._dealer_discovery_ok(text);
+delete from public.admin_settings where key = 'dealer_discovery';
 
 create or replace function public._dealer_fill_lines(p_order uuid, p_lines jsonb)
 returns numeric language plpgsql set search_path = 'public' as $$
-declare v_n integer; v_total numeric; v_mix boolean;
+declare v_n integer; v_total numeric;
 begin
   if jsonb_typeof(p_lines) is distinct from 'array' then raise exception 'Commande vide.'; end if;
   if jsonb_array_length(p_lines) > 200 then raise exception 'Trop de lignes dans la commande.'; end if;
-  select coalesce(discovery, false) into v_mix from public.dealer_orders where id = p_order;
   delete from public.dealer_order_lines where order_id = p_order;
   with raw as (
     select e ->> 'product_id' as pid_txt, e ->> 'qty' as qty_txt, ord
@@ -4608,7 +4573,7 @@ begin
     select v.pid, v.qty, v.ord, v.name,
            public._dealer_unit_price(case when pb.on1 then pb.p1 else coalesce(v.dealer_price, v.sell_price, 0) end,
                                      case when pb.on1 then pb.t1 else v.tiers end,
-                                     case when v_mix then (select sum(qty)::integer from valid) else v.qty end) as unit
+                                     (select sum(qty)::integer from valid)) as unit
       from valid v
       left join public._promo_best pb on pb.product_id = v.pid and pb.aud = 'dealer'
   )
@@ -4642,10 +4607,9 @@ begin
        where lower(dealer_email) = v_email and created_at > now() - interval '1 hour') >= 20 then
     raise exception 'Trop de commandes envoyées en peu de temps. Réessaie plus tard.';
   end if;
-  insert into public.dealer_orders (number, dealer_email, dealer_name, note, status, discovery)
+  insert into public.dealer_orders (number, dealer_email, dealer_name, note, status)
   values ('D-' || lpad(nextval('public.dealer_order_seq')::text, 4, '0'),
-          v_dealer.email, v_dealer.name, nullif(left(btrim(coalesce(p_note, '')), 1000), ''), 'new',
-          public._dealer_discovery_ok(v_email))
+          v_dealer.email, v_dealer.name, nullif(left(btrim(coalesce(p_note, '')), 1000), ''), 'new')
   returning * into v_order;
   perform public._dealer_fill_lines(v_order.id, p_lines);
   perform public._dealer_apply_ship(v_order.id, p_delivery, p_address);
@@ -4664,9 +4628,9 @@ begin
   if p_id is null then
     select * into v_dealer from public.dealers where lower(email) = lower(btrim(coalesce(p_email, ''))) for update;
     if not found then raise exception 'Dealer introuvable.' using errcode = 'P0001'; end if;
-    insert into public.dealer_orders (number, dealer_email, dealer_name, note, status, created_by, discovery)
+    insert into public.dealer_orders (number, dealer_email, dealer_name, note, status, created_by)
     values ('D-' || lpad(nextval('public.dealer_order_seq')::text, 4, '0'),
-            v_dealer.email, v_dealer.name, v_note, 'new', 'admin', public._dealer_discovery_ok(v_dealer.email))
+            v_dealer.email, v_dealer.name, v_note, 'new', 'admin')
     returning * into v_order;
   else
     select * into v_order from public.dealer_orders where id = p_id for update;
@@ -4682,14 +4646,19 @@ begin
   return v_order;
 end $$;
 
-revoke all on function public._dealer_discovery_ok(text) from public, anon, authenticated;
 revoke all on function public._dealer_fill_lines(uuid, jsonb) from public, anon, authenticated;
-revoke all on function public.dealer_discovery(text) from public, anon;
 revoke all on function public.dealer_submit_order(jsonb, text, text, jsonb) from public, anon;
 revoke all on function public.admin_save_dealer_order(uuid, text, jsonb, text, text, jsonb) from public, anon;
-grant execute on function public.dealer_discovery(text) to authenticated;
 grant execute on function public.dealer_submit_order(jsonb, text, text, jsonb) to authenticated;
 grant execute on function public.admin_save_dealer_order(uuid, text, jsonb, text, text, jsonb) to authenticated;
+
+-- Seuils 6 / 12 / 24 paires (le 3e palier passe de 18 à 24) ; chaque modèle garde ses %.
+update public.products p
+   set tiers = (select jsonb_agg(case when (t ->> 'min')::int = 18 then jsonb_set(t, '{min}', '24'::jsonb) else t end
+                                 order by (t ->> 'min')::int)
+                  from jsonb_array_elements(p.tiers) t)
+ where p.type = 'spacer' and jsonb_typeof(p.tiers) = 'array'
+   and exists (select 1 from jsonb_array_elements(p.tiers) t where (t ->> 'min')::int = 18);
 
 -- ------------------------------------------------------------
 -- DEMANDES DE SERVICE (Impression 3D, Entretien) — 2026-11-06
