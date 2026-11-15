@@ -442,7 +442,7 @@
     st.view = 'compose'; stopPoll(); clearTimeout(resendT);
     head(_t('Écris-nous'), st.signed ? (st.acct && st.acct.email) || '' : _t('On répond ici et par courriel'), st.signed && st.convs.length > 0);
     altEl.hidden = false;
-    var needName = !st.signed || !String((st.acct && st.acct.name) || '').trim();
+    var needName = !st.signed || !String((st.acct && st.acct.first_name) || '').trim() || !String((st.acct && st.acct.last_name) || '').trim();
     var unread = st.convs.reduce(function (s, c) { return s + (+c.unread || 0); }, 0);
     main.innerHTML =
       '<form class="msg-form" id="msg-compose" novalidate>' +
@@ -464,9 +464,10 @@
           '<label class="msg-attach msg-attach3d"><input type="file" multiple hidden>' +
             '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>' +
             _t('<span>Ajouter un fichier 3D</span></label></div>') : '') +
-        (needName ? '<div class="msg-grid' + (st.signed ? ' one' : '') + '">' +
-          _t('<div class="msg-field"><label for="msg-name">Nom</label><input type="text" id="msg-name" autocomplete="name" maxlength="80"></div>') +
-          (st.signed ? '' : _t('<div class="msg-field"><label for="msg-email">Courriel</label><input type="email" id="msg-email" inputmode="email" ') +
+        (needName ? '<div class="msg-grid">' +
+          _t('<div class="msg-field"><label for="msg-first">Prénom</label><input type="text" id="msg-first" autocomplete="given-name" maxlength="60"></div>') +
+          _t('<div class="msg-field"><label for="msg-last">Nom</label><input type="text" id="msg-last" autocomplete="family-name" maxlength="60"></div>') +
+          (st.signed ? '' : _t('<div class="msg-field msg-wide"><label for="msg-email">Courriel</label><input type="email" id="msg-email" inputmode="email" ') +
             _t('autocomplete="email" maxlength="254" spellcheck="false" placeholder="ton@courriel.com"></div>')) +
         '</div>' : '') +
         '<input type="text" class="msg-hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">' +
@@ -475,6 +476,10 @@
         (st.signed ? '' : _t('<p class="msg-legal">Un code te sera envoyé pour confirmer ton courriel. <a href="') + ROOT + _t('confidentialite#messagerie">Confidentialité</a></p>')) +
       '</form>';
     var form = $('#msg-compose', main), ta = $('#msg-body', main), status = $('.msg-status', form);
+    if (needName && st.signed && st.acct) {   // compte d'avant la séparation : prénom/nom déjà devinés, à confirmer
+      $('#msg-first', form).value = st.acct.first_name || '';
+      $('#msg-last', form).value = st.acct.last_name || '';
+    }
     paintThumbs();
     $$('input[name="msg-topic"]', form).forEach(function (r) {
       r.addEventListener('change', function () { st.ctx.topic = r.value; ta.placeholder = HINT[r.value] || HINT.autre; saveDraft(); });
@@ -509,13 +514,15 @@
   function submitCompose(form, status) {
     if (st.busy) return;
     var topic = currentTopic(), body = $('#msg-body', form).value.trim();
-    var nameIn = $('#msg-name', form), emailIn = $('#msg-email', form);
-    var name = nameIn ? nameIn.value.trim() : '', email = emailIn ? emailIn.value.trim().toLowerCase() : '';
+    var firstIn = $('#msg-first', form), lastIn = $('#msg-last', form), emailIn = $('#msg-email', form);
+    var first = firstIn ? firstIn.value.trim() : '', last = lastIn ? lastIn.value.trim() : '';
+    var name = (first + ' ' + last).trim(), email = emailIn ? emailIn.value.trim().toLowerCase() : '';
     if (!topic) { say(status, 'Choisis un sujet.', 'bad'); var r = $('input[name="msg-topic"]', form); if (r) r.focus(); return; }
     if (!body && !st.photos.length && !st.files.length) { say(status, _t('Écris ton message.'), 'bad'); $('#msg-body', form).focus(); return; }
-    if (nameIn && !name) { say(status, _t('Entre ton nom.'), 'bad'); nameIn.focus(); return; }
+    if (firstIn && !first) { say(status, _t('Entre ton prénom.'), 'bad'); firstIn.focus(); return; }
+    if (lastIn && !last) { say(status, _t('Entre ton nom de famille.'), 'bad'); lastIn.focus(); return; }
     if (emailIn && !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) { say(status, _t('Entre un courriel valide.'), 'bad'); emailIn.focus(); return; }
-    var draft = { topic: topic, ref: st.ctx.ref || '', body: body, name: name };
+    var draft = { topic: topic, ref: st.ctx.ref || '', body: body, name: name, first: first, last: last };
     var btn = $('.msg-send', form);
     if (st.signed) { sendNew(draft, status, btn); return; }
     // pas connecté : code par courriel, puis envoi
@@ -542,8 +549,9 @@
   }
   function sendNew(d, status, btn) {
     st.busy = true; if (btn) btn.disabled = true; say(status, _t('Envoi…'));
-    var nameStep = d.name && !String((st.acct && st.acct.name) || '').trim()
-      ? rpc('me_update', { p_name: d.name, p_phone: (st.acct && st.acct.phone) || '' }).then(function (a) { st.acct = a || st.acct; })
+    var a0 = st.acct || {};
+    var nameStep = d.first && d.last && (d.first !== a0.first_name || d.last !== a0.last_name)
+      ? rpc('me_update', { p_first: d.first, p_last: d.last, p_company: a0.company || '', p_phone: a0.phone || '' }).then(function (a) { st.acct = a || st.acct; })
       : Promise.resolve();
     // langue des courriels de réponse = celle de cette page (customers.lang)
     var langStep = function () { return rpc('me_set_lang', { p_lang: CA.lang || 'fr' }).then(null, function () {}); };
@@ -644,7 +652,10 @@
     if (p) st.ctx = { topic: p.topic, ref: p.ref, body: p.body };
     setPending(null); clearTimeout(resendT);
     showCompose();
-    if (p) { var n = $('#msg-name', main), e = $('#msg-email', main); if (n) n.value = p.name || ''; if (e) e.value = p.email || ''; }
+    if (p) {
+      var f = $('#msg-first', main), l = $('#msg-last', main), e = $('#msg-email', main);
+      if (f) f.value = p.first || ''; if (l) l.value = p.last || ''; if (e) e.value = p.email || '';
+    }
     if (msg) say($('.msg-status', main), msg, 'bad');
   }
 

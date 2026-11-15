@@ -27,8 +27,9 @@
 
   var loaded = false, editing = null, cache = [], reqs = [];
   var editor = $('#dl-editor'), editorTitle = $('#dl-editor-title'),
-      emailI = $('#dl-email'), nameI = $('#dl-name'),
+      emailI = $('#dl-email'), nameI = $('#dl-name'), firstI = $('#dl-first'), lastI = $('#dl-last'),
       phoneI = $('#dl-phone'), addressI = $('#dl-address'), cityI = $('#dl-city'),
+      langI = $('#dl-lang'), sourceI = $('#dl-source'),
       statusEl = $('#dl-status'), listEl = $('#dl-list'),
       newBtn = $('#dl-new'), refreshBtn = $('#dl-refresh'),
       saveBtn = $('#dl-save'), cancelBtn = $('#dl-cancel'),
@@ -74,7 +75,12 @@
 
   function openEditor(row) {
     editing = row ? row.email : null;
-    editorTitle.textContent = row ? ('Modifier « ' + row.email + ' »') : 'Nouveau dealer';
+    editorTitle.textContent = row ? ('Modifier « ' + (who(row) || row.email) + ' »') : 'Nouveau dealer';
+    firstI.value = row && row.first_name ? row.first_name : '';
+    lastI.value = row && row.last_name ? row.last_name : '';
+    langI.value = row && row.lang === 'en' ? 'en' : 'fr';
+    if (CA.pick) CA.pick(langI);
+    if (CA.fillSources) CA.fillSources(sourceI, row && row.source);
     emailI.value = row ? row.email : '';
     emailI.readOnly = !!row;               // le courriel = clé/identité
     nameI.value = row && row.name ? row.name : '';
@@ -85,8 +91,8 @@
     // grand écran : éditeur collé à droite, la liste reste visible (CA.dockEditor) ; sinon en haut, comme avant
     var docked = !!(window.CA.dockEditor && window.CA.dockEditor(editor));
     editor.hidden = false;
-    if (docked) { emailI.focus({ preventScroll: true }); editor.parentNode.scrollTop = 0; return; }
-    emailI.focus();
+    if (docked) { (row ? firstI : emailI).focus({ preventScroll: true }); editor.parentNode.scrollTop = 0; return; }
+    (row ? firstI : emailI).focus();
     editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function closeEditor() { editor.hidden = true; editing = null; }
@@ -97,6 +103,8 @@
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { statusEl.textContent = 'Courriel invalide.'; return; }
     var isNew = !editing && !cache.some(function (d) { return d.email === email; });
     var row = { email: email, name: nameI.value.trim() || null,
+      first_name: firstI.value.trim() || null, last_name: lastI.value.trim() || null,
+      lang: langI.value === 'en' ? 'en' : 'fr', source: sourceI.value || null,
       phone: phoneI.value.trim() || null, address: addressI.value.trim() || null, city: cityI.value.trim() || null };
     saveBtn.disabled = true; statusEl.textContent = 'Enregistrement…';
     sb.from('dealers').upsert(row, { onConflict: 'email' }).select().then(function (res) {
@@ -134,6 +142,8 @@
     }, function () { if (loaded) listEl.innerHTML = '<p class="empty">Erreur réseau.</p>'; return []; });
   }
 
+  // « Prénom Nom » du contact ; le commerce (name) s'affiche dessous
+  function who(d) { return [d.first_name, d.last_name].filter(Boolean).join(' ').trim(); }
   function render() {
     if (!cache.length) {
       listEl.innerHTML = '<p class="empty">Aucun dealer pour l\'instant.<br>Approuve une demande ou clique «&nbsp;+ Ajouter un dealer&nbsp;».</p>';
@@ -142,10 +152,12 @@
     listEl.innerHTML = cache.map(function (d) {
       var loc = [d.address, d.city].filter(Boolean).join(', ');
       return '<div class="mat-row person" data-email="' + esc(d.email) + '">' +
-        CA.avatar(d.name || d.email) +
+        CA.avatar(who(d) || d.name || d.email) +
         '<div class="mat-main">' +
-          '<div class="mat-name">' + esc(d.name || d.email) + ' <span class="person-tag">Portail dealer</span>' +
+          '<div class="mat-name">' + esc(who(d) || d.name || d.email) + ' <span class="person-tag">Portail dealer</span>' +
+            (!d.first_name || !d.last_name ? '<span class="person-tag is-todo">À compléter</span>' : '') +
             (CA.credit ? CA.credit.chip(d.email) : '') + '</div>' +
+          (who(d) && d.name ? '<div class="person-co">' + esc(d.name) + '</div>' : '') +
           '<div class="person-meta">' +
             '<span class="pm pm-mail">' + CA.pv(d.email) + '</span>' +
             (d.phone ? '<span class="pm pm-tel">' + CA.pv(d.phone) + '</span>' : '') +

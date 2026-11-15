@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=167">
+<link rel="stylesheet" href="assets/admin.css?v=168">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
@@ -1383,12 +1383,20 @@
         <h2 id="dl-editor-title">Nouveau dealer</h2>
         <div class="grid">
           <div class="field">
-            <label class="lbl" for="dl-email">Courriel</label>
-            <input type="text" id="dl-email" placeholder="dealer@example.com" autocomplete="off" inputmode="email">
+            <label class="lbl" for="dl-first">Prénom</label>
+            <input type="text" id="dl-first" placeholder="Prénom du contact" autocomplete="off" maxlength="60">
           </div>
           <div class="field">
-            <label class="lbl" for="dl-name">Nom / entreprise</label>
-            <input type="text" id="dl-name" placeholder="Nom du dealer ou de son entreprise" autocomplete="off">
+            <label class="lbl" for="dl-last">Nom</label>
+            <input type="text" id="dl-last" placeholder="Nom de famille" autocomplete="off" maxlength="60">
+          </div>
+          <div class="field">
+            <label class="lbl" for="dl-name">Entreprise</label>
+            <input type="text" id="dl-name" placeholder="Nom du commerce" autocomplete="off" maxlength="120">
+          </div>
+          <div class="field">
+            <label class="lbl" for="dl-email">Courriel</label>
+            <input type="text" id="dl-email" placeholder="dealer@example.com" autocomplete="off" inputmode="email">
           </div>
           <div class="field">
             <label class="lbl" for="dl-phone">Téléphone</label>
@@ -1401,6 +1409,14 @@
           <div class="field">
             <label class="lbl" for="dl-city">Ville, code postal</label>
             <input type="text" id="dl-city" placeholder="Québec, QC  G1A 1A1" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="dl-lang">Langue</label>
+            <select id="dl-lang" data-nosearch><option value="fr">Français</option><option value="en">Anglais</option></select>
+          </div>
+          <div class="field">
+            <label class="lbl" for="dl-source">Comment il nous a connus</label>
+            <select id="dl-source" data-nosearch class="who-source"></select>
           </div>
         </div>
         <div class="editor-actions">
@@ -1456,6 +1472,7 @@
           <p class="muted">Ton carnet de clients et leurs comptes en ligne.</p>
         </div>
         <span class="grow"></span>
+        <button class="btn btn-ghost btn-sm cl-todo" id="cl-todo" type="button" aria-pressed="false" hidden>À compléter</button>
         <button class="btn btn-ghost btn-sm" id="cl-refresh" type="button" data-ic="refresh">Actualiser</button>
         <button class="btn btn-accent" id="cl-new" type="button" data-ic="plus">Ajouter un client</button>
       </div>
@@ -1464,8 +1481,16 @@
         <h2 id="cl-editor-title">Nouveau client</h2>
         <div class="grid">
           <div class="field">
-            <label class="lbl" for="cl-name">Nom / entreprise</label>
-            <input type="text" id="cl-name" placeholder="Nom ou raison sociale" autocomplete="off">
+            <label class="lbl" for="cl-first">Prénom</label>
+            <input type="text" id="cl-first" placeholder="Prénom" autocomplete="off" maxlength="60">
+          </div>
+          <div class="field">
+            <label class="lbl" for="cl-last">Nom</label>
+            <input type="text" id="cl-last" placeholder="Nom de famille" autocomplete="off" maxlength="60">
+          </div>
+          <div class="field">
+            <label class="lbl" for="cl-company">Entreprise</label>
+            <input type="text" id="cl-company" placeholder="Facultatif" autocomplete="off" maxlength="120">
           </div>
           <div class="field">
             <label class="lbl" for="cl-email">Courriel</label>
@@ -1482,6 +1507,14 @@
           <div class="field">
             <label class="lbl" for="cl-city">Ville, code postal</label>
             <input type="text" id="cl-city" placeholder="Québec, QC  G1A 1A1" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="cl-lang">Langue</label>
+            <select id="cl-lang" data-nosearch><option value="">—</option><option value="fr">Français</option><option value="en">Anglais</option></select>
+          </div>
+          <div class="field">
+            <label class="lbl" for="cl-source">Comment il nous a connus</label>
+            <select id="cl-source" data-nosearch class="who-source"></select>
           </div>
         </div>
         <div class="editor-actions">
@@ -3092,8 +3125,8 @@
 <script src="assets/cms-reserves.js?v=4"></script>
 <script src="assets/cms-en-route.js?v=9"></script>
 <script src="assets/cms-credit.js?v=1"></script>
-<script src="assets/cms-dealers.js?v=12"></script>
-<script src="assets/cms-clients.js?v=13"></script>
+<script src="assets/cms-dealers.js?v=13"></script>
+<script src="assets/cms-clients.js?v=14"></script>
 <script src="assets/cms-messages.js?v=9"></script>
 <script src="assets/cms-facturation.js?v=66"></script>
 <script src="assets/cms-historique.js?v=22"></script>
@@ -3123,7 +3156,7 @@
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-promotions.js?v=9"></script>
 <script src="assets/cms-nouveautes.js?v=1"></script>
-<script src="assets/cms-recherche.js?v=3"></script>
+<script src="assets/cms-recherche.js?v=4"></script>
 <script src="assets/aide.js?v=4"></script>
 <script src="assets/cms-aide.js?v=8"></script>
 </body>

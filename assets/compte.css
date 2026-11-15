@@ -23,6 +23,7 @@
 .acct-lead b { color:var(--ink); }
 .acct-card .field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; min-width:0; }
 .acct-card label { font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.acct-pair { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:0 12px; }
 .acct-opt { text-transform:none; letter-spacing:0; font-weight:500; }
 .acct-card input { width:100%; min-width:0; padding:11px 12px; font:inherit; color:var(--ink); background:var(--paper);
   border:1.5px solid var(--line); border-radius:var(--radius-sm); }

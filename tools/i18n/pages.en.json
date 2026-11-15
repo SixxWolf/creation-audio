@@ -181,7 +181,7 @@
  "Bienvenue": "Welcome",
  "Ton nom": "Your name",
  "Pour qu'on reconnaisse tes achats.": "So we can recognize your purchases.",
- "Nom": "Name",
+ "Nom": "Last name",
  "Téléphone": "Phone",
  "facultatif": "optional",
  "Continuer": "Continue",
@@ -971,5 +971,7 @@
  "Création Audio — Accessoires": "Création Audio — Accessories",
  "Bobines vides réutilisables et accessoires d'impression 3D — Création Audio, région de Québec.": "Reusable empty spools and 3D printing accessories — Création Audio, Québec City area.",
  "Création Audio — Promotions": "Création Audio — Promotions",
- "Filaments, accessoires et spacers en rabais — Création Audio, région de Québec.": "Filament, accessories and spacers on sale — Création Audio, Québec City area."
+ "Filaments, accessoires et spacers en rabais — Création Audio, région de Québec.": "Filament, accessories and spacers on sale — Création Audio, Québec City area.",
+ "Prénom": "First name",
+ "Entreprise": "Company"
 }

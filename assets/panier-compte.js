@@ -239,7 +239,7 @@ window.CA = window.CA || {};
       document.querySelectorAll('.home-account').forEach(function (a) { a.classList.add('is-in'); });
       return c.rpc('me_account').then(function (res) {
         var acct = (res && !res.error && res.data) || null;
-        if (acct && !String(acct.name || '').trim()) stepName(c, acct, send);
+        if (acct && (!String(acct.first_name || '').trim() || !String(acct.last_name || '').trim())) stepName(c, acct, send);
         else finish(send);
       }, function () { finish(send); });
     });
@@ -247,20 +247,28 @@ window.CA = window.CA || {};
   function stepName(c, acct, send) {
     var d = paint('user', _t('Ton compte est créé ✓'), esc(word('nameWhy', 'Il nous manque ton nom pour préparer ta commande.')),
       '<form class="pc-form" novalidate>' +
-        '<label class="pc-label" for="pc-name">' + esc(_t('Ton nom')) + '</label>' +
-        '<input class="dlg-field pc-field" type="text" id="pc-name" autocomplete="name" maxlength="80">' +
+        '<div class="pc-2">' +
+          '<div class="pc-col"><label class="pc-label" for="pc-first">' + esc(_t('Prénom')) + '</label>' +
+          '<input class="dlg-field pc-field" type="text" id="pc-first" autocomplete="given-name" maxlength="60"></div>' +
+          '<div class="pc-col"><label class="pc-label" for="pc-last">' + esc(_t('Nom')) + '</label>' +
+          '<input class="dlg-field pc-field" type="text" id="pc-last" autocomplete="family-name" maxlength="60"></div>' +
+        '</div>' +
         '<button type="submit" class="cart-order pc-go">' + esc(send ? word('sendNow', 'Envoyer ma commande') : _t('Enregistrer')) + '</button>' +
         '<p class="pc-status" role="status" aria-live="polite"></p>' +
       '</form>');
     // fermer ici : Mon compte redemandera le nom ; rien n'est envoyé
     onDismiss = function () { finish(false, true); };
-    var input = d.querySelector('#pc-name'), btn = d.querySelector('.pc-go'), st = d.querySelector('.pc-status');
+    var firstI = d.querySelector('#pc-first'), lastI = d.querySelector('#pc-last'),
+        btn = d.querySelector('.pc-go'), st = d.querySelector('.pc-status');
+    firstI.value = acct.first_name || ''; lastI.value = acct.last_name || '';
+    var input = firstI.value ? lastI : firstI;
     d.querySelector('form').addEventListener('submit', function (e) {
       e.preventDefault();
-      var name = input.value.trim();
-      if (!name) { say(st, _t('Entre ton nom.'), true); input.focus(); return; }
+      var first = firstI.value.trim(), last = lastI.value.trim();
+      if (!first) { say(st, _t('Entre ton prénom.'), true); firstI.focus(); return; }
+      if (!last) { say(st, _t('Entre ton nom de famille.'), true); lastI.focus(); return; }
       btn.disabled = true; say(st, _t('Enregistrement…'));
-      c.rpc('me_update', { p_name: name, p_phone: acct.phone || '' }).then(function (res) {
+      c.rpc('me_update', { p_first: first, p_last: last, p_company: acct.company || '', p_phone: acct.phone || '' }).then(function (res) {
         btn.disabled = false;
         if (res.error) { say(st, _t('Enregistrement impossible. Réessaie.'), true); return; }
         finish(send);

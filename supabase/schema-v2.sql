@@ -5615,3 +5615,180 @@ begin
 end $$;
 revoke all on function public.dealer_order_use_credit(uuid, boolean) from public, anon;
 grant execute on function public.dealer_order_use_credit(uuid, boolean) to authenticated;
+
+-- ------------------------------------------------------------
+-- PRÉNOM / NOM / ENTREPRISE SÉPARÉS (2026-11-14)
+-- clients, customers, dealers : first_name + last_name (+ company pour clients/customers ;
+-- pour dealers, « name » reste le nom du commerce). La colonne « name » est gardée et
+-- recomposée par trigger -> tout le code existant (factures, recherche, courriels) continue
+-- de lire « name ». Écrire seulement « name » (anciens chemins) = découpage automatique :
+-- 1er mot = prénom, le reste = nom ; un mot avec chiffre (pseudo) -> entreprise.
+-- clients : + lang (fr|en) et source (« Comment il nous a connus ») ; dealers : + source.
+-- Fiche « À compléter » (admin) = prénom ou nom vide : calculé, rien en base.
+-- dealer_requests : le formulaire revendeur envoie contact = « Prénom | Nom » (la fonction
+-- Edge ne laisse passer que contact) ; le trigger dealer_requests_split le sépare.
+-- ------------------------------------------------------------
+alter table public.clients   add column if not exists first_name text;
+alter table public.clients   add column if not exists last_name  text;
+alter table public.clients   add column if not exists company    text;
+alter table public.clients   add column if not exists lang       text;
+alter table public.clients   add column if not exists source     text;
+alter table public.customers add column if not exists first_name text;
+alter table public.customers add column if not exists last_name  text;
+alter table public.customers add column if not exists company    text;
+alter table public.dealers   add column if not exists first_name text;
+alter table public.dealers   add column if not exists last_name  text;
+alter table public.dealers   add column if not exists source     text;
+alter table public.dealer_requests add column if not exists first_name text;
+alter table public.dealer_requests add column if not exists last_name  text;
+do $$ begin
+  alter table public.clients add constraint clients_lang_chk check (lang is null or lang in ('fr','en'));
+exception when duplicate_object then null; end $$;
+
+-- « Jean-François Tremblay Roy » -> {Jean-François, Tremblay Roy, null} ; « Jo3dcuties » -> {null, null, Jo3dcuties}
+create or replace function private.split_name(p text)
+returns text[] language plpgsql immutable set search_path = '' as $$
+declare v text := regexp_replace(btrim(coalesce(p, '')), '\s+', ' ', 'g');
+begin
+  if v = '' then return array[null, null, null]::text[]; end if;
+  if v ~ '[0-9@]' then return array[null, null, v]::text[]; end if;
+  if position(' ' in v) = 0 then return array[v, null, null]::text[]; end if;
+  return array[split_part(v, ' ', 1), nullif(btrim(substr(v, position(' ' in v) + 1)), ''), null]::text[];
+end $$;
+
+-- clients / customers : name = « Prénom Nom », sinon l'entreprise
+create or replace function private.person_name_sync()
+returns trigger language plpgsql set search_path = '' as $$
+declare s text[]; parts_changed boolean; c record;
+begin
+  new.first_name := nullif(btrim(coalesce(new.first_name, '')), '');
+  new.last_name  := nullif(btrim(coalesce(new.last_name, '')), '');
+  new.company    := nullif(btrim(coalesce(new.company, '')), '');
+  if tg_op = 'INSERT' then
+    parts_changed := coalesce(new.first_name, new.last_name, new.company) is not null;
+  else
+    parts_changed := new.first_name is distinct from old.first_name or new.last_name is distinct from old.last_name
+                  or new.company is distinct from old.company;
+  end if;
+  if not parts_changed and (tg_op = 'INSERT' or new.name is distinct from old.name) then
+    -- seulement « name » fourni : fiche client créée depuis un compte -> on reprend ses champs
+    if tg_table_name = 'clients' and tg_op = 'INSERT' and new.email is not null then
+      select u.first_name, u.last_name, u.company into c from public.customers u
+       where lower(u.email) = lower(new.email) and coalesce(u.first_name, u.last_name) is not null limit 1;
+      if found then new.first_name := c.first_name; new.last_name := c.last_name; new.company := c.company; end if;
+    end if;
+    if coalesce(new.first_name, new.last_name) is null then
+      s := private.split_name(new.name);
+      new.first_name := s[1]; new.last_name := s[2]; new.company := coalesce(new.company, s[3]);
+    end if;
+  end if;
+  new.name := coalesce(nullif(btrim(concat_ws(' ', new.first_name, new.last_name)), ''), new.company, new.name);
+  return new;
+end $$;
+drop trigger if exists clients_name_sync on public.clients;
+create trigger clients_name_sync before insert or update on public.clients
+  for each row execute function private.person_name_sync();
+drop trigger if exists customers_name_sync on public.customers;
+create trigger customers_name_sync before insert or update on public.customers
+  for each row execute function private.person_name_sync();
+
+-- reprise des fiches existantes (seulement celles encore sans prénom/nom/entreprise ; rejouable)
+update public.customers u set first_name = x.s[1], last_name = x.s[2], company = x.s[3]
+  from (select id as cid, private.split_name(name) s from public.customers
+         where coalesce(first_name, last_name, company) is null and coalesce(btrim(name), '') <> '') x
+ where u.id = x.cid;
+update public.clients k set first_name = x.s[1], last_name = x.s[2], company = x.s[3]
+  from (select id as kid, private.split_name(name) s from public.clients
+         where coalesce(first_name, last_name, company) is null) x
+ where k.id = x.kid;
+-- dealers : prénom/nom repris de leur demande d'accès
+update public.dealers d set first_name = r.s[1], last_name = r.s[2]
+  from (select distinct on (lower(email)) lower(email) e, private.split_name(contact) s
+          from public.dealer_requests where status = 'approved' order by lower(email), created_at desc) r
+ where lower(d.email) = r.e and d.first_name is null and d.last_name is null;
+
+-- Mon compte / panier / Messagerie : prénom + nom obligatoires, entreprise facultative
+create or replace function public.me_account()
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := (select auth.uid()); c public.customers;
+begin
+  if v_uid is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  update public.customers set last_seen_at = now() where id = v_uid returning * into c;
+  if not found then
+    insert into public.customers (id, email) values (v_uid, lower((select auth.jwt()) ->> 'email')) returning * into c;
+  end if;
+  return jsonb_build_object('email', c.email, 'name', c.name, 'phone', c.phone,
+    'first_name', c.first_name, 'last_name', c.last_name, 'company', c.company,
+    'linked', c.client_id is not null, 'can_reserve', c.can_reserve, 'created_at', c.created_at);
+end $$;
+
+create or replace function public.me_update(p_first text, p_last text, p_company text, p_phone text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_first text := btrim(coalesce(p_first, '')); v_last text := btrim(coalesce(p_last, ''));
+        v_co text := nullif(btrim(coalesce(p_company, '')), ''); v_phone text := nullif(btrim(coalesce(p_phone, '')), '');
+begin
+  if (select auth.uid()) is null then raise exception 'Connexion requise.' using errcode = '42501'; end if;
+  if v_first = '' or length(v_first) > 60 then raise exception 'Prénom invalide.'; end if;
+  if v_last = '' or length(v_last) > 60 then raise exception 'Nom invalide.'; end if;
+  if length(coalesce(v_co, '')) > 120 then raise exception 'Entreprise invalide.'; end if;
+  if length(coalesce(v_phone, '')) > 30 then raise exception 'Téléphone invalide.'; end if;
+  update public.customers set first_name = v_first, last_name = v_last, company = v_co, phone = v_phone
+   where id = (select auth.uid());
+  return public.me_account();
+end $$;
+revoke all on function public.me_update(text, text, text, text) from public, anon;
+grant execute on function public.me_update(text, text, text, text) to authenticated;
+-- l'ancienne me_update(p_name, p_phone) reste pour les pages encore en cache (découpage auto)
+
+-- compte_touch : « needs_name » tant que le prénom ou le nom manque
+create or replace function public.compte_touch(p_id uuid, p_email text)
+returns jsonb language sql security definer set search_path = '' as $$
+  insert into public.customers as c (id, email) values (p_id, lower(btrim(p_email)))
+  on conflict (id) do update set email = excluded.email, last_seen_at = now()
+  returning jsonb_build_object('needs_name', coalesce(btrim(c.first_name), '') = '' or coalesce(btrim(c.last_name), '') = '');
+$$;
+revoke all on function public.compte_touch(uuid, text) from public, anon, authenticated;
+grant execute on function public.compte_touch(uuid, text) to service_role;
+
+-- demande revendeur : contact « Prénom | Nom » -> first_name / last_name, contact = « Prénom Nom »
+create or replace function private.dealer_request_split()
+returns trigger language plpgsql set search_path = '' as $$
+declare s text[];
+begin
+  if position('|' in new.contact) > 0 then
+    new.first_name := nullif(btrim(split_part(new.contact, '|', 1)), '');
+    new.last_name  := nullif(btrim(split_part(new.contact, '|', 2)), '');
+    new.contact    := left(concat_ws(' ', new.first_name, new.last_name), 120);
+  elsif new.first_name is null and new.last_name is null then
+    s := private.split_name(new.contact); new.first_name := s[1]; new.last_name := s[2];
+  end if;
+  return new;
+end $$;
+drop trigger if exists dealer_requests_split on public.dealer_requests;
+create trigger dealer_requests_split before insert on public.dealer_requests
+  for each row execute function private.dealer_request_split();
+
+-- approbation : le dealer reçoit aussi le prénom/nom du contact et sa langue
+create or replace function public.admin_dealer_request_decide(p_id uuid, p_approve boolean)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.dealer_requests;
+begin
+  if not (select public.is_admin()) then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  update public.dealer_requests
+     set status = case when p_approve then 'approved' else 'refused' end, decided_at = now()
+   where id = p_id and status = 'pending' returning * into r;
+  if not found then raise exception 'Demande introuvable ou déjà traitée.'; end if;
+  if p_approve then
+    insert into public.dealers (email, name, first_name, last_name, phone, city, address, lang)
+    values (lower(r.email), r.business, r.first_name, r.last_name, r.phone, r.city, r.address, r.lang)
+    on conflict (email) do update set name       = coalesce(public.dealers.name, excluded.name),
+                                      first_name = coalesce(public.dealers.first_name, excluded.first_name),
+                                      last_name  = coalesce(public.dealers.last_name, excluded.last_name),
+                                      phone      = coalesce(public.dealers.phone, excluded.phone),
+                                      city       = coalesce(public.dealers.city, excluded.city),
+                                      address    = coalesce(public.dealers.address, excluded.address);
+  end if;
+  return to_jsonb(r) - 'ip';
+end $$;
+revoke all on function public.admin_dealer_request_decide(uuid, boolean) from public, anon;
+grant execute on function public.admin_dealer_request_decide(uuid, boolean) to authenticated;

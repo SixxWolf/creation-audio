@@ -716,7 +716,9 @@ body.has-buybar .toast { bottom:92px; }
 .pc-body { grid-column:1 / -1; margin-top:16px; }
 .pc-form { display:flex; flex-direction:column; gap:8px; }
 .pc-label { font-weight:600; font-size:.88rem; color:var(--ink); }
-.pc-form .pc-field { margin:0; }   /* dialog.css est chargé après */
+.pc-form .pc-field { margin:0; }
+.pc-2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; }
+.pc-col { display:grid; gap:6px; min-width:0; }   /* dialog.css est chargé après */
 .pc-form .pc-code { font-size:1.5rem; font-weight:700; letter-spacing:.3em; text-align:center; font-variant-numeric:tabular-nums; }
 .pc-hp { display:none; }
 .pc-go { width:100%; margin-top:6px; }

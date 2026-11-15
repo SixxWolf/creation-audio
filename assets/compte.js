@@ -220,7 +220,7 @@
         acct = res.data || {};
         syncLook();
         if (CA.custLang) CA.custLang();          // langue des courriels = celle de cette page
-        if (!String(acct.name || '').trim()) { openWelcome(); return; }
+        if (!hasName(acct)) { openWelcome(); return; }
         openHome();
       });
     }).catch(function () { show('acct-boot'); $('#acct-boot').textContent = _t('Impossible de charger ton compte. Réessaie dans un instant.'); });
@@ -232,18 +232,34 @@
   }
 
   /* ---------- 3. première connexion : le nom ---------- */
+  // prénom ET nom requis (compte créé avant la séparation : prérempli par la base, à confirmer)
+  function hasName(a) { return !!(String(a.first_name || '').trim() && String(a.last_name || '').trim()); }
+  // prénom + nom (+ entreprise facultative) : vérifie, met le focus sur le champ manquant
+  function readName(pre, st) {
+    var f = $('#' + pre + '-first'), l = $('#' + pre + '-last'), c = $('#' + pre + '-company');
+    var v = { p_first: f.value.trim(), p_last: l.value.trim(), p_company: c.value.trim() };
+    if (!v.p_first) { say(st, _t('Entre ton prénom.'), 'bad'); f.focus(); return null; }
+    if (!v.p_last) { say(st, _t('Entre ton nom de famille.'), 'bad'); l.focus(); return null; }
+    return v;
+  }
+  function fillName(pre) {
+    $('#' + pre + '-first').value = acct.first_name || '';
+    $('#' + pre + '-last').value = acct.last_name || '';
+    $('#' + pre + '-company').value = acct.company || '';
+  }
   function openWelcome() {
-    $('#acct-w-name').value = ''; $('#acct-w-phone').value = acct.phone || '';
+    fillName('acct-w'); $('#acct-w-phone').value = acct.phone || '';
     say($('#acct-w-status'), '');
     show('acct-welcome');
-    $('#acct-w-name').focus();
+    $(acct.first_name ? '#acct-w-last' : '#acct-w-first').focus();
   }
   $('#acct-welcome-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    var name = $('#acct-w-name').value.trim(), st = $('#acct-w-status'), btn = $('#acct-w-btn');
-    if (!name) { say(st, _t('Entre ton nom.'), 'bad'); $('#acct-w-name').focus(); return; }
+    var st = $('#acct-w-status'), btn = $('#acct-w-btn'), v = readName('acct-w', st);
+    if (!v) return;
+    v.p_phone = $('#acct-w-phone').value.trim();
     btn.disabled = true; say(st, _t('Enregistrement…'));
-    sb.rpc('me_update', { p_name: name, p_phone: $('#acct-w-phone').value.trim() }).then(function (res) {
+    sb.rpc('me_update', v).then(function (res) {
       btn.disabled = false;
       if (res.error) { say(st, _t('Enregistrement impossible. Réessaie.'), 'bad'); return; }
       acct = res.data || acct;
@@ -252,7 +268,7 @@
   });
 
   /* ---------- 4. espace client ---------- */
-  function firstName(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+  function firstName(n) { return String(acct.first_name || '').trim() || String(n || '').trim().split(/\s+/)[0] || ''; }
   function openHome() {
     $('#acct-hello').textContent = _t('Bonjour ') + firstName(acct.name);
     $('#acct-sub').textContent = acct.email || '';
@@ -911,16 +927,17 @@
   /* ---- Mes infos ---- */
   function fillInfos() {
     $('#acct-i-email').value = acct.email || '';
-    $('#acct-i-name').value = acct.name || '';
+    fillName('acct-i');
     $('#acct-i-phone').value = acct.phone || '';
     say($('#acct-i-status'), '');
   }
   $('#acct-infos-form').addEventListener('submit', function (e) {
     e.preventDefault();
-    var st = $('#acct-i-status'), btn = $('#acct-i-btn'), name = $('#acct-i-name').value.trim();
-    if (!name) { say(st, _t('Entre ton nom.'), 'bad'); $('#acct-i-name').focus(); return; }
+    var st = $('#acct-i-status'), btn = $('#acct-i-btn'), v = readName('acct-i', st);
+    if (!v) return;
+    v.p_phone = $('#acct-i-phone').value.trim();
     btn.disabled = true; say(st, _t('Enregistrement…'));
-    sb.rpc('me_update', { p_name: name, p_phone: $('#acct-i-phone').value.trim() }).then(function (res) {
+    sb.rpc('me_update', v).then(function (res) {
       btn.disabled = false;
       if (res.error) { say(st, _t('Enregistrement impossible. Réessaie.'), 'bad'); return; }
       acct = res.data || acct;

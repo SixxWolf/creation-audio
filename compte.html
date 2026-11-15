@@ -19,7 +19,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=29">
-<link rel="stylesheet" href="assets/compte.css?v=18">
+<link rel="stylesheet" href="assets/compte.css?v=19">
 <link rel="stylesheet" href="assets/dialog.css?v=2">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
@@ -117,9 +117,19 @@
       <p class="eyebrow">Bienvenue</p>
       <h1>Ton nom</h1>
       <p class="acct-lead">Pour qu'on reconnaisse tes achats.</p>
+      <div class="acct-pair">
+        <div class="field">
+          <label for="acct-w-first">Prénom</label>
+          <input type="text" id="acct-w-first" autocomplete="given-name" maxlength="60">
+        </div>
+        <div class="field">
+          <label for="acct-w-last">Nom</label>
+          <input type="text" id="acct-w-last" autocomplete="family-name" maxlength="60">
+        </div>
+      </div>
       <div class="field">
-        <label for="acct-w-name">Nom</label>
-        <input type="text" id="acct-w-name" autocomplete="name" maxlength="80">
+        <label for="acct-w-company">Entreprise <span class="acct-opt">facultatif</span></label>
+        <input type="text" id="acct-w-company" autocomplete="organization" maxlength="120">
       </div>
       <div class="field">
         <label for="acct-w-phone">Téléphone <span class="acct-opt">facultatif</span></label>
@@ -168,8 +178,16 @@
             <input type="email" id="acct-i-email" disabled>
           </div>
           <div class="field">
-            <label for="acct-i-name">Nom</label>
-            <input type="text" id="acct-i-name" autocomplete="name" maxlength="80">
+            <label for="acct-i-first">Prénom</label>
+            <input type="text" id="acct-i-first" autocomplete="given-name" maxlength="60">
+          </div>
+          <div class="field">
+            <label for="acct-i-last">Nom</label>
+            <input type="text" id="acct-i-last" autocomplete="family-name" maxlength="60">
+          </div>
+          <div class="field">
+            <label for="acct-i-company">Entreprise <span class="acct-opt">facultatif</span></label>
+            <input type="text" id="acct-i-company" autocomplete="organization" maxlength="120">
           </div>
           <div class="field">
             <label for="acct-i-phone">Téléphone</label>
@@ -278,10 +296,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js" integrity="sha384-dl/4LkSyQ4uEucc48NM6VDZLAjLLq9yMzZ5JLXumBq7Ld33XBof73hseOqPhO89+" crossorigin="anonymous"></script>
 <script src="assets/dialog.js?v=5"></script>
 <script src="assets/supabase-config.js?v=1"></script>
-<script src="assets/nav.js?v=22"></script>
+<script src="assets/nav.js?v=23"></script>
 <script src="assets/commande-client.js?v=13"></script>
 <script src="assets/demande-fil.js?v=2"></script>
 <script src="assets/compte-demandes.js?v=4"></script>
-<script src="assets/compte.js?v=27"></script>
+<script src="assets/compte.js?v=28"></script>
 </body>
 </html>

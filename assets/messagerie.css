@@ -55,6 +55,7 @@ html.msg-open { overflow:hidden; }
 .msg-field .msg-code-in { font-size:1.5rem; letter-spacing:.3em; font-weight:700; text-align:center; font-variant-numeric:tabular-nums; }
 .msg-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .msg-grid.one { grid-template-columns:1fr; }
+.msg-grid .msg-wide { grid-column:1 / -1; }
 .msg-hp { position:absolute; left:-9999px; width:1px; height:1px; opacity:0; }
 
 /* sujet : puces */

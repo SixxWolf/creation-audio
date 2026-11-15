@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 41;
+window.CA_EN_V = 42;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -562,6 +562,13 @@ window.CA_EN = (function (pairs) {
   [`Connexion impossible pour le moment. Réessaie.`, `Couldn't sign in right now. Try again.`],
   [`Impossible de charger ton compte. Réessaie dans un instant.`, `Couldn't load your account. Try again in a moment.`],
   [`Entre ton nom.`, `Enter your name.`],
+  [`Prénom`, `First name`],
+  [`Nom`, `Last name`],
+  [`Entre ton prénom.`, `Enter your first name.`],
+  [`Entre ton nom de famille.`, `Enter your last name.`],
+  [`<div class="msg-field"><label for="msg-first">Prénom</label><input type="text" id="msg-first" autocomplete="given-name" maxlength="60"></div>`, `<div class="msg-field"><label for="msg-first">First name</label><input type="text" id="msg-first" autocomplete="given-name" maxlength="60"></div>`],
+  [`<div class="msg-field"><label for="msg-last">Nom</label><input type="text" id="msg-last" autocomplete="family-name" maxlength="60"></div>`, `<div class="msg-field"><label for="msg-last">Last name</label><input type="text" id="msg-last" autocomplete="family-name" maxlength="60"></div>`],
+  [`<div class="msg-field msg-wide"><label for="msg-email">Courriel</label><input type="email" id="msg-email" inputmode="email" `, `<div class="msg-field msg-wide"><label for="msg-email">Email</label><input type="email" id="msg-email" inputmode="email" `],
   [`Enregistrement impossible. Réessaie.`, `Couldn't save. Try again.`],
   [`Bonjour `, `Hello `],
   [`<div id="acct-resv"></div><div id="acct-cmds"></div><div id="acct-invs"><p class="acct-empty">Chargement…</p></div>`, `<div id="acct-resv"></div><div id="acct-cmds"></div><div id="acct-invs"><p class="acct-empty">Loading…</p></div>`],

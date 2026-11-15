@@ -1,6 +1,9 @@
 /* =========================================================
    Création Audio V2 — CMS Clients (carnet de facturation)
-   Table « clients » : nom, courriel, téléphone, adresse, ville.
+   Table « clients » : prénom, nom, entreprise, courriel, téléphone, adresse, ville,
+   langue, « comment il nous a connus » (source). « name » est recomposé par la base
+   (trigger clients_name_sync) : Prénom Nom, sinon l'entreprise.
+   « À compléter » = prénom ou nom vide (filtre en tête de liste).
    Sert à resuggérer un client sur une facture (autocomplétion) ;
    chaque facture enregistrée mémorise aussi son client ici.
    Expose sur window.CA :
@@ -26,6 +29,22 @@ window.CA = window.CA || {};
   }
   function norm(s) { return String(s == null ? '' : s).trim(); }
   function lc(s) { return norm(s).toLowerCase(); }
+
+  /* ---- prénom / nom / entreprise (partagé avec cms-dealers.js) ---- */
+  CA.WHO_SOURCES = ['Facebook', 'Marketplace', 'Google', 'Instagram', 'Bouche-à-oreille', 'Revendeur', 'Amazon', 'Autre'];
+  CA.fillSources = function (sel, val) {
+    if (!sel) return;
+    var list = CA.WHO_SOURCES.slice();
+    if (val && list.indexOf(val) < 0) list.push(val);
+    sel.innerHTML = '<option value="">—</option>' + list.map(function (s) {
+      return '<option value="' + esc(s) + '">' + esc(s) + '</option>'; }).join('');
+    sel.value = val || '';
+    if (CA.pick) CA.pick(sel);
+  };
+  CA.personName = function (r) {
+    return r ? (norm([r.first_name, r.last_name].filter(Boolean).join(' ')) || norm(r.company) || norm(r.name)) : '';
+  };
+  CA.personTodo = function (r) { return !!r && (!norm(r.first_name) || !norm(r.last_name)); };
 
   /* ---- cache partagé + abonnements ---- */
   CA.clients = { list: [], loaded: false };
@@ -83,8 +102,10 @@ window.CA = window.CA || {};
   /* ---- éléments (onglet Clients) ---- */
   var loaded = false, editingId = null;
   var editor = $('#cl-editor'), editorTitle = $('#cl-editor-title'),
-      nameI = $('#cl-name'), emailI = $('#cl-email'), phoneI = $('#cl-phone'),
-      addressI = $('#cl-address'), cityI = $('#cl-city'),
+      firstI = $('#cl-first'), lastI = $('#cl-last'), companyI = $('#cl-company'),
+      emailI = $('#cl-email'), phoneI = $('#cl-phone'),
+      addressI = $('#cl-address'), cityI = $('#cl-city'), langI = $('#cl-lang'), sourceI = $('#cl-source'),
+      todoBtn = $('#cl-todo'), todoOnly = false,
       statusEl = $('#cl-status'), listEl = $('#cl-list'),
       newBtn = $('#cl-new'), refreshBtn = $('#cl-refresh'),
       saveBtn = $('#cl-save'), cancelBtn = $('#cl-cancel');
@@ -109,6 +130,9 @@ window.CA = window.CA || {};
   if (refreshBtn) refreshBtn.addEventListener('click', function () { clientInvs = null; reloadAll(); });
   if (cancelBtn) cancelBtn.addEventListener('click', function () { var id = editingId; closeEditor(); focusRow(id, true); });
   if (editor) editor.addEventListener('submit', onSave);
+  if (todoBtn) todoBtn.addEventListener('click', function () {
+    todoOnly = !todoOnly; todoBtn.setAttribute('aria-pressed', todoOnly ? 'true' : 'false'); render();
+  });
 
   /* ---- éditeur ---- */
   function moveEditorHome() {
@@ -125,8 +149,13 @@ window.CA = window.CA || {};
   }
   function openEditor(row, rowEl) {
     editingId = row ? row.id : null;
-    editorTitle.textContent = row ? 'Modifier le client' : 'Nouveau client';
-    nameI.value = row ? (row.name || '') : '';
+    editorTitle.textContent = row ? 'Modifier « ' + (CA.personName(row) || row.email || '') + ' »' : 'Nouveau client';
+    firstI.value = row && row.first_name ? row.first_name : '';
+    lastI.value = row && row.last_name ? row.last_name : '';
+    companyI.value = row && row.company ? row.company : '';
+    langI.value = row && row.lang ? row.lang : '';
+    if (CA.pick) CA.pick(langI);
+    CA.fillSources(sourceI, row && row.source);
     emailI.value = row && row.email ? row.email : '';
     phoneI.value = row && row.phone ? row.phone : '';
     addressI.value = row && row.address ? row.address : '';
@@ -139,7 +168,7 @@ window.CA = window.CA || {};
     else if (rowEl && rowEl.parentNode) { rowEl.insertAdjacentElement('afterend', editor); editor.classList.add('is-inline'); }
     else moveEditorHome();
     editor.hidden = false;
-    nameI.focus({ preventScroll: true });
+    (row && !row.first_name ? firstI : row && !row.last_name ? lastI : firstI).focus({ preventScroll: true });
     if (docked) editor.parentNode.scrollTop = 0;
     else editor.scrollIntoView({ behavior: 'smooth', block: rowEl ? 'nearest' : 'start' });
   }
@@ -147,10 +176,15 @@ window.CA = window.CA || {};
 
   function onSave(e) {
     e.preventDefault();
-    var name = norm(nameI.value);
-    if (!name) { nameI.focus(); return; }
+    var first = norm(firstI.value), last = norm(lastI.value), company = norm(companyI.value);
+    if (!first && !last && !company) { statusEl.textContent = 'Prénom et nom requis.'; firstI.focus(); return; }
     var patch = {
-      name: name,
+      first_name: first || null,
+      last_name: last || null,
+      company: company || null,
+      name: norm([first, last].filter(Boolean).join(' ')) || company,
+      lang: langI.value || null,
+      source: sourceI.value || null,
       email: norm(emailI.value) || null,
       phone: norm(phoneI.value) || null,
       address: norm(addressI.value) || null,
@@ -194,7 +228,14 @@ window.CA = window.CA || {};
     moveEditorHome();
     closeMerger();
     renderAccounts();
-    var list = CA.clients.list || [];
+    var all = CA.clients.list || [];
+    var nTodo = all.filter(CA.personTodo).length;
+    if (todoBtn) {
+      todoBtn.hidden = !nTodo && !todoOnly;
+      todoBtn.innerHTML = 'À compléter <b class="cl-sec-n">' + nTodo + '</b>';
+      if (!nTodo) { todoOnly = false; todoBtn.setAttribute('aria-pressed', 'false'); }
+    }
+    var list = todoOnly ? all.filter(CA.personTodo) : all;
     if (!list.length) {
       listEl.innerHTML = '<p class="empty">Aucun client pour l\'instant.<br>Clique «&nbsp;+ Ajouter un client&nbsp;», ou enregistre une facture : le client sera mémorisé ici.</p>';
       return;
@@ -207,8 +248,10 @@ window.CA = window.CA || {};
       return '<article class="mat-row person" data-id="' + esc(c.id) + '">' +
         CA.avatar(c.name) +
         '<div class="mat-main">' +
-          '<div class="mat-name">' + esc(c.name) + (accOf(c.id) ? '<span class="person-tag">Compte</span>' : '') +
+          '<div class="mat-name">' + esc(CA.personName(c)) + (accOf(c.id) ? '<span class="person-tag">Compte</span>' : '') +
+          (CA.personTodo(c) ? '<span class="person-tag is-todo">À compléter</span>' : '') +
           (dupsOf(c).length ? '<span class="person-tag">Doublon possible</span>' : '') + '</div>' +
+          (c.company && c.company !== CA.personName(c) ? '<div class="person-co">' + esc(c.company) + '</div>' : '') +
           '<div class="person-meta">' + (meta || '<span class="pm pm-none">Aucune coordonnée</span>') + '</div>' +
         '</div>' +
         '<div class="mat-actions">' +
@@ -329,7 +372,7 @@ window.CA = window.CA || {};
   }
 
   CA.loadAccounts = function () {
-    return sb.from('customers').select('id, email, name, phone, client_id, can_reserve, no_shows, reserve_suspended_until, created_at, last_seen_at, linked_at')
+    return sb.from('customers').select('id, email, name, first_name, last_name, company, phone, client_id, can_reserve, no_shows, reserve_suspended_until, created_at, last_seen_at, linked_at')
       .order('created_at', { ascending: false })
       .then(function (res) {
         if (res.error) throw res.error;
@@ -458,7 +501,8 @@ window.CA = window.CA || {};
     var off = boxes.filter(function (b) { return !b.checked; }).map(function (b) { return b.value; });
     btn.disabled = true; st.textContent = 'Enregistrement…';
     var ensure = fid === '__new'
-      ? sb.from('clients').insert({ name: a.name || a.email, email: a.email, phone: a.phone || null }).select().then(function (r) {
+      ? sb.from('clients').insert({ name: a.name || a.email, first_name: a.first_name || null, last_name: a.last_name || null,
+          company: a.company || null, email: a.email, phone: a.phone || null }).select().then(function (r) {
           if (r.error) throw r.error;
           if (!r.data || !r.data.length) throw new Error('Refusé (permissions).');
           return r.data[0].id;

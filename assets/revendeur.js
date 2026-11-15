@@ -207,7 +207,7 @@
   var form = $('#rv-form'), status = $('#rv-status'), btn = $('#rv-submit');
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
   var POSTAL_RE = /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/;
-  var REQUIRED = ['business', 'contact', 'email', 'phone', 'address', 'city', 'province', 'postal'];
+  var REQUIRED = ['business', 'first', 'last', 'email', 'phone', 'address', 'city', 'province', 'postal'];
   var provPk = window.CA.pick(form.elements.province);
   function say(msg, bad) { status.textContent = msg || ''; status.classList.toggle('is-bad', !!bad); }
   function field(n) { return form.elements[n]; }
@@ -253,10 +253,12 @@
     var cfg = window.CA_SUPABASE || {};
     if (!cfg.url || !window.fetch) { say(_t('Envoi impossible pour l\'instant. Écris-nous à contact@creationaudio.ca.'), true); return; }
     var body = { action: 'submit', lang: EN ? 'en' : 'fr', hp: field('hp').value };
-    ['business', 'contact', 'email', 'phone', 'website', 'facebook'].forEach(function (n) { body[n] = field(n).value.trim(); });
+    ['business', 'email', 'phone', 'website', 'facebook'].forEach(function (n) { body[n] = field(n).value.trim(); });
     // « adresse | Ville, QC G1A 1A1 » : séparé par dealer_request_submit (60 + 3 + 45 + 12 = 120 max)
     var post = field('postal').value.trim().toUpperCase().replace(/[ -]/, '');
     function clean(n) { return field(n).value.trim().replace(/\s*\|\s*/g, ' '); }
+    // « Prénom | Nom » : séparé par le trigger dealer_requests_split
+    body.contact = clean('first') + ' | ' + clean('last');
     body.city = clean('address') + ' | ' + clean('city') + ', ' + field('province').value + ' ' + post.slice(0, 3) + ' ' + post.slice(3);
     btn.disabled = true; say(_t('Envoi…'));
     fetch(cfg.url + '/functions/v1/dealer-request', {
