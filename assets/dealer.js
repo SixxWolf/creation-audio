@@ -551,10 +551,9 @@
   }
   function tierBarHtml(p, qty) {
     var ti = tierInfo(p, qty); if (!ti) return '';
-    var best = ti.tiers.length - 1;
     return '<div class="citem-tiers" data-reached="' + ti.reached + '">' + ti.tiers.map(function (t, i) {
       var q = plural(t.min, 'paire', 'paires'), off = _t('{n} % de rabais', { n: ti.pct(t) });
-      return '<button type="button" class="tb-tier' + (i === best ? ' is-best' : '') + (i === ti.reached ? ' is-reached' : '') + '" data-min="' + t.min + '"' +
+      return '<button type="button" class="tb-tier' + (i === ti.reached ? ' is-reached' : '') + '" data-min="' + t.min + '"' +
           (i === ti.reached ? ' aria-current="true"' : '') + ' aria-label="' + esc(q + ' · ' + money(t.price) + ' · ' + off) + '">' +
         '<span class="tb-q">' + esc(q) + '</span>' +
         '<span class="tb-pw"><span class="tb-p">' + money(t.price) + '</span></span>' +

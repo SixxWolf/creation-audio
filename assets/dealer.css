@@ -351,13 +351,16 @@ body.dealer-page { background:var(--dl-bg); }
 .tb-r { font-size:.74rem; line-height:1.25; color:var(--muted); }
 @media (hover:hover) {
   .tb-tier:hover .tb-p { background:color-mix(in srgb, var(--ember) 24%, var(--paper)); }
-  .tb-tier.is-best:hover .tb-p { background:var(--ember-dim); }
 }
-.tb-tier.is-best .tb-p { color:var(--on-ember); background:var(--ember); }
-.tb-tier.is-reached .tb-p { box-shadow:inset 0 0 0 2px var(--ember); }
-.tb-tier.is-best.is-reached .tb-p { box-shadow:0 0 0 2px var(--paper), 0 0 0 4px var(--ember); }
+/* Tous les paliers ont le même look ; celui où on se trouve a un contour qui pulse doucement (« vous êtes ici »). */
+.tb-tier.is-reached .tb-p { box-shadow:inset 0 0 0 2px var(--ember); animation:dlTierHere 2.4s ease-in-out infinite; }
 .tb-tier.is-reached .tb-r { font-weight:700; color:var(--tb-ink); }
+@keyframes dlTierHere {
+  0%, 100% { box-shadow:inset 0 0 0 2px var(--ember), 0 0 0 0 color-mix(in srgb, var(--ember) 45%, transparent); }
+  50%      { box-shadow:inset 0 0 0 2px color-mix(in srgb, var(--ember) 55%, transparent), 0 0 0 5px color-mix(in srgb, var(--ember) 0%, transparent); }
+}
 .tb-p.is-pop { animation:dlLblPop .8s ease-out; }
+.tb-tier.is-reached .tb-p.is-pop { animation:dlLblPop .8s ease-out, dlTierHere 2.4s ease-in-out infinite; }
 @keyframes dlLblPop { 0% { transform:scale(1); } 35% { transform:scale(1.14); } 100% { transform:scale(1); } }
 .citem-unit.is-pop { display:inline-block; border-radius:6px; animation:dlPricePop 1s ease-out; }
 @keyframes dlPricePop {
@@ -366,7 +369,7 @@ body.dealer-page { background:var(--dl-bg); }
 }
 
 @media (prefers-reduced-motion:reduce) {
-  .tb-p.is-pop, .citem-unit.is-pop, .cart-phead.pulse, .dl-mbar.pulse { animation:none; }
+  .tb-p.is-pop, .tb-tier.is-reached .tb-p, .tb-tier.is-reached .tb-p.is-pop, .citem-unit.is-pop, .cart-phead.pulse, .dl-mbar.pulse { animation:none; }
   .tb-p, .ship-fill { transition:none; }
 }
 
