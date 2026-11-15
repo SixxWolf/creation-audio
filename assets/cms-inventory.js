@@ -342,7 +342,7 @@
             (part ? '<span class="po-partial">Partielle</span>' : '') +
             '<span class="po-meta">' + esc([o.supplier, o.ordered_at].filter(Boolean).join(' · ')) + '</span>' +
             '<span class="po-prog">' + left + ' attendu' + (left > 1 ? 's' : '') + (got ? ' · ' + got + ' déjà reçu' + (got > 1 ? 's' : '') : '') + '</span>' +
-            (part ? '<span class="po-bar" role="img" aria-label="' + got + ' sur ' + (got + left) + ' reçus"><i style="width:' + Math.round(got / (got + left) * 100) + '%"></i></span>' : '') +
+            (part ? '<span class="po-meter" role="img" aria-label="' + got + ' sur ' + (got + left) + ' reçus"><i style="width:' + Math.round(got / (got + left) * 100) + '%"></i></span>' : '') +
           '</button>' +
           (isCur ? '<span class="rv-cur">En cours</span>'
                  : '<span class="po-acts">' +
