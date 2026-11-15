@@ -382,12 +382,6 @@
   function unitOf(it) { var p = byId[it.id]; return p ? tierPrice(p.sell_price, p.tiers, tierQty(it)) : 0; }
   function lineTotal(it) { return it.qty * unitOf(it); }
   function total() { return entries().reduce(function (s, it) { return s + lineTotal(it); }, 0); }
-  function stockLine(it) {
-    var st = byId[it.id].qty | 0;
-    if (st <= 0) return _t('<span class="citem-made">Sur commande</span>');
-    if (it.qty <= st) return _t('<span class="citem-ok">En stock</span>');
-    return '<span class="citem-made">' + st + _t(' en stock · ') + (it.qty - st) + _t(' sur commande</span>');
-  }
 
   var cartPanel = $('#cart-panel'), cartBackdrop = $('#cart-backdrop'), cartItems = $('#cart-items'),
       cartCount = $('#cart-count'), cartTotal = $('#cart-total'), cartMsg = $('#cart-msg'),
@@ -498,14 +492,12 @@
       entries().forEach(function (it) {
         var p = byId[it.id];
         var url = publicUrl(p.image_path);
-        var base = +p.sell_price || 0, u = unitOf(it);
+        var u = unitOf(it);
         var row = document.createElement('div'); row.className = 'citem';
         row.innerHTML =
           '<a class="citem-thumb" href="' + esc(sc.hrefOf(p)) + _t('" aria-label="Voir ') + esc(p.name) + '">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:var(--wash)"></span>') + '</a>' +
           '<div class="citem-main">' +
             '<div class="citem-name">' + esc(p.name) + '</div>' +
-            '<div class="citem-type"><span class="citem-unit">' + money(u) + _t(' / paire') + (u < base ? _t(' · <em>rabais</em>') : '') + '</span></div>' +
-            '<div class="citem-stock">' + stockLine(it) + '</div>' +
             '<div class="citem-qty">' +
               _t('<button type="button" class="cq-minus" aria-label="Retirer une paire">&minus;</button>') +
               '<input type="number" class="cq-val" min="0" max="' + MAX_QTY + '" value="' + it.qty + _t('" inputmode="numeric" aria-label="Quantité (paires)">') +
@@ -514,7 +506,8 @@
           '</div>' +
           '<div class="citem-right">' +
             _t('<button type="button" class="citem-del" aria-label="Retirer ') + esc(p.name) + '">&times;</button>' +
-            '<div class="citem-line">' + money(lineTotal(it)) + '</div>' +
+            '<div class="citem-sum"><div class="citem-line">' + money(lineTotal(it)) + '</div>' +
+              '<span class="citem-unit">' + it.qty + ' × ' + money(u) + '</span></div>' +
           '</div>' + tierBarHtml(p, tierQty(it));
         row.setAttribute('data-id', it.id);
         $$('.tb-tier', row).forEach(function (b) {
