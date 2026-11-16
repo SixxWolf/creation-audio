@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=169">
+<link rel="stylesheet" href="assets/admin.css?v=170">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
@@ -775,6 +775,7 @@
         <button type="button" class="inv-subtab" role="tab" data-sub="commander">À commander</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="codes">Codes-barres</button>
         <button type="button" class="inv-subtab" role="tab" data-sub="attente">Liste d'attente <span class="wl-tab-count" id="wl-tab-count" hidden></span></button>
+        <button type="button" class="inv-subtab" role="tab" data-sub="historique">Historique</button>
       </div>
 
       <!-- ============ SOUS-ONGLET : RÉCEPTION SCANNABLE ============ -->
@@ -814,11 +815,18 @@
                 <button type="button" class="btn btn-accent scan-toggle" id="scan-toggle" aria-pressed="false" data-ic="scan">Reprendre le scan</button>
                 <div class="scan-count" id="scan-count" aria-live="polite"></div>
               </div>
+              <!-- Bandeau géant : couleur + nom du dernier article scanné (comparer avec la boîte en main) -->
+              <div class="scan-banner" id="scan-banner" hidden aria-live="polite">
+                <div class="scan-banner-name" id="scan-banner-name"></div>
+                <div class="scan-banner-sub"><b id="scan-banner-kind"></b><span id="scan-banner-n"></span></div>
+                <button type="button" class="btn btn-sm scan-banner-again" id="scan-banner-again" hidden>Compter quand même</button>
+              </div>
               <div class="scan-inputwrap">
                 <input type="text" id="scan-input" class="scan-input" autocomplete="off" autocorrect="off"
                        autocapitalize="off" spellcheck="false" placeholder="Scanne un article…" disabled>
               </div>
               <div class="scan-feedback" id="scan-feedback" aria-live="polite"></div>
+              <div class="scan-tools"><button type="button" class="btn btn-ghost btn-sm scan-undo" id="scan-undo" data-ic="undo" disabled title="Échap">Annuler le dernier</button></div>
 
               <!-- Panneau d'apprentissage (code-barres inconnu) -->
               <div class="scan-learn" id="scan-learn" hidden>
@@ -971,6 +979,30 @@
           <span class="bc-count" id="bc-count"></span>
         </div>
         <div id="bc-body"></div>
+      </div>
+
+      <!-- ============ SOUS-ONGLET : HISTORIQUE DU STOCK (cms-stock-journal.js) ============ -->
+      <div class="inv-subpanel" id="inv-sub-historique" role="tabpanel" hidden>
+        <div class="panel-head" style="margin-top:4px">
+          <div>
+            <h1 style="font-size:1.1rem">Historique du stock</h1>
+            <p class="muted" id="sj-note"></p>
+          </div>
+          <span class="grow"></span>
+          <button class="btn btn-accent btn-sm" id="sj-count-btn" type="button" data-ic="scan">Compter l'inventaire</button>
+          <button class="btn btn-ghost btn-sm" id="sj-refresh" type="button" data-ic="refresh">Actualiser</button>
+        </div>
+        <div id="sj-view">
+          <div class="sj-bar">
+            <label class="sj-date">Du <input type="date" id="sj-from"></label>
+            <label class="sj-date">au <input type="date" id="sj-to"></label>
+            <div class="sj-quick"><button type="button" class="btn btn-ghost btn-sm" data-days="1">Aujourd'hui</button><button type="button" class="btn btn-ghost btn-sm" data-days="7">7 jours</button><button type="button" class="btn btn-ghost btn-sm" data-days="30">30 jours</button></div>
+            <label class="sj-check"><input type="checkbox" id="sj-moved" checked> Seulement ce qui a bougé</label>
+          </div>
+          <div class="sj-snap" id="sj-snap" hidden></div>
+          <div id="sj-body"></div>
+        </div>
+        <div class="sj-count" id="sj-count" hidden></div>
       </div>
 
       <!-- ============ SOUS-ONGLET : LISTE D'ATTENTE ============ -->
@@ -3141,7 +3173,8 @@
 <script src="assets/cms-spacers.js?v=21"></script>
 <script src="assets/cms-accessories.js?v=14"></script>
 <script src="assets/ca-pick.js?v=3"></script>
-<script src="assets/cms-inventory.js?v=57"></script>
+<script src="assets/cms-inventory.js?v=58"></script>
+<script src="assets/cms-stock-journal.js?v=1"></script>
 <script src="assets/cms-attente.js?v=7"></script>
 <script src="assets/cms-reserves.js?v=4"></script>
 <script src="assets/cms-en-route.js?v=9"></script>

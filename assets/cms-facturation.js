@@ -1203,7 +1203,7 @@
         return sb.from('invoice_lines').insert(lineRows).select('id,sort_order').then(function (r3) {
           if (r3.error) throw r3.error;
           if (!doDeduct) return inv;
-          return deductStock(valid, r3.data || []).then(function () {
+          return deductStock(valid, r3.data || [], invoice.client_type === 'internal' ? (invoice.internal_use === 'production' ? 'production' : 'internal') : 'invoice', number).then(function () {
             return sb.from('invoices').update({ stock_deducted: true }).eq('id', inv.id).then(function () { return inv; });
           });
         });
@@ -1276,7 +1276,7 @@
   // (stock borné à 0) -> mémorisée dans invoice_lines.qty_deducted pour qu'une annulation
   // ne remette que ça (vendre à stock 0 puis annuler ne doit pas créer de stock fantôme).
   // Repli sur receive_stock si schema-v2.sql n'a pas encore été relancé.
-  function deductStock(valid, savedLines) {
+  function deductStock(valid, savedLines, reason, ref) {   // reason / ref -> journal du stock (stock_moves)
     var idBySort = {};
     savedLines.forEach(function (r) { idBySort[r.sort_order] = r.id; });
     var calls = valid.map(function (l, i) {
@@ -1288,7 +1288,7 @@
         return sb.from('invoice_lines').update({ qty_deducted: 0 }).eq('id', idBySort[i])
           .then(function (r3) { if (r3 && r3.error) throw r3.error; });
       }
-      var args = { p_product: l.productId, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: give };
+      var args = { p_product: l.productId, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: give, p_reason: reason || 'invoice', p_ref: ref || null };
       return sb.rpc('deduct_stock', args).then(function (res) {
         if (res && res.error) {
           if (!/PGRST202|could not find the function/i.test((res.error.code || '') + ' ' + (res.error.message || ''))) throw res.error;

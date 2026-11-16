@@ -464,7 +464,9 @@ create policy receipt_lines_admin_all
 -- kind = 'refill' -> qty_2 ; sinon -> qty.
 -- p_qty peut être négatif (annulation lors d'une suppression/modification) ;
 -- le stock est borné à 0 (jamais négatif).
-create or replace function public.receive_stock(p_product uuid, p_kind text, p_qty integer)
+-- p_reason / p_ref (2026-11-16) : raison + référence notées au journal stock_moves (trigger plus bas).
+drop function if exists public.receive_stock(uuid, text, integer);
+create or replace function public.receive_stock(p_product uuid, p_kind text, p_qty integer, p_reason text default null, p_ref text default null)
 returns void language plpgsql security definer set search_path = public as $$
 begin
   -- Garde : fonction SECURITY DEFINER réservée à l'admin (sinon n'importe quel
@@ -473,14 +475,16 @@ begin
   if not public.is_admin() then
     raise exception 'Réservé à l''administrateur.';
   end if;
+  perform set_config('ca.stock_reason', coalesce(p_reason, ''), true);
+  perform set_config('ca.stock_ref', coalesce(p_ref, ''), true);
   update public.products
      set qty   = case when p_kind <> 'refill' then greatest(0, coalesce(qty,0)   + p_qty) else qty   end,
          qty_2 = case when p_kind =  'refill' then greatest(0, coalesce(qty_2,0) + p_qty) else qty_2 end,
          updated_at = now()
    where id = p_product;
 end $$;
-revoke all on function public.receive_stock(uuid, text, integer) from public, anon;
-grant execute on function public.receive_stock(uuid, text, integer) to authenticated;
+revoke all on function public.receive_stock(uuid, text, integer, text, text) from public, anon;
+grant execute on function public.receive_stock(uuid, text, integer, text, text) to authenticated;
 
 -- ------------------------------------------------------------
 -- STORAGE — bucket des images de produits
@@ -788,13 +792,16 @@ alter table public.invoice_lines add column if not exists qty_deducted integer;
 alter table public.invoice_lines add column if not exists qty_pending integer not null default 0 check (qty_pending >= 0);
 
 -- Déduction de stock bornée à 0 qui RENVOIE la quantité effectivement retirée.
-create or replace function public.deduct_stock(p_product uuid, p_kind text, p_qty integer)
+drop function if exists public.deduct_stock(uuid, text, integer);
+create or replace function public.deduct_stock(p_product uuid, p_kind text, p_qty integer, p_reason text default null, p_ref text default null)
 returns integer language plpgsql security definer set search_path = public as $$
 declare v_before integer; v_taken integer;
 begin
   if not public.is_admin() then
     raise exception 'Réservé à l''administrateur.';
   end if;
+  perform set_config('ca.stock_reason', coalesce(p_reason, ''), true);
+  perform set_config('ca.stock_ref', coalesce(p_ref, ''), true);
   select case when p_kind = 'refill' then coalesce(qty_2,0) else coalesce(qty,0) end
     into v_before from public.products where id = p_product for update;
   if not found then return 0; end if;
@@ -806,8 +813,8 @@ begin
    where id = p_product;
   return v_taken;
 end $$;
-revoke all on function public.deduct_stock(uuid, text, integer) from public, anon;
-grant execute on function public.deduct_stock(uuid, text, integer) to authenticated;
+revoke all on function public.deduct_stock(uuid, text, integer, text, text) from public, anon;
+grant execute on function public.deduct_stock(uuid, text, integer, text, text) to authenticated;
 
 -- NOTE : l'ancienne « caisse en direct » (table public.pos_display + écran
 -- client caisse.html) a été retirée. Elle est remplacée par le mode caisse
@@ -938,6 +945,8 @@ begin
   select * into v_inv from public.invoices where id = p_id for update;
   if not found then raise exception 'Facture introuvable.'; end if;
   if v_inv.status = 'cancelled' then raise exception 'Une facture annulée ne peut pas être modifiée.'; end if;
+  perform set_config('ca.stock_reason', 'invoice_edit', true);              -- journal stock_moves
+  perform set_config('ca.stock_ref', coalesce(v_inv.number, ''), true);
   if p_lines is null or jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
     raise exception 'La facture doit contenir au moins une ligne.';
   end if;
@@ -1045,6 +1054,8 @@ begin
   select * into v_inv from public.invoices where id = p_invoice for update;
   if not found then raise exception 'Facture introuvable.'; end if;
   if v_inv.status = 'cancelled' then raise exception 'Une facture annulée ne peut pas être remise.'; end if;
+  perform set_config('ca.stock_reason', 'deliver', true);                   -- journal stock_moves
+  perform set_config('ca.stock_ref', coalesce(v_inv.number, ''), true);
 
   for r in select id, product_id, kind, qty_pending from public.invoice_lines
             where invoice_id = p_invoice and qty_pending > 0 and (p_line is null or id = p_line)
@@ -3467,6 +3478,7 @@ begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   select * into v_sp from public.products where id = (p ->> 'spacer_id')::uuid and type = 'spacer' for update;
   if not found then raise exception 'Spacer introuvable.'; end if;
+  perform pg_catalog.set_config('ca.stock_reason', 'production', true);     -- journal stock_moves
   if jsonb_typeof(p -> 'fils') is distinct from 'array' or jsonb_array_length(p -> 'fils') = 0 then
     raise exception 'Choisis le filament utilisé.';
   end if;
@@ -3533,6 +3545,7 @@ begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   select * into v_pr from public.productions where id = p_id;
   if not found then return; end if;
+  perform pg_catalog.set_config('ca.stock_reason', 'production_delete', true);   -- journal stock_moves
   if v_pr.spacer_id is not null then
     perform 1 from public.products where id = v_pr.spacer_id for update;
     if exists (select 1 from public.productions where spacer_id = v_pr.spacer_id and created_at > v_pr.created_at) then
@@ -5803,3 +5816,118 @@ begin
 end $$;
 revoke all on function public.admin_dealer_request_decide(uuid, boolean) from public, anon;
 grant execute on function public.admin_dealer_request_decide(uuid, boolean) to authenticated;
+
+-- ============================================================
+-- JOURNAL DU STOCK + PHOTO DU JOUR + COMPTAGE (2026-11-16)
+-- ------------------------------------------------------------
+-- stock_moves : une ligne par changement de products.qty / qty_2, écrite par
+-- un TRIGGER (aucun chemin ne peut l'éviter : RPC, éditeurs, SQL). La raison
+-- vient de set_config('ca.stock_reason' / 'ca.stock_ref', …, true) posé par la
+-- RPC appelante (receive_stock / deduct_stock p_reason, update_invoice,
+-- deliver_invoice, productions, admin_set_stock) ; sinon 'manual'.
+-- Raisons : reception, reception_edit, invoice, invoice_cancel, invoice_edit,
+-- deliver, internal, production, production_delete, count, manual, created.
+-- stock_snapshots : photo du stock de tous les produits, chaque nuit (pg_cron
+-- 05:00 UTC = minuit/1 h à Québec), datée du jour qui vient de finir.
+-- ------------------------------------------------------------
+create table if not exists public.stock_moves (
+  id         bigserial primary key,
+  at         timestamptz not null default now(),
+  product_id uuid not null references public.products(id) on delete cascade,
+  kind       text not null,                 -- 'spool' (qty) | 'refill' (qty_2)
+  qty_before integer,
+  qty_after  integer,
+  delta      integer not null,
+  reason     text not null default 'manual',
+  ref        text,                          -- n° de facture / réception / note
+  by_email   text
+);
+create index if not exists stock_moves_at_idx      on public.stock_moves (at desc);
+create index if not exists stock_moves_product_idx on public.stock_moves (product_id, at desc);
+alter table public.stock_moves enable row level security;
+drop policy if exists stock_moves_admin_read on public.stock_moves;
+create policy stock_moves_admin_read on public.stock_moves for select to authenticated
+  using ( (select public.is_admin()) );
+
+create or replace function public._log_stock_move()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare
+  v_reason text := nullif(pg_catalog.current_setting('ca.stock_reason', true), '');
+  v_ref    text := nullif(pg_catalog.current_setting('ca.stock_ref', true), '');
+  v_by     text := (select auth.jwt() ->> 'email');
+  v_old1 integer; v_old2 integer;
+begin
+  if tg_op = 'INSERT' then v_reason := coalesce(v_reason, 'created'); v_old1 := null; v_old2 := null;
+  else v_old1 := old.qty; v_old2 := old.qty_2; end if;
+  v_reason := coalesce(v_reason, 'manual');
+  if new.qty is distinct from v_old1 and coalesce(new.qty, 0) <> coalesce(v_old1, 0) then
+    insert into public.stock_moves (product_id, kind, qty_before, qty_after, delta, reason, ref, by_email)
+    values (new.id, 'spool', v_old1, new.qty, coalesce(new.qty, 0) - coalesce(v_old1, 0), v_reason, v_ref, v_by);
+  end if;
+  if new.qty_2 is distinct from v_old2 and coalesce(new.qty_2, 0) <> coalesce(v_old2, 0) then
+    insert into public.stock_moves (product_id, kind, qty_before, qty_after, delta, reason, ref, by_email)
+    values (new.id, 'refill', v_old2, new.qty_2, coalesce(new.qty_2, 0) - coalesce(v_old2, 0), v_reason, v_ref, v_by);
+  end if;
+  return null;
+end $$;
+revoke all on function public._log_stock_move() from public, anon, authenticated;
+drop trigger if exists products_stock_log on public.products;
+create trigger products_stock_log after insert or update of qty, qty_2 on public.products
+  for each row execute function public._log_stock_move();
+
+-- Corriger un stock à une valeur exacte (comptage, correction) avec sa raison.
+create or replace function public.admin_set_stock(p_product uuid, p_kind text, p_qty integer, p_reason text default 'count', p_ref text default null)
+returns integer language plpgsql security definer set search_path = '' as $$
+declare v_before integer;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  perform pg_catalog.set_config('ca.stock_reason', coalesce(nullif(p_reason, ''), 'count'), true);
+  perform pg_catalog.set_config('ca.stock_ref', coalesce(p_ref, ''), true);
+  select case when p_kind = 'refill' then qty_2 else qty end into v_before
+    from public.products where id = p_product for update;
+  if not found then raise exception 'Produit introuvable.'; end if;
+  update public.products
+     set qty   = case when p_kind <> 'refill' then greatest(0, p_qty) else qty   end,
+         qty_2 = case when p_kind =  'refill' then greatest(0, p_qty) else qty_2 end,
+         updated_at = now()
+   where id = p_product;
+  return coalesce(v_before, 0);
+end $$;
+revoke all on function public.admin_set_stock(uuid, text, integer, text, text) from public, anon;
+grant execute on function public.admin_set_stock(uuid, text, integer, text, text) to authenticated;
+
+create table if not exists public.stock_snapshots (
+  day        date not null,
+  product_id uuid not null references public.products(id) on delete cascade,
+  qty        integer,
+  qty_2      integer,
+  taken_at   timestamptz not null default now(),
+  primary key (day, product_id)
+);
+alter table public.stock_snapshots enable row level security;
+drop policy if exists stock_snapshots_admin_read on public.stock_snapshots;
+create policy stock_snapshots_admin_read on public.stock_snapshots for select to authenticated
+  using ( (select public.is_admin()) );
+
+-- Photo du stock. Sans date : le jour (heure de Québec) qui vient de finir si
+-- lancée la nuit (avant 6 h), sinon aujourd'hui (photo « maintenant », remplacée
+-- par celle de la nuit). Appelée par pg_cron (sans JWT) ou par l'admin.
+create or replace function public.take_stock_snapshot(p_day date default null)
+returns integer language plpgsql security definer set search_path = '' as $$
+declare v_day date; v_n integer;
+begin
+  if (select auth.jwt()) is not null and not public.is_admin() then
+    raise exception 'Réservé à l''administrateur.' using errcode = '42501';
+  end if;
+  v_day := coalesce(p_day, ((now() at time zone 'America/Montreal') - interval '6 hours')::date);
+  insert into public.stock_snapshots (day, product_id, qty, qty_2, taken_at)
+  select v_day, id, qty, qty_2, now() from public.products where qty is not null or qty_2 is not null
+  on conflict (day, product_id) do update set qty = excluded.qty, qty_2 = excluded.qty_2, taken_at = excluded.taken_at;
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+revoke all on function public.take_stock_snapshot(date) from public, anon;
+grant execute on function public.take_stock_snapshot(date) to authenticated;
+
+select cron.unschedule(jobid) from cron.job where jobname = 'stock-snapshot';
+select cron.schedule('stock-snapshot', '0 5 * * *', 'select public.take_stock_snapshot()');

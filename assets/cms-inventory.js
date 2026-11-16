@@ -169,6 +169,10 @@
     filaments: function () { return filaments; },
     accessories: function () { return accessories; },
     prod: function (id) { return bcProd(id); },
+    // pour cms-stock-journal.js (Historique + comptage)
+    reload: function () { return loadFilaments(); },
+    find: function (code) { return findByBarcode(code); },
+    kindLabel: function (k) { return kindLabel(k); },
     label: function (p) { return bcLabel(p); },
     isAcc: function (p) { return isAcc(p); },
     offersSpool: function (f) { return offersSpool(f); },
@@ -199,10 +203,10 @@
      SOUS-ONGLETS
      ========================================================= */
   var subReception = $('#inv-sub-reception'), subCommander = $('#inv-sub-commander'),
-      subCodes = $('#inv-sub-codes'), subAttente = $('#inv-sub-attente');
+      subCodes = $('#inv-sub-codes'), subAttente = $('#inv-sub-attente'), subHist = $('#inv-sub-historique');
   // bascule DOM du sous-onglet (l'URL est gérée par le routing de admin-core)
   function showSub(sub) {
-    if (['commander', 'codes', 'attente'].indexOf(sub) < 0) sub = 'reception';
+    if (['commander', 'codes', 'attente', 'historique'].indexOf(sub) < 0) sub = 'reception';
     $$('.inv-subtab').forEach(function (b) {
       var on = b.getAttribute('data-sub') === sub;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on));
@@ -211,6 +215,8 @@
     if (subCommander) subCommander.hidden = (sub !== 'commander');
     if (subCodes) subCodes.hidden = (sub !== 'codes');
     if (subAttente) subAttente.hidden = (sub !== 'attente');
+    if (subHist) subHist.hidden = (sub !== 'historique');
+    if (sub === 'historique' && window.CA.stockJournal) window.CA.stockJournal.show();   // cms-stock-journal.js
     if (sub === 'commander') renderReorder();
     if (sub === 'reception') renderPick();
     if (sub === 'codes') renderCodes();
@@ -474,6 +480,7 @@
   }
   function orderOfRow(r) { return orders.filter(function (o) { return String(o.id) === String(r.ord); })[0] || orders[0] || null; }
   function startWork(o, rc, oldLines) {
+    resetScanGuard();   // nouveau pointage : bandeau + « Annuler le dernier » repartent à zéro
     orders = rc ? [] : (o ? ordersByAge([].concat(o)) : []);
     current = orders[0] || null;
     editingReceipt = rc || null;
@@ -729,6 +736,9 @@
   }
   function beepOk() { tone(1320, 0, 0.09, 'sine', 0.35); tone(1760, 0.09, 0.09, 'sine', 0.35); }
   function beepBad() { tone(180, 0, 0.22, 'sawtooth', 0.4); tone(140, 0.26, 0.38, 'sawtooth', 0.4); }
+  // recharge : son différent de la bobine (trois notes) pour ne pas confondre les formats
+  function beepRefill() { tone(880, 0, 0.08, 'triangle', 0.4); tone(660, 0.09, 0.08, 'triangle', 0.4); tone(990, 0.18, 0.1, 'triangle', 0.4); }
+  window.CA.invBeep = { ok: beepOk, bad: beepBad, refill: beepRefill };
 
   // Entrée = fin d'un code scanné.
   if (scanInput) scanInput.addEventListener('keydown', function (e) {
@@ -760,10 +770,86 @@
     scanFeedback.className = 'scan-feedback' + (cls ? ' ' + cls : '');
   }
 
+  /* ---- garde-fous : bandeau géant, annuler le dernier, double lecture ---- */
+  var scanBanner = $('#scan-banner'), scanUndo = $('#scan-undo'), bannerAgain = $('#scan-banner-again');
+  var undoStack = [];           // [{ line, created }] : derniers +1 du scan, du plus ancien au plus récent
+  var lastScan = { code: '', t: 0 }, heldCode = '';
+  var DOUBLE_MS = 1000;         // même code deux fois en moins d'une seconde = double lecture probable
+  // texte lisible sur la couleur du filament (foncé sur clair, blanc sur foncé)
+  function inkOn(hex) {
+    if (!isHex(hex)) return '#111';
+    var r = parseInt(hex.substr(1, 2), 16), g = parseInt(hex.substr(3, 2), 16), b = parseInt(hex.substr(5, 2), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#111' : '#fff';
+  }
+  function showBanner(f, kind, line, warn) {
+    if (!scanBanner || !f) return;
+    var acc = isAcc(f);
+    scanBanner.hidden = false;
+    scanBanner.className = 'scan-banner' + (warn ? ' is-warn' : '') + (kind === 'refill' ? ' is-refill' : '') + (acc ? ' is-acc' : '');
+    scanBanner.style.background = acc ? '' : swOf(f);
+    scanBanner.style.color = acc ? '' : inkOn(colorsOf(f)[0] || f.hex);
+    $('#scan-banner-name').textContent = acc ? accLabel(f) : ((f.material ? f.material + ' · ' : '') + (f.name || ''));
+    $('#scan-banner-kind').textContent = acc ? 'ARTICLE' : (kind === 'refill' ? 'RECHARGE' : 'BOBINE');
+    $('#scan-banner-n').textContent = line ? (line.expected > 0 ? line.qty + ' / ' + line.expected + ' reçues' : '× ' + line.qty) : '';
+    if (bannerAgain) bannerAgain.hidden = true;
+  }
+  function resetScanGuard() { if (scanBanner) scanBanner.hidden = true; undoStack = []; heldCode = ''; lastScan = { code: '', t: 0 }; syncUndo(); }
+  function syncUndo() { if (scanUndo) scanUndo.disabled = !undoStack.length; }
+  function undoLast() {
+    var u = undoStack.pop(); syncUndo();
+    if (!u) return;
+    var line = u.line, i = rows.indexOf(line);
+    if (i < 0) { feedback('Rien à annuler.', 'warn'); return; }
+    line.qty = Math.max(0, (line.qty | 0) - 1);
+    if (u.created && line.qty === 0) rows.splice(i, 1);
+    var still = rows.indexOf(line);
+    renderRows(still >= 0 ? still : undefined);
+    var p = bcProd(line.productId);
+    beepBad();
+    feedback('↶ Retiré : ' + (p ? scanLabel(p, line.kind) : 'article') + (still >= 0 ? '  (×' + line.qty + ')' : ''), 'warn');
+    lastScan = { code: '', t: 0 };
+    var prev = undoStack[undoStack.length - 1];
+    if (prev && rows.indexOf(prev.line) >= 0) showBanner(bcProd(prev.line.productId), prev.line.kind, prev.line);
+    else if (scanBanner) scanBanner.hidden = true;
+    focusScan();
+  }
+  if (scanUndo) scanUndo.addEventListener('click', undoLast);
+  // Échap dans la case de scan = annuler le dernier (pas pendant l'association d'un code inconnu)
+  if (scanInput) scanInput.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !scanActive || learnOpen) return;
+    e.preventDefault(); undoLast();
+  });
+  if (bannerAgain) bannerAgain.addEventListener('click', function () {
+    var code = heldCode; heldCode = ''; bannerAgain.hidden = true;
+    if (code) countScan(code);
+    focusScan();
+  });
+
   function processScan(code) {
     var hit = findByBarcode(code);
     if (!hit) { openLearn(code); return; }
-    scanNote(addScanUnit(hit.f, hit.kind), hit.f, hit.kind, '');
+    var now = Date.now();
+    if (code === lastScan.code && now - lastScan.t < DOUBLE_MS) {
+      lastScan.t = now; heldCode = code;
+      beepBad();
+      showBanner(hit.f, hit.kind, null, true);
+      $('#scan-banner-n').textContent = 'Lu 2 fois · compté 1 fois';
+      if (bannerAgain) bannerAgain.hidden = false;
+      feedback('⚠ Double lecture ignorée : ' + scanLabel(hit.f, hit.kind), 'warn');
+      focusScan();
+      return;
+    }
+    lastScan = { code: code, t: now };
+    countScan(code, hit);
+  }
+  function countScan(code, hit) {
+    hit = hit || findByBarcode(code);
+    if (!hit) return;
+    var before = rows.length;
+    var line = addScanUnit(hit.f, hit.kind);
+    undoStack.push({ line: line, created: rows.length > before }); if (undoStack.length > 50) undoStack.shift(); syncUndo();
+    scanNote(line, hit.f, hit.kind, '');
+    showBanner(hit.f, hit.kind, line, line.expected === 0 || (line.expected > 0 && line.qty > line.expected));
     bumpCount();
     if (window.CA.waitlist) window.CA.waitlist.onScan(hit.f.id, hit.kind);   // quelqu'un l'attend ?
     if (window.CA.reserved) window.CA.reserved.onScan(hit.f.id, hit.kind);   // réservé pour un client ?
@@ -786,7 +872,7 @@
     if (orders.length > 1) { var og = orderOfRow(line); if (og) name += ' → ' + (og.order_number || 'Sans n°'); }
     if (line.expected === 0) { beepBad(); feedback('⚠ ' + prefix + 'Pas dans la commande : ' + name, 'warn'); }
     else if (line.expected > 0 && line.qty > line.expected) { beepBad(); feedback('⚠ ' + prefix + name + ' : ' + (line.qty - line.expected) + ' de trop', 'warn'); }
-    else beepOk(), feedback('✓ ' + prefix + name + (line.expected > 0 ? '  (' + line.qty + ' / ' + line.expected + ')' : '  (×' + line.qty + ')'), 'ok');
+    else (kind === 'refill' ? beepRefill() : beepOk()), feedback('✓ ' + prefix + name + (line.expected > 0 ? '  (' + line.qty + ' / ' + line.expected + ')' : '  (×' + line.qty + ')'), 'ok');
   }
 
   // compteur : « reçus / attendus » + barre pour une commande, sinon le nombre d'articles
@@ -860,7 +946,11 @@
         if (res.error || !res.data || !res.data.length) { beepBad(); feedback('Échec de l\'association (permissions ?).', 'bad'); return; }
         f.attrs = res.data[0].attrs || f.attrs;   // maj en mémoire -> reconnu immédiatement ensuite
         closeLearn();
-        scanNote(addScanUnit(f, kind), f, kind, 'Associé · ');
+        var before = rows.length, line = addScanUnit(f, kind);
+        undoStack.push({ line: line, created: rows.length > before }); syncUndo();
+        scanNote(line, f, kind, 'Associé · ');
+        showBanner(f, kind, line, line.expected === 0);
+        lastScan = { code: code, t: Date.now() };
         bumpCount();
         if (window.CA.waitlist) window.CA.waitlist.onScan(f.id, kind);
         if (window.CA.reserved) window.CA.reserved.onScan(f.id, kind);
@@ -875,9 +965,11 @@
   /* =========================================================
      CONFIRMATION — stock + archive + commande en route consommée
      ========================================================= */
-  function applyStock(lines, sign) {
+  // reason / ref : notés au journal du stock (stock_moves) — Inventaire › Historique
+  function applyStock(lines, sign, reason, ref) {
     return Promise.all(lines.filter(function (l) { return l.product_id && l.qty > 0; }).map(function (l) {
-      return sb.rpc('receive_stock', { p_product: l.product_id, p_kind: l.kind, p_qty: sign * l.qty })
+      return sb.rpc('receive_stock', { p_product: l.product_id, p_kind: l.kind, p_qty: sign * l.qty,
+        p_reason: reason || (sign > 0 ? 'reception' : 'reception_edit'), p_ref: ref || null })
         .then(function (res) { if (res && res.error) throw res.error; return res; });   // ne PAS masquer une erreur RPC
     }));
   }
@@ -937,7 +1029,7 @@
               return { receipt_id: res.data[0].id, product_id: r.productId, label: f ? bcLabel(f) : null, kind: kind, qty: r.qty,
                 unit_cost: cost != null ? round2(cost) : null };
             });
-            return sb.from('receipt_lines').insert(newLines).then(function (r2) { if (r2.error) throw r2.error; return applyStock(newLines, +1); });
+            return sb.from('receipt_lines').insert(newLines).then(function (r2) { if (r2.error) throw r2.error; return applyStock(newLines, +1, 'reception', order.order_number || null); });
           })
           .then(function () {
             done++;
@@ -1001,7 +1093,7 @@
         : Promise.resolve(numChanged ? null : oldRef);
       chain = relink.then(function (nr) {
         ref = nr;
-        return applyStock(oldLines, -1);
+        return applyStock(oldLines, -1, 'reception_edit', rc.order_number || null);
       })
         .then(function () { return sb.from('receipt_lines').delete().eq('receipt_id', rc.id); })
         .then(function () {
@@ -1012,7 +1104,7 @@
         .then(function (res) {
           if (res.error || !res.data || !res.data.length) throw (res.error || new Error('Modification refusée (permissions).'));
           newLines = newLinesFor(rc.id);
-          return sb.from('receipt_lines').insert(newLines).then(function (r2) { if (r2.error) throw r2.error; return applyStock(newLines, +1); });
+          return sb.from('receipt_lines').insert(newLines).then(function (r2) { if (r2.error) throw r2.error; return applyStock(newLines, +1, 'reception_edit', newNum || rc.order_number || null); });
         });
     } else {
       var head = { order_number: order ? (order.order_number || null) : null, received_at: date, note: null,
@@ -1021,7 +1113,7 @@
         .then(function (res) {
           if (res.error || !res.data || !res.data.length) throw (res.error || new Error('Réception refusée (permissions).'));
           newLines = newLinesFor(res.data[0].id);
-          return sb.from('receipt_lines').insert(newLines).then(function (r2) { if (r2.error) throw r2.error; return applyStock(newLines, +1); });
+          return sb.from('receipt_lines').insert(newLines).then(function (r2) { if (r2.error) throw r2.error; return applyStock(newLines, +1, 'reception', head.order_number); });
         });
     }
     // commande en route : la réception consomme ce qui était attendu (modification = on rend l'ancien d'abord)
@@ -1401,7 +1493,7 @@
       message: 'Le stock qu\'elle a ajouté sera retiré.', ok: 'Supprimer', danger: true, icon: 'trash' }).then(function (ok) {
       if (!ok) return;
       var affected = uniq(lines.map(function (l) { return l.product_id; }));
-      applyStock(lines, -1)
+      applyStock(lines, -1, 'reception_edit', rc.order_number || null)
         .then(function () { return sb.from('receipts').delete().eq('id', rc.id).select(); })
         .then(function (res) {
           // ce qu'elle avait consommé redevient « en route »

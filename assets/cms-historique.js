@@ -370,11 +370,11 @@
   /* ---------- remise en stock (inverse de la déduction) ---------- */
   // ne remet que ce qui a RÉELLEMENT été retiré (qty_deducted) : un article vendu à stock 0
   // n'a rien retiré -> rien à remettre. qty_deducted NULL = ancienne facture -> on remet qty.
-  function restoreStock(lines) {
+  function restoreStock(lines, ref) {   // ref = n° de facture -> journal du stock
     var calls = (lines || []).map(function (l) {
       var back = (l.qty_deducted != null) ? +l.qty_deducted : Math.abs(+l.qty);
       if (!l.product_id || !(back > 0)) return null;
-      return sb.rpc('receive_stock', { p_product: l.product_id, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: back })
+      return sb.rpc('receive_stock', { p_product: l.product_id, p_kind: l.kind === 'refill' ? 'refill' : 'spool', p_qty: back, p_reason: 'invoice_cancel', p_ref: ref || null })
         .then(function (res) { if (res && res.error) throw res.error; });
     }).filter(Boolean);
     return Promise.all(calls);
@@ -407,7 +407,7 @@
       message: (inv.stock_deducted ? 'Le stock déduit sera remis.\n' : '') + 'Elle restera dans l\'historique (« Annulée ») et sortira des statistiques.',
       ok: 'Annuler la facture', danger: true }).then(function (ok) {
       if (!ok) return;
-      var chain = inv.stock_deducted ? restoreStock(lines) : Promise.resolve();
+      var chain = inv.stock_deducted ? restoreStock(lines, inv.number) : Promise.resolve();
       chain.then(function () {
         return sb.from('invoices').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), stock_deducted: false })
           .eq('id', inv.id).select();
@@ -431,7 +431,7 @@
       // la commande d'origine EN PREMIER : après la suppression, son lien vers la facture est perdu ;
       // si ça échoue, rien n'a encore bougé (ni stock, ni facture)
       reopenOrders(inv)
-        .then(function (msg) { reopened = msg; return inv.stock_deducted ? restoreStock(lines) : null; })
+        .then(function (msg) { reopened = msg; return inv.stock_deducted ? restoreStock(lines, inv.number) : null; })
         .then(function () { return sb.from('invoices').delete().eq('id', inv.id).select(); })
         .then(function (res) {
           if (res.error) throw res.error;
