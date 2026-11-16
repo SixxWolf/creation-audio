@@ -54,15 +54,17 @@
   var curSub = 'apercu';
   function showSub(sub) {
     curSub = (sub === 'produits' || sub === 'visites') ? sub : 'apercu';
+    // grand écran (≥ 1600 px, CA.wideLayout) : Vue d'ensemble et Produits vendus côte à côte
+    // (onglet « Produits vendus » masqué) ; Visites reste un onglet à part.
+    var wide = !!(panelEl && panelEl.classList.contains('is-wide'));
+    var eff = (wide && curSub === 'produits') ? 'apercu' : curSub;
     $$('.stat-subtab').forEach(function (b) {
-      var on = b.getAttribute('data-sub') === curSub;
+      var on = b.getAttribute('data-sub') === eff;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', String(on));
     });
-    // grand écran (≥ 1600 px, CA.wideLayout) : Vue d'ensemble et Produits vendus côte à côte
-    var both = !!(panelEl && panelEl.classList.contains('is-wide'));
-    if (bodyEl) bodyEl.hidden = !both && (curSub !== 'apercu');
-    if (soldEl) soldEl.hidden = !both && (curSub !== 'produits');
-    if (visEl) visEl.hidden = !both && (curSub !== 'visites');
+    if (bodyEl) bodyEl.hidden = eff !== 'apercu';
+    if (soldEl) soldEl.hidden = wide ? eff !== 'apercu' : curSub !== 'produits';
+    if (visEl) visEl.hidden = curSub !== 'visites';
   }
   var panelEl = bodyEl && bodyEl.closest('.tabpanel');
   if (panelEl) panelEl.addEventListener('ca:wide', function () { showSub(curSub); });
@@ -215,7 +217,7 @@
     }
     var n = rows.length;
     var ca = 0, cost = 0, collected = 0;
-    var byCat = {}, prod = {};
+    var byCat = {}, catCost = {}, catQty = {}, prod = {};
     rows.forEach(function (inv) {
       ca += (+inv.subtotal) || 0; cost += (+inv.cost_total) || 0; collected += (+inv.total) || 0;
       var lns = linesByInv[inv.id] || [];
@@ -225,6 +227,8 @@
           // répartit ses filaments et ses accessoires dans les bonnes cases.
           var lc = lineCat(l, inv);
           byCat[lc] = (byCat[lc] || 0) + ((+l.line_total) || 0);
+          catCost[lc] = (catCost[lc] || 0) + ((+l.unit_cost) || 0) * ((+l.qty) || 0);
+          catQty[lc] = (catQty[lc] || 0) + ((+l.qty) || 0);
           // regroupe par produit ET format (bobine/recharge/unité) — sinon on
           // fusionnerait à tort les ventes bobine et recharge d'une même couleur.
           var key = l.product_id ? (l.product_id + '|' + (l.kind || '')) : ('free:' + (l.label || ''));
@@ -235,6 +239,7 @@
       } else {
         // repli : facture dont les lignes n'ont pas pu être chargées
         var c = inv.category || 'mixte'; byCat[c] = (byCat[c] || 0) + ((+inv.subtotal) || 0);
+        catCost[c] = (catCost[c] || 0) + ((+inv.cost_total) || 0);
       }
     });
     var margin = ca - cost, avg = n ? ca / n : 0;
@@ -256,12 +261,24 @@
       card('Encaissé', money(collected), 'taxes incluses') +
       intCard('Interne · production', intUse.production) + intCard('Interne · autre', intUse.other);
 
-    // répartition par gabarit
-    var catRows = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; }).map(function (c) {
-      return '<div class="stat-catrow"><span class="stat-catname">' + esc(CAT_LABEL[c] || c) + '</span>' +
-        '<span class="stat-bar"><span class="stat-bar-fill" style="width:' + pct(byCat[c], ca) + '%"></span></span>' +
-        '<span class="stat-catval">' + money(byCat[c]) + '</span></div>';
-    }).join('');
+    // répartition par gabarit : ventes, coût, marge et % de marge — la seule place où la marge est détaillée
+    function gabRow(name, rev, cst, qty, share, cls) {
+      var m = rev - cst;
+      return '<div class="stat-gabrow' + (cls ? ' ' + cls : '') + '">' +
+        '<span class="stat-gabname">' + esc(name) + (qty ? ' <span class="stat-gabqty">×' + qty + '</span>' : '') + '</span>' +
+        '<span class="stat-gabbar">' + (share == null ? '' : '<span class="stat-bar"><span class="stat-bar-fill" style="width:' + share + '%"></span></span>') + '</span>' +
+        '<span class="stat-gabnum">' + money(rev) + '</span>' +
+        '<span class="stat-gabnum stat-gabcost">' + money(cst) + '</span>' +
+        '<span class="stat-gabnum stat-gabm ' + (m >= 0 ? 'pos' : 'neg') + '">' + money(m) + '</span>' +
+        '<span class="stat-gabnum stat-gabpct">' + pct(m, rev) + ' %</span></div>';
+    }
+    var catKeys = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
+    var catRows = catKeys.length ? '<div class="stat-gab">' +
+      '<div class="stat-gabrow stat-gabhead"><span>Gabarit</span><span class="stat-gabbar"></span><span>Ventes</span>' +
+        '<span class="stat-gabcost">Coût</span><span>Marge</span><span>%</span></div>' +
+      catKeys.map(function (c) { return gabRow(CAT_LABEL[c] || c, byCat[c], catCost[c] || 0, catQty[c] || 0, pct(byCat[c], ca)); }).join('') +
+      (catKeys.length > 1 ? gabRow('Total', ca, cost, 0, null, 'stat-gabtotal') : '') +
+    '</div>' : '';
 
     // produits vendus, groupés par catégorie et triés du plus vendu (unités)
     // au moins vendu — MÊME calcul pour « Top produits » et « Produits vendus ».
@@ -299,18 +316,16 @@
         ' · ' + units + ' unité' + (units > 1 ? 's' : '') + ' · ' + money(rev) + '</span></div>';
       if (!list.length) return '<div class="stat-panel stat-soldpanel">' + head + '<p class="muted stat-none">Aucune vente sur cette période.</p></div>';
       var rows = list.map(function (p, i) {
-        var m = p.rev - p.cost;
         return '<div class="stat-soldrow">' +
           '<span class="stat-soldrank">' + (i + 1) + '</span>' +
           '<span class="stat-soldname">' + chip(p, g.key) + '<span class="stat-soldlabel">' + esc(p.label) +
             (p.meta ? ' <span class="stat-topmeta">' + esc(p.meta) + '</span>' : '') + '</span></span>' +
           '<span class="stat-soldqty">×' + p.qty + '</span>' +
           '<span class="stat-soldrev">' + money(p.rev) + '</span>' +
-          '<span class="stat-soldmargin"><span class="stat-topmargin ' + (m >= 0 ? 'pos' : 'neg') + '">' + money(m) + '</span></span>' +
         '</div>';
       }).join('');
       return '<div class="stat-panel stat-soldpanel">' + head +
-        '<div class="stat-soldcols"><span>#</span><span>Produit</span><span>Qté</span><span>Revenu</span><span>Marge</span></div>' +
+        '<div class="stat-soldcols"><span>#</span><span>Produit</span><span>Qté</span><span>Revenu</span></div>' +
         rows + '</div>';
     }).join('');
   }
@@ -321,13 +336,11 @@
     return '<span class="stat-chip" style="background:' + esc(swatchBg(prodInfo[p.pid])) + '"></span>';
   }
   function topRow(p, group, maxQty) {
-    var m = p.rev - p.cost;
     return '<div class="stat-toprow">' +
       '<div class="stat-topmain"><span class="stat-topname">' + chip(p, group) + esc(p.label) + (p.meta ? ' <span class="stat-topmeta">' + esc(p.meta) + '</span>' : '') + '</span>' +
         '<span class="stat-bar"><span class="stat-bar-fill" style="width:' + pct(p.qty, maxQty) + '%"></span></span></div>' +
       '<div class="stat-topnums"><span class="stat-topqty">×' + p.qty + '</span>' +
-        '<span class="stat-toprev">' + money(p.rev) + '</span>' +
-        '<span class="stat-topmargin ' + (m >= 0 ? 'pos' : 'neg') + '">marge ' + money(m) + '</span></div>' +
+        '<span class="stat-toprev">' + money(p.rev) + '</span></div>' +
     '</div>';
   }
 

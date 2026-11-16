@@ -520,6 +520,26 @@
 .stat-bar { flex:1; height:10px; overflow:hidden; background:var(--wash); border-radius:100px; }
 .stat-bar-fill { display:block; height:100%; background:linear-gradient(90deg, var(--ember-dim), var(--ember)); border-radius:100px; }
 
+/* ventes par gabarit : ventes / coût / marge / % (seule place où la marge est détaillée) */
+.stat-gab { font-variant-numeric:tabular-nums; }
+.stat-gabrow { display:grid; grid-template-columns:minmax(110px, 150px) minmax(60px, 1fr) 100px 100px 100px 52px; align-items:center; gap:12px;
+  padding:9px 0; border-top:1px solid var(--line); }
+.stat-gabhead { padding:0 0 8px; border-top:none; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.stat-gabhead span:nth-child(n+3) { text-align:right; }
+.stat-gabname { font-size:.88rem; font-weight:600; white-space:nowrap; }
+.stat-gabqty { margin-left:4px; font-size:.78rem; font-weight:500; color:var(--muted); }
+.stat-gabbar .stat-bar { display:block; height:8px; }
+.stat-gabnum { text-align:right; font-size:.86rem; font-weight:600; white-space:nowrap; }
+.stat-gabcost { color:var(--muted); font-weight:500; }
+.stat-gabm.pos { color:var(--good); } .stat-gabm.neg { color:var(--bad); }
+.stat-gabpct { color:var(--muted); font-weight:500; }
+.stat-gabtotal { border-top:1px solid var(--line-2); }
+.stat-gabtotal .stat-gabname, .stat-gabtotal .stat-gabnum:not(.stat-gabcost):not(.stat-gabpct) { font-weight:700; }
+@media (max-width:720px) {
+  .stat-gabrow { grid-template-columns:minmax(0, 1fr) auto auto 40px; gap:10px; }
+  .stat-gabbar, .stat-gabcost { display:none; }
+}
+
 /* classements */
 .stat-toprow { padding:10px 0; border-top:1px solid var(--line); }
 .stat-toprow:first-child { border-top:none; }
@@ -550,13 +570,14 @@
 /* Grand écran (≥ 1600 px — 2026-10-12) : Vue d'ensemble | Produits vendus côte à côte, sans sous-onglets */
 @media screen and (min-width:1600px) {
   .tabpanel[data-panel="statistiques"].is-wide:not([hidden]) { display:grid; grid-template-columns:minmax(0, 1fr) minmax(560px, .8fr);
-    column-gap:20px; align-items:start; grid-template-areas:"head head" "filt filt" "body sold" "vis vis"; }
+    column-gap:20px; align-items:start; grid-template-areas:"head head" "tabs tabs" "filt filt" "body sold" "vis vis"; }
   .tabpanel[data-panel="statistiques"].is-wide > .panel-head { grid-area:head; }
-  .tabpanel[data-panel="statistiques"].is-wide > .stat-subtabs { display:none; }
+  .tabpanel[data-panel="statistiques"].is-wide > .stat-subtabs { grid-area:tabs; }
+  .tabpanel[data-panel="statistiques"].is-wide .stat-subtab[data-sub="produits"] { display:none; }
   .tabpanel[data-panel="statistiques"].is-wide > .stat-filters { grid-area:filt; }
   .tabpanel[data-panel="statistiques"].is-wide > #stat-body { grid-area:body; min-width:0; }
   .tabpanel[data-panel="statistiques"].is-wide > #stat-sold { grid-area:sold; min-width:0; }
-  .tabpanel[data-panel="statistiques"].is-wide > #stat-visits { grid-area:vis; min-width:0; margin-top:20px; }
+  .tabpanel[data-panel="statistiques"].is-wide > #stat-visits { grid-area:vis; min-width:0; }
   /* colonne plus étroite : les noms passent à la ligne plutôt que d'être coupés (comme sur mobile) */
   .tabpanel[data-panel="statistiques"].is-wide .stat-soldname { align-items:flex-start; }
   .tabpanel[data-panel="statistiques"].is-wide .stat-soldlabel { white-space:normal; line-height:1.35; }
@@ -579,7 +600,7 @@
 .stat-soldhead { display:flex; align-items:baseline; flex-wrap:wrap; gap:12px; margin-bottom:8px; }
 .stat-soldhead h2 { margin:0; }
 .stat-soldsum { font-size:.8rem; color:var(--muted); font-variant-numeric:tabular-nums; }
-.stat-soldcols, .stat-soldrow { display:grid; grid-template-columns:32px minmax(0, 1fr) 64px 110px 130px; align-items:center; gap:10px; }
+.stat-soldcols, .stat-soldrow { display:grid; grid-template-columns:32px minmax(0, 1fr) 64px 110px; align-items:center; gap:10px; }
 .stat-soldcols { padding:8px 10px; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
   background:var(--wash); border-radius:10px; }
 .stat-soldcols span:nth-child(n+3) { text-align:right; }
@@ -595,9 +616,7 @@
 @media (max-width:720px) {
   .stat-cols { grid-template-columns:1fr; }
   .stat-soldcols { display:none; }
-  .stat-soldrow { grid-template-columns:24px minmax(0, 1fr) auto; row-gap:2px; padding:9px 4px; }
-  .stat-soldrev { grid-column:2; text-align:left; }
-  .stat-soldmargin { grid-column:3; }
+  .stat-soldrow { grid-template-columns:24px minmax(0, 1fr) auto auto; row-gap:2px; padding:9px 4px; }
   .stat-soldname { align-items:flex-start; }
   .stat-soldlabel { white-space:normal; line-height:1.35; }
   .stat-soldname .stat-chip { margin-top:2px; }
