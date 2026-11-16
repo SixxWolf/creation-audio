@@ -779,73 +779,70 @@
     reader.readAsArrayBuffer(file);
   }
   /* ---- Bibliothèque de plateaux (bucket privé « autoloop » + table autoloop_plates) ----
-     Un plateau tranché par spacer, gardé une fois : on le choisit dans le menu au lieu de
+     Les fichiers vivent dans l'onglet Fichiers (cms-autoloop-files.js, window.ALFiles) : on choisit spacer + version au lieu de
      chercher le .gcode.3mf. Les réglages du batch (loops…) restent ceux de la page. */
-  var libPlates = [], libCur = null, lastFile = null, libPending = null;
+  var libCur = null, lastFile = null, libPending = null;
   var STUDIO_MAX = 50 * 1024 * 1024 - 65536;   // limite de fichier du stockage Supabase (marge pour l'envoi)
   var PRESETS = [6, 12, 18];   // lignes « Batchs prêts » (loops)
   function libSb() { return window.CA && window.CA.sb; }
   function libToast(msg, kind) { if (window.caDialog && caDialog.toast) caDialog.toast(msg, kind); }
-  function libRow(id) { return libPlates.filter(function (p) { return p.id === id; })[0] || null; }
+  function libRow(id) { return id && window.ALFiles ? ALFiles.row(id) : null; }
+  // Menu du Générateur : spacer (cartes de l'onglet Fichiers, même ordre) puis version (celle par défaut d'office)
   function renderLib() {
-    var sel = $('#al-lib-sel'); if (!sel) return;
-    sel.innerHTML = '<option value="">' + (libPlates.length ? 'Bibliothèque : choisir un spacer' : 'Bibliothèque vide') + '</option>' +
-      libPlates.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>'; }).join('');
-    sel.value = libCur || '';
-    if (window.CA && CA.pick) CA.pick(sel);
+    var sp = $("#al-lib-sp"), ver = $("#al-lib-ver"), F = window.ALFiles;
+    if (!sp || !ver || !F) return;
+    var ids = F.cards(), cur = libRow(libCur), curSp = cur && cur.spacer_id ? String(cur.spacer_id) : "";
+    sp.innerHTML = "<option value=\"\">" + (ids.length ? "Fichiers : choisir un spacer" : "Aucun fichier") + "</option>" + ids.map(function (id) {
+      var s = F.spacer(id), u = F.imgOf(s);
+      return "<option value=\"" + esc(id) + "\"" + (u ? " data-sw=\"#fff url(&quot;" + esc(u) + "&quot;) center/contain no-repeat\"" : "") + ">" + esc(F.spLabel(s)) + "</option>";
+    }).join("");
+    sp.value = ids.indexOf(curSp) !== -1 ? curSp : "";
+    var vs = sp.value ? F.versionsOf(sp.value) : [], def = sp.value ? F.defaultOf(sp.value) : null, has = cur && vs.indexOf(cur) !== -1;
+    ver.innerHTML = (has ? "" : "<option value=\"\">Version</option>") + vs.map(function (r) {
+      return "<option value=\"" + esc(r.id) + "\">" + esc(r.name + (r.client ? " · " + r.client.label : "") + (r === def ? " · défaut" : "")) + "</option>";
+    }).join("");
+    ver.value = has ? cur.id : "";
+    ver.disabled = !vs.length;
+    if (window.CA && CA.pick) { CA.pick(sp); CA.pick(ver); }
   }
   function syncLib() {
-    var save = $('#al-lib-save'), del = $('#al-lib-del'), set = $('#al-lib-set'), sel = $('#al-lib-sel');
+    var save = $("#al-lib-save"), set = $("#al-lib-set");
     if (!save) return;
     save.hidden = !(lastFile && !libCur);
-    set.hidden = del.hidden = !libCur;
-    if (sel && sel.value !== (libCur || '')) { sel.value = libCur || ''; if (window.CA && CA.pick) CA.pick(sel); }
-  }
-  function loadLib() {
-    var sb = libSb(); if (!sb) return;
-    sb.from('autoloop_plates').select('*').order('name').then(function (res) {
-      if (res.error) { libToast('Bibliothèque : ' + res.error.message, 'bad'); return; }
-      libPlates = res.data || []; renderLib(); syncLib();
-    });
+    set.hidden = !libCur;
+    renderLib();
   }
   function libPick(id) {
     var sb = libSb(), row = libRow(id);
     if (!row) { libCur = null; syncLib(); return; }
-    $('#al-file-name').textContent = 'Chargement de ' + row.name + '…';
-    sb.storage.from('autoloop').download(row.file_path).then(function (res) {
+    $("#al-file-name").textContent = "Chargement de " + row.name + "…";
+    sb.storage.from("autoloop").download(row.file_path).then(function (res) {
       if (res.error || !res.data) {
-        libToast('Fichier introuvable : ' + (res.error ? res.error.message : row.name), 'bad');
+        libToast("Fichier introuvable : " + (res.error ? res.error.message : row.name), "bad");
         libCur = null; syncLib(); return;
       }
-      loadFile(new File([res.data], row.file_name || (row.name + '.gcode.3mf')), row.id);
+      loadFile(new File([res.data], row.file_name || (row.name + ".gcode.3mf")), row.id);
     });
   }
+  // fichier glissé ici : on l'ajoute à l'onglet Fichiers (même fenêtre), avec les réglages de la page
   function libSave() {
-    var sb = libSb(); if (!sb || !lastFile) return;
-    var file = lastFile;
-    caDialog.prompt({ title: 'Nom du plateau', value: file.name.replace(/(.gcode)?.3mf$|.gcode$/i, ''), ok: 'Enregistrer', icon: 'save' }).then(function (name) {
-      name = (name || '').trim(); if (!name) return;
-      var old = libPlates.filter(function (p) { return p.name.toLowerCase() === name.toLowerCase(); })[0] || null;
-      var go = old ? caDialog.confirm({ title: 'Remplacer « ' + old.name + ' » ?', message: 'Le fichier enregistré sera remplacé.', ok: 'Remplacer', icon: 'save' }) : Promise.resolve(true);
-      go.then(function (ok) {
-        if (!ok) return;
-        var path = old ? old.file_path : ((window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + '.gcode.3mf');
-        var btn = $('#al-lib-save'); btn.disabled = true;
-        sb.storage.from('autoloop').upload(path, file, { upsert: true, contentType: 'application/octet-stream' }).then(function (up) {
-          if (up.error) throw up.error;
-          var row = { name: name, file_path: path, file_name: file.name, size_bytes: file.size, settings: libSettings(), updated_at: new Date().toISOString() };
-          return old ? sb.from('autoloop_plates').update(row).eq('id', old.id).select().single()
-                     : sb.from('autoloop_plates').insert(row).select().single();
-        }).then(function (res) {
-          if (res.error) throw res.error;
-          libCur = res.data.id; loadLibThen();
-          libToast('« ' + name + ' » enregistré.');
-        }).catch(function (err) {
-          libToast('Enregistrement : ' + (err && err.message ? err.message : err), 'bad');
-        }).then(function () { btn.disabled = false; });
+    if (!lastFile || !window.ALFiles) return;
+    var btn = $("#al-lib-save"); btn.disabled = true;
+    ALFiles.addFiles([lastFile]).then(function (row) {
+      if (!row) return;
+      libCur = row.id;
+      var st = libSettings();
+      return libSb().from("autoloop_plates").update({ settings: st }).eq("id", row.id).then(function (res) {
+        if (!res.error) ALFiles.patch(row.id, { settings: st });
       });
-    });
+    }).then(function () { btn.disabled = false; syncLib(); });
   }
+  // « Utiliser » dans l'onglet Fichiers : retour au Générateur avec ce fichier
+  if (window.CA) window.CA.autoloopUse = function (id) {
+    var seg = $("#al-subnav .al-seg[data-view=\"gcode\"]"); if (seg) seg.click();
+    var top = $("#al-subnav"); if (top && top.scrollIntoView) top.scrollIntoView({ behavior: "smooth", block: "start" });
+    libPick(id);
+  };
   // Tout ce que la page règle (batch, calculateur de prix, cases de calibration) suit le plateau.
   function libSettings() {
     var N = loopCount(); fitCal(N);
@@ -861,7 +858,7 @@
     var btn = $('#al-lib-set'); btn.disabled = true;
     sb.from('autoloop_plates').update({ settings: libSettings(), updated_at: new Date().toISOString() }).eq('id', row.id).select().single().then(function (res) {
       if (res.error) throw res.error;
-      libToast('Réglages de « ' + row.name + ' » enregistrés.'); loadLibThen();
+      ALFiles.patch(row.id, { settings: res.data.settings }); libToast('Réglages de « ' + row.name + ' » enregistrés.');
     }).catch(function (err) { libToast('Réglages : ' + (err && err.message ? err.message : err), 'bad'); })
       .then(function () { btn.disabled = false; });
   }
@@ -959,39 +956,18 @@
     });
   }
 
-  function loadLibThen() {
-    var sb = libSb();
-    sb.from('autoloop_plates').select('*').order('name').then(function (res) {
-      if (!res.error) libPlates = res.data || [];
-      renderLib(); syncLib();
-    });
-  }
-  function libDelete() {
-    var sb = libSb(), row = libRow(libCur); if (!sb || !row) return;
-    caDialog.confirm({ title: 'Retirer « ' + row.name + ' » de la bibliothèque ?', message: 'Action définitive.', ok: 'Retirer', danger: true, icon: 'trash' }).then(function (ok) {
-      if (!ok) return;
-      sb.storage.from('autoloop').remove([row.file_path]).then(function (r1) {
-        if (r1.error) throw r1.error;
-        return sb.from('autoloop_plates').delete().eq('id', row.id);
-      }).then(function (r2) {
-        if (r2.error) throw r2.error;
-        libCur = null; loadLibThen(); libToast('Plateau retiré.');
-      }).catch(function (err) { libToast('Suppression : ' + (err && err.message ? err.message : err), 'bad'); });
-    });
-  }
   function initLib() {
-    var sel = $('#al-lib-sel'); if (!sel) return;
-    renderLib();
-    sel.addEventListener('change', function () { if (sel.value) libPick(sel.value); });
+    var sp = $('#al-lib-sp'), ver = $('#al-lib-ver'); if (!sp) return;
+    sp.addEventListener('change', function () { var d = sp.value && ALFiles.defaultOf(sp.value); if (d) libPick(d.id); });
+    ver.addEventListener('change', function () { if (ver.value) libPick(ver.value); });
     $('#al-lib-save').addEventListener('click', libSave);
-    $('#al-lib-del').addEventListener('click', libDelete);
     $('#al-lib-set').addEventListener('click', libSet);
     $('#al-pre').addEventListener('click', onPresetClick);
     $('#al-open-studio').addEventListener('click', openCustom);
     // durée / filament des lignes suivent les réglages (cooldown, purge…)
     var main = $('.al-main');
     if (main) { main.addEventListener('input', schedulePresets); main.addEventListener('change', schedulePresets); }
-    if (window.CA && window.CA.onAdminReady) window.CA.onAdminReady(loadLib);
+    if (window.ALFiles) ALFiles.onChange(renderLib);
   }
 
   function loadProject(u8) {

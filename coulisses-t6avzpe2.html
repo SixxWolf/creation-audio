@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
 <link rel="stylesheet" href="assets/facture.css?v=47">
-<link rel="stylesheet" href="assets/autoloop.css?v=30">
+<link rel="stylesheet" href="assets/autoloop.css?v=31">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
 <link rel="stylesheet" href="assets/boites.css?v=8">
 <link rel="stylesheet" href="assets/imprimantes.css?v=6">
@@ -1962,6 +1962,7 @@
 
       <div class="al-subnav" id="al-subnav" role="tablist" aria-label="Outils AutoLoop">
         <button class="al-seg" type="button" role="tab" data-view="gcode" aria-selected="true">Générateur de batch</button>
+        <button class="al-seg" type="button" role="tab" data-view="files" aria-selected="false">Fichiers</button>
         <button class="al-seg" type="button" role="tab" data-view="prix" aria-selected="false">Calculateur de prix</button>
       </div>
 
@@ -1974,10 +1975,10 @@
             <div class="al-card">
               <div class="al-card-head"><span class="al-ic al-step">1</span> Plateau tranché</div>
               <div class="al-lib" id="al-lib">
-                <select id="al-lib-sel" aria-label="Bibliothèque de plateaux"></select>
-                <button class="btn btn-ghost btn-sm" id="al-lib-save" type="button" hidden data-ic="save">Enregistrer</button>
+                <select id="al-lib-sp" aria-label="Spacer"></select>
+                <select id="al-lib-ver" aria-label="Version"></select>
+                <button class="btn btn-ghost btn-sm" id="al-lib-save" type="button" hidden data-ic="save">Ajouter aux fichiers</button>
                 <button class="btn btn-ghost btn-sm" id="al-lib-set" type="button" hidden data-ic="save">Enregistrer les réglages</button>
-                <button class="btn btn-ghost btn-sm" id="al-lib-del" type="button" hidden data-ic="trash">Retirer</button>
               </div>
               <div class="al-drop" id="al-drop">
                 <div class="al-drop-ic">＋</div>
@@ -2136,6 +2137,20 @@
       </div>
 
       <!-- ===== VUE : CALCULATEUR DE PRIX ===== -->
+      <!-- ===== VUE : FICHIERS (plateaux d’un loop, par spacer et par version) ===== -->
+      <div class="al-view" data-view="files" hidden>
+        <div class="al-card alf-add">
+          <div class="al-card-head"><span class="al-ic">＋</span> Ajouter des fichiers <span class="al-note" id="alf-total"></span></div>
+          <div class="al-drop" id="alf-drop" role="button" tabindex="0">
+            <div class="al-drop-ic">＋</div>
+            <p class="al-drop-t">Glisse tes <b>.gcode.3mf</b> d’un loop ici, ou clique pour choisir</p>
+            <p class="al-drop-s">Plusieurs à la fois</p>
+          </div>
+          <input type="file" id="alf-file" accept=".3mf,.gcode" multiple hidden>
+        </div>
+        <div id="alf-list" class="alf-list"></div>
+      </div>
+
       <div class="al-view" data-view="prix" hidden>
         <div class="al-cols">
           <!-- Entrées -->
@@ -3119,7 +3134,7 @@
 <script src="assets/cms-linkbuilder.js?v=5"></script>
 <script src="assets/cms-spacers.js?v=21"></script>
 <script src="assets/cms-accessories.js?v=14"></script>
-<script src="assets/ca-pick.js?v=2"></script>
+<script src="assets/ca-pick.js?v=3"></script>
 <script src="assets/cms-inventory.js?v=57"></script>
 <script src="assets/cms-attente.js?v=7"></script>
 <script src="assets/cms-reserves.js?v=4"></script>
@@ -3141,7 +3156,8 @@
 <script src="assets/cms-statistiques.js?v=15"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
-<script src="assets/cms-autoloop.js?v=50"></script>
+<script src="assets/cms-autoloop-files.js?v=1"></script>
+<script src="assets/cms-autoloop.js?v=51"></script>
 <!-- Silhouettes : le ?v= du moteur sert aussi au worker (cms-silhouettes.js le lit ici) -->
 <script src="assets/silhouette-engine.js?v=17"></script>
 <script src="assets/cms-silhouettes.js?v=16"></script>

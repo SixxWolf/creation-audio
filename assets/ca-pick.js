@@ -101,7 +101,7 @@
       pop.className = 'cpk-pop';
       pop.innerHTML = (sel.options.length > 10 && !sel.hasAttribute('data-nosearch') ? '<input type="search" class="cpk-search" placeholder="Rechercher…" autocomplete="off" spellcheck="false" aria-label="Rechercher">' : '') +
         '<div class="cpk-list" role="listbox"></div>';
-      document.body.appendChild(pop);
+      (btn.closest('dialog') || document.body).appendChild(pop);   // dans une fenêtre caDialog : sinon caché sous la couche du haut
       list = pop.querySelector('.cpk-list');
       search = pop.querySelector('.cpk-search');
       active = -1;

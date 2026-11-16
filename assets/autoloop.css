@@ -290,3 +290,76 @@
   .al-card { padding:16px; }
   .al-sum-head { margin:-16px -16px 14px; padding:12px 16px; }
 }
+
+/* --- Générateur : menus spacer + version (onglet Fichiers) --- */
+.al-lib .cpk:first-child { flex:2 1 260px; }
+.al-lib .cpk-sw { width:26px; height:26px; border-radius:7px; }
+.cpk-pop .cpk-sw[style*="url("] { width:30px; height:30px; border-radius:7px; }
+
+/* --- Fichiers : une carte par spacer, versions empilées ---------- */
+.alf-add { margin-bottom:16px; }
+.alf-add .al-drop { padding:20px 16px; }
+.alf-list { display:flex; flex-direction:column; gap:16px; }
+.alf-cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 620px), 1fr)); gap:16px; align-items:start; }
+.alf-card { padding:16px 18px; }
+.alf-head { display:flex; align-items:center; gap:12px; }
+.alf-photo { flex:none; display:grid; place-items:center; width:76px; height:76px; overflow:hidden;
+  background:#fff; border:1px solid var(--line); border-radius:12px; }
+.alf-photo img { width:100%; height:100%; object-fit:contain; }
+.alf-photo.is-q { font-family:var(--display); font-weight:700; font-size:1.4rem; color:var(--muted); background:var(--wash); }
+.alf-title { min-width:0; }
+.alf-title h3 { margin:0; font-family:var(--display); font-size:1.12rem; letter-spacing:-.01em; overflow-wrap:anywhere; }
+.alf-title p { margin:2px 0 0; font-size:.84rem; color:var(--muted); overflow-wrap:anywhere; }
+.alf-title p:empty { display:none; }
+.alf-title .alf-count { font-weight:600; }
+.alf-vers { list-style:none; margin:14px 0 0; padding:0; }
+.alf-ver { display:grid; grid-template-columns:auto 52px minmax(0, 1fr) auto; align-items:center; gap:4px 12px;
+  padding:10px 0; border-top:1px solid var(--line); background:var(--paper); }
+.alf-ver.is-def .alf-vname { color:var(--ink); }
+.alf-thumb { display:grid; place-items:center; width:52px; height:52px; overflow:hidden; background:var(--wash); border:1px solid var(--line); border-radius:9px; }
+.alf-thumb img { width:100%; height:100%; object-fit:contain; }
+.alf-vmain { min-width:0; }
+.alf-vtop { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.alf-vname { font-weight:700; overflow-wrap:anywhere; }
+.alf-tag, .alf-def { padding:1px 8px; font-size:.74rem; font-weight:700; white-space:nowrap; border-radius:99px; }
+.alf-tag { color:var(--ink-2, var(--ink)); background:var(--wash-2, var(--wash)); border:1px solid var(--line); }
+.alf-def { color:var(--ember-ink); background:color-mix(in srgb, var(--ember) 14%, var(--paper)); }
+.alf-sum { margin-top:2px; font-size:.86rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.alf-sum.is-bad { color:var(--bad); }
+.alf-act { display:flex; align-items:center; gap:6px; }
+.alf-ib { width:34px; padding-left:0; padding-right:0; justify-content:center; }
+.alf-ib::before { margin:0 !important; }
+.alf-more { grid-column:2 / -1; margin-top:2px; }
+.alf-more > summary { width:max-content; font-size:.84rem; font-weight:600; color:var(--ember-ink); cursor:pointer; }
+.alf-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap:4px 22px; margin-top:8px; }
+.alf-sec h4 { margin:8px 0 4px; font-size:.74rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.alf-sec dl { display:grid; grid-template-columns:max-content minmax(0, 1fr); gap:3px 12px; margin:0; font-size:.86rem; }
+.alf-sec dt { color:var(--muted); }
+.alf-sec dd { margin:0; font-weight:600; overflow-wrap:break-word; min-width:0; font-variant-numeric:tabular-nums; }
+.alf-fil { display:flex; align-items:center; gap:6px; }
+.alf-sw { width:12px; height:12px; flex:none; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.2); }
+.alf-empty { margin:6px 2px; }
+
+/* poignée ⠿ : glisser-déposer souris + tactile */
+.alf-grip { display:grid; place-items:center; width:22px; height:34px; flex:none; color:var(--muted); cursor:grab; touch-action:none; border-radius:6px; }
+.alf-grip svg { width:18px; height:18px; fill:currentColor; }
+.alf-grip:hover { color:var(--ink); background:var(--wash); }
+.alf-grip.is-off { cursor:default; visibility:hidden; }
+.is-drag { position:relative; z-index:2; opacity:.92; box-shadow:0 10px 30px -10px rgba(0,0,0,.35); border-radius:12px; }
+.alf-ver.is-drag { outline:2px solid var(--ember); outline-offset:-2px; }
+body.alf-dragging, body.alf-dragging * { cursor:grabbing !important; user-select:none; }
+
+/* fenêtre Ajouter / Modifier */
+.alf-form { display:grid; gap:6px; margin-top:14px; }
+.alf-form .lbl { margin-top:6px; }
+.alf-form .lbl:first-child { margin-top:0; }
+
+@media (max-width:640px) {
+  .alf-card { padding:14px; }
+  .alf-photo { width:60px; height:60px; }
+  .alf-ver { grid-template-columns:auto 44px minmax(0, 1fr); }
+  .alf-thumb { width:44px; height:44px; }
+  .alf-act { grid-column:2 / -1; flex-wrap:wrap; }
+  .alf-act .btn-accent { flex:1 1 auto; }
+  .alf-more { grid-column:1 / -1; }
+}

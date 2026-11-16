@@ -4131,6 +4131,15 @@ drop policy if exists autoloop_plates_admin_all on public.autoloop_plates;
 create policy autoloop_plates_admin_all on public.autoloop_plates for all to authenticated
   using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
 revoke all on public.autoloop_plates from anon;
+-- Onglet AutoLoop › Fichiers (2026-11-16) : une ligne = une VERSION du plateau d'un spacer.
+--   sort   : ordre des versions dans la carte du spacer (le plus petit en haut ; défaut = première sans étiquette)
+--   client : étiquette facultative { kind: 'dealer'|'customer', id, label } (version faite pour un commerce)
+--   meta   : infos lues dans le fichier (murs, remplissage, couches, poids, temps, vignette du plateau…)
+-- Ordre des cartes : admin_settings « autoloop_cards » = { order: [spacer_id, …] }.
+alter table public.autoloop_plates add column if not exists sort   integer not null default 0;
+alter table public.autoloop_plates add column if not exists client jsonb;
+alter table public.autoloop_plates add column if not exists meta   jsonb not null default '{}'::jsonb;
+create index if not exists autoloop_plates_spacer_sort_idx on public.autoloop_plates (spacer_id, sort);
 
 -- ------------------------------------------------------------
 -- FACTURE PAR COURRIEL (Edge Function « invoice-notify »)
