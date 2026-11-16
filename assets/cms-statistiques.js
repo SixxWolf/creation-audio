@@ -261,23 +261,26 @@
       card('Encaissé', money(collected), 'taxes incluses') +
       intCard('Interne · production', intUse.production) + intCard('Interne · autre', intUse.other);
 
-    // répartition par gabarit : ventes, coût, marge et % de marge — la seule place où la marge est détaillée
-    function gabRow(name, rev, cst, qty, share, cls) {
+    // répartition par gabarit — la seule place où la marge est détaillée :
+    //  Part (ventes) = ventes de la catégorie ÷ chiffre d'affaires ; Part (marge) = marge ÷ marge totale ;
+    //  Taux = marge ÷ ventes de la catégorie.
+    function gabRow(name, rev, cst, qty, cls) {
       var m = rev - cst;
       return '<div class="stat-gabrow' + (cls ? ' ' + cls : '') + '">' +
         '<span class="stat-gabname">' + esc(name) + (qty ? ' <span class="stat-gabqty">×' + qty + '</span>' : '') + '</span>' +
-        '<span class="stat-gabbar">' + (share == null ? '' : '<span class="stat-bar"><span class="stat-bar-fill" style="width:' + share + '%"></span></span>') + '</span>' +
         '<span class="stat-gabnum">' + money(rev) + '</span>' +
+        '<span class="stat-gabnum stat-gabshare">' + pct(rev, ca) + ' %</span>' +
         '<span class="stat-gabnum stat-gabcost">' + money(cst) + '</span>' +
         '<span class="stat-gabnum stat-gabm ' + (m >= 0 ? 'pos' : 'neg') + '">' + money(m) + '</span>' +
+        '<span class="stat-gabnum stat-gabshare">' + (margin > 0 ? pct(m, margin) + ' %' : '—') + '</span>' +
         '<span class="stat-gabnum stat-gabpct">' + pct(m, rev) + ' %</span></div>';
     }
     var catKeys = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
     var catRows = catKeys.length ? '<div class="stat-gab">' +
-      '<div class="stat-gabrow stat-gabhead"><span>Gabarit</span><span class="stat-gabbar"></span><span>Ventes</span>' +
-        '<span class="stat-gabcost">Coût</span><span>Marge</span><span>%</span></div>' +
-      catKeys.map(function (c) { return gabRow(CAT_LABEL[c] || c, byCat[c], catCost[c] || 0, catQty[c] || 0, pct(byCat[c], ca)); }).join('') +
-      (catKeys.length > 1 ? gabRow('Total', ca, cost, 0, null, 'stat-gabtotal') : '') +
+      '<div class="stat-gabrow stat-gabhead"><span>Gabarit</span><span>Ventes</span><span>Part</span>' +
+        '<span class="stat-gabcost">Coût</span><span>Marge</span><span>Part</span><span class="stat-gabpct">Taux</span></div>' +
+      catKeys.map(function (c) { return gabRow(CAT_LABEL[c] || c, byCat[c], catCost[c] || 0, catQty[c] || 0); }).join('') +
+      (catKeys.length > 1 ? gabRow('Total', ca, cost, 0, 'stat-gabtotal') : '') +
     '</div>' : '';
 
     // produits vendus, groupés par catégorie et triés du plus vendu (unités)

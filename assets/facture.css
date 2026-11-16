@@ -522,13 +522,13 @@
 
 /* ventes par gabarit : ventes / coût / marge / % (seule place où la marge est détaillée) */
 .stat-gab { font-variant-numeric:tabular-nums; }
-.stat-gabrow { display:grid; grid-template-columns:minmax(110px, 150px) minmax(60px, 1fr) 100px 100px 100px 52px; align-items:center; gap:12px;
+.stat-gabrow { display:grid; grid-template-columns:minmax(120px, 1fr) 100px 52px 100px 100px 52px 52px; align-items:center; gap:12px;
   padding:9px 0; border-top:1px solid var(--line); }
 .stat-gabhead { padding:0 0 8px; border-top:none; font-size:.66rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
-.stat-gabhead span:nth-child(n+3) { text-align:right; }
+.stat-gabhead span:nth-child(n+2) { text-align:right; }
 .stat-gabname { font-size:.88rem; font-weight:600; white-space:nowrap; }
 .stat-gabqty { margin-left:4px; font-size:.78rem; font-weight:500; color:var(--muted); }
-.stat-gabbar .stat-bar { display:block; height:8px; }
+.stat-gabshare { color:var(--ink); font-weight:500; }
 .stat-gabnum { text-align:right; font-size:.86rem; font-weight:600; white-space:nowrap; }
 .stat-gabcost { color:var(--muted); font-weight:500; }
 .stat-gabm.pos { color:var(--good); } .stat-gabm.neg { color:var(--bad); }
@@ -536,8 +536,11 @@
 .stat-gabtotal { border-top:1px solid var(--line-2); }
 .stat-gabtotal .stat-gabname, .stat-gabtotal .stat-gabnum:not(.stat-gabcost):not(.stat-gabpct) { font-weight:700; }
 @media (max-width:720px) {
-  .stat-gabrow { grid-template-columns:minmax(0, 1fr) auto auto 40px; gap:10px; }
-  .stat-gabbar, .stat-gabcost { display:none; }
+  .stat-gabrow { grid-template-columns:minmax(0, 1fr) auto 44px auto 44px; gap:6px; }
+  .stat-gabname { white-space:normal; line-height:1.25; }
+  .stat-gabqty { display:block; margin-left:0; }
+  .stat-gabnum { font-size:.8rem; }
+  .stat-gabcost, .stat-gabpct { display:none; }
 }
 
 /* classements */
