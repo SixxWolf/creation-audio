@@ -434,8 +434,10 @@
       ok: false, loops: opts.loops, eol: eol === '\r\n' ? 'CRLF' : 'LF',
       maxZ: null, pushZ: null, pushHalf: false, flow: [], bed: [], bendsPerLoop: 0, size: 0, error: null,
       loadLineReplaced: false, amsUnload: false, layersPer: 0, wipe: null, weightPer: 0,
-      progress: false, loopMin: 0, transMin: 0, totalMin: 0
+      progress: false, loopMin: 0, transMin: 0, totalMin: 0, ztrim: null
     };
+    // Z de la 1re couche (G29.1 Z du start gcode) : réécrit avant tout le reste → vaut pour chaque loop
+    if (opts.ztrim != null) { var zr = ztApply(raw, opts.ztrim); raw = zr.text; report.ztrim = { to: opts.ztrim, count: zr.count }; }
     var idx = raw.indexOf(END_ANCHOR);
     var mz = raw.match(RE_MAXZ);
     // Déjà un batch (AutoLoop ou FarmLoop) : le re-traiter empilerait des loops dans chaque loop.
@@ -605,7 +607,8 @@
       coolMode: $('#al-cool-mode').value,
       coolTemp: num($('#al-cool-temp').value, 45),
       coolSec: num($('#al-cool-sec').value, 60),
-      coolEst: num($('#al-cool-est').value, 5)
+      coolEst: num($('#al-cool-est').value, 5),
+      ztrim: ztValue()
     };
   }
 
@@ -659,6 +662,7 @@
         rrow('Flow', rep.flow.length + ' loop' + (rep.flow.length > 1 ? 's' : '')) +
         rrow('Bed leveling', rep.bed.length + ' loop' + (rep.bed.length > 1 ? 's' : '')) +
         rrow('Vibrations', rep.sweep ? 'loop 1 seulement' : 'introuvable') +
+        (ztFile !== null ? rrow('Z 1re couche', rep.ztrim ? ztFr(rep.ztrim.to) + ' · fichier ' + ztFr(ztFile) : ztFr(ztFile) + ' · du fichier') : '') +
         rrow('Push', z(rep.pushZ) + ' mm' + (rep.pushHalf ? ' · mi-hauteur' : ''), rep.pushHalf ? 'al-caution-t' : '') +
         rrow('Purge', rep.loadLineReplaced ? 'en goulotte' : 'introuvable', rep.loadLineReplaced ? '' : 'al-bad') +
         (w && w.changes
@@ -1002,10 +1006,111 @@
     $('#al-drop').classList.add('has-file');   // zone compacte : une ligne avec le fichier
     $('#al-process').disabled = false;
     syncPushWarn();
+    ztLoad(rawText);
     applyGcodeToPricing(rawText, rawName);
     libApply(libPending); libPending = null;
     renderPresets();
   }
+  /* ---- Z de la 1re couche : « G29.1 Z… ; for Textured PEI Plate » du start gcode P2S (décalage
+     du plateau). Valeur plus haute = buse plus haute = moins écrasé (profil « Less Squish » = 0,06,
+     Bambu d'origine ≈ 0,02). Réécrite dans chaque loop ; « G29.1 Z0 ; clear z-trim » jamais touché.
+     Une valeur par imprimante : admin_settings « autoloop_ztrim » = { values: { printer_id: z } } ;
+     l'imprimante choisie reste choisie (localStorage) et sa valeur s'applique à chaque fichier. ---- */
+  var RE_ZT = /^([ \t]*G29\.1 Z)(-?\d*\.?\d+)([ \t]*;[^\r\n]*)?$/gm;
+  var ZT_KEY = 'autoloop_ztrim', ZT_LS = 'al-zt-printer';
+  var ztFile = null, ztModel = '', ztPrinters = [], ztVals = {}, ztCur = null;
+  try { ztCur = localStorage.getItem(ZT_LS) || null; } catch (e) { ztCur = null; }
+  function ztFr(v) { return (Math.round(v * 1000) / 1000).toFixed(3).replace('.', ',') + ' mm'; }
+  function ztNum(v) { return (Math.round(v * 1000) / 1000).toFixed(3).replace(/0$/, ''); }
+  function ztFind(text) {
+    var v = null;
+    text.replace(RE_ZT, function (m, a, n, c) { if (v === null && !/clear/i.test(c || '')) v = +n; return m; });
+    return v;
+  }
+  function ztApply(text, val) {
+    var n = 0;
+    var out = text.replace(RE_ZT, function (m, a, v, c) { if (/clear/i.test(c || '')) return m; n++; return a + ztNum(val) + (c || ''); });
+    return { text: out, count: n };
+  }
+  function ztValue() {
+    var r = $('#al-ztrim');
+    if (!r || ztFile === null) return null;
+    var v = +r.value;
+    return Math.abs(v - ztFile) < 1e-6 ? null : v;
+  }
+  function ztPrintersShown() {
+    return ztPrinters.filter(function (p) { return !ztModel || ztModel.indexOf(p.model) !== -1; });
+  }
+  function ztLoad(text) {
+    ztFile = text ? ztFind(text) : null;
+    var m = /^; printer_model = (.+)$/m.exec(text || '');
+    ztModel = m ? m[1].trim() : '';
+    var box = $('#al-zt'), r = $('#al-ztrim');
+    if (!box) return;
+    box.hidden = ztFile === null;
+    if (ztFile === null) return;
+    r.min = Math.min(-0.05, ztFile - 0.05).toFixed(3);
+    r.max = Math.max(0.15, ztFile + 0.05).toFixed(3);
+    var mine = ztCur && ztVals[ztCur] != null && ztPrintersShown().some(function (p) { return p.id === ztCur; });
+    r.value = mine ? ztVals[ztCur] : ztFile;
+    ztRender();
+  }
+  function ztRender() {
+    var r = $('#al-ztrim'); if (!r || ztFile === null) return;
+    var v = +r.value, min = +r.min, max = +r.max;
+    $('#al-zt-v').textContent = ztFr(v);
+    var p = (ztFile - min) / (max - min) * 100, mk = $('#al-zt-file');
+    mk.style.left = 'calc(' + p + '% + ' + ((0.5 - p / 100) * 18) + 'px)';
+    mk.title = 'Fichier : ' + ztFr(ztFile);
+    var cur = ztPrintersShown().filter(function (x) { return x.id === ztCur; })[0] || null;
+    var saved = cur ? ztVals[cur.id] : null;
+    $('#al-zt-pr').innerHTML = ztPrintersShown().map(function (x) {
+      var on = cur && x.id === cur.id;
+      return '<button type="button" class="al-zt-p" data-p="' + esc(x.id) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(x.name) +
+        '<span>' + (ztVals[x.id] != null ? ztFr(ztVals[x.id]).replace(' mm', '') : '—') + '</span></button>';
+    }).join('') +
+      (cur && (saved == null || Math.abs(saved - v) > 1e-6) ? '<button type="button" class="btn btn-ghost btn-sm" data-zt="save" data-ic="save">Enregistrer pour ' + esc(cur.name) + '</button>' : '') +
+      (Math.abs(v - ztFile) > 1e-6 ? '<button type="button" class="al-link" data-zt="reset">Rétablir celle du fichier</button>' : '');
+  }
+  function ztChanged() { ztRender(); if (outText) resetOutput(); schedulePresets(); }
+  function ztLoadPrinters() {
+    var sb = libSb(); if (!sb) return;
+    Promise.all([
+      sb.from('printers').select('id,name,model,sort').order('sort'),
+      sb.from('admin_settings').select('value').eq('key', ZT_KEY).maybeSingle()
+    ]).then(function (res) {
+      ztPrinters = (res[0] && !res[0].error && res[0].data) || [];
+      ztVals = (res[1] && res[1].data && res[1].data.value && res[1].data.value.values) || {};
+      if (rawText) ztLoad(rawText);
+    });
+  }
+  function initZtrim() {
+    var r = $('#al-ztrim'); if (!r) return;
+    r.addEventListener('input', ztChanged);
+    $('#al-zt-pr').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.zt === 'reset') { r.value = ztFile; ztChanged(); return; }
+      if (b.dataset.zt === 'save') {
+        var id = ztCur, v = Math.round(+r.value * 1000) / 1000, next = Object.assign({}, ztVals);
+        next[id] = v; b.disabled = true;
+        libSb().from('admin_settings').upsert({ key: ZT_KEY, value: { values: next }, updated_at: new Date().toISOString() }).then(function (res) {
+          if (res.error) { b.disabled = false; libToast('Z : ' + res.error.message, 'bad'); return; }
+          ztVals = next; ztRender();
+          var p = ztPrinters.filter(function (x) { return x.id === id; })[0];
+          libToast('Z de ' + (p ? p.name : id) + ' : ' + ztFr(v));
+        });
+        return;
+      }
+      var pid = b.dataset.p; if (!pid) return;
+      ztCur = ztCur === pid ? null : pid;   // re-clic = aucune imprimante
+      try { if (ztCur) localStorage.setItem(ZT_LS, ztCur); else localStorage.removeItem(ZT_LS); } catch (err) { /* stockage indisponible */ }
+      if (ztCur && ztVals[ztCur] != null) r.value = ztVals[ztCur];
+      ztChanged();
+    });
+    if (window.CA) window.CA.autoloopZtReload = ztLoadPrinters;   // relire imprimantes + valeurs
+    if (window.CA && window.CA.onAdminReady) window.CA.onAdminReady(ztLoadPrinters);
+  }
+
   // Avertissement sous le fichier dès qu'il est chargé : pièce ≤ 10 mm ou push calculé < 2 mm
   // → push à mi-hauteur (cf. pushHeight). Suit aussi le champ Retrait.
   function syncPushWarn() {
@@ -1032,7 +1137,7 @@
     rawText = '';
     $('#al-file-name').textContent = rawName;
     $('#al-drop').classList.remove('has-file');
-    syncPushWarn();
+    syncPushWarn(); ztLoad('');
     $('#al-process').disabled = true;
     renderPresets();
     $('#al-report').innerHTML = '<p class="al-warn">' + esc(msg) + '</p>';
@@ -1166,6 +1271,7 @@
     if (machine) { machine.addEventListener('input', syncMachineSum); machine.addEventListener('change', syncMachineSum); }
     syncMachineSum();
     $('#al-push-offset').addEventListener('input', syncPushWarn);
+    initZtrim();
 
     $('#al-process').addEventListener('click', runGenerate);
     $('#al-download').addEventListener('click', download);
