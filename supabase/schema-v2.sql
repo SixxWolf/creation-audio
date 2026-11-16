@@ -3377,6 +3377,8 @@ create table if not exists public.productions (
 );
 -- filaments de la production (figés) : [{ product_id, label, material, hex, grams, cost }]
 alter table public.productions add column if not exists fils jsonb not null default '[]'::jsonb;
+-- imprimante qui a fait le batch (nom, ex. « P2S-3 » ; null = à la main / inconnue)
+alter table public.productions add column if not exists printer text;
 create index if not exists productions_spacer_idx on public.productions (spacer_id, created_at desc);
 alter table public.productions enable row level security;
 drop policy if exists productions_admin_all on public.productions;
@@ -3499,12 +3501,12 @@ begin
   end if;
 
   insert into public.productions (made_at, spacer_id, spacer_label, file_name, loops, per_plate, pieces, good, minutes,
-         grams, filament_cost, machine_cost, total_cost, piece_cost, loose_in, loose_in_cost, loose_out, pairs, pair_cost, rates, note, fils, created_at)
+         grams, filament_cost, machine_cost, total_cost, piece_cost, loose_in, loose_in_cost, loose_out, pairs, pair_cost, rates, note, fils, printer, created_at)
   values (coalesce((p ->> 'made_at')::date, current_date), v_sp.id, v_sp.name, nullif(p ->> 'file_name', ''),
           greatest(1, coalesce((p ->> 'loops')::integer, 1)), greatest(1, coalesce((p ->> 'per_plate')::integer, 1)),
           greatest(0, coalesce((p ->> 'pieces')::integer, 0)), v_good, greatest(0, coalesce((p ->> 'minutes')::integer, 0)),
           v_grams, round(v_fil, 2), v_mach, v_total, v_piece, v_lin, case when v_lin > 0 then v_linc end, v_lout, v_pairs, v_pairc,
-          coalesce(p -> 'rates', '{}'::jsonb), nullif(p ->> 'note', ''), v_fils,
+          coalesce(p -> 'rates', '{}'::jsonb), nullif(p ->> 'note', ''), v_fils, nullif(btrim(p ->> 'printer'), ''),
           clock_timestamp())   -- heure exacte : ordre des productions d'un spacer (suppression de la plus récente)
   returning id into v_id;
 

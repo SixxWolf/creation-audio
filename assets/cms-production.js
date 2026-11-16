@@ -261,6 +261,7 @@
      ========================================================= */
   var queue = [];           // production_queue, plus ancien d'abord
   var fromQueue = null;     // id de la ligne chargée dans le formulaire
+  var jobPrinter = null;    // imprimante du batch chargé (info.printer), gardée dans productions.printer
   function pickFiles(list) { Array.prototype.slice.call(list || []).forEach(readFile); }
   el.drop.addEventListener('click', function () { el.file.click(); });
   el.drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.file.click(); } });
@@ -339,7 +340,19 @@
 
   function loadQueue() {
     return sb.from('production_queue').select('*').order('started_at', { ascending: true })
-      .then(function (res) { queue = res.error ? [] : (res.data || []); }, function () { queue = []; });
+      .then(function (res) {
+        // un batch retiré ici ne revient pas, même si la lecture est partie avant la suppression
+        queue = (res.error ? [] : (res.data || [])).filter(function (j) { return !qGone[j.id]; });
+      }, function () { queue = []; });
+  }
+  var qGone = {};   // ids retirés de la file pendant cette session (enregistrés ou ✕)
+  function dropQueued(id) {
+    qGone[id] = true;
+    queue = queue.filter(function (x) { return String(x.id) !== String(id); });
+    renderQueue();
+    return sb.from('production_queue').delete().eq('id', id).then(function (res) {
+      if (res.error) { delete qGone[id]; throw res.error; }
+    });
   }
   function qProgress(j) {
     var tot = (+j.minutes || 0) * 60000;
@@ -411,12 +424,8 @@
     if (b.getAttribute('data-act') === 'stop') { stopJob(j); return; }
     caDialog.confirm({ title: 'Retirer de la file ?', message: j.file_name + ' — rien n\'est ajouté au stock.', ok: 'Retirer' }).then(function (ok) {
       if (!ok) return;
-      sb.from('production_queue').delete().eq('id', j.id).then(function (res) {
-        if (res.error) { caDialog.error(res.error); return; }
-        queue = queue.filter(function (x) { return x !== j; });
-        if (String(fromQueue) === String(j.id)) { fromQueue = null; closeForm(); }
-        renderQueue();
-      });
+      if (String(fromQueue) === String(j.id)) { fromQueue = null; closeForm(); }
+      dropQueued(j.id).catch(function (err) { caDialog.error(err); loadQueue().then(renderQueue); });
     });
   });
   // « Valider » : le batch passe dans le formulaire (pièces bonnes, bobines) avant l'enregistrement
@@ -436,7 +445,7 @@
   function loadJob(j, stopAt) {
     var info = j.info || {}, n = stopAt && stopAt < j.loops ? stopAt : j.loops;
     var per = j.loops > 0 && j.minutes > 0 ? j.minutes / j.loops : 0;
-    fromQueue = j.id;
+    fromQueue = j.id; jobPrinter = info.printer || null;
     openForm(info.printer ? info.printer + ' · ' + j.file_name : j.file_name);
     useFile(j.file_name, { isAuto: info.isAuto !== false, loops: n, minutes: per ? Math.round(per * n) : j.minutes, perLoopMin: per, fils: info.fils || [] }, info.objects || 0);
     if (j.spacer_id && spacerById(j.spacer_id)) spacerPk.set(j.spacer_id);
@@ -744,7 +753,7 @@
       loops: loops, per_plate: per, pieces: loops * per,
       good: r.good, minutes: Math.round(r.minutes), machine_cost: r.mach,
       rates: { elec: rates.elec, deprec: rates.deprec },
-      fils: r.fils
+      fils: r.fils, printer: jobPrinter
     };
     sb.rpc('admin_save_production', { p: payload }).then(function (res) {
       saving = false;
@@ -754,14 +763,15 @@
       if (file && file.name && !hasMap(file.name)) saveMap(file.name, r.sp.id);   // la prochaine fois, ce fichier = ce spacer
       file = null; rows = []; edited = { good: false, perPlate: false };
       el.fileWarn.hidden = true;
-      // batch confirmé : sort de la file « En impression »
+      // batch confirmé : sort de la file « À enregistrer » tout de suite, puis on recharge
+      // une fois la suppression faite (sinon la relecture peut le ramener)
+      var gone = Promise.resolve();
       if (fromQueue) {
         var qid = fromQueue; fromQueue = null;
-        queue = queue.filter(function (x) { return String(x.id) !== String(qid); }); renderQueue();
-        sb.from('production_queue').delete().eq('id', qid).then(function (r2) { if (r2.error) toast('File : ' + r2.error.message, 'bad'); });
+        gone = dropQueued(qid).catch(function (err) { toast('File : ' + errText(err), 'bad'); });
       }
       el.timeH.value = 0; el.timeM.value = 0; el.loops.value = 1; lastLoops = 1; perLoopMin = 0; closeForm();
-      reloadAfterChange();
+      gone.then(reloadAfterChange);
     }, function (err) { saving = false; el.save.disabled = false; el.status.textContent = 'Erreur : ' + errText(err); });
   });
 
@@ -994,7 +1004,7 @@
 
   /* ---- formulaire « Valider » : visible seulement avec un batch chargé ---- */
   function openForm(src) { el.form.hidden = false; if (el.formSrc) { el.formSrc.textContent = src || ''; el.formSrc.title = src || ''; } }
-  function closeForm() { el.form.hidden = true; fromQueue = null; renderQueue(); }
+  function closeForm() { el.form.hidden = true; fromQueue = null; jobPrinter = null; renderQueue(); }
   var formX = $('#pr-form-close'); if (formX) formX.addEventListener('click', closeForm);
 
   /* =========================================================
@@ -1006,7 +1016,7 @@
     var latest = {};   // la plus récente de chaque spacer (seule supprimable)
     prods.forEach(function (p) { var k = String(p.spacer_id); if (!latest[k]) latest[k] = p.id; });
     el.history.innerHTML = '<div class="rcp-table-wrap"><table class="rcp-table pr-table"><thead><tr>' +
-      '<th>Date</th><th>Spacer</th><th>Filament</th><th class="num">Pièces</th><th class="num">Paires</th><th class="num">Coût / paire</th><th></th>' +
+      '<th>Date</th><th>Spacer</th><th>Imprimante</th><th>Filament</th><th class="num">Pièces</th><th class="num">Paires</th><th class="num">Coût / paire</th><th></th>' +
       '</tr></thead><tbody>' + prods.map(function (p) {
         // filaments figés de la production (productions.fils), puis pastille de leur filament s'il existe encore
         var fil = (Array.isArray(p.fils) ? p.fils : []).map(function (x) {
@@ -1016,6 +1026,7 @@
         return '<tr data-id="' + esc(p.id) + '">' +
           '<td class="pr-nowrap">' + esc(shortDay(p.made_at)) + '</td>' +
           '<td><b>' + esc(p.spacer_label) + '</b>' + (p.file_name ? '<span class="pr-file" title="' + esc(p.file_name) + '">' + esc(p.file_name) + '</span>' : '') + '</td>' +
+          '<td class="pr-nowrap">' + (p.printer ? '<b>' + esc(p.printer) + '</b>' : '<span class="muted">—</span>') + '</td>' +
           '<td>' + (fil || '—') + '</td>' +
           '<td class="num pr-nowrap" title="Bonnes / lancées">' + (p.good | 0) + ' / ' + (p.pieces | 0) + '</td>' +
           '<td class="num pr-nowrap">' + (p.pairs | 0) + (p.loose_out ? ' <em>+1</em>' : '') + '</td>' +
