@@ -304,3 +304,43 @@ export async function thumbs(db: any, rows: { product_id?: string | null; kind?:
     return await Promise.all(rows.map((r) => { const u = urlOf(r); return u ? get(u) : Promise.resolve(null); }));
   } catch { return rows.map(() => null); }
 }
+
+// ---- packs de filament (2026-11-16) ----
+// Les lignes d'un même pack (colonne jsonb `pack`, repère `pack.k`) deviennent UNE ligne :
+// nom du pack, qté = nombre de packs, prix = prix du pack, détail = « code · 2 × Black, 2 × Jade White ».
+// Marche pour customer_order_lines (name), customer_reservation_lines (name) et invoice_lines (label).
+// deno-lint-ignore no-explicit-any
+export function packGroup<T extends Record<string, any>>(lines: T[], en = false): T[] {
+  // deno-lint-ignore no-explicit-any
+  const out: any[] = [];
+  const at: Record<string, number> = {};
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  for (const l of lines) {
+    const p = l && l.pack;
+    if (!p || !p.k) { out.push(l); continue; }
+    const n = Math.max(1, Number(p.n) || 1);
+    const col = Math.round((Number(l.qty) || 0) / n) + " × " + String(l.name ?? l.label ?? "");
+    if (at[p.k] == null) {
+      at[p.k] = out.length;
+      const name = (en && p.name_en) || p.name || "Pack";
+      out.push({ ...l, name, label: name, qty: n, unit_price: Number(p.price) || 0, line_total: Number(l.line_total) || 0,
+        qty_to_order: 0, qty_pending: Number(l.qty_pending) || 0, _cols: [col] });
+    } else {
+      const g = out[at[p.k]];
+      g.line_total = r2(g.line_total + (Number(l.line_total) || 0));
+      g.qty_pending += Number(l.qty_pending) || 0;
+      g._cols.push(col);
+    }
+  }
+  for (const g of out) {
+    if (!g || !g._cols) continue;
+    g.meta = [g.pack.code, g._cols.join(", ")].filter(Boolean).join(" · ");
+    delete g._cols;
+  }
+  return out as T[];
+}
+/** Après packGroup(…, false) : remet le nom anglais des packs (courriel anglais). */
+// deno-lint-ignore no-explicit-any
+export function packEn<T extends Record<string, any>>(lines: T[]): T[] {
+  return lines.map((l) => (l && l.pack && l.pack.k && l.pack.name_en ? { ...l, name: l.pack.name_en, label: l.pack.name_en } : l));
+}

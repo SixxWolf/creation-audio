@@ -14,6 +14,7 @@
  "Impression 3D · Audio auto": "3D printing · Car audio",
  "Navigation principale": "Main navigation",
  "Filaments": "Filament",
+ "Packs de filaments": "Filament packs",
  "Spacers": null,
  "Accessoires": "Accessories",
  "Contact": null,
@@ -981,5 +982,8 @@
  "Packs": "Packs",
  "Des recharges à prix réduit, à composer par paires de couleurs.": "Discounted refills, mixed in colour pairs.",
  "Création Audio — Packs": "Création Audio — Packs",
- "Packs de recharges de filament à prix réduit, à composer par paires — Création Audio, région de Québec.": "Discounted filament refill packs, mixed in pairs — Création Audio, Québec City area."
+ "Packs de recharges de filament à prix réduit, à composer par paires — Création Audio, région de Québec.": "Discounted filament refill packs, mixed in pairs — Création Audio, Québec City area.",
+ "Dernière mise à jour : 16 novembre 2026": "Last updated: November 16, 2026 · This is a translation; in case of discrepancy, the French version prevails.",
+ "Packs : un pack de filament (par ex. le Pack Essentiels) est vendu à prix fixe, composé par paires de couleurs. Seuls les packs noir et blanc peuvent être personnalisés ; les packs de couleurs ont des compositions fixes. Le prix d'un pack ne reçoit aucun rabais quantité, mais ses unités comptent pour atteindre le palier des autres filaments de la même marque dans ton panier. Les packs sont réservés aux particuliers (pas aux comptes revendeurs) et limités au stock disponible : ils ne peuvent pas être commandés hors stock. Ta facture les affiche sur une seule ligne, avec leur code d'offre et le détail des couleurs.": "Packs: a filament pack (e.g. the Essentials Pack) is sold at a fixed price and made up of pairs of colours. Only black and white packs can be customized; colour packs have fixed compositions. A pack's price gets no quantity discount, but its units count toward the tier of other filaments of the same brand in your cart. Packs are for individual customers only (not dealer accounts) and limited to available stock: they cannot be ordered out of stock. Your invoice shows each pack on a single line, with its offer code and the colour breakdown.",
+ "Les packs de filament suivent la même règle.": "Filament packs follow the same rule."
 }

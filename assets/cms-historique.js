@@ -462,7 +462,7 @@
         (inv.client_contact ? '<div>' + esc(inv.client_contact) + '</div>' : '') + '</div>'
       : '';
 
-    var rows = (lines || []).map(function (l) {
+    var rows = (window.CA.packRows ? window.CA.packRows(lines || []) : (lines || [])).map(function (l) {   // un pack = une ligne
       return '<tr><td>' + esc(l.label || '') + (l.meta ? ' <span class="inv-mat">' + esc(l.meta) + '</span>' : '') + '</td>' +
         '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num">' + money(l.line_total) + '</td></tr>';
     }).join('');

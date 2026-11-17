@@ -76,7 +76,7 @@ function build(src, name) {
   // lien actif du menu déroulant et du tiroir
   h = h.replace(/<div class="(nav-dd-m|drawer-sub)">[\s\S]*?<\/div>/g, (blk) => blk
     .replace(/ class="is-active"/g, '')
-    .replace('<a href="../boutique/' + name + '">', '<a href="../boutique/' + name + '" class="is-active">'));
+    .replace(new RegExp('<a href="\.\./boutique/' + name + '"([^>]*)>'), '<a href="../boutique/' + name + '" class="is-active"$1>'));
   // barre des rayons
   h = h.replace(/  <nav class="shop-tabs" id="shop-tabs"[\s\S]*?<\/nav>/, tabs(P.tab, '../boutique/', '  '));
   // écran visible au chargement

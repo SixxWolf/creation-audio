@@ -35,6 +35,7 @@
 
   var listEl = $('#pk-list'), editor = $('#pk-editor');
   if (!listEl || !editor) return;
+  var codeI = $('#pk-code');
   var nameI = $('#pk-name'), nameEnI = $('#pk-name-en'), noteI = $('#pk-note'), noteEnI = $('#pk-note-en'),
       kindSeg = $('#pk-kind'), pairsI = $('#pk-pairs'), priceI = $('#pk-price'), calcEl = $('#pk-calc'),
       customI = $('#pk-custom'), featI = $('#pk-featured'), qI = $('#pk-q'), colorsEl = $('#pk-colors'),
@@ -116,7 +117,7 @@
           '<div class="pm-top"><b class="pm-title">' + esc(pk.name) + '</b>' +
             '<span class="pm-state' + (pk.enabled ? ' s-on' : '') + '">' + (pk.enabled ? 'En ligne' : 'Hors ligne') + '</span>' +
             (pk.featured ? '<span class="pm-tag">En haut de Filaments</span>' : '') + '</div>' +
-          '<div class="pm-meta">' + money(+pk.price) + ' · ' + units + ' ' + unitWord(pk.kind, units) + ' · ' + money(unit) + ' l\'unité' +
+          '<div class="pm-meta">' + (pk.code ? esc(pk.code) + ' · ' : '') + money(+pk.price) + ' · ' + units + ' ' + unitWord(pk.kind, units) + ' · ' + money(unit) + ' l\'unité' +
             (pk.allow_custom ? ' · personnalisable' : '') + '</div>' +
           '<div class="pk-cols">' + cols.map(function (p) { return '<span class="pk-col">' + dot(p) + esc(p.name) + '</span>'; }).join('') + '</div>' +
           (pres ? '<div class="pk-pres">' + pres + '</div>' : '') +
@@ -218,6 +219,7 @@
     $('#pk-editor-title').textContent = pk ? 'Modifier le pack' : 'Nouveau pack';
     nameI.value = pk ? pk.name || '' : '';
     nameEnI.value = pk ? pk.name_en || '' : '';
+    codeI.value = pk ? pk.code || '' : '';
     noteI.value = pk ? pk.note || '' : '';
     noteEnI.value = pk ? pk.note_en || '' : '';
     pairsI.value = pk ? pk.pairs : 2;
@@ -434,7 +436,7 @@
       if (!ok) return;
       var old = editingId ? packs.filter(function (x) { return x.id === editingId; })[0] : null;
       var row = {
-        name: name, name_en: nameEnI.value.trim() || null, note: noteI.value.trim() || null, note_en: noteEnI.value.trim() || null,
+        name: name, name_en: nameEnI.value.trim() || null, code: codeI.value.trim().toUpperCase() || null, note: noteI.value.trim() || null, note_en: noteEnI.value.trim() || null,
         kind: st.kind, pairs: pairs, price: price, colors: st.colors.slice(), presets: presets,
         allow_custom: customI.checked && bwOnly(), featured: featI.checked, updated_at: new Date().toISOString()
       };

@@ -16,6 +16,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { buildInvoicePdf, dateTxt, money, type Fonts, type InvoiceLine } from "./pdf.ts";
 import { buildInvoiceEmail, fitBox, imageSize } from "./email.ts";
+import { packGroup } from "../_shared/mail.ts";   // packs de filament : une ligne par pack
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -199,8 +200,8 @@ Deno.serve(async (req) => {
 
   // 5) données de la facture + coordonnées de l'entreprise
   const { data: lines } = await db.from("invoice_lines")
-    .select("label, meta, qty, unit_price, line_total, product_id, kind").eq("invoice_id", invoiceId).order("sort_order");
-  const L = (lines || []) as (InvoiceLine & { product_id?: string | null; kind?: string })[];
+    .select("label, meta, qty, unit_price, line_total, product_id, kind, pack").eq("invoice_id", invoiceId).order("sort_order");
+  const L = packGroup((lines || []) as (InvoiceLine & { product_id?: string | null; kind?: string; pack?: unknown })[], en);   // un pack = une ligne (code + couleurs)
   let imgs: { url: string; bytes: Uint8Array | null }[] = [];
   try {
     imgs = await lineImages(db, L);

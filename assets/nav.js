@@ -186,6 +186,15 @@
     return newsP;
   };
 
+  // menu Boutique : « Packs de filaments » caché tant qu'aucun pack n'est en ligne (la RLS ne montre que les actifs)
+  var pkLinks = document.querySelectorAll('[data-nav-packs]');
+  if (pkLinks.length && window.fetch) cfgP().then(function (c) {
+    if (!c) return;
+    return fetch(c.url + '/rest/v1/packs?select=id&limit=1', { headers: { apikey: c.anonKey, Authorization: 'Bearer ' + c.anonKey } })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) { if (Array.isArray(rows) && rows.length) [].forEach.call(pkLinks, function (a) { a.style.display = ''; }); });
+  }).then(null, function () {});
+
   var bar = document.querySelector('.promo-bar');
   if (!bar) return;
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

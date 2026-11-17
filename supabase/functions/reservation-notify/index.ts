@@ -128,8 +128,8 @@ function first(r: Res) { return String(r.name || "").trim().split(/\s+/)[0] || "
 
 async function linesOf(db: SupabaseClient, id: string) {
   const { data } = await db.from("customer_reservation_lines")
-    .select("name, meta, qty, unit_price, line_total, product_id, kind").eq("reservation_id", id).order("sort_order");
-  const L = (data || []) as Line[];
+    .select("name, meta, qty, unit_price, line_total, product_id, kind, pack").eq("reservation_id", id).order("sort_order");
+  const L = M.packGroup((data || []) as Line[]);   // un pack = une ligne (code + couleurs)
   await M.loadCompany(db);
   const pics = await M.thumbs(db, L);
   L.forEach((l, i) => { l.thumb = pics[i]; });
@@ -224,6 +224,7 @@ async function mailAdminCancelled(m: Mailer, r: Res, L: Line[]) {
 }
 // ---- versions anglaises (client de /en/) ----
 async function mailNewEn(m: Mailer, r: Res, L: Line[]) {
+  L = M.packEn(L);
   const until = when(r.expires_at, true), pk = pkOf(r, true);
   const subject = "Reservation " + r.number + " confirmed — Création Audio";
   const rule = "Come before the deadline: after that, the items go back on sale and the reservation counts as not picked up " +
@@ -243,6 +244,7 @@ async function mailNewEn(m: Mailer, r: Res, L: Line[]) {
   await send(m, { to: [r.email], reply_to: REPLY_TO, subject, html, text });
 }
 async function mailReminderEn(m: Mailer, r: Res, L: Line[]) {
+  L = M.packEn(L);
   const until = when(r.expires_at, true), pk = pkOf(r, true);
   const subject = "Reminder: your reservation " + r.number + " ends soon";
   const text = "Hello " + first(r) + ",\n\nA quick reminder: we're holding your reservation " + r.number + " until " + until + ".\n" +

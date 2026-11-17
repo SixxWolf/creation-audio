@@ -412,7 +412,7 @@
       g.qty_pending += +l.qty_pending || 0;
       g.members.push(Math.round((+l.qty || 0) / (+pk.n || 1)) + ' × ' + (l.name || l.label || ''));
       if (l.hex) g.hexes.push(l.hex);
-      g.meta = g.members.join(' · ');
+      g.meta = [pk.code].concat(g.members.join(', ')).filter(Boolean).join(' · ');   // code d'offre + couleurs (comme PDF/courriels)
       g.hex = g.hexes.length > 1 ? 'linear-gradient(90deg, ' + g.hexes.map(function (h, i) {
         return h + ' ' + (100 * i / g.hexes.length) + '% ' + (100 * (i + 1) / g.hexes.length) + '%'; }).join(', ') + ')' : g.hexes[0] || null;
     });

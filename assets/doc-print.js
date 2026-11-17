@@ -42,7 +42,7 @@
         (inv.client_city ? '<div>' + esc(inv.client_city) + '</div>' : '') +
         (inv.client_contact ? '<div>' + esc(inv.client_contact) + '</div>' : '') + '</div>'
       : '';
-    var rows = (inv.lines || []).map(function (l) {
+    var rows = window.CA.packRows(inv.lines || []).map(function (l) {
       return '<tr><td>' + esc(l.label || '') + (l.meta ? ' <span class="inv-mat">' + esc(l.meta) + '</span>' : '') + '</td>' +
         '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num">' + money(l.line_total) + '</td></tr>';
     }).join('');
@@ -125,6 +125,27 @@
     setTimeout(function () { document.body.classList.remove('doc-printing'); box.innerHTML = ''; document.title = TITLE; }, 400);
     return true;
   }
+  // packs de filament (2026-11-16) : les lignes d'un même pack (pack.k) → une ligne « nom du pack », détail « code · 2 × Black, 2 × Jade White »
+  // (même règle que packGroup dans supabase/functions/_shared/mail.ts : PDF et courriels)
+  window.CA.packRows = function (lines) {
+    var out = [], at = {};
+    (lines || []).forEach(function (l) {
+      var pk = l && l.pack;
+      if (!pk || !pk.k) { out.push(l); return; }
+      var n = Math.max(1, +pk.n || 1), col = Math.round((+l.qty || 0) / n) + ' × ' + (l.label || l.name || '');
+      var g = at[pk.k];
+      if (!g) {
+        g = at[pk.k] = { pack: pk, label: (window.CA.lang === 'en' && pk.name_en) || pk.name || 'Pack', qty: n, unit_price: +pk.price || 0,
+          line_total: 0, qty_pending: 0, cols: [] };
+        out.push(g);
+      }
+      g.line_total = Math.round((g.line_total + (+l.line_total || 0)) * 100) / 100;
+      g.qty_pending += +l.qty_pending || 0;
+      g.cols.push(col);
+      g.meta = [pk.code, g.cols.join(', ')].filter(Boolean).join(' · ');
+    });
+    return out;
+  };
   window.CA.docPrint = function (kind, docs) {
     if (!docs || !docs.invoice) return false;
     return printHtml(build(kind, docs), (kind === 'receipt' ? _t('Reçu') + ' ' : '') + String(docs.invoice.number || ''));

@@ -1946,6 +1946,9 @@ drop policy if exists packs_public_read on public.packs;
 create policy packs_public_read on public.packs for select to anon, authenticated using (enabled);
 grant select on public.packs to anon, authenticated;
 alter table public.customer_order_lines add column if not exists pack jsonb;
+-- code d'offre du pack (2026-11-16) : affiché sur la ligne groupée (courriels, PDF, factures), ex. CA-PCK-ESS-001
+alter table public.packs add column if not exists code text;
+update public.packs set code = 'CA-PCK-ESS-001' where code is null and slug = 'essentiels';
 
 -- Lignes des packs d'un panier : [{ pack_id, qty (nb de packs), comp: [{ product_id, qty (recharges par pack) }] }]
 -- (les entrées sans pack_id sont ignorées). Valide pack actif, couleurs permises, paires, total,
@@ -1999,7 +2002,7 @@ begin
         'product_id', r.id, 'ptype', 'filament', 'kind', pk.kind, 'name', r.name, 'brand', r.brand, 'material', r.material,
         'sort_order', r.sort_order, 'qty', r.q * v_n, 'unit_price', v_unit, 'line_total', round(v_unit * r.q * v_n, 2),
         'gkey', 'fil|' || coalesce(nullif(r.brand, ''), nullif(r.material, ''), ''),
-        'pack', jsonb_build_object('id', pk.id, 'k', 'k' || v_idx, 'n', v_n, 'name', pk.name, 'name_en', pk.name_en,
+        'pack', jsonb_build_object('id', pk.id, 'k', 'k' || v_idx, 'n', v_n, 'name', pk.name, 'name_en', pk.name_en, 'code', pk.code,
                                    'price', pk.price, 'kind', pk.kind)));
     end loop;
     if v_idx > 20 then raise exception 'Trop de packs dans une seule commande.'; end if;

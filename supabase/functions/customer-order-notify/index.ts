@@ -69,7 +69,8 @@ function fmtPickup(d: unknown, s: unknown, e: unknown, en = false) {
   return JOURS[x.getUTCDay()] + " " + x.getUTCDate() + " " + MOIS[x.getUTCMonth()] + (s ? ", " + hTxt(s) + (e ? " – " + hTxt(e) : "") : "");
 }
 
-type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number; qty_to_order: number; product_id: string | null; kind: string | null; ptype: string | null };
+type Line = { name: string; meta: string | null; qty: number; unit_price: number; line_total: number; qty_to_order: number; product_id: string | null; kind: string | null; ptype: string | null;
+  pack?: { k?: string; n?: number; name?: string; name_en?: string | null; code?: string | null; price?: number } | null };
 
 // filaments / accessoires à commander chez le fournisseur : délai annoncé (les spacers, imprimés ici, gardent « on te confirme »)
 const BO_DELAY = "3 à 14 jours ouvrables";
@@ -185,8 +186,9 @@ Deno.serve(async (req) => {
   if (/@resend\.dev$/i.test(order.email || "")) adminTo = "delivered@resend.dev";   // tests
 
   const { data: lines } = await db.from("customer_order_lines")
-    .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype").eq("order_id", orderId).order("sort_order");
-  const L = (lines || []) as Line[];
+    .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype, pack").eq("order_id", orderId).order("sort_order");
+  const raw = (lines || []) as Line[];
+  const L = M.packGroup(raw);   // un pack = une ligne (code + couleurs)
   await loadEmptyIds(db, L);
   await M.loadCompany(db);
   const pics = await M.thumbs(db, L);
@@ -200,6 +202,7 @@ Deno.serve(async (req) => {
   // ---- courriel au client (envoi et modification), dans sa langue ----
   if (event !== "cancelled") {
     const en = await clientEn(db, order.customer_id);
+    const LC = en ? M.packGroup(raw, true) : L;   // nom du pack dans la langue du client
     const T = (fr: string, e: string) => (en ? e : fr);
     const m = (n: unknown) => money(n, en);
     const site = SITE + (en ? "/en" : "");
@@ -231,7 +234,7 @@ Deno.serve(async (req) => {
       T("Merci ! Ta commande " + order.number + " est bien " + verb + ".", "Thank you! Your order " + order.number + " has been " + verb + ".") + "\n\n" +
       status + "\n\n" +
       (toOrder.length ? T("Articles à commander :", "Items to order:") + "\n" + toOrderTxt + "\n\n" : "") +
-      L.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + m(l.line_total)).join("\n") +
+      LC.map((l) => "- " + l.name + (l.meta ? " (" + l.meta + ")" : "") + " × " + l.qty + " — " + m(l.line_total)).join("\n") +
       "\n\n" + T("Total estimé : ", "Estimated total: ") + m(order.total) + "\n" +
       pickupLine + "\n" +
       (order.note ? "\n" + T("Ta note : ", "Your note: ") + order.note + "\n" : "") +
@@ -246,7 +249,7 @@ Deno.serve(async (req) => {
         M.text(T("Bonjour " + esc(first) + ", merci&nbsp;! Ta commande <strong>" + esc(order.number) + "</strong> est bien " + verb + ".",
                  "Hello " + esc(first) + ", thank you! Your order <strong>" + esc(order.number) + "</strong> has been " + verb + ".")) +
         M.notice(esc(status), toOrder.length ? "warn" : "ok") +
-        orderItems(L, pics, en) +
+        orderItems(LC, pics, en) +
         M.totalBox(T("Total estimé", "Estimated total"), m(order.total), [esc(pickupLine)]) +
         (order.note ? M.quote(order.note, T("Ta note :", "Your note:")) : "") +
         M.button(link, toOrder.length || pkC ? T("Suivre ma commande", "Track my order") : T("Choisir ma plage de cueillette", "Choose my pickup time slot"), 18) +
@@ -272,7 +275,7 @@ Deno.serve(async (req) => {
   const aRows = L.map((l) => {
     const p = l.product_id ? stockOf.get(l.product_id) : null;
     const st = p ? (l.kind === "refill" ? Number(p.qty_2) || 0 : Number(p.qty) || 0) : 0;
-    return { l, miss: Math.max(0, l.qty - st) };
+    return { l, miss: l.pack ? 0 : Math.max(0, l.qty - st) };   // pack : toujours en stock (_pack_fill)
   });
   const aText =
     label + " " + order.number + "\n" + who + " · " + order.email + (order.phone ? " · " + order.phone : "") + "\n\n" +
@@ -327,9 +330,9 @@ async function notifyReady(db: any, order: any, resendKey: string | undefined, f
   if (!resendKey) return json({ error: "Envoi non configuré : secret RESEND_API_KEY manquant." }, 503);
 
   const { data: lines } = await db.from("customer_order_lines")
-    .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype").eq("order_id", order.id).order("sort_order");
-  const L = (lines || []) as Line[];
+    .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype, pack").eq("order_id", order.id).order("sort_order");
   const en = await clientEn(db, order.customer_id);
+  const L = M.packGroup((lines || []) as Line[], en);
   const T = (fr: string, e: string) => (en ? e : fr);
   const m = (n: unknown) => money(n, en);
   const site = SITE + (en ? "/en" : "");

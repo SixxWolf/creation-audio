@@ -925,7 +925,7 @@
     var units = (pk.pairs | 0) * 2, unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100, kind = pk.kind || 'refill';
     var maxK = 0;
     lines.forEach(function (l) { var m = l.pack && /^k(\d+)$/.exec(l.pack.k || ''); if (m) maxK = Math.max(maxK, +m[1]); });
-    var pack = { id: pk.id, k: 'k' + (maxK + 1), n: 1, name: pk.name, name_en: pk.name_en || null, price: +pk.price, kind: kind };
+    var pack = { id: pk.id, k: 'k' + (maxK + 1), n: 1, name: pk.name, name_en: pk.name_en || null, code: pk.code || null, price: +pk.price, kind: kind };
     var added = 0;
     (pr.lines || []).forEach(function (pl) {
       var hit = findProduct(pl.p); if (!hit || !(pl.n > 0)) return;
