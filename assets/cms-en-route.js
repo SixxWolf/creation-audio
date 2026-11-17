@@ -192,18 +192,26 @@
   }
 
   // Bambu : « Matériau » puis « Couleur (code) / Refill|Spool|Filament with spool / 1kg », « x N », prix.
-  var BAMBU = /^(.+?)\s*\((\d{4,6})\)\s*\/\s*([^/]+?)\s*\/\s*[\d.,]+\s*k?g\b/i;
+  // Packs : « PLA Basic 10-20 Pack » puis « Jade White and Black (10100 10101) / Refill / 1kg*20 »
+  // ou « Multi-Color (10 Options) / Refill / 1kg*20 » -> détaillés en lignes par couleur (voir expandPacks).
+  var BAMBU = /^(.+?)\s*\(([^)]*\d[^)]*)\)\s*\/\s*([^/]+?)\s*\/\s*[\d.,]+\s*k?g(?:\s*[*x×]\s*(\d+))?/i;
   function parseBambu(lines) {
     var anchors = [];
-    lines.forEach(function (l, i) { if (BAMBU.test(l)) anchors.push(i); });
+    lines.forEach(function (l, i) { var m = l.match(BAMBU); if (m && (/^\s*\d{4,6}\s*$/.test(m[2]) || m[4] || /option/i.test(m[2]))) anchors.push(i); });
     return anchors.map(function (i, n) {
       var m = lines[i].match(BAMBU);
-      var color = m[1].trim(), code = m[2], typeStr = m[3];
-      var material = '';
+      var color = m[1].trim(), inner = m[2], typeStr = m[3], per = parseInt(m[4], 10) || 1;
+      var codes = inner.match(/\d{4,6}/g) || [];
+      var code = codes.length === 1 && per === 1 ? codes[0] : '';
+      var material = '', packTitle = '';
       for (var k = i - 1; k >= 0 && k >= i - 4; k--) {
         var t = lines[k];
         if (!t || /^x\s*\d+$/i.test(t) || /^\d+$/.test(t) || /\$/.test(t)) continue;
         material = t; break;
+      }
+      if (/\bpack\b/i.test(material)) {   // « PLA Basic 10-20 Pack » -> matériau « PLA Basic »
+        packTitle = material;
+        material = material.replace(/\b\d+\s*[-x×]\s*\d+\s*pack\b|\bpack\b/ig, '').replace(/\s+/g, ' ').trim();
       }
       var end = n + 1 < anchors.length ? anchors[n + 1] : lines.length;
       var qty = null;
@@ -216,10 +224,54 @@
       }
       qty = qty || 1;
       var paid = paidOf(lines, i + 1, end);
+      var kind = /refill|recharge/i.test(typeStr) ? 'refill' : 'spool';
+      if (per > 1 || codes.length !== 1) {
+        var opt = inner.match(/(\d+)\s*options?/i);
+        return { at: i, brand: 'bambu', label: (packTitle || material) + ' · ' + color + ' (' + inner.trim() + ')',
+          material: material, color: color, code: '', kind: kind, qty: qty,
+          pack: { per: per, codes: codes, options: opt ? parseInt(opt[1], 10) : 0,
+            colors: color.split(/\s+(?:and|et|&|\+)\s+|\s*,\s*/i) },
+          unitCost: paid != null ? round2(paid / (qty * per)) : null };
+      }
       return { at: i, brand: 'bambu', label: (material ? material + ' · ' : '') + color + ' (' + code + ')',
-        material: material, color: color, code: code, kind: /refill|recharge/i.test(typeStr) ? 'refill' : 'spool', qty: qty,
+        material: material, color: color, code: code, kind: kind, qty: qty,
         unitCost: paid != null ? round2(paid / qty) : null };
     });
+  }
+
+  // Un pack devient une ligne par couleur :
+  // 1) composition retenue (admin_settings « commande_alias » : { pack: [{ pid, kind, n }] }, n par pack) ;
+  // 2) sinon un code par couleur (« 10100 10101 ») ou les noms (« Jade White and Black ») -> parts égales ;
+  // 3) sinon « (10 Options) » -> 10 lignes à choisir, parts égales ; la composition choisie est retenue.
+  function expandPacks(list) {
+    var out = [];
+    list.forEach(function (r) {
+      if (!r.pack) { out.push(r); return; }
+      var pk = r.pack, key = norm(r.label), total = r.qty * pk.per;
+      var base = { at: r.at, brand: r.brand, material: r.material, kind: r.kind, unitCost: r.unitCost,
+        packKey: key, packQty: r.qty };
+      var known = aliases[key] && aliases[key].pack;
+      if (known && known.length && known.every(function (c) { return inv().prod(c.pid); })) {
+        known.forEach(function (c, j) {
+          out.push(Object.assign({}, base, { label: r.label + ' · ' + (j + 1) + '/' + known.length, color: '', code: '',
+            kind: c.kind || r.kind, qty: c.n * r.qty, fixed: { pid: c.pid, how: 'appris' } }));
+        });
+        return;
+      }
+      var parts = pk.options ? null
+        : pk.codes.length ? pk.codes.map(function (c, j) { return { code: c, color: pk.colors.length === pk.codes.length ? pk.colors[j] : '' }; })
+        : pk.colors.map(function (c) { return { code: '', color: c }; });
+      var slots = parts ? parts.length : (pk.options || 1);
+      if (total % slots) { parts = null; slots = 1; }
+      for (var j = 0; j < slots; j++) {
+        var p = parts ? parts[j] : null;
+        out.push(Object.assign({}, base, {
+          label: p ? r.material + ' · ' + (p.color || p.code) + (p.code && p.color ? ' (' + p.code + ')' : '') + ' · pack'
+            : r.label + (slots > 1 ? ' · ' + (j + 1) + '/' + slots : ''),
+          color: p ? p.color : '', code: p ? p.code : '', qty: total / slots, packSlot: !p }));
+      }
+    });
+    return out;
   }
 
   // Elegoo (boutique Shopify) : « Produit », « Quantity2 », « Produit » répété, puis la variante :
@@ -339,8 +391,10 @@
   function fmtDisc(v) { return +v > 0 ? String((+v).toFixed(2)).replace('.', ',') : ''; }
   // « Coupon -$25.00 », « Discount (-$25.00) »… dans le texte collé
   function findCoupon(text) {
-    var m = /(?:discount|coupon|promo|rabais)[\s\S]{0,80}?[-−]\s*\$\s*(\d[\d,]*(?:\.\d{1,2})?)/i.exec(text);
-    return m ? parseFloat(m[1].replace(/,/g, '')) : 0;
+    // « Item Discount » (rabais d'un article) est déjà dans son prix payé : ignoré
+    var re = /(item\s+)?(?:discount|coupon|promo|rabais)[\s\S]{0,80}?[-−]\s*\$\s*(\d[\d,]*(?:\.\d{1,2})?)/gi, m;
+    while ((m = re.exec(text))) { if (!m[1]) return parseFloat(m[2].replace(/,/g, '')); }
+    return 0;
   }
   if (discI) discI.addEventListener('input', function () { discI.dataset.touched = '1'; renderSum(); });
 
@@ -403,11 +457,12 @@
     statusEl.textContent = 'Analyse…';
     parseBtn.disabled = true;
     Promise.all([inv().ready(), loadAliases()]).then(function () {
-      var found = parseRules(text).map(function (r) {
-        var m = match(r);
+      var found = expandPacks(parseRules(text)).map(function (r) {
+        var m = r.fixed ? { pid: r.fixed.pid, kind: r.kind, how: r.fixed.how } : r.packSlot ? null : match(r);
         var p = m && m.pid ? inv().prod(m.pid) : null;
         return { label: r.label, productId: p ? String(p.id) : '', kind: p ? inv().fitKind(p, m.kind) : r.kind,
-          qty: r.qty, unitCost: r.unitCost, how: m ? m.how : 'aucun', picked: false };
+          qty: r.qty, unitCost: r.unitCost, how: m ? m.how : (r.packKey ? 'pack' : 'aucun'), picked: false,
+          packKey: r.packKey || null, packQty: r.packQty || 0 };
       });
       var unknown = found.filter(function (r) { return r.how === 'aucun'; });   // « hors catalogue » : pas la peine de demander à l'IA
       // tout reconnu par les règles fixes : pas besoin de l'IA
@@ -473,7 +528,7 @@
   function sortRows() { rows = inv().sortLines(rows, function (r) { return r.productId; }, function (r) { return r.kind; }); }
 
   var HOW = { code: ['ok', 'Reconnu'], nom: ['ok', 'Reconnu'], appris: ['ok', 'Appris'], proche: ['ia', 'Nom proche'], ia: ['ia', 'IA'],
-    aucun: ['miss', 'À choisir'], hors: ['off', 'Hors catalogue'] };
+    aucun: ['miss', 'À choisir'], pack: ['miss', 'Pack · à choisir'], hors: ['off', 'Hors catalogue'] };
   function renderRows() {
     reviewEl.hidden = false;
     if (!rows.length) { rowsEl.innerHTML = '<tr><td colspan="6" class="po-empty">Aucune ligne.</td></tr>'; renderSum(); return; }
@@ -566,8 +621,18 @@
     };
     // corrections retenues pour la prochaine fois (choix à la main ou lecture IA validée)
     var learn = {};
+    var packs = {};   // composition d'un pack : retenue dès qu'une couleur a été choisie à la main
     valid.forEach(function (r) {
+      if (r.packKey) { (packs[r.packKey] = packs[r.packKey] || []).push(r); return; }
       if (r.label && (r.picked || r.how === 'ia')) learn[norm(r.label)] = { pid: r.productId };
+    });
+    Object.keys(packs).forEach(function (k) {
+      var list = packs[k];
+      if (!list.some(function (r) { return r.picked || r.how === 'ia'; })) return;
+      if (rows.some(function (r) { return r.packKey === k && !(r.productId && r.qty > 0); })) return;   // pack pas fini : rien retenu
+      var n = list[0].packQty || 1;
+      if (list.some(function (r) { return r.qty % n; })) return;
+      learn[k] = { pack: list.map(function (r) { return { pid: r.productId, kind: r.kind, n: r.qty / n }; }) };
     });
 
     saveBtn.disabled = true; statusEl.textContent = 'Enregistrement…';
