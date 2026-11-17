@@ -922,7 +922,7 @@
     });
   }
   function addPackLines(pk, pr) {
-    var units = (pk.pairs | 0) * 2, unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100, kind = pk.kind || 'refill';
+    var units = (pk.units | 0) || 4, unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100, kind = pk.kind || 'refill';
     var maxK = 0;
     lines.forEach(function (l) { var m = l.pack && /^k(\d+)$/.exec(l.pack.k || ''); if (m) maxK = Math.max(maxK, +m[1]); });
     var pack = { id: pk.id, k: 'k' + (maxK + 1), n: 1, name: pk.name, name_en: pk.name_en || null, code: pk.code || null, price: +pk.price, kind: kind };
@@ -932,9 +932,9 @@
       var p = hit.p;
       lines.push({ id: uid(), productId: String(p.id), ptype: 'filament', kind: kind, label: p.name,
         meta: [p.brand, p.material, kind === 'refill' ? 'Recharge' : 'Avec bobine'].filter(Boolean).join(' · '),
-        hex: p.hex, qty: pl.n * 2, base: unit, tiers: [], cost: +filCost(p, kind) || 0, tierKey: filTierKey(p),
+        hex: p.hex, qty: +pl.n, base: unit, tiers: [], cost: +filCost(p, kind) || 0, tierKey: filTierKey(p),
         price: unit, manual: true, sp: null, pack: pack });
-      added += pl.n * 2;
+      added += +pl.n;
     });
     if (added !== units) caDialog.toast('Composition incomplète : vérifie le pack dans Packs.');
     afterChange();

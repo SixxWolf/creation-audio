@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 43;
+window.CA_EN_V = 44;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -1180,13 +1180,14 @@ window.CA_EN = (function (pairs) {
   [`la bobine`, `per spool`],
   [`la recharge`, `per refill`],
   [`Packs`, `Packs`],
-  [`Prix fixe, par paires de couleurs`, `Fixed price, in colour pairs`],
+  [`Prix fixe, couleurs assorties`, `Fixed price, matched colours`],
   [`Aucun pack pour le moment.`, `No packs right now.`],
   [`Voir les filaments`, `See filaments`],
   [`Personnaliser`, `Customize`],
-  [`Choisis tes paires`, `Pick your pairs`],
-  [`Retirer une paire`, `Remove a pair`],
-  [`Ajouter une paire`, `Add a pair`],
+  [`Choisis tes recharges`, `Pick your refills`],
+  [`Choisis tes bobines`, `Pick your spools`],
+  [`Retirer une unité`, `Remove one`],
+  [`Ajouter une unité`, `Add one`],
   [`Choisis `, `Pick `],
   [` bobines`, ` spools`],
   [` recharges`, ` refills`],

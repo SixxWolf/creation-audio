@@ -1,6 +1,6 @@
 /* =========================================================
    Création Audio — CMS Packs (table « packs », schema-v2.sql § Packs de filament)
-   Un pack = prix fixe pour N paires de recharges (ou bobines) parmi des couleurs permises :
+   Un pack = prix fixe pour N recharges (ou bobines) parmi des couleurs permises :
    compositions toutes faites (presets) + « Personnaliser » au choix du client.
    Le prix n'a pas de palier ; ses unités comptent pour le palier de la marque (option B, serveur).
    Le serveur (_pack_fill) refuse un prix qui ne se divise pas au cent près et tout ce qui dépasse le stock.
@@ -37,7 +37,7 @@
   if (!listEl || !editor) return;
   var codeI = $('#pk-code');
   var nameI = $('#pk-name'), nameEnI = $('#pk-name-en'), noteI = $('#pk-note'), noteEnI = $('#pk-note-en'),
-      kindSeg = $('#pk-kind'), pairsI = $('#pk-pairs'), priceI = $('#pk-price'), calcEl = $('#pk-calc'),
+      kindSeg = $('#pk-kind'), unitsI = $('#pk-units'), priceI = $('#pk-price'), calcEl = $('#pk-calc'),
       customI = $('#pk-custom'), featI = $('#pk-featured'), qI = $('#pk-q'), colorsEl = $('#pk-colors'),
       presetsEl = $('#pk-presets'), photoEl = $('#pk-photo'), fileI = $('#pk-file'),
       saveBtn = $('#pk-save'), statusEl = $('#pk-status');
@@ -87,11 +87,11 @@
   function dot(p) { return '<i class="pm-dot" style="background:' + esc(p && p.hex || '#ccc') + '"></i>'; }
   function unitWord(kind, n) { return kind === 'spool' ? (n > 1 ? 'bobines' : 'bobine') : (n > 1 ? 'recharges' : 'recharge'); }
 
-  // packs possibles avec le stock pour une composition { pid: paires }
+  // packs possibles avec le stock pour une composition { pid: unités }
   function possible(lines, kind) {
     var best = Infinity, any = false;
     Object.keys(lines).forEach(function (pid) {
-      var n = lines[pid] * 2; if (!n) return; any = true;
+      var n = lines[pid]; if (!n) return; any = true;
       var p = byId[pid]; best = Math.min(best, p ? Math.floor(stockOf(p, kind) / n) : 0);
     });
     return any ? best : 0;
@@ -104,7 +104,7 @@
   function render() {
     if (!packs.length) { listEl.innerHTML = '<p class="empty">Aucun pack. Crée le premier avec « Pack ».</p>'; return; }
     listEl.innerHTML = packs.map(function (pk) {
-      var units = pk.pairs * 2, unit = r2(pk.price / units);
+      var units = pk.units || 4, unit = r2(pk.price / units);
       var cols = (pk.colors || []).map(function (id) { return byId[id]; }).filter(Boolean).sort(filCmp);
       var pres = (pk.presets || []).map(function (pr) {
         var n = possible(linesObj(pr), pk.kind);
@@ -222,7 +222,7 @@
     codeI.value = pk ? pk.code || '' : '';
     noteI.value = pk ? pk.note || '' : '';
     noteEnI.value = pk ? pk.note_en || '' : '';
-    pairsI.value = pk ? pk.pairs : 2;
+    unitsI.value = pk ? pk.units : 4;
     priceI.value = pk ? +pk.price : '';
     customI.checked = pk ? pk.allow_custom : true;
     featI.checked = pk ? pk.featured : true;
@@ -248,9 +248,9 @@
     if (imgBlob) { URL.revokeObjectURL(imgBlob); imgBlob = ''; }
   }
 
-  function pairsVal() { var n = parseInt(pairsI.value, 10); return isFinite(n) ? Math.max(1, Math.min(10, n)) : 2; }
+  function unitsVal() { var n = parseInt(unitsI.value, 10); return isFinite(n) ? Math.max(1, Math.min(20, n)) : 4; }
   function renderCalc() {
-    var price = num(priceI.value), units = pairsVal() * 2;
+    var price = num(priceI.value), units = unitsVal();
     if (price == null || price <= 0) { calcEl.innerHTML = '<span class="muted">—</span>'; return; }
     var unit = r2(price / units), exact = Math.abs(unit * units - price) < 0.001;
     var cols = st.colors.map(function (id) { return byId[id]; }).filter(Boolean);
@@ -310,7 +310,7 @@
   qI.addEventListener('input', renderColors);
 
   function renderPresets() {
-    var pairs = pairsVal(), cols = st.colors.map(function (id) { return byId[id]; }).filter(Boolean);
+    var units = unitsVal(), cols = st.colors.map(function (id) { return byId[id]; }).filter(Boolean);
     if (!st.presets.length) { presetsEl.innerHTML = '<p class="muted">Aucune composition.</p>'; return; }
     presetsEl.innerHTML = st.presets.map(function (pr, i) {
       var tot = Object.keys(pr.lines).reduce(function (s, k) { return s + (pr.lines[k] || 0); }, 0);
@@ -325,11 +325,11 @@
           var v = pr.lines[p.id] || 0;
           return '<div class="pk-step' + (v ? ' is-on' : '') + '">' + dot(p) + '<span>' + esc(p.name) + '</span>' +
             '<button type="button" data-st="-1" data-p="' + esc(p.id) + '" aria-label="Moins">−</button>' +
-            '<b>' + v * 2 + '</b>' +
+            '<b>' + v + '</b>' +
             '<button type="button" data-st="1" data-p="' + esc(p.id) + '" aria-label="Plus">+</button></div>';
         }).join('') : '<p class="muted">Choisis d\'abord les couleurs.</p>') + '</div>' +
-        '<div class="pk-pcf"><span class="' + (tot === pairs ? 'pos' : 'neg') + '">' + tot * 2 + ' / ' + pairs * 2 + '</span>' +
-          (tot === pairs ? ' · ' + (n ? n + ' en stock' : 'Épuisé') : '') + '</div>' +
+        '<div class="pk-pcf"><span class="' + (tot === units ? 'pos' : 'neg') + '">' + tot + ' / ' + units + '</span>' +
+          (tot === units ? ' · ' + (n ? n + ' en stock' : 'Épuisé') : '') + '</div>' +
       '</div>';
     }).join('');
     wirePresetDrag();
@@ -345,7 +345,7 @@
       var pr = st.presets[+stp.closest('.pk-pc').getAttribute('data-i')], pid = stp.getAttribute('data-p');
       var tot = Object.keys(pr.lines).reduce(function (s, k) { return s + (pr.lines[k] || 0); }, 0);
       var d = +stp.getAttribute('data-st'), v = (pr.lines[pid] || 0) + d;
-      if (v < 0 || (d > 0 && tot >= pairsVal())) return;
+      if (v < 0 || (d > 0 && tot >= unitsVal())) return;
       if (v) pr.lines[pid] = v; else delete pr.lines[pid];
       renderPresets();
     }
@@ -402,7 +402,7 @@
       .then(function (res) { if (res.error) throw res.error; return path; });
   }
 
-  [pairsI, priceI].forEach(function (el) { el.addEventListener('input', function () { renderCalc(); if (el === pairsI) renderPresets(); }); });
+  [unitsI, priceI].forEach(function (el) { el.addEventListener('input', function () { renderCalc(); if (el === unitsI) renderPresets(); }); });
   kindSeg.addEventListener('click', function (e) {
     var b = e.target.closest('[data-kind]'); if (!b) return;
     setKind(b.getAttribute('data-kind')); renderColors(); renderPresets(); renderCalc();
@@ -411,7 +411,7 @@
   /* ---------- enregistrement ---------- */
   editor.addEventListener('submit', function (e) {
     e.preventDefault();
-    var name = nameI.value.trim(), price = num(priceI.value), pairs = pairsVal(), units = pairs * 2;
+    var name = nameI.value.trim(), price = num(priceI.value), units = unitsVal();
     if (!name) { statusEl.textContent = 'Nom requis.'; nameI.focus(); return; }
     if (price == null || price <= 0) { statusEl.textContent = 'Prix requis.'; priceI.focus(); return; }
     price = r2(price);
@@ -424,7 +424,7 @@
     for (var i = 0; i < presets.length; i++) {
       var tot = presets[i].lines.reduce(function (s, l) { return s + l.n; }, 0);
       if (!presets[i].name) { statusEl.textContent = 'Nomme chaque composition.'; return; }
-      if (tot !== pairs) { statusEl.textContent = '« ' + presets[i].name + ' » doit compter ' + units + ' unités.'; return; }
+      if (tot !== units) { statusEl.textContent = '« ' + presets[i].name + ' » doit compter ' + units + ' unités.'; return; }
     }
     if (!presets.length && !customI.checked) { statusEl.textContent = 'Ajoute une composition ou permets « Personnaliser ».'; return; }
     var cols = st.colors.map(function (id) { return byId[id]; });
@@ -437,7 +437,7 @@
       var old = editingId ? packs.filter(function (x) { return x.id === editingId; })[0] : null;
       var row = {
         name: name, name_en: nameEnI.value.trim() || null, code: codeI.value.trim().toUpperCase() || null, note: noteI.value.trim() || null, note_en: noteEnI.value.trim() || null,
-        kind: st.kind, pairs: pairs, price: price, colors: st.colors.slice(), presets: presets,
+        kind: st.kind, units: units, price: price, colors: st.colors.slice(), presets: presets,
         allow_custom: customI.checked && bwOnly(), featured: featI.checked, updated_at: new Date().toISOString()
       };
       if (!old) {

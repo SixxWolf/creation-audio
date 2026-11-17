@@ -54,7 +54,7 @@ const PAGES = {
   packs: {
     tab: 'packs', screen: 'screen-packs',
     title: 'Création Audio — Packs',
-    desc: 'Packs de recharges de filament à prix réduit, à composer par paires — Création Audio, région de Québec.'
+    desc: 'Packs de recharges de filament à prix réduit — Création Audio, région de Québec.'
   }
 };
 

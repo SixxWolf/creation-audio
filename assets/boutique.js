@@ -687,7 +687,7 @@
 
   /* =========================================================
      PACKS (table packs, Admin › Packs — 2026-11-16) : prix fixe, composé par
-     paires parmi les couleurs permises (compositions toutes faites + Personnaliser).
+     recharges parmi les couleurs permises (compositions toutes faites + Personnaliser).
      Panier : une ligne { id: pack, type: 'pack', key, comp: [{ id, n: unités }], qty }.
      Le serveur (_pack_fill) revalide la composition, le prix et le stock ; les unités
      du pack comptent pour le palier de la marque des autres filaments (option B).
@@ -699,7 +699,7 @@
   function packName(pk) { return enOr(pk.name, pk.name_en); }
   function packNote(pk) { return enOr(pk.note, pk.note_en); }
   function preName(pr) { return enOr(pr.name, pr.name_en); }
-  function packUnits(pk) { return (pk.pairs | 0) * 2; }
+  function packUnits(pk) { return (pk.units | 0) || 4; }
   function packUnit(pk) { return Math.round(+pk.price / Math.max(1, packUnits(pk)) * 100) / 100; }
   function unitWord(pk) { return pk.kind === 'spool' ? _t('la bobine') : _t('la recharge'); }
   function unitsText(pk, n) { return pk.kind === 'spool' ? plural(n, 'bobine', 'bobines') : plural(n, 'recharge', 'recharges'); }
@@ -720,12 +720,12 @@
   function compValid(pk, comp) {
     var ids = {}, sum = 0, ok = Array.isArray(comp) && comp.length > 0;
     packCols(pk).forEach(function (p) { ids[p.id] = 1; });
-    (comp || []).forEach(function (c) { if (!c || !ids[c.id] || !(c.n > 0) || c.n % 2) ok = false; else sum += c.n; });
+    (comp || []).forEach(function (c) { if (!c || !ids[c.id] || !(c.n > 0)) ok = false; else sum += c.n; });
     return ok && sum === packUnits(pk);
   }
   function preComp(pr) {
     return (Array.isArray(pr.lines) ? pr.lines : []).filter(function (l) { return l && (l.n | 0) > 0; })
-      .map(function (l) { return { id: l.p, n: (l.n | 0) * 2 }; });
+      .map(function (l) { return { id: l.p, n: l.n | 0 }; });
   }
   function presetsOf(pk) {
     return (Array.isArray(pk.presets) ? pk.presets : []).filter(function (pr) { return pr && compValid(pk, preComp(pr)); });
@@ -820,7 +820,7 @@
     return '<section class="cat-group pack-sec" aria-labelledby="g-packs">' +
       '<header class="cat-ghead">' +
         '<h2 class="cat-gtitle" id="g-packs">' + _t('Packs') + '</h2>' +
-        '<span class="cat-gmeta">' + _t('Prix fixe, par paires de couleurs') + '</span>' +
+        '<span class="cat-gmeta">' + _t('Prix fixe, couleurs assorties') + '</span>' +
         '<span class="cat-grule" aria-hidden="true"></span>' +
       '</header>' +
       '<div class="pack-minis">' + list.map(packMini).join('') + '</div>' +
@@ -864,7 +864,7 @@
     var s = selOf(pk);
     if (s.sel === 'custom') {
       var comp = Object.keys(s.custom).filter(function (id) { return s.custom[id] > 0; })
-        .map(function (id) { return { id: id, n: s.custom[id] * 2 }; });
+        .map(function (id) { return { id: id, n: s.custom[id] | 0 }; });
       return compValid(pk, comp) ? comp : null;
     }
     var pr = presetsOf(pk).filter(function (x) { return x.id === s.sel; })[0];
@@ -898,21 +898,21 @@
     }
     var custom = '';
     if (s.sel === 'custom') {
-      var used = 0; Object.keys(s.custom).forEach(function (id) { used += (s.custom[id] | 0) * 2; });
+      var used = 0; Object.keys(s.custom).forEach(function (id) { used += s.custom[id] | 0; });
       custom = '<div class="pack-custom">' +
-        '<div class="pack-custom-h"><span>' + _t('Choisis tes paires') + '</span><b class="' + (used === units ? 'is-full' : '') + '">' + used + ' / ' + units + '</b></div>' +
+        '<div class="pack-custom-h"><span>' + (pk.kind === 'spool' ? _t('Choisis tes bobines') : _t('Choisis tes recharges')) + '</span><b class="' + (used === units ? 'is-full' : '') + '">' + used + ' / ' + units + '</b></div>' +
         packCols(pk).map(function (p) {
-          var n = (s.custom[p.id] | 0) * 2;
-          // reste du stock pour cette couleur (panier compris), une fois les paires déjà choisies
+          var n = s.custom[p.id] | 0;
+          // reste du stock pour cette couleur (panier compris), une fois les unités déjà choisies
           var free = stockOf(p, pk.kind) - packUse(p.id, pk.kind, null) - (canBackorder() ? 0 : regQty(p.id, pk.kind));
-          var canInc = used + 2 <= units && n + 2 <= free;
-          return '<div class="pack-crow' + (free < 2 && !n ? ' is-out' : '') + '">' +
+          var canInc = used + 1 <= units && n + 1 <= free;
+          return '<div class="pack-crow' + (free < 1 && !n ? ' is-out' : '') + '">' +
             '<span class="pack-csw" style="background:' + esc(swatchBg(p)) + '"></span>' +
-            '<span class="pack-cname">' + esc(p.name) + (free < 2 && !n ? ' <em>' + _t('Épuisé') + '</em>' : '') + '</span>' +
+            '<span class="pack-cname">' + esc(p.name) + (free < 1 && !n ? ' <em>' + _t('Épuisé') + '</em>' : '') + '</span>' +
             '<span class="pack-step">' +
-              '<button type="button" data-pk="' + esc(pk.id) + '" data-p="' + esc(p.id) + '" data-d="-1" aria-label="' + _t('Retirer une paire') + '"' + (n ? '' : ' disabled') + '>&minus;</button>' +
+              '<button type="button" data-pk="' + esc(pk.id) + '" data-p="' + esc(p.id) + '" data-d="-1" aria-label="' + _t('Retirer une unité') + '"' + (n ? '' : ' disabled') + '>&minus;</button>' +
               '<b>' + n + '</b>' +
-              '<button type="button" data-pk="' + esc(pk.id) + '" data-p="' + esc(p.id) + '" data-d="1" aria-label="' + _t('Ajouter une paire') + '"' + (canInc ? '' : ' disabled') + '>+</button>' +
+              '<button type="button" data-pk="' + esc(pk.id) + '" data-p="' + esc(p.id) + '" data-d="1" aria-label="' + _t('Ajouter une unité') + '"' + (canInc ? '' : ' disabled') + '>+</button>' +
             '</span>' +
           '</div>';
         }).join('') +

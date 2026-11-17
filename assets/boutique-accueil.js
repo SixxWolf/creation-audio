@@ -146,7 +146,7 @@
     var byId = {}; rows.forEach(function (p) { byId[p.id] = p; });
     var pk = (pks || []).filter(function (x) { return x.featured && (x.colors || []).some(function (id) { return byId[id]; }); })[0];
     if (!el || !pk) return;
-    var units = (pk.pairs | 0) * 2, unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100, spool = pk.kind === 'spool';
+    var units = (pk.units | 0) || 4, unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100, spool = pk.kind === 'spool';
     var hexes = (pk.colors || []).map(function (id) { var p = byId[id]; var c = p && p.attrs && Array.isArray(p.attrs.colors) && p.attrs.colors[0]; return c || (p && p.hex) || null; })
       .filter(function (h) { return /^#[0-9a-fA-F]{6}$/.test(h || ''); });
     var art = '';

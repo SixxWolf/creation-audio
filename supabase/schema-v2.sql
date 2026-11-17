@@ -1929,7 +1929,7 @@ create table if not exists public.packs (
   pairs        integer not null default 2 check (pairs between 1 and 10),
   price        numeric(10,2) not null check (price > 0),
   colors       uuid[] not null default '{}',
-  presets      jsonb not null default '[]'::jsonb,     -- [{ id, name, name_en, lines: [{ p: uuid, n: paires }] }]
+  presets      jsonb not null default '[]'::jsonb,     -- [{ id, name, name_en, lines: [{ p: uuid, n: recharges }] }]
   allow_custom boolean not null default true,
   enabled      boolean not null default false,
   featured     boolean not null default true,          -- mis en avant en haut de Filaments
@@ -1949,9 +1949,23 @@ alter table public.customer_order_lines add column if not exists pack jsonb;
 -- code d'offre du pack (2026-11-16) : affiché sur la ligne groupée (courriels, PDF, factures), ex. CA-PCK-ESS-001
 alter table public.packs add column if not exists code text;
 update public.packs set code = 'CA-PCK-ESS-001' where code is null and slug = 'essentiels';
+-- 2026-11-16 : un pack se compte en RECHARGES (unités), plus en paires → 4 couleurs différentes possibles.
+-- `units` remplace `pairs` (gardée, plus utilisée) ; presets.lines.n = unités. Conversion une seule fois (units null).
+alter table public.packs add column if not exists units integer;
+update public.packs pk set units = pk.pairs * 2,
+  presets = coalesce((select jsonb_agg(jsonb_set(pr, '{lines}', coalesce((
+      select jsonb_agg(jsonb_set(l, '{n}', to_jsonb((l ->> 'n')::int * 2)))
+        from jsonb_array_elements(case when jsonb_typeof(pr -> 'lines') = 'array' then pr -> 'lines' else '[]'::jsonb end) l), '[]'::jsonb)))
+      from jsonb_array_elements(pk.presets) pr), '[]'::jsonb)
+ where pk.units is null;
+alter table public.packs alter column units set default 4;
+alter table public.packs alter column units set not null;
+alter table public.packs alter column pairs drop not null;
+alter table public.packs drop constraint if exists packs_units_check;
+alter table public.packs add constraint packs_units_check check (units between 1 and 20);
 
 -- Lignes des packs d'un panier : [{ pack_id, qty (nb de packs), comp: [{ product_id, qty (recharges par pack) }] }]
--- (les entrées sans pack_id sont ignorées). Valide pack actif, couleurs permises, paires, total,
+-- (les entrées sans pack_id sont ignorées). Valide pack actif, couleurs permises, total d'unités,
 -- composition toute faite si la personnalisation est fermée, et le STOCK (aucune commande au-delà).
 -- -> jsonb [{ product_id, ptype, kind, name, brand, material, sort_order, qty, unit_price, line_total, gkey, pack }]
 create or replace function public._pack_fill(p_lines jsonb)
@@ -1967,7 +1981,7 @@ begin
     if not found then raise exception 'Un pack de ton panier n''est plus offert. Recharge la page puis réessaie.'; end if;
     if coalesce(x ->> 'qty', '') !~ '^\d{1,2}$' or (x ->> 'qty')::int < 1 then raise exception 'Quantité de pack invalide.'; end if;
     v_n := (x ->> 'qty')::int;
-    v_units := pk.pairs * 2;
+    v_units := pk.units;
     v_unit := round(pk.price / v_units, 2);
     if v_unit * v_units <> pk.price then raise exception 'Prix du pack « % » à revoir. Écris-nous.', pk.name; end if;
     select coalesce(jsonb_object_agg(pid, q), '{}'::jsonb), coalesce(sum(q), 0)::int into v_comp, v_sum
@@ -1976,7 +1990,6 @@ begin
              where (e ->> 'product_id') ~* v_uuid and coalesce(e ->> 'qty', '') ~ '^\d{1,3}$' and (e ->> 'qty')::int > 0
              group by 1) z;
     if v_sum <> v_units
-       or exists (select 1 from jsonb_each_text(v_comp) c where c.value::int % 2 <> 0)
        or exists (select 1 from jsonb_object_keys(v_comp) k where not (k::uuid = any (pk.colors))) then
       raise exception 'Composition du pack « % » invalide. Recharge la page puis réessaie.', pk.name;
     end if;
@@ -1984,7 +1997,7 @@ begin
                                                and upper(coalesce(p.hex, '')) not in ('#000000', '#FFFFFF')))
        and not exists (
       select 1 from jsonb_array_elements(pk.presets) pr
-       where (select coalesce(jsonb_object_agg(lower(l ->> 'p'), (l ->> 'n')::int * 2), '{}'::jsonb)
+       where (select coalesce(jsonb_object_agg(lower(l ->> 'p'), (l ->> 'n')::int), '{}'::jsonb)
                 from jsonb_array_elements(case when jsonb_typeof(pr -> 'lines') = 'array' then pr -> 'lines' else '[]'::jsonb end) l
                where coalesce(l ->> 'n', '') ~ '^\d+$' and (l ->> 'n')::int > 0) = v_comp) then
       raise exception 'Composition du pack « % » invalide. Recharge la page puis réessaie.', pk.name;
