@@ -2347,6 +2347,7 @@ a.ms-b-file:hover { border-color:var(--ink); }
 .pk-pc.dragging { opacity:.4; }
 .pk-pch { display:flex; gap:8px; align-items:center; }
 .pk-pch input { flex:1; min-width:0; }
+.pk-pimg { width:64px; height:44px; flex:none; object-fit:contain; border-radius:8px; background:var(--wash); }
 .pk-steps { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 6px; }
 .pk-step { display:inline-flex; align-items:center; gap:7px; padding:4px 6px 4px 10px; border:1px solid var(--line-2); border-radius:100px; font-size:.84rem; }
 .pk-step.is-on { border-color:var(--ember); }

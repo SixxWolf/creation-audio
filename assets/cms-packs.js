@@ -229,7 +229,7 @@
     st = {
       kind: 'refill',
       colors: pk ? (pk.colors || []).filter(function (id) { return byId[id]; }) : [],
-      presets: pk ? (pk.presets || []).map(function (pr) { return { id: pr.id || uid(), name: pr.name || '', name_en: pr.name_en || '', lines: linesObj(pr) }; }) : [],
+      presets: pk ? (pk.presets || []).map(function (pr) { return { id: pr.id || uid(), name: pr.name || '', name_en: pr.name_en || '', img: pr.img || null, lines: linesObj(pr) }; }) : [],
       image: pk ? pk.image_path || null : null
     };
     setKind(pk ? pk.kind : 'refill');
@@ -319,6 +319,9 @@
         '<div class="pk-pch">' +
           '<input type="text" data-f="name" value="' + esc(pr.name) + '" placeholder="Nom (ex. 4 noires)" maxlength="40" aria-label="Nom">' +
           '<input type="text" data-f="name_en" value="' + esc(pr.name_en) + '" placeholder="Anglais (ex. 4 black)" maxlength="40" aria-label="Nom en anglais">' +
+          (pr.img ? '<img class="pk-pimg" src="' + esc(publicUrl(pr.img)) + '" alt="">' : '') +
+          '<button type="button" class="btn btn-ghost btn-sm" data-pimg="' + i + '" data-ic="plus">' + (pr.img ? 'Changer' : 'Photo') + '</button>' +
+          (pr.img ? '<button type="button" class="btn btn-ghost btn-sm" data-pimgdel="' + i + '" aria-label="Retirer la photo">×</button>' : '') +
           '<button type="button" class="btn btn-ghost btn-sm" data-pdel="' + i + '" data-ic="trash" aria-label="Retirer"></button>' +
         '</div>' +
         '<div class="pk-steps">' + (cols.length ? cols.map(function (p) {
@@ -340,6 +343,9 @@
   });
   presetsEl.addEventListener('click', function (e) {
     var del = e.target.closest('[data-pdel]'), stp = e.target.closest('[data-st]');
+    var pim = e.target.closest('[data-pimg]'), pimDel = e.target.closest('[data-pimgdel]');
+    if (pimDel) { st.presets[+pimDel.getAttribute('data-pimgdel')].img = null; renderPresets(); return; }
+    if (pim) { pickPresetImg(st.presets[+pim.getAttribute('data-pimg')], pim); return; }
     if (del) { st.presets.splice(+del.getAttribute('data-pdel'), 1); renderPresets(); return; }
     if (stp) {
       var pr = st.presets[+stp.closest('.pk-pc').getAttribute('data-i')], pid = stp.getAttribute('data-p');
@@ -369,7 +375,7 @@
     });
   }
   $('#pk-preset-add').addEventListener('click', function () {
-    st.presets.push({ id: uid(), name: '', name_en: '', lines: {} });
+    st.presets.push({ id: uid(), name: '', name_en: '', img: null, lines: {} });
     renderPresets();
     var last = presetsEl.lastElementChild, inp = last && $('input', last);
     if (inp) inp.focus();
@@ -394,6 +400,20 @@
     imgFile = f; if (imgBlob) URL.revokeObjectURL(imgBlob); imgBlob = URL.createObjectURL(f);
     renderPhoto();
   });
+  // photo d'une composition (montrée quand le client la choisit) : envoyée tout de suite
+  function pickPresetImg(pr, btn) {
+    var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+    inp.addEventListener('change', function () {
+      var f = inp.files && inp.files[0]; if (!f) return;
+      var ext = (f.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+      var path = 'packs/' + Date.now() + '-' + uid() + '.' + ext;
+      btn.disabled = true; statusEl.textContent = 'Envoi de la photo…';
+      sb.storage.from(BUCKET).upload(path, f, { cacheControl: '3600', upsert: false, contentType: f.type || undefined })
+        .then(function (res) { if (res.error) throw res.error; pr.img = path; statusEl.textContent = ''; renderPresets(); })
+        .catch(function (err) { statusEl.textContent = ''; btn.disabled = false; caDialog.error(err); });
+    });
+    inp.click();
+  }
   function uploadImg() {
     if (!imgFile) return Promise.resolve(null);
     var ext = (imgFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
@@ -418,7 +438,7 @@
     if (Math.abs(r2(price / units) * units - price) > 0.001) { statusEl.textContent = 'Le prix doit se diviser au cent près par ' + units + '.'; priceI.focus(); return; }
     if (!st.colors.length) { statusEl.textContent = 'Choisis au moins une couleur.'; return; }
     var presets = st.presets.map(function (pr) {
-      return { id: pr.id, name: pr.name.trim(), name_en: pr.name_en.trim() || null,
+      return { id: pr.id, name: pr.name.trim(), name_en: pr.name_en.trim() || null, img: pr.img || null,
         lines: st.colors.filter(function (id) { return pr.lines[id] > 0; }).map(function (id) { return { p: id, n: pr.lines[id] }; }) };
     });
     for (var i = 0; i < presets.length; i++) {

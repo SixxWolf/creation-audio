@@ -803,8 +803,11 @@
     return '<svg class="pack-art" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' +
       hexes.map(function (h, i) { return coilSvg(R + 4 + i * step, R + 4, R, h, pk.kind); }).join('') + '</svg>';
   }
+  // photo : celle de la composition choisie (preset.img), sinon celle du pack, sinon les bobines dessinées
   function packMedia(pk, comp) {
-    var u = pk.image_path ? publicUrl(pk.image_path) : '';
+    var u = '', k = comp ? compKey(comp) : '';
+    if (k) presetsOf(pk).some(function (pr) { if (pr.img && compKey(preComp(pr)) === k) { u = publicUrl(pr.img); return true; } });
+    if (!u && pk.image_path) u = publicUrl(pk.image_path);
     return u ? '<img src="' + esc(u) + '" alt="" loading="lazy">' : packArt(pk, comp);
   }
 
