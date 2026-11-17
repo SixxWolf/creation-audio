@@ -937,9 +937,13 @@
     return path ? publicUrl(path) : '';
   }
   function packImgs(pk) {
-    var comp = selComp(pk), view = viewComp(pk), u = packPhoto(pk, comp);
+    var comp = selComp(pk), u = packPhoto(pk, comp);
     var list = [{ url: u, art: u ? '' : packArt(pk, comp), alt: packName(pk) }], seen = {};
-    var cols = view ? view.map(function (c) { return byId[c.id]; }) : packCols(pk);
+    // toutes les couleurs du pack, en tout temps (règle de Théo 2026-11-16 : le blanc reste visible même avec « 4 noires »),
+    // dans l'ordre de la section Filaments → les vignettes ne bougent pas quand on change de composition
+    var ids = {}; (pk.colors || []).forEach(function (id) { ids[id] = 1; });
+    presetsOf(pk).forEach(function (pr) { preComp(pr).forEach(function (c) { ids[c.id] = 1; }); });
+    var cols = products.filter(function (p) { return ids[p.id]; });
     cols.forEach(function (p) {
       if (!p || seen[p.id]) return; seen[p.id] = 1;
       var cu = colorImg(p, pk.kind); if (cu) list.push({ url: cu, alt: p.name });
