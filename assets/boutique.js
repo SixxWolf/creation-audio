@@ -932,7 +932,8 @@
         '<p class="pack-sub">' + unitsText(pk, units) + ' · ' + esc(lineOf(pk)) + '</p>' +
         (note ? '<p class="pack-note">' + esc(note) + '</p>' : '') +
         '<div class="pack-price"><b>' + money(+pk.price) + '</b><span>' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></div>' +
-        '<div class="pack-pres" role="group" aria-label="' + _t('Composition') + '">' + tiles.join('') + '</div>' +
+        // une seule composition, sans Personnaliser : la photo suffit, pas de tuile à choisir
+        (tiles.length > 1 ? '<div class="pack-pres" role="group" aria-label="' + _t('Composition') + '">' + tiles.join('') + '</div>' : '') +
         custom +
         '<button type="button" class="pack-add btn-add" data-pk="' + esc(pk.id) + '"' + (comp && room > 0 ? '' : ' disabled') + '>' + IC.cart + '<span>' + btn + '</span></button>' +
         (brand ? '<p class="pack-tier">' + _t('Le pack compte pour le rabais quantité de tes autres filaments ') + esc(brand) + '.</p>' : '') +
