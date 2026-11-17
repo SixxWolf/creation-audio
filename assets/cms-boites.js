@@ -25,7 +25,7 @@
     subSave: $('#bx-sub-save'), subNew: $('#bx-sub-new'), subDel: $('#bx-sub-del'),
     ref: $('#bx-ref'), veh: $('#bx-veh'), fcF: $('#bx-fc-f'), fc: $('#bx-fc'),
     type: $('#bx-type'), vtF: $('#bx-vt-f'), vt: $('#bx-vt'), w: $('#bx-w'), h: $('#bx-h'), d: $('#bx-d'),
-    mw: $('#bx-mw'), mh: $('#bx-mh'), md: $('#bx-md'), maxRep: $('#bx-max-rep'), ratio: $('#bx-ratio'),
+    ratio: $('#bx-ratio'),
     boxRep: $('#bx-box-rep'), boxWarn: $('#bx-box-warn'), boxSum: $('#bx-box-sum'),
     portStep: $('#bx-port-step'), portSum: $('#bx-port-sum'), fb: $('#bx-fb'), pw: $('#bx-pw'), dp: $('#bx-dp'), wall: $('#bx-wall'), k: $('#bx-k'),
     flare: $('#bx-flare'), soft: $('#bx-soft'), rad: $('#bx-rad'), radF: $('#bx-rad-f'), portRep: $('#bx-port-rep'),
@@ -210,11 +210,11 @@
     var tsc = S.tsc, ts = tsc.ts, P = D.P;
     P.n = D.n;
     S.volOk = true;
-    capDims();
+    // volume visé : largeur + hauteur fixées, la profondeur suit
     var fit = function () {
       if (D.mode === 'vol' && D.vt > 0) {
-        var sol = E.solveDim(P, ts, 'w', D.vt, 3 * IN, D.max.w || 160 * IN);
-        P.w = sol.x; S.volOk = sol.ok;
+        var sol = E.solveDim(P, ts, 'd', D.vt, 3 * IN, 160 * IN);
+        P.d = sol.x; S.volOk = sol.ok;
       }
     };
     fit();
@@ -224,14 +224,6 @@
     var pcs = E.pieces(r.g);
     var cut = pcs.length ? E.cutlist(pcs, { L: D.sheet.L, W: D.sheet.W, kerf: D.sheet.kerf, trim: D.sheet.trim, grain: D.sheet.grain }) : { ok: false, sheets: [], bad: [] };
     S.res = { g: r.g, sim: tsc.ok ? r.sim : null, pcs: pcs, cut: cut, ts: ts };
-    S.max = maxCalc(ts);
-  }
-  // l'espace max n'est jamais dépassé
-  function capDims() {
-    var P = D.P, m = D.max;
-    if (m.w && P.w > m.w) P.w = m.w;
-    if (m.h && P.h > m.h) P.h = m.h;
-    if (m.d && P.d > m.d) P.d = m.d;
   }
   function ratioOn() { return D.ratio > 0 && D.P.type !== 'sealed'; }
   // un évent plus large s'allonge et mange du volume → bissection (surface − ratio × net croît avec la largeur)
@@ -253,26 +245,6 @@
     else for (var k = 0; k < 30 && hi - lo > 1e-5; k++) { var mid = (lo + hi) / 2; if (over(mid)) hi = mid; else lo = mid; }
     setX(hi);
     return true;
-  }
-  // espace max : volume net et accord le plus bas qui tiennent dedans
-  function maxCalc(ts) {
-    var m = D.max;
-    if (!(m.w && m.h && m.d)) return null;
-    var Q = clone(D.P); Q.n = D.n; Q.w = m.w; Q.h = m.h; Q.d = m.d;
-    var at = function (fb) {
-      Q.fb = fb;
-      if (ratioOn()) portToRatio(Q, ts);
-      return E.geometry(Q, ts);
-    };
-    var g = at(D.P.fb || 34), out = { net: g.net, fb: null };
-    if (D.P.type === 'sealed') return out;
-    var fits = function (fb) { var x = at(fb); return x.net > 0 && !x.errK.port && !x.errK.depth; };
-    if (!fits(150)) return out;
-    var lo = 10, hi = 150;
-    if (fits(lo)) hi = lo;
-    else for (var k = 0; k < 24 && hi - lo > 0.05; k++) { var mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; }
-    out.fb = Math.ceil(hi * 10) / 10;
-    return out;
   }
   function scrollParent(n) {
     for (n = n.parentElement; n && n !== document.body; n = n.parentElement) {
@@ -548,12 +520,9 @@
     { el: el.watts, k: 'num', get: function () { return D.watts; }, set: function (v) { D.watts = v; }, empty: true, min: 1, d: 0 },
     { el: el.fc, k: 'num', get: function () { return D.fc; }, set: function (v) { D.fc = v; }, min: 10, max: 200, d: 0 },
     { el: el.vt, k: 'vol', get: function () { return D.vt; }, set: function (v) { D.vt = v; }, min: 0.05 * FT3 },
-    { el: el.mw, k: 'len', get: function () { return D.max.w; }, set: function (v) { D.max.w = v; }, empty: true, lazy: true, min: 3 * IN },
-    { el: el.mh, k: 'len', get: function () { return D.max.h; }, set: function (v) { D.max.h = v; }, empty: true, lazy: true, min: 3 * IN },
-    { el: el.md, k: 'len', get: function () { return D.max.d; }, set: function (v) { D.max.d = v; }, empty: true, lazy: true, min: 3 * IN },
-    { el: el.w, k: 'len', get: function () { return D.P.w; }, set: function (v) { D.P.w = v; }, min: 3 * IN, cap: 'w' },
-    { el: el.h, k: 'len', get: function () { return D.P.h; }, set: function (v) { D.P.h = v; }, min: 3 * IN, cap: 'h' },
-    { el: el.d, k: 'len', get: function () { return D.P.d; }, set: function (v) { D.P.d = v; }, min: 3 * IN, cap: 'd' },
+    { el: el.w, k: 'len', get: function () { return D.P.w; }, set: function (v) { D.P.w = v; }, min: 3 * IN },
+    { el: el.h, k: 'len', get: function () { return D.P.h; }, set: function (v) { D.P.h = v; }, min: 3 * IN },
+    { el: el.d, k: 'len', get: function () { return D.P.d; }, set: function (v) { D.P.d = v; }, min: 3 * IN },
     { el: el.fb, k: 'num', get: function () { return D.P.fb; }, set: function (v) { D.P.fb = v; }, min: 10, max: 150, d: 1 },
     { el: el.ratio, k: 'ratio', get: function () { return D.ratio; }, set: function (v) { D.ratio = v; portUI(); }, empty: true, min: 1, max: 60 },
     { el: el.pw, k: 'len', get: function () { return D.P.port.pw; }, set: function (v) { D.P.port.pw = v; }, min: 0.25 * IN },
@@ -576,7 +545,6 @@
       if (f.el.readOnly) return;
       var v = f.k === 'len' ? parseLen(f.el.value) : f.k === 'vol' ? parseVolF(f.el.value) : parseNum(f.el.value);
       if (f.k === 'ratio' && v != null && mm()) v /= RATIO_MM;
-      if (f.cap && v != null && D.max[f.cap] && v > D.max[f.cap]) v = D.max[f.cap];
       if (v == null) { if (!f.empty) return; f.set(null); }
       else {
         if (isNaN(v) || (f.min != null && v < f.min) || (f.max != null && v > f.max)) return;
@@ -690,7 +658,7 @@
   }
   function modeUI() {
     var vol = D.mode === 'vol';
-    el.vtF.hidden = !vol; el.w.readOnly = vol; el.w.tabIndex = vol ? -1 : 0;
+    el.vtF.hidden = !vol; el.d.readOnly = vol; el.d.tabIndex = vol ? -1 : 0;
   }
   function fillVehicles() {
     el.veh.innerHTML = E.VEHICLES.map(function (v) {
@@ -734,7 +702,7 @@
   function proposeNow() {
     return E.propose({
       ts: S.tsc.ts, rec: D.rec, n: D.n, coil: D.coil, link: D.link, watts: wattsNow(), goal: D.goal, type: D.atype,
-      max: { w: D.max.w, h: D.max.h, d: D.max.d }, area: D.ratio, vehicle: D.vehicle, fc: D.fc,
+      max: { w: null, h: null, d: null }, area: D.ratio, vehicle: D.vehicle, fc: D.fc,
       t: D.P.t, layers: D.P.layers, side: D.P.port.side, brace: D.P.brace
     });
   }
@@ -762,13 +730,7 @@
     ]) : '';
     var w = g.err.map(function (t) { return '<li class="is-bad">' + esc(t) + '</li>'; })
       .concat(g.warn.map(function (t) { return '<li>' + esc(t) + '</li>'; }));
-    if (D.mode === 'vol' && !S.volOk) w.unshift('<li class="is-bad">' + esc('Volume visé hors d\'atteinte : ' + volTxt(g.net) + ' net au plus') + '</li>');
-    var M = S.max;
-    el.maxRep.innerHTML = M ? rep([
-      ['Net max', M.net > 0 ? volTxt(M.net) : '—', M.net > 0 ? '' : 'bad'],
-      D.P.type !== 'sealed' ? ['Accord min', M.fb != null ? hz(M.fb, 1) : 'évent impossible', M.fb != null ? '' : 'bad'] : null
-    ]) : '';
-    el.maxRep.hidden = !M;
+    if (D.mode === 'vol' && !S.volOk) w.unshift('<li class="is-bad">' + esc('Volume visé hors d\'atteinte avec cette largeur et cette hauteur : ' + volTxt(g.net) + ' net au plus') + '</li>');
     el.boxWarn.innerHTML = w.join('');
     el.boxSum.textContent = g.net > 0 ? volTxt(g.net) + ' net' : '';
   }
@@ -1432,7 +1394,7 @@
       if (!tsc.ok || !pr.D) { toast('Ce projet n\'a pas de T/S complets', 'bad'); return; }
       var d = merge(defaults(), pr.D), P = Object.assign({}, d.P, { n: d.n, coil: d.coil, link: d.link,
         watts: d.watts > 0 ? d.watts : (rec.rms || 500) * d.n, vehicle: d.vehicle, fc: d.fc });
-      if (d.mode === 'vol' && d.vt > 0) P.w = E.solveDim(P, tsc.ts, 'w', d.vt, 3 * IN, 160 * IN).x;
+      if (d.mode === 'vol' && d.vt > 0) P.d = E.solveDim(P, tsc.ts, 'd', d.vt, 3 * IN, 160 * IN).x;
       var sim = E.run(P, tsc.ts, { f: FQ }).sim;
       if (!sim) { toast('Ce projet ne se simule pas', 'bad'); return; }
       addOverlay({ key: 'p:' + id, name: res.data.name || 'Projet', sim: sim, dash: '6 4', vented: d.P.type !== 'sealed' });
