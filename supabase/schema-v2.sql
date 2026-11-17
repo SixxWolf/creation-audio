@@ -1912,7 +1912,8 @@ create policy customer_order_lines_admin_all on public.customer_order_lines for 
 -- ============ Packs de filament (2026-11-16) ============
 -- Offre à prix fixe (ex. « Pack Essentiels » : 4 recharges PLA Basic noir/blanc pour 60 $).
 -- Composition par PAIRES parmi `colors` (ids de produits filament, dans l'ordre affiché) :
--- compositions toutes faites (`presets`) et/ou « Personnaliser » (`allow_custom`).
+-- compositions toutes faites (`presets`) et/ou « Personnaliser » (`allow_custom`, NOIR ET BLANC SEULEMENT :
+-- un pack qui contient une couleur reste à compositions fixes — règle de Théo 2026-11-16).
 -- Le prix du pack ne suit aucun palier, mais ses recharges COMPTENT dans le palier de la
 -- marque pour les autres filaments du panier (choix de Théo, option B). Limité au stock.
 -- Une ligne de commande/facture par couleur, avec `pack` = { id, k, n, name, name_en, price }
@@ -1976,7 +1977,9 @@ begin
        or exists (select 1 from jsonb_object_keys(v_comp) k where not (k::uuid = any (pk.colors))) then
       raise exception 'Composition du pack « % » invalide. Recharge la page puis réessaie.', pk.name;
     end if;
-    if not pk.allow_custom and not exists (
+    if not (pk.allow_custom and not exists (select 1 from public.products p where p.id = any (pk.colors)
+                                               and upper(coalesce(p.hex, '')) not in ('#000000', '#FFFFFF')))
+       and not exists (
       select 1 from jsonb_array_elements(pk.presets) pr
        where (select coalesce(jsonb_object_agg(lower(l ->> 'p'), (l ->> 'n')::int * 2), '{}'::jsonb)
                 from jsonb_array_elements(case when jsonb_typeof(pr -> 'lines') = 'array' then pr -> 'lines' else '[]'::jsonb end) l

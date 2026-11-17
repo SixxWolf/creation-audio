@@ -708,6 +708,13 @@
     var ok = {}; (pk.colors || []).forEach(function (id) { ok[id] = 1; });
     return products.filter(function (p) { return ok[p.id] && offered(p, pk.kind); });
   }
+  // « Personnaliser » : noir et blanc seulement (règle de Théo 2026-11-16 : un pack de couleurs reste fixe,
+  // sinon les couleurs lentes restent sur les tablettes). Même règle dans _pack_fill.
+  function packCustom(pk) {
+    return !!pk.allow_custom && (pk.colors || []).every(function (id) {
+      var p = byId[id]; return !p || /^#(000000|FFFFFF)$/i.test(p.hex || '');
+    });
+  }
   function lineOf(pk) { var f = packCols(pk)[0]; return f ? ((f.brand ? f.brand + ' ' : '') + (f.material || '')).trim() : ''; }
   function brandOf(pk) { var f = packCols(pk)[0]; return f ? (f.brand || f.material || '') : ''; }
   function compValid(pk, comp) {
@@ -755,7 +762,7 @@
   }
   function packAnyStock(pk) {
     return presetsOf(pk).some(function (pr) { return packRoom(pk, preComp(pr), null, true) > 0; }) ||
-      (pk.allow_custom && packCols(pk).reduce(function (s, p) { return s + 2 * Math.floor(stockOf(p, pk.kind) / 2); }, 0) >= packUnits(pk));
+      (packCustom(pk) && packCols(pk).reduce(function (s, p) { return s + 2 * Math.floor(stockOf(p, pk.kind) / 2); }, 0) >= packUnits(pk));
   }
   function defComp(pk) {
     var pres = presetsOf(pk);
@@ -849,7 +856,7 @@
     if (!s) {
       var pres = presetsOf(pk);
       var first = pres.filter(function (pr) { return packRoom(pk, preComp(pr), null, true) > 0; })[0] || pres[0];
-      s = packSel[pk.id] = { sel: first ? first.id : (pk.allow_custom ? 'custom' : null), custom: {} };
+      s = packSel[pk.id] = { sel: first ? first.id : (packCustom(pk) ? 'custom' : null), custom: {} };
     }
     return s;
   }
@@ -881,7 +888,7 @@
         (ok ? '' : '<span class="pack-pre-out">' + _t('Épuisé') + '</span>') +
       '</button>';
     });
-    if (pk.allow_custom) {
+    if (packCustom(pk)) {
       var on = s.sel === 'custom';
       tiles.push('<button type="button" class="pack-pre pack-pre-custom' + (on ? ' is-on' : '') + '" data-pk="' + esc(pk.id) + '" data-pre="custom" aria-pressed="' + on + '">' +
         '<span class="pack-pre-art pack-pre-dots" aria-hidden="true">' + packCols(pk).slice(0, 8).map(function (p) {

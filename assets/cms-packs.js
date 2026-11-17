@@ -231,6 +231,7 @@
       image: pk ? pk.image_path || null : null
     };
     setKind(pk ? pk.kind : 'refill');
+    syncCustom();
     imgFile = null; if (imgBlob) { URL.revokeObjectURL(imgBlob); imgBlob = ''; }
     qI.value = ''; statusEl.textContent = '';
     renderColors(); renderPresets(); renderCalc(); renderPhoto();
@@ -265,6 +266,16 @@
     calcEl.innerHTML = h;
   }
 
+  // « Personnaliser » : noir et blanc seulement (règle de Théo, 2026-11-16) — une couleur => compositions fixes
+  function bwOnly() {
+    return st.colors.every(function (id) { var p = byId[id]; return !p || /^#(000000|FFFFFF)$/i.test(p.hex || ''); });
+  }
+  function syncCustom() {
+    var ok = bwOnly();
+    customI.disabled = !ok;
+    if (!ok) customI.checked = false;
+    customI.parentNode.title = ok ? '' : 'Noir et blanc seulement';
+  }
   function renderColors() {
     var q = fold(qI.value.trim()), sel = {};
     st.colors.forEach(function (id) { sel[id] = true; });
@@ -292,7 +303,7 @@
       st.presets.forEach(function (pr) { delete pr.lines[id]; });
     } else st.colors.push(id);
     st.colors.sort(function (a, b2) { return filCmp(byId[a], byId[b2]); });
-    renderColors(); renderPresets(); renderCalc();
+    syncCustom(); renderColors(); renderPresets(); renderCalc();
   });
   qI.addEventListener('input', renderColors);
 
@@ -425,7 +436,7 @@
       var row = {
         name: name, name_en: nameEnI.value.trim() || null, note: noteI.value.trim() || null, note_en: noteEnI.value.trim() || null,
         kind: st.kind, pairs: pairs, price: price, colors: st.colors.slice(), presets: presets,
-        allow_custom: customI.checked, featured: featI.checked, updated_at: new Date().toISOString()
+        allow_custom: customI.checked && bwOnly(), featured: featI.checked, updated_at: new Date().toISOString()
       };
       if (!old) {
         var base = slugify(name), slug = base, n = 2, taken = packs.map(function (x) { return x.slug; });
