@@ -372,8 +372,9 @@
       sb.from('products_public').select('*').eq('type', 'accessory').order('sort_order', { ascending: true }),
       // page Promotions seulement : les spacers en promo (leur fiche et leur panier sont sur boutique/spacers)
       PAGE === 'promotions' ? sb.from('products_public').select('*').eq('type', 'spacer').order('sort_order', { ascending: true }) : Promise.resolve({ data: [] }),
-      // packs en ligne (RLS : enabled seulement) ; une erreur ne bloque pas la boutique
-      sb.from('packs').select('*').order('sort_order', { ascending: true })
+      // packs en ligne seulement : le filtre est explicite, car connecté en admin la RLS laisse passer les packs hors ligne
+      // (session partagée avec la page admin) ; une erreur ne bloque pas la boutique
+      sb.from('packs').select('*').eq('enabled', true).order('sort_order', { ascending: true })
     ]).then(function (res) {
       var pr = res[0], br = res[1], ac = res[2];
       spacers = (res[3] && !res[3].error && res[3].data) || [];

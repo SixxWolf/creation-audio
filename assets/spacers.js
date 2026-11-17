@@ -14,7 +14,7 @@
 
   var sb = window.CA && window.CA.sb;
   // onglet Packs (barre des rayons) : montré seulement si un pack est en ligne
-  if (sb) sb.from('packs').select('id').limit(1).then(function (r) {
+  if (sb) sb.from('packs').select('id').eq('enabled', true).limit(1).then(function (r) {
     if (r && !r.error && r.data && r.data.length) { var tp = document.querySelector('a[data-tab="packs"]'); if (tp) tp.hidden = false; }
   }, function () {});
   var FB = window.CASpacers.CONTACT.messenger;

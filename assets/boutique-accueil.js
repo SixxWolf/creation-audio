@@ -169,7 +169,7 @@
     Promise.all([
       sb.from('products_public').select(cols).in('type', ['filament', 'spacer', 'accessory']).order('sort_order', { ascending: true }).limit(2000),
       sb.from('brands').select('name,sort_order,slug,image_path'),
-      sb.from('packs').select('*').order('sort_order', { ascending: true })
+      sb.from('packs').select('*').eq('enabled', true).order('sort_order', { ascending: true })   // explicite : l'admin connecté voit aussi les packs hors ligne
     ]).then(function (res) {
       var pr = res[0], br = res[1];
       if (!pr || pr.error || !pr.data) return;
