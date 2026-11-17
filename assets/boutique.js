@@ -1217,8 +1217,18 @@
     }
     return stage + thumbs;
   }
+  // Mobile (≤ 900 px) : Couleur puis Format juste sous les miniatures, pour voir la photo en changeant de couleur.
+  // Ordi : dans le panneau, à sa place d'origine (avant le bouton d'achat). Le nœud est déplacé, pas copié.
+  function placePick() {
+    var pick = $('.pdp-pick', configEl); if (!pick) return;
+    var mob = !!(narrow && narrow.matches);
+    var dest = mob ? $('.pdp-media', configEl) : $('.pdp-panel', configEl);
+    if (!dest || pick.parentNode === dest) return;
+    if (mob) dest.appendChild(pick);
+    else dest.insertBefore(pick, $('.cfg-buy', dest));
+  }
   function renderMedia() {
-    var box = $('.pdp-media', configEl); if (!box) return;
+    var box = $('.pdp-gal', configEl); if (!box) return;
     box.innerHTML = mediaHtml();
     wireMedia();
   }
@@ -1337,7 +1347,7 @@
 
     configEl.innerHTML =
       '<div class="pdp">' +
-        '<div class="pdp-media">' + mediaHtml() + '</div>' +
+        '<div class="pdp-media"><div class="pdp-gal">' + mediaHtml() + '</div></div>' +
         '<div class="pdp-panel">' +
           '<p class="pdp-eyebrow pdp-brand">' + brandBadge(m.brand, 'pdp-blogo') + '<span>' + (brandLogo(m.brand) ? '' : '<b>' + esc(m.brand) + '</b> · ') + esc(m.name) + '</span></p>' +
           '<h1 class="pdp-name">' + esc(p.name) + '</h1>' +
@@ -1351,7 +1361,9 @@
           _t('<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>') +
           '<div class="js-tiers">' + tierGridHtml() + '</div>' +
 
-          '<div class="pdp-sec">' +
+          // Format + Couleur : sous les miniatures sur mobile (placePick), dans le panneau sur ordi
+          '<div class="pdp-pick">' +
+          '<div class="pdp-sec pick-fmt">' +
             _t('<p class="pdp-label">Format</p>') +
             '<div class="fmt">' + fmtOpt('refill', _t('Recharge')) + fmtOpt('spool', _t('Avec bobine')) + '</div>' +
             (curType === 'refill' && spoolHint ? '<p class="fmt-note">' + IC.info + _t('<span>La recharge n\'a pas de bobine : elle s\'installe sur une bobine réutilisable. ') +
@@ -1366,6 +1378,7 @@
             _t('<div class="sws" role="group" aria-label="Couleurs ') + esc(m.name) + '">' + swatches + '</div>' +
             (hiddenN ? '<p class="sws-note">' + plural(hiddenN, 'couleur en rupture masquée', 'couleurs en rupture masquées') +
               _t(' · <button type="button" class="js-show-all">Tout afficher</button></p>') : '') +
+          '</div>' +
           '</div>' +
 
           '<div class="cfg-buy">' +
@@ -1393,6 +1406,7 @@
       relatedHtml();
 
     document.title = p.name + ' — ' + m.name + ' ' + m.brand + _t(' · Création Audio');
+    placePick();
     wireConfig();
     observeBuy();
     updateBuybar();
@@ -1864,8 +1878,9 @@
     buybar.hidden = !show;
     document.body.classList.toggle('has-buybar', show);
   }
-  if (narrow.addEventListener) narrow.addEventListener('change', updateBuybar);
-  else if (narrow.addListener) narrow.addListener(updateBuybar);
+  function onNarrow() { placePick(); updateBuybar(); }
+  if (narrow.addEventListener) narrow.addEventListener('change', onNarrow);
+  else if (narrow.addListener) narrow.addListener(onNarrow);
   if (bbBtn) bbBtn.addEventListener('click', function () {
     if (!curColor) return;
     if (bbBtn.classList.contains('is-notify')) {

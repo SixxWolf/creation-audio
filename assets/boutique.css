@@ -798,6 +798,10 @@ body.cart-lock { overflow:hidden; }
 @media (max-width:900px) {
   .pdp { grid-template-columns:1fr; gap:26px; }
   .pdp-media { position:static; width:100%; max-width:560px; margin:0 auto; }
+  /* Couleur puis Format, juste sous les miniatures (déplacés là par placePick) */
+  .pdp-media .pdp-pick { display:flex; flex-direction:column; }
+  .pdp-media .pdp-pick .sw-sec { order:-1; margin-top:20px; }
+  .pdp-media .pdp-pick .pick-fmt { margin-top:20px; }
 }
 @media (min-width:901px) { .buybar { display:none !important; } }
 @media (max-width:720px) {
