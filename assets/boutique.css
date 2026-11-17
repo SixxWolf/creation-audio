@@ -964,8 +964,9 @@ body.cart-lock { overflow:hidden; }
 .pack-tile-body { display:flex; flex-direction:column; gap:5px; padding:16px 18px 18px; }
 .pack-tile-name { font-family:var(--display); font-weight:700; font-size:1.3rem; line-height:1.15; letter-spacing:-.02em; }
 .pack-tile-sub { font-size:.88rem; color:var(--muted); }
-.pack-tile-price { margin-top:4px; font-size:.88rem; font-weight:700; color:var(--ember-ink); font-variant-numeric:tabular-nums; }
-.pack-tile-price b { margin-right:6px; font-size:1.3rem; color:var(--ink); }
+/* prix du pack en gros ; prix à la recharge à l'écart et discret (choix de Théo 2026-11-16) */
+.pack-tile-price { display:flex; flex-wrap:wrap; align-items:baseline; column-gap:clamp(14px, 4vw, 22px); row-gap:2px; margin-top:4px; font-size:.86rem; font-weight:500; color:var(--muted); font-variant-numeric:tabular-nums; }
+.pack-tile-price b { font-size:1.3rem; font-weight:700; color:var(--ink); }
 .pack-tile-save { align-self:flex-start; padding:3px 9px; font-size:.82rem; font-weight:700; color:var(--good-ink); background:var(--good-wash); border-radius:100px; }
 .pack-tile-go { display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-weight:700; font-size:.95rem; }
 .pack-tile-go svg { width:16px; height:16px; }
