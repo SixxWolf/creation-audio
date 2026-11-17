@@ -904,14 +904,14 @@
       : '<p class="empty">' + _t('Aucun pack pour le moment.') + ' <a href="' + esc(FIL_PRE || '#/') + '">' + _t('Voir les filaments') + '</a></p>';
   }
   function packTile(pk) {
-    var out = !packAnyStock(pk), comp = defComp(pk), sv = packSaving(pk, comp);
+    var out = !packAnyStock(pk), comp = defComp(pk);
+    // pas d'économie sur la carte (choix de Théo 2026-11-16 : trop de prix au même endroit) → seulement sur la fiche
     return '<a class="pack-tile' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
       '<span class="pack-tile-art">' + packMedia(pk, comp) + '</span>' +
       '<span class="pack-tile-body">' +
         '<span class="pack-tile-name">' + esc(packName(pk)) + '</span>' +
         '<span class="pack-tile-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
         '<span class="pack-tile-price"><b>' + money(+pk.price) + '</b> ' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span>' +
-        (sv ? '<span class="pack-tile-save">' + _t('Économise {s}', { s: money(sv.save) }) + '</span>' : '') +
         '<span class="pack-tile-go">' + (out ? _t('Épuisé') : _t('Voir le pack') + ' ' + IC.arrow) + '</span>' +
       '</span>' +
     '</a>';
