@@ -932,7 +932,7 @@ body.cart-lock { overflow:hidden; }
 /* pastilles de couleur d'un pack (une par recharge/bobine) — taille par contexte via --d */
 .pack-dots { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:var(--g, 6px); }
 .pack-dots i { flex:none; width:var(--d, 24px); height:var(--d, 24px); border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.16); }
-.pack-hero .pack-dots { --d:clamp(46px, 9vw, 76px); --g:clamp(10px, 2vw, 16px); padding:clamp(28px, 6vw, 64px) 0; }
+.pack-hero .pack-dots { --d:clamp(46px, 9vw, 76px); --g:clamp(10px, 2vw, 16px); }
 .pack-mini-art > .pack-dots { --d:clamp(20px, 4vw, 30px); aspect-ratio:16 / 9; border-radius:12px; background:var(--thumb-bg); }
 .citem-pack .pack-dots { --d:11px; --g:2px; }
 .pack-minis { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
@@ -956,8 +956,9 @@ body.cart-lock { overflow:hidden; }
 .pack-card { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.05fr); gap:clamp(20px, 3.4vw, 44px); align-items:start;
   padding:clamp(18px, 2.6vw, 32px); background:var(--paper); border:1px solid var(--line); border-radius:22px;
   scroll-margin-top:calc(var(--top-h) + 20px); }
-.pack-hero { display:grid; place-items:center; padding:clamp(16px, 3vw, 36px); background:var(--thumb-bg); border-radius:16px; }
-.pack-hero img { width:100%; max-height:420px; object-fit:contain; }
+/* carré fixe : la hauteur ne change jamais (photo qui charge, photo ↔ pastilles) → rien ne bouge sous le doigt */
+.pack-hero { --pad:clamp(16px, 3vw, 36px); position:relative; display:grid; place-items:center; aspect-ratio:1 / 1; padding:var(--pad); background:var(--thumb-bg); border-radius:16px; }
+.pack-hero img { position:absolute; inset:var(--pad); width:calc(100% - 2 * var(--pad)); height:calc(100% - 2 * var(--pad)); object-fit:contain; }
 .pack-body { display:flex; flex-direction:column; gap:12px; min-width:0; }
 .pack-name { margin:0; font-size:clamp(1.6rem, 2.6vw, 2.1rem); line-height:1.08; letter-spacing:-.025em; }
 .pack-sub { margin:-4px 0 0; color:var(--muted); font-weight:600; }

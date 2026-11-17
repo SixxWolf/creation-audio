@@ -869,7 +869,26 @@
     el.innerHTML = list.length ? list.map(packCardHtml).join('')
       : '<p class="empty">' + _t('Aucun pack pour le moment.') + ' <a href="' + esc(FIL_PRE || '#/') + '">' + _t('Voir les filaments') + '</a></p>';
   }
+  // met à jour une seule fiche sur place (clic sur une composition, +/−, ajout) : on garde la même balise photo
+  // et on change seulement son image → la page ne bouge pas (avant : toute la liste refaite, photo à 0 px le temps du chargement)
+  function updatePackCard(pk) {
+    var old = document.getElementById('pk-' + pk.id);
+    if (!old) { renderPacksPage(); return; }
+    var tmp = document.createElement('div'); tmp.innerHTML = packCardHtml(pk);
+    var nu = tmp.firstElementChild, oh = old.querySelector('.pack-hero'), nh = nu.querySelector('.pack-hero');
+    var oi = oh && oh.querySelector('img'), ni = nh && nh.querySelector('img');
+    if (oi && ni) { if (oi.getAttribute('src') !== ni.getAttribute('src')) oi.src = ni.getAttribute('src'); }
+    else if (oh && nh) oh.innerHTML = nh.innerHTML;
+    old.querySelector('.pack-body').replaceWith(nu.querySelector('.pack-body'));
+  }
+  // précharge les photos des compositions pour que le changement soit instantané
+  var packPre = {};
+  function preloadPack(pk) {
+    if (packPre[pk.id]) return; packPre[pk.id] = 1;
+    presetsOf(pk).forEach(function (pr) { if (pr.img) { var im = new Image(); im.src = publicUrl(pr.img); } });
+  }
   function packCardHtml(pk) {
+    preloadPack(pk);
     var s = selOf(pk), pres = presetsOf(pk), comp = selComp(pk), units = packUnits(pk);
     var tiles = pres.map(function (pr) {
       var c = preComp(pr), ok = packRoom(pk, c, null, true) > 0, on = s.sel === pr.id;
@@ -933,7 +952,7 @@
     if (packRoom(pk, comp, null) < 1) { toast(_t('Plus assez de stock pour ce pack.')); renderPacksPage(); return; }
     var k = packKey(pk, comp), cur = cart[k] ? cart[k].qty : 0;
     cart[k] = { id: pk.id, type: 'pack', key: k, comp: comp.map(function (c) { return { id: c.id, n: c.n }; }), qty: cur + 1 };
-    saveCart(); renderCart(); renderPacksPage(); pulseCart();
+    saveCart(); renderCart(); updatePackCard(pk); pulseCart();
     toast(packName(pk) + _t(' ajouté au panier.'));
   }
   document.addEventListener('click', function (e) {
@@ -941,11 +960,11 @@
     if (!t || t.disabled || !screenPacks || !screenPacks.contains(t)) return;
     var pk = packById[t.getAttribute('data-pk')]; if (!pk) return;
     var s = selOf(pk);
-    if (t.classList.contains('pack-pre')) { s.sel = t.getAttribute('data-pre'); renderPacksPage(); return; }
+    if (t.classList.contains('pack-pre')) { s.sel = t.getAttribute('data-pre'); updatePackCard(pk); return; }
     if (t.classList.contains('pack-add')) { addPack(pk, selComp(pk)); return; }
     var pid = t.getAttribute('data-p'), d = +t.getAttribute('data-d');
     s.custom[pid] = Math.max(0, (s.custom[pid] | 0) + d);
-    renderPacksPage();
+    updatePackCard(pk);
     var again = $('.pack-step button[data-p="' + pid + '"][data-d="' + d + '"]', screenPacks);
     if (again && !again.disabled) again.focus();
   });
