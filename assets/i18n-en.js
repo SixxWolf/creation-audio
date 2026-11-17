@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 44;
+window.CA_EN_V = 45;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -1195,6 +1195,17 @@ window.CA_EN = (function (pairs) {
   [`Composition`, `Mix`],
   [`Le pack compte pour le rabais quantité de tes autres filaments `, `The pack counts toward the volume discount on your other filaments from `],
   [`Plus assez de stock pour ce pack.`, `Not enough stock left for this pack.`],
+  [`Économise {s}`, `Save {s}`],
+  [`Économise {s} par rapport à {n} recharges achetées à l'unité ({t})`, `Save {s} compared with {n} refills bought individually ({t})`],
+  [`Économise {s} par rapport à {n} bobines achetées à l'unité ({t})`, `Save {s} compared with {n} spools bought individually ({t})`],
+  [`Voir le pack`, `View pack`],
+  [`Agrandir la photo`, `Enlarge photo`],
+  [`Ce pack contient`, `This pack contains`],
+  [`Bon à savoir`, `Good to know`],
+  [`Une recharge, c'est le filament sans la bobine en plastique : elle s'installe sur une bobine réutilisable.`, `A refill is the filament without the plastic spool: it mounts on a reusable spool.`],
+  [`Voir les bobines vides`, `See empty spools`],
+  [`Puce RFID : l'AMS reconnaît la couleur et le matériau tout seul.`, `RFID chip: the AMS recognizes the color and material on its own.`],
+  [`Compatible AMS et AMS lite.`, `Works with the AMS and AMS lite.`],
   [` le pack`, ` per pack`],
   [`*** PACKS ***\n`, `*** PACKS ***\n`],
   [`Pack`, `Pack`]

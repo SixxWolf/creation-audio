@@ -10,7 +10,7 @@
    boutique/filaments   #/ · #/m/<marque> · #/m/<marque>/<matériau>[/<couleur>]
    boutique/accessoires #/ · #/c/<catégorie> · #/a/<accessoire>
    boutique/promotions  #/ (filaments + accessoires + spacers en promo)
-   boutique/packs       #/ · #/p/<slug> (packs à prix fixe, table packs — 2026-11-16)
+   boutique/packs       #/ (cartes) · #/p/<slug> (fiche du pack) — packs à prix fixe, table packs (2026-11-16)
    Un lien d'un autre rayon pointe vers sa page (« accessoires#/a/x ») ;
    un ancien lien (#/accessoires…) arrivé sur la mauvaise page y est renvoyé.
    ========================================================= */
@@ -215,7 +215,7 @@
       crumbsEl = $('#crumbs'), configEl = $('#config');
   var screenAccs = $('#screen-accs'), screenAcc = $('#screen-acc'),
       accGroupsEl = $('#acc-groups'), accChipsEl = $('#acc-chips'), accCrumbsEl = $('#acc-crumbs'), accConfigEl = $('#acc-config');
-  var screenPromo = $('#screen-promo'), screenPacks = $('#screen-packs');
+  var screenPromo = $('#screen-promo'), screenPacks = $('#screen-packs'), screenPack = $('#screen-pack');
   // écran de la page en attendant les données (accessoires / promotions / packs : pas de flash du catalogue filaments)
   if (PAGE !== 'filaments') showScreen(PAGE === 'accessoires' ? 'accs' : PAGE === 'packs' ? 'packs' : 'promo');
   // un seul écran visible à la fois ; l'onglet du menu suit (Filaments / Accessoires)
@@ -226,12 +226,13 @@
     screenAcc.hidden = name !== 'acc';
     if (screenPromo) screenPromo.hidden = name !== 'promo';
     if (screenPacks) screenPacks.hidden = name !== 'packs';
+    if (screenPack) screenPack.hidden = name !== 'pack';
     var acc = name === 'accs' || name === 'acc';
     // onglets des rayons : visibles sur les listes, pas sur une fiche
     var tabs = $('#shop-tabs');
     if (tabs) {
-      tabs.hidden = name === 'product' || name === 'acc';
-      var cur = name === 'promo' ? 'promo' : name === 'packs' ? 'packs' : acc ? 'accessoires' : 'filaments';
+      tabs.hidden = name === 'product' || name === 'acc' || name === 'pack';
+      var cur = name === 'promo' ? 'promo' : (name === 'packs' || name === 'pack') ? 'packs' : acc ? 'accessoires' : 'filaments';
       $$('a', tabs).forEach(function (a) {
         var on = a.getAttribute('data-tab') === cur;
         a.classList.toggle('is-active', on);
@@ -240,7 +241,7 @@
     }
     $$('.nav-dd-m a, .drawer-sub a').forEach(function (a) {
       var h = a.getAttribute('href') || '';
-      var on = new RegExp('(^|/)' + (name === 'promo' ? 'promotions' : name === 'packs' ? 'packs' : acc ? 'accessoires' : 'filaments') + '$').test(h);
+      var on = new RegExp('(^|/)' + (name === 'promo' ? 'promotions' : (name === 'packs' || name === 'pack') ? 'packs' : acc ? 'accessoires' : 'filaments') + '$').test(h);
       a.classList.toggle('is-active', on);
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -793,11 +794,29 @@
     return dotsHtml(list);
   }
   // photo : celle de la composition choisie (preset.img), sinon celle du pack, sinon les pastilles
-  function packMedia(pk, comp) {
+  function packPhoto(pk, comp) {
     var u = '', k = comp ? compKey(comp) : '';
     if (k) presetsOf(pk).some(function (pr) { if (pr.img && compKey(preComp(pr)) === k) { u = publicUrl(pr.img); return true; } });
     if (!u && pk.image_path) u = publicUrl(pk.image_path);
+    return u;
+  }
+  function packMedia(pk, comp) {
+    var u = packPhoto(pk, comp);
     return u ? '<img src="' + esc(u) + '" alt="" loading="lazy">' : packArt(pk, comp);
+  }
+  // économie par rapport aux mêmes recharges achetées à l'unité (prix du palier atteint par la quantité du pack)
+  function packSaving(pk, comp) {
+    comp = comp || defComp(pk); if (!comp) return null;
+    var units = packUnits(pk), sum = 0;
+    comp.forEach(function (c) { var p = byId[c.id]; if (p) sum += tierPrice(baseOf(p, pk.kind), tiersOf(p, pk.kind), units) * c.n; });
+    sum = Math.round(sum * 100) / 100;
+    var save = Math.round((sum - (+pk.price || 0)) * 100) / 100;
+    return save > 0 ? { sum: sum, save: save } : null;
+  }
+  function saveText(pk, sv) {
+    var v = { s: '<b>' + money(sv.save) + '</b>', n: packUnits(pk), t: money(sv.sum) };
+    return pk.kind === 'spool' ? _t('Économise {s} par rapport à {n} bobines achetées à l\'unité ({t})', v)
+      : _t('Économise {s} par rapport à {n} recharges achetées à l\'unité ({t})', v);
   }
 
   /* ---- mise en avant en haut de Filaments ---- */
@@ -831,17 +850,32 @@
     '</a>';
   }
 
-  /* ---- page boutique/packs ---- */
+  /* ---- page boutique/packs : liste de cartes (#/) + fiche d'un pack (#/p/<slug>) ---- */
+  var curPack = null, pkImg = 0, packsScrollY = null;
+  function packBySlug(seg) { return seg ? packs.filter(function (x) { return x.slug === seg || x.id === seg; })[0] || null : null; }
   function showPacks(slugSeg) {
+    curMat = null; curColor = null; curAcc = null; updateBuybar();
+    var pk = packBySlug(slugSeg);
+    if (pk && packCols(pk).length) { showPack(pk); return; }
+    if (slugSeg) { replaceRoute('#/'); return; }
+    curPack = null;
     renderPacksPage();
     showScreen('packs');
-    curMat = null; curColor = null; curAcc = null; updateBuybar();
     document.title = BASE_TITLE;
-    var pk = slugSeg && packs.filter(function (x) { return x.slug === slugSeg || x.id === slugSeg; })[0];
-    var el = pk && document.getElementById('pk-' + pk.id);
-    if (el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.pageYOffset - topOffset() - 12));
+    if (lastScreen === 'pack' && packsScrollY != null) window.scrollTo(0, packsScrollY);
     else if (lastScreen !== 'packs') window.scrollTo(0, 0);
     lastScreen = 'packs';
+  }
+  function showPack(pk) {
+    if (lastScreen === 'packs') packsScrollY = window.pageYOffset;
+    var same = curPack === pk && lastScreen === 'pack';
+    if (!same) pkImg = 0;
+    curPack = pk;
+    renderPack();
+    showScreen('pack');
+    document.title = packName(pk) + _t(' · Création Audio');
+    if (!same) window.scrollTo(0, 0);
+    lastScreen = 'pack';
   }
   function selOf(pk) {
     var s = packSel[pk.id];
@@ -866,20 +900,77 @@
     var el = $('#pack-groups'); if (!el) return;
     var list = packs.filter(function (pk) { return packCols(pk).length > 0; });
     el.removeAttribute('aria-busy');
-    el.innerHTML = list.length ? list.map(packCardHtml).join('')
+    el.innerHTML = list.length ? list.map(packTile).join('')
       : '<p class="empty">' + _t('Aucun pack pour le moment.') + ' <a href="' + esc(FIL_PRE || '#/') + '">' + _t('Voir les filaments') + '</a></p>';
   }
-  // met à jour une seule fiche sur place (clic sur une composition, +/−, ajout) : on garde la même balise photo
-  // et on change seulement son image → la page ne bouge pas (avant : toute la liste refaite, photo à 0 px le temps du chargement)
+  function packTile(pk) {
+    var out = !packAnyStock(pk), comp = defComp(pk), sv = packSaving(pk, comp);
+    return '<a class="pack-tile' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
+      '<span class="pack-tile-art">' + packMedia(pk, comp) + '</span>' +
+      '<span class="pack-tile-body">' +
+        '<span class="pack-tile-name">' + esc(packName(pk)) + '</span>' +
+        '<span class="pack-tile-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
+        '<span class="pack-tile-price"><b>' + money(+pk.price) + '</b> ' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span>' +
+        (sv ? '<span class="pack-tile-save">' + _t('Économise {s}', { s: money(sv.save) }) + '</span>' : '') +
+        '<span class="pack-tile-go">' + (out ? _t('Épuisé') : _t('Voir le pack') + ' ' + IC.arrow) + '</span>' +
+      '</span>' +
+    '</a>';
+  }
+  function renderPack() {
+    var el = $('#pack-config'), cr = $('#pk-crumbs'), pk = curPack; if (!el || !pk) return;
+    if (cr) cr.innerHTML = '<a href="#/">' + _t('Packs') + '</a>' + IC.chev + '<span aria-current="page">' + esc(packName(pk)) + '</span>';
+    el.innerHTML = packCardHtml(pk);
+  }
+  // composition montrée (photo, galerie, « Ce pack contient ») : la sélection, sinon ce qui est déjà choisi en Personnaliser
+  function viewComp(pk) {
+    var c = selComp(pk); if (c) return c;
+    var s = selOf(pk);
+    if (s.sel === 'custom') {
+      var part = Object.keys(s.custom).filter(function (id) { return s.custom[id] > 0 && byId[id]; }).map(function (id) { return { id: id, n: s.custom[id] | 0 }; });
+      return part.length ? part : null;
+    }
+    return null;
+  }
+  // galerie : photo du pack (ou ses pastilles), puis la photo de chaque couleur qu'il contient
+  function colorImg(p, kind) {
+    var a = p.attrs || {}, path = a[kind === 'spool' ? 'img_spool' : 'img_refill'] || p.image_path;
+    return path ? publicUrl(path) : '';
+  }
+  function packImgs(pk) {
+    var comp = selComp(pk), view = viewComp(pk), u = packPhoto(pk, comp);
+    var list = [{ url: u, art: u ? '' : packArt(pk, comp), alt: packName(pk) }], seen = {};
+    var cols = view ? view.map(function (c) { return byId[c.id]; }) : packCols(pk);
+    cols.forEach(function (p) {
+      if (!p || seen[p.id]) return; seen[p.id] = 1;
+      var cu = colorImg(p, pk.kind); if (cu) list.push({ url: cu, alt: p.name });
+    });
+    return list;
+  }
+  function pkStageHtml(it) {
+    return it.url
+      ? '<button type="button" class="pdp-stage pk-stage" aria-label="' + _t('Agrandir la photo') + '"><img src="' + esc(it.url) + '" alt="' + esc(it.alt) + '">' +
+          '<span class="pdp-zoom" aria-hidden="true">' + IC.zoom + '</span></button>'
+      : '<div class="pdp-stage pk-stage no-zoom">' + it.art + '</div>';
+  }
+  function pkThumbsHtml(imgs) {
+    if (imgs.length < 2) return '';
+    return imgs.map(function (t, i) {
+      return '<button type="button" class="pdp-thumb pk-thumb' + (i === pkImg ? ' is-active' : '') + '" data-i="' + i + '"' +
+        ' aria-label="' + esc(t.alt) + '"' + (i === pkImg ? ' aria-current="true"' : '') + '>' +
+        (t.url ? '<img src="' + esc(t.url) + '" alt="" loading="lazy">' : t.art) + '</button>';
+    }).join('');
+  }
+  // met à jour la fiche sur place (composition, +/−, ajout, photo) : même balise photo, seule son image change → la page ne bouge pas
   function updatePackCard(pk) {
     var old = document.getElementById('pk-' + pk.id);
-    if (!old) { renderPacksPage(); return; }
+    if (!old) { if (curPack === pk && screenPack && !screenPack.hidden) renderPack(); else renderPacksPage(); return; }
+    var imgs = packImgs(pk); if (pkImg >= imgs.length) pkImg = 0;
+    var it = imgs[pkImg], st = old.querySelector('.pk-stage'), oi = st && st.querySelector('img');
+    if (oi && it.url) { if (oi.getAttribute('src') !== it.url) oi.src = it.url; oi.alt = it.alt; }
+    else if (st) { var tmp0 = document.createElement('div'); tmp0.innerHTML = pkStageHtml(it); st.replaceWith(tmp0.firstElementChild); }
+    var th = old.querySelector('.pk-thumbs'); if (th) th.innerHTML = pkThumbsHtml(imgs);
     var tmp = document.createElement('div'); tmp.innerHTML = packCardHtml(pk);
-    var nu = tmp.firstElementChild, oh = old.querySelector('.pack-hero'), nh = nu.querySelector('.pack-hero');
-    var oi = oh && oh.querySelector('img'), ni = nh && nh.querySelector('img');
-    if (oi && ni) { if (oi.getAttribute('src') !== ni.getAttribute('src')) oi.src = ni.getAttribute('src'); }
-    else if (oh && nh) oh.innerHTML = nh.innerHTML;
-    old.querySelector('.pack-body').replaceWith(nu.querySelector('.pack-body'));
+    old.querySelector('.pack-body').replaceWith(tmp.firstElementChild.querySelector('.pack-body'));
   }
   // précharge les photos des compositions pour que le changement soit instantané
   var packPre = {};
@@ -931,41 +1022,82 @@
     var room = comp ? packRoom(pk, comp, null) : 0, bare = comp ? packRoom(pk, comp, null, true) : 0;
     var btn = !comp ? (s.sel === 'custom' ? _t('Choisis ') + units + (pk.kind === 'spool' ? _t(' bobines') : _t(' recharges')) : _t('Épuisé'))
       : bare < 1 ? _t('Épuisé') : room < 1 ? _t('Maximum au panier') : _t('Ajouter au panier');
-    var note = packNote(pk), brand = brandOf(pk);
-    return '<article class="pack-card" id="pk-' + esc(pk.id) + '">' +
-      '<div class="pack-hero">' + packMedia(pk, comp || defComp(pk)) + '</div>' +
-      '<div class="pack-body">' +
-        '<h2 class="pack-name">' + esc(packName(pk)) + '</h2>' +
-        '<p class="pack-sub">' + unitsText(pk, units) + ' · ' + esc(lineOf(pk)) + '</p>' +
-        (note ? '<p class="pack-note">' + esc(note) + '</p>' : '') +
+    var note = packNote(pk), brand = brandOf(pk), view = viewComp(pk), sv = packSaving(pk, comp);
+    var imgs = packImgs(pk); if (pkImg >= imgs.length) pkImg = 0;
+    // « Ce pack contient » : couleur, code Bambu Lab, quantité
+    var used = view ? view.reduce(function (a, c) { return a + c.n; }, 0) : 0;
+    var contains = view ? '<div class="pkc">' +
+        '<div class="pkc-h"><h2>' + _t('Ce pack contient') + '</h2>' + (comp ? '' : '<b>' + used + ' / ' + units + '</b>') + '</div>' +
+        view.map(function (c) {
+          var p = byId[c.id]; if (!p) return '';
+          return '<div class="pkc-row"><span class="pack-csw" style="background:' + esc(swatchBg(p)) + '"></span>' +
+            '<span class="pkc-name">' + esc(p.name) + '</span>' +
+            (p.code ? '<span class="pkc-code">' + esc(p.code) + '</span>' : '') +
+            '<span class="pkc-n">× ' + c.n + '</span></div>';
+        }).join('') +
+      '</div>' : '';
+    var refill = pk.kind !== 'spool', bambu = /bambu/i.test(brand);
+    var know = (refill || bambu) ? '<div class="pdp-feats pk-know"><h2>' + _t('Bon à savoir') + '</h2><ul>' +
+        (refill ? '<li>' + _t('Une recharge, c\'est le filament sans la bobine en plastique : elle s\'installe sur une bobine réutilisable.') +
+          ' <a href="' + esc(accRouteFor()) + '">' + _t('Voir les bobines vides') + '</a></li>' : '') +
+        (bambu ? '<li>' + _t('Puce RFID : l\'AMS reconnaît la couleur et le matériau tout seul.') + '</li>' +
+          '<li>' + _t('Compatible AMS et AMS lite.') + '</li>' : '') +
+      '</ul></div>' : '';
+    return '<article class="pdp pack-pdp" id="pk-' + esc(pk.id) + '">' +
+      '<div class="pdp-media">' + pkStageHtml(imgs[pkImg]) + '<div class="pdp-thumbs pk-thumbs">' + pkThumbsHtml(imgs) + '</div></div>' +
+      '<div class="pdp-panel pack-body">' +
+        (brand ? '<p class="pdp-eyebrow pdp-brand">' + brandBadge(brand, 'pdp-blogo') + '<span>' + esc(lineOf(pk)) + '</span></p>' : '') +
+        '<h1 class="pdp-name">' + esc(packName(pk)) + '</h1>' +
+        (pk.code ? _t('<p class="pdp-ref">Réf. ') + esc(pk.code) + '</p>' : '') +
         '<div class="pack-price"><b>' + money(+pk.price) + '</b><span>' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></div>' +
+        (sv ? '<p class="pack-save">' + saveText(pk, sv) + '</p>' : '') +
+        _t('<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>') +
+        (note ? '<p class="pack-note">' + esc(note) + '</p>' : '') +
         // une seule composition, sans Personnaliser : la photo suffit, pas de tuile à choisir
         (tiles.length > 1 ? '<div class="pack-pres" role="group" aria-label="' + _t('Composition') + '">' + tiles.join('') + '</div>' : '') +
         custom +
+        contains +
         '<button type="button" class="pack-add btn-add" data-pk="' + esc(pk.id) + '"' + (comp && room > 0 ? '' : ' disabled') + '>' + IC.cart + '<span>' + btn + '</span></button>' +
         (brand ? '<p class="pack-tier">' + _t('Le pack compte pour le rabais quantité de tes autres filaments ') + esc(brand) + '.</p>' : '') +
+        '<ul class="pdp-assure">' +
+          '<li>' + IC.pin + _t('Ramassage local à Québec, sur rendez-vous</li>') +
+          '<li>' + IC.chat + _t('Commande par Messenger ou courriel — on confirme la dispo</li>') +
+          '<li>' + IC.card + _t('Aucun paiement en ligne</li>') +
+        '</ul>' +
+        know +
       '</div>' +
     '</article>';
   }
   function addPack(pk, comp) {
     if (!comp || !compValid(pk, comp)) return;
-    if (packRoom(pk, comp, null) < 1) { toast(_t('Plus assez de stock pour ce pack.')); renderPacksPage(); return; }
+    if (packRoom(pk, comp, null) < 1) { toast(_t('Plus assez de stock pour ce pack.')); updatePackCard(pk); return; }
     var k = packKey(pk, comp), cur = cart[k] ? cart[k].qty : 0;
     cart[k] = { id: pk.id, type: 'pack', key: k, comp: comp.map(function (c) { return { id: c.id, n: c.n }; }), qty: cur + 1 };
     saveCart(); renderCart(); updatePackCard(pk); pulseCart();
     toast(packName(pk) + _t(' ajouté au panier.'));
   }
   document.addEventListener('click', function (e) {
-    var t = e.target && e.target.closest ? e.target.closest('.pack-pre, .pack-step button, .pack-add') : null;
-    if (!t || t.disabled || !screenPacks || !screenPacks.contains(t)) return;
-    var pk = packById[t.getAttribute('data-pk')]; if (!pk) return;
-    var s = selOf(pk);
-    if (t.classList.contains('pack-pre')) { s.sel = t.getAttribute('data-pre'); updatePackCard(pk); return; }
+    var t = e.target && e.target.closest ? e.target.closest('.pack-pre, .pack-step button, .pack-add, .pk-thumb, .pk-stage') : null;
+    if (!t || t.disabled || !screenPack || !screenPack.contains(t) || !curPack) return;
+    var pk = curPack, s = selOf(pk);
+    if (t.classList.contains('pk-stage')) {
+      if (t.tagName !== 'BUTTON') return;
+      var imgs = packImgs(pk), urls = [], at = 0;
+      imgs.forEach(function (x, i) { if (x.url) { if (i === pkImg) at = urls.length; urls.push(x.url); } });
+      openLightbox(urls, at); return;
+    }
+    if (t.classList.contains('pk-thumb')) {
+      pkImg = +t.getAttribute('data-i'); updatePackCard(pk);
+      var tb = $('.pk-thumb[data-i="' + pkImg + '"]', screenPack); if (tb) tb.focus();
+      return;
+    }
+    if (t.classList.contains('pack-pre')) { s.sel = t.getAttribute('data-pre'); pkImg = 0; updatePackCard(pk); return; }
     if (t.classList.contains('pack-add')) { addPack(pk, selComp(pk)); return; }
     var pid = t.getAttribute('data-p'), d = +t.getAttribute('data-d');
     s.custom[pid] = Math.max(0, (s.custom[pid] | 0) + d);
+    pkImg = 0;
     updatePackCard(pk);
-    var again = $('.pack-step button[data-p="' + pid + '"][data-d="' + d + '"]', screenPacks);
+    var again = $('.pack-step button[data-p="' + pid + '"][data-d="' + d + '"]', screenPack);
     if (again && !again.disabled) again.focus();
   });
 
@@ -2067,6 +2199,7 @@
     cartTotal.textContent = money(total());
     if (onCartChange && (lastScreen === 'product' || lastScreen === 'acc')) onCartChange();
     if (dataReady && screenPacks && !screenPacks.hidden && !focusedIn(screenPacks)) renderPacksPage();
+    if (dataReady && curPack && screenPack && !screenPack.hidden && !focusedIn(screenPack)) updatePackCard(curPack);
     orderBtn.classList.toggle('is-disabled', n === 0);
     if (emailBtn) emailBtn.classList.toggle('is-disabled', n === 0);
     refreshAcctUi();
@@ -2314,6 +2447,7 @@
       if (!screenCatalog.hidden && !focusedIn(catGroups)) renderCatalog();
       if (screenPromo && !screenPromo.hidden) renderPromoPage();
       if (screenPacks && !screenPacks.hidden && !focusedIn(screenPacks)) renderPacksPage();
+      if (curPack && screenPack && !screenPack.hidden && !focusedIn(screenPack)) updatePackCard(curPack);
       // fiche : rafraîchit stock / ruptures, sans interrompre une saisie
       if (curColor && !screenProduct.hidden && !focusedIn(configEl)) {
         var st = stockOf(curColor, curType);
