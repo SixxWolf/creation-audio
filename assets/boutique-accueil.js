@@ -140,12 +140,37 @@
     sec.hidden = false;
   }
 
-  /* ---------- pack mis en avant (table packs, 2026-11-16) : bandeau sous les tuiles ---------- */
+  /* ---------- packs (table packs) : bandeau sous les tuiles ----------
+     2+ packs en ligne (Théo, 2026-11-17) : une tuile « N packs de filament » vers la page des packs, photos de chaque pack en mosaïque.
+     1 seul pack : son nom, son prix et ses pastilles, vers sa fiche. */
+  function packImg(pk) {
+    var pr = (pk.presets || []).filter(function (x) { return x && x.img; })[0];
+    return pk.image_path || (pr && pr.img) || '';
+  }
   function renderPack(pks, rows) {
     var el = $('#bq-pack'), en = CA.lang === 'en';
     var byId = {}; rows.forEach(function (p) { byId[p.id] = p; });
-    var pk = (pks || []).filter(function (x) { return x.featured && (x.colors || []).some(function (id) { return byId[id]; }); })[0];
-    if (!el || !pk) return;
+    var live = (pks || []).filter(function (x) { return (x.colors || []).some(function (id) { return byId[id]; }); });
+    if (!el || !live.length) return;
+    if (live.length > 1) {
+      var shown = live.slice(0, 4);
+      $('#bq-pack-art').innerHTML = shown.map(function (x) {
+        var u = publicUrl(packImg(x));
+        return u ? '<img class="bq-pack-ph" src="' + esc(u) + '" alt="">' : '';
+      }).join('');
+      $('#bq-pack-art').classList.add('is-photos');
+      $('#bq-pack-name').textContent = tn(live.length, '{n} pack de filament', '{n} packs de filament');
+      var min = Math.min.apply(null, live.map(function (x) { return +x.price; }));
+      var units = live.map(function (x) { return (x.units | 0) || 4; });
+      var same = units.every(function (u) { return u === units[0]; }) && live.every(function (x) { return x.kind === live[0].kind; });
+      var sp = live[0].kind === 'spool';
+      $('#bq-pack-meta').innerHTML = (same ? tn(units[0], sp ? '{n} bobine' : '{n} recharge', sp ? '{n} bobines' : '{n} recharges') + ' · ' : '') +
+        _t('dès') + ' <b>' + money(min) + '</b>';
+      el.href = 'boutique/packs';
+      el.hidden = false;
+      return;
+    }
+    var pk = live[0];
     var units = (pk.units | 0) || 4, unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100, spool = pk.kind === 'spool';
     var hexes = (pk.colors || []).map(function (id) { var p = byId[id]; var c = p && p.attrs && Array.isArray(p.attrs.colors) && p.attrs.colors[0]; return c || (p && p.hex) || null; })
       .filter(function (h) { return /^#[0-9a-fA-F]{6}$/.test(h || ''); });

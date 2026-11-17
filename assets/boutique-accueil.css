@@ -65,6 +65,10 @@
 .bq-pack-art { flex:none; display:flex; padding-left:14px; }
 .bq-pack-art i { width:clamp(46px, 5vw, 64px); aspect-ratio:1; margin-left:-14px; border-radius:50%;
   box-shadow:0 0 0 2px var(--paper), inset 0 0 0 1px rgba(0,0,0,.18); }
+/* 2+ packs : photos de chaque pack en mosaïque */
+.bq-pack-art.is-photos { padding-left:0; gap:8px; }
+.bq-pack-ph { width:clamp(64px, 7vw, 92px); aspect-ratio:1; object-fit:contain; border-radius:12px;
+  background:var(--thumb-bg, #f3f3f1); border:1px solid var(--line); }
 .bq-pack-body { display:flex; flex-direction:column; gap:3px; min-width:0; }
 .bq-pack-kicker { font-size:.74rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ember-ink); }
 .bq-pack-name { font-family:var(--display); font-weight:700; font-size:1.42rem; line-height:1.1; letter-spacing:-.02em; }
