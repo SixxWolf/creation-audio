@@ -781,29 +781,18 @@
     if (bad) saveCart();
   }
 
-  /* ---- bobines dessinées aux vraies couleurs (photo facultative dans l'admin) ---- */
-  function coilSvg(cx, cy, r, hex, kind) {
-    var w = kind === 'spool' ? r * 0.84 : r, o = '';
-    if (kind === 'spool') o += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#2b2f36"/>';
-    o += '<circle cx="' + cx + '" cy="' + cy + '" r="' + w + '" fill="' + esc(hex) + '" stroke="rgba(0,0,0,.2)" stroke-width="1.5"/>' +
-      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (w * 0.8) + '" fill="none" stroke="rgba(0,0,0,.08)" stroke-width="1"/>' +
-      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (w * 0.6) + '" fill="none" stroke="rgba(0,0,0,.08)" stroke-width="1"/>' +
-      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 0.36) + '" fill="' + (kind === 'spool' ? '#2b2f36' : '#f3f3f0') + '" stroke="rgba(0,0,0,.18)" stroke-width="1.2"/>' +
-      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 0.13) + '" fill="#d9d9d4"/>';
-    return o;
+  /* ---- pastilles de couleur (une par recharge/bobine) quand il n'y a pas de photo (règle de Théo 2026-11-16) ---- */
+  function dotsHtml(list) {
+    return '<span class="pack-dots" aria-hidden="true">' + list.map(function (p) {
+      return '<i style="background:' + esc(p ? swatchBg(p) : '#cccccc') + '"></i>'; }).join('') + '</span>';
   }
   function packArt(pk, comp) {
-    var hexes = [];
-    if (comp) comp.forEach(function (c) { var p = byId[c.id]; for (var i = 0; i < c.n; i++) hexes.push(p ? colorsOf(p)[0] : '#cccccc'); });
-    else {
-      var cols = packCols(pk);
-      for (var i = 0; i < packUnits(pk); i++) hexes.push(cols.length ? colorsOf(cols[i % cols.length])[0] : '#cccccc');
-    }
-    var n = hexes.length, R = 40, step = n > 6 ? 44 : 56, W = (n - 1) * step + 2 * R + 8, H = 2 * R + 8;
-    return '<svg class="pack-art" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' +
-      hexes.map(function (h, i) { return coilSvg(R + 4 + i * step, R + 4, R, h, pk.kind); }).join('') + '</svg>';
+    var list = [];
+    if (comp) comp.forEach(function (c) { for (var i = 0; i < c.n; i++) list.push(byId[c.id]); });
+    else { var cols = packCols(pk); for (var i = 0; i < packUnits(pk); i++) list.push(cols.length ? cols[i % cols.length] : null); }
+    return dotsHtml(list);
   }
-  // photo : celle de la composition choisie (preset.img), sinon celle du pack, sinon les bobines dessinées
+  // photo : celle de la composition choisie (preset.img), sinon celle du pack, sinon les pastilles
   function packMedia(pk, comp) {
     var u = '', k = comp ? compKey(comp) : '';
     if (k) presetsOf(pk).some(function (pr) { if (pr.img && compKey(preComp(pr)) === k) { u = publicUrl(pr.img); return true; } });
@@ -894,8 +883,7 @@
     if (packCustom(pk)) {
       var on = s.sel === 'custom';
       tiles.push('<button type="button" class="pack-pre pack-pre-custom' + (on ? ' is-on' : '') + '" data-pk="' + esc(pk.id) + '" data-pre="custom" aria-pressed="' + on + '">' +
-        '<span class="pack-pre-art pack-pre-dots" aria-hidden="true">' + packCols(pk).slice(0, 8).map(function (p) {
-          return '<i style="background:' + esc(swatchBg(p)) + '"></i>'; }).join('') + '</span>' +
+        '<span class="pack-pre-art">' + dotsHtml(packCols(pk).slice(0, 8)) + '</span>' +
         '<span class="pack-pre-name">' + _t('Personnaliser') + '</span>' +
       '</button>');
     }
