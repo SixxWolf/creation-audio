@@ -1024,3 +1024,9 @@ body.cart-lock { overflow:hidden; }
   .pack-pres { grid-template-columns:repeat(2, minmax(0, 1fr)); }
 }
 .shop-tabs a[hidden] { display:none; }
+
+/* ---- Promos et nouveautés (2026-11-17) : pastilles de filtre (boutons), carte .mcard d'un pack, « Nouveau » sur les packs ---- */
+button.chip { font-family:inherit; cursor:pointer; }
+.pack-mcard .mcard-media .pack-dots { --d:clamp(26px, 4vw, 40px); --g:8px; }
+.pack-mc-unit { margin-left:6px; font-size:.8rem; font-weight:500; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.pack-tile-art, .pack-mini-art { position:relative; }

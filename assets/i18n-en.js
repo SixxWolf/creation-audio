@@ -1160,6 +1160,11 @@ window.CA_EN = (function (pairs) {
   [`Crédit`, `Credit`],
   // Rayons de la boutique (2026-11-14) : page Promotions, accueil de la boutique
   [`Création Audio — Promotions`, `Création Audio — Promotions`],
+  // Promos et nouveautés regroupées (2026-11-17)
+  [`Création Audio — Promos et nouveautés`, `Création Audio — Deals & new`],
+  [`Tout`, `All`],
+  [`En promo`, `On sale`],
+  [`Aucune promo ni nouveauté en ce moment.`, `No deals or new arrivals right now.`],
   [`Aucune promotion en stock pour le moment. `, `No sale items in stock right now. `],
   [`Aucune promotion en ce moment.`, `No sales right now.`],
   [`Voir toute la boutique`, `See the whole shop`],

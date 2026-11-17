@@ -9,7 +9,8 @@
    Trois pages, un seul script (body[data-shop]) :
    boutique/filaments   #/ · #/m/<marque> · #/m/<marque>/<matériau>[/<couleur>]
    boutique/accessoires #/ · #/c/<catégorie> · #/a/<accessoire>
-   boutique/promotions  #/ (filaments + accessoires + spacers en promo)
+   boutique/promotions  #/ « Promos et nouveautés » (2026-11-17) : filaments, packs, accessoires et spacers
+                        en promo OU nouveaux (une grille, pastilles Tout · En promo · Nouveau)
    boutique/packs       #/ (cartes) · #/p/<slug> (fiche du pack) — packs à prix fixe, table packs (2026-11-16)
    Un lien d'un autre rayon pointe vers sa page (« accessoires#/a/x ») ;
    un ancien lien (#/accessoires…) arrivé sur la mauvaise page y est renvoyé.
@@ -27,7 +28,7 @@
   var UP = '../';                         // les trois pages vivent dans boutique/ (FR et /en/) : liens vers les autres pages, langue gardée
   var PAGE = document.body.getAttribute('data-shop') || 'filaments';
   var FIL_PRE = PAGE === 'filaments' ? '' : 'filaments', ACC_PRE = PAGE === 'accessoires' ? '' : 'accessoires';
-  var BASE_TITLE = PAGE === 'promotions' ? _t('Création Audio — Promotions') : PAGE === 'packs' ? _t('Création Audio — Packs') : _t('Création Audio — Filaments');
+  var BASE_TITLE = PAGE === 'promotions' ? _t('Création Audio — Promos et nouveautés') : PAGE === 'packs' ? _t('Création Audio — Packs') : _t('Création Audio — Filaments');
   var PACK_PRE = PAGE === 'packs' ? '' : 'packs';
 
   // Accessoires « bobine vide réutilisable » (repli si aucun accessoire dans l'admin).
@@ -604,13 +605,13 @@
   }
   function spacerCard(p) {
     var pc = spacerPromoPct(p), img = publicUrl(p.image_path), out = (p.qty | 0) <= 0;
-    return '<a class="mcard is-promo' + (out ? ' is-out' : '') + '" href="' + esc('spacers#/s/' + encodeURIComponent(p.slug || p.id)) + '">' +
+    return '<a class="mcard' + (pc ? ' is-promo' : '') + (out ? ' is-out' : '') + '" href="' + esc('spacers#/s/' + encodeURIComponent(p.slug || p.id)) + '">' +
       '<span class="mcard-media">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy">' : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') +
-        PR.ribbon(pc) + (PR.isNew(p) ? PR.newTag() : '') + '</span>' +
+        (pc ? PR.ribbon(pc) : '') + (PR.isNew(p) ? PR.newTag() : '') + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(p.name) + '</span>' +
         '<span class="mcard-foot">' +
-          '<span class="mcard-price"><s>' + money(+p.reg_price) + '</s> <b>' + money(+p.sell_price) + '</b></span>' +
+          '<span class="mcard-price">' + (pc ? '<s>' + money(+p.reg_price) + '</s> ' : '') + (p.sell_price != null ? '<b>' + money(+p.sell_price) + '</b>' : '') + '</span>' +
         '</span>' +
       '</span>' +
     '</a>';
@@ -623,42 +624,56 @@
     if (lastScreen !== 'promo') window.scrollTo(0, 0);
     lastScreen = 'promo';
   }
+  // pastilles Tout · En promo · Nouveau (choix de Théo 2026-11-17 : une seule grille, promos d'abord)
+  var prFilter = 'all';
+  var prChips = $('#pr-chips');
+  if (prChips) prChips.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-f]'); if (!b) return;
+    prFilter = b.getAttribute('data-f');
+    renderPromoPage();
+  });
   function renderPromoPage() {
     var el = $('#promo-groups');
     if (!el) return;
-    var mats = [];
+    // une carte par matériau / accessoire / spacer / pack ; promo = ruban %, nouveau = pastille, les deux = une carte (classée en promo)
+    var items = [];
     brands.forEach(function (B) {
       B.materials.forEach(function (m) {
-        if (!matPromo(m)) return;
-        mats.push(m);
+        var pm = matPromo(m), nw = m.items.some(PR.isNew);
+        if (pm || nw) items.push({ pc: pm ? pm.pct : 0, nw: nw, html: matCard(m) });
       });
     });
-    mats.sort(function (a, b) { return matPromo(b).pct - matPromo(a).pct; });
-    var accs = accessories.filter(function (a) { return a.promoOn; });
-    var sps = spacers.filter(function (p) { return spacerPromoPct(p) > 0; });
-    function group(id, title, cards, n) {
-      if (!cards) return '';
-      return '<section class="cat-group" aria-labelledby="' + id + '">' +
-        '<header class="cat-ghead">' +
-          '<h2 class="cat-gtitle" id="' + id + '">' + title + '</h2>' +
-          '<span class="cat-gmeta">' + n + '</span>' +
-          '<span class="cat-grule" aria-hidden="true"></span>' +
-        '</header>' +
-        '<div class="cat-grid">' + cards + '</div>' +
-      '</section>';
+    accessories.forEach(function (a) {
+      var pc = a.promoOn ? accPromoPct(a) : 0, nw = PR.isNew(a.promoRow);
+      if (a.promoOn || nw) items.push({ pc: pc || (a.promoOn ? 1 : 0), nw: nw, html: accCard(a) });
+    });
+    spacers.forEach(function (p) {
+      var pc = spacerPromoPct(p), nw = PR.isNew(p);
+      if (pc || nw) items.push({ pc: pc, nw: nw, html: spacerCard(p) });
+    });
+    packs.forEach(function (pk) {
+      if (packIsNew(pk) && packCols(pk).length) items.push({ pc: 0, nw: true, html: packCard(pk) });
+    });
+    var nP = items.filter(function (x) { return x.pc > 0; }).length, nN = items.filter(function (x) { return x.nw; }).length;
+    if (prFilter === 'promo' && !nP || prFilter === 'new' && !nN) prFilter = 'all';
+    if (prChips) {
+      prChips.hidden = !(nP && nN);
+      prChips.innerHTML = [['all', _t('Tout'), items.length], ['promo', _t('En promo'), nP], ['new', _t('Nouveau'), nN]].map(function (c) {
+        return '<button type="button" class="chip" data-f="' + c[0] + '"' + (prFilter === c[0] ? ' aria-current="true"' : '') + '>' +
+          c[1] + ' <span class="chip-n">' + c[2] + '</span></button>';
+      }).join('');
     }
-    var html =
-      group('pg-fil', window.CA.lang === 'en' ? 'Filament' : 'Filaments', mats.map(matCard).join(''), plural(mats.length, 'matériau', 'matériaux')) +
-      group('pg-acc', _t('Accessoires'), accs.map(accCard).join(''), plural(accs.length, 'article', 'articles')) +
-      group('pg-spa', _t('Spacers'), sps.map(spacerCard).join(''), plural(sps.length, 'modèle', 'modèles'));
-    $('#pr-st-items').textContent = mats.length + accs.length + sps.length;
+    var shown = items.filter(function (x) { return prFilter === 'promo' ? x.pc > 0 : prFilter === 'new' ? x.nw : true; });
+    // promos d'abord (meilleur rabais en tête), puis les nouveautés dans l'ordre des rayons
+    shown = shown.map(function (x, i) { x.i = i; return x; }).sort(function (a, b) { return (b.pc > 0) - (a.pc > 0) || b.pc - a.pc || a.i - b.i; });
+    $('#pr-st-items').textContent = nP;
+    var stNew = $('#pr-st-new'); if (stNew) stNew.textContent = nN;
     var best = 0;
-    mats.forEach(function (m) { best = Math.max(best, matPromo(m).pct); });
-    accs.forEach(function (a) { best = Math.max(best, accPromoPct(a)); });
-    sps.forEach(function (p) { best = Math.max(best, spacerPromoPct(p)); });
-    $('#pr-st-best').textContent = best ? PR.pctText(best) : '—';
+    items.forEach(function (x) { best = Math.max(best, x.pc); });
+    $('#pr-st-best').textContent = best > 1 ? PR.pctText(best) : '—';
     el.removeAttribute('aria-busy');
-    el.innerHTML = html || '<p class="empty">' + _t('Aucune promotion en ce moment.') + ' <a href="' + esc(UP + 'boutique') + '">' + _t('Voir toute la boutique') + '</a></p>';
+    el.innerHTML = shown.length ? '<div class="cat-grid">' + shown.map(function (x) { return x.html; }).join('') + '</div>'
+      : '<p class="empty">' + _t('Aucune promo ni nouveauté en ce moment.') + ' <a href="' + esc(UP + 'boutique') + '">' + _t('Voir toute la boutique') + '</a></p>';
   }
 
   /* =========================================================
@@ -746,6 +761,23 @@
     return hit ? preComp(hit) : null;
   }
   function packHref(pk) { return PACK_PRE + '#/p/' + encodeURIComponent(pk.slug || pk.id); }
+  // ruban « Nouveau » d'un pack : packs.new_until (Admin › Promos & nouveautés › Nouveautés, 2026-11-17)
+  function packIsNew(pk) { return PR.isNew({ attrs: { new_until: pk && pk.new_until } }); }
+  // carte .mcard d'un pack (page Promos et nouveautés) : photo, unités, prix + prix à l'unité gris
+  function packCard(pk) {
+    var out = !packAnyStock(pk);
+    return '<a class="mcard pack-mcard' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
+      '<span class="mcard-media">' + packMedia(pk, defComp(pk)) + (packIsNew(pk) ? PR.newTag() : '') + '</span>' +
+      '<span class="mcard-body">' +
+        '<span class="mcard-name">' + esc(packName(pk)) + '</span>' +
+        '<span class="mcard-tag">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
+        '<span class="mcard-foot">' +
+          '<span class="mcard-price"><b>' + money(+pk.price) + '</b> <span class="pack-mc-unit">' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></span>' +
+          (out ? '<span class="pill out">' + _t('Épuisé') + '</span>' : '') +
+        '</span>' +
+      '</span>' +
+    '</a>';
+  }
   // panier : lignes de pack dont le pack n'est plus offert ou la composition plus valide → retirées
   function purgePacks() {
     var bad = false;
@@ -815,7 +847,7 @@
   function packMini(pk) {
     var out = !packAnyStock(pk);
     return '<a class="pack-mini' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
-      '<span class="pack-mini-art">' + packMedia(pk, defComp(pk)) + '</span>' +
+      '<span class="pack-mini-art">' + packMedia(pk, defComp(pk)) + (packIsNew(pk) ? PR.newTag() : '') + '</span>' +
       '<span class="pack-mini-body">' +
         '<span class="pack-mini-name">' + esc(packName(pk)) + '</span>' +
         '<span class="pack-mini-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
@@ -882,7 +914,7 @@
     var out = !packAnyStock(pk), comp = defComp(pk);
     // pas d'économie sur la carte (choix de Théo 2026-11-16 : trop de prix au même endroit) → seulement sur la fiche
     return '<a class="pack-tile' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
-      '<span class="pack-tile-art">' + packMedia(pk, comp) + '</span>' +
+      '<span class="pack-tile-art">' + packMedia(pk, comp) + (packIsNew(pk) ? PR.newTag() : '') + '</span>' +
       '<span class="pack-tile-body">' +
         '<span class="pack-tile-name">' + esc(packName(pk)) + '</span>' +
         '<span class="pack-tile-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +

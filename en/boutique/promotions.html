@@ -5,8 +5,8 @@
 <!-- Vieux liens « .html » : l'adresse affichée devient propre (sans recharger) -->
 <script>if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.pathname.slice(0,-5)+location.search+location.hash);</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Création Audio — Promotions</title>
-<meta name="description" content="Filament, accessories and spacers on sale — Création Audio, Québec City area.">
+<title>Création Audio — Deals & new</title>
+<meta name="description" content="Filaments, packs, accessories and spacers on sale or new — Création Audio, Quebec City area.">
 <link rel="canonical" href="https://creationaudio.ca/en/boutique/promotions">
 <link rel="alternate" hreflang="fr-CA" href="https://creationaudio.ca/boutique/promotions">
 <link rel="alternate" hreflang="en-CA" href="https://creationaudio.ca/en/boutique/promotions">
@@ -15,8 +15,8 @@
 <meta property="og:site_name" content="Création Audio">
 <meta property="og:locale" content="en_CA">
 <meta property="og:url" content="https://creationaudio.ca/en/boutique/promotions">
-<meta property="og:title" content="Création Audio — Promotions">
-<meta property="og:description" content="Filament, accessories and spacers on sale — Création Audio, Québec City area.">
+<meta property="og:title" content="Création Audio — Deals & new">
+<meta property="og:description" content="Filaments, packs, accessories and spacers on sale or new — Création Audio, Quebec City area.">
 <meta property="og:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://creationaudio.ca/assets/img/og-creation-audio.png">
@@ -29,7 +29,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../../assets/site.css?v=29">
-<link rel="stylesheet" href="../../assets/boutique.css?v=73">
+<link rel="stylesheet" href="../../assets/boutique.css?v=74">
 <link rel="stylesheet" href="../../assets/dialog.css?v=2">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="../../assets/fetes.css?v=9">
@@ -54,7 +54,7 @@
     <div class="nav-dd">
       <a class="nav-dd-t is-active" href="../boutique" aria-haspopup="true" aria-expanded="false">Shop <svg class="nav-dd-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
       <div class="nav-dd-m">
-        <a href="../boutique/promotions" class="is-active">Promotions</a>
+        <a href="../boutique/promotions" class="is-active">Deals & new</a>
         <a href="../boutique/filaments">Filament</a>
         <a href="../boutique/packs" data-nav-packs style="display:none">Filament packs</a>
         <a href="../boutique/spacers">Spacers</a>
@@ -93,7 +93,7 @@
     <a href="../boutique/spacers" data-tab="spacers">Spacers</a>
     <a href="../boutique/accessoires" data-tab="accessoires">Accessories</a>
     <a href="../boutique/imprimantes" data-tab="imprimantes">3D Printers</a>
-    <a href="../boutique/promotions" data-tab="promo" class="is-active" aria-current="page">Promotions</a>
+    <a href="../boutique/promotions" data-tab="promo" class="is-active" aria-current="page">Deals & new</a>
   </nav>
   <!-- Catalogue : matériaux regroupés par marque, filtrables (#/ ou #/m/<marque>) -->
   <section id="screen-catalog" hidden aria-labelledby="cat-title">
@@ -156,20 +156,24 @@
     <div id="acc-config"></div>
   </section>
 
-  <!-- Promotions : tous les rayons (page boutique/promotions) -->
+  <!-- Promos et nouveautés : tous les rayons + packs (page boutique/promotions ; regroupées le 2026-11-17) -->
   <section id="screen-promo" aria-labelledby="pr-title">
     <header class="cat-hero">
       <div class="cat-hero-tx">
         <p class="eyebrow">Shop</p>
-        <h1 id="pr-title">Promotions</h1>
-        <p class="cat-sub">Everything on sale right now: filament, accessories and spacers. <strong>Final prices, no added tax.</strong></p>
+        <h1 id="pr-title">Deals & new</h1>
+        <p class="cat-sub">Current deals and what just arrived: filaments, packs, accessories and spacers. <strong>Final prices, no added tax.</strong></p>
       </div>
-      <dl class="cat-stats" aria-label="Sales at a glance">
+      <dl class="cat-stats" aria-label="Deals and new arrivals in numbers">
         <div><dt>On sale</dt><dd id="pr-st-items">—</dd></div>
+        <div><dt>New arrivals</dt><dd id="pr-st-new">—</dd></div>
         <div><dt>Best discount</dt><dd id="pr-st-best">—</dd></div>
       </dl>
     </header>
 
+    <div class="cat-bar">
+      <nav class="cat-chips" id="pr-chips" aria-label="Filter" hidden></nav>
+    </div>
 
     <div class="cat-groups" id="promo-groups" aria-busy="true">
       <div class="cat-grid"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
@@ -301,7 +305,7 @@
     <a href="../">Home</a>
     <a class="drawer-parent" href="../boutique">Shop</a>
     <div class="drawer-sub">
-      <a href="../boutique/promotions" class="is-active">Promotions</a>
+      <a href="../boutique/promotions" class="is-active">Deals & new</a>
       <a href="../boutique/filaments">Filament</a>
       <a href="../boutique/packs" data-nav-packs style="display:none">Filament packs</a>
       <a href="../boutique/spacers">Spacers</a>
@@ -334,6 +338,6 @@
 <script src="../../assets/commande-client.js?v=13"></script>
 <script src="../../assets/panier-compte.js?v=28"></script>
 <script src="../../assets/promo.js?v=2"></script>
-<script src="../../assets/boutique.js?v=74"></script>
+<script src="../../assets/boutique.js?v=75"></script>
 </body>
 </html>

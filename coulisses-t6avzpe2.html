@@ -111,8 +111,7 @@
       <nav class="mat-nav" id="mat-nav" aria-label="Aller au matériau"></nav>
       <button class="tab" type="button" data-tab="spacers" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="5.5"/><path d="M12 2.5v1.5M12 20v1.5M2.5 12H4M20 12h1.5"/></svg><span>Spacers</span></button>
       <button class="tab" type="button" data-tab="accessoires" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.3V4.5a1 1 0 0 1 1-1h7.8l8.2 8.2a1 1 0 0 1 0 1.4l-6.9 6.9a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.5"/></svg><span>Accessoires</span></button>
-      <button class="tab" type="button" data-tab="promotions" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5L5 19"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg><span>Promotions</span></button>
-      <button class="tab" type="button" data-tab="nouveautes" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 5.3 5.3.5-4 3.6 1.2 5.4L12 15l-4.7 2.8 1.2-5.4-4-3.6 5.3-.5z"/></svg><span>Nouveautés</span></button>
+      <button class="tab" type="button" data-tab="promotions" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5L5 19"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg><span>Promos &amp; nouveautés</span></button>
       <button class="tab" type="button" data-tab="packs" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 12h18M9 8V5h6v3"/></svg><span>Packs</span></button>
 
       <p class="side-group" aria-hidden="true">Stock</p>
@@ -280,20 +279,29 @@
      <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
 
-    <!-- ---------------- PROMOTIONS (cms-promotions.js, tables promotions + promotion_items) ----------------
+    <!-- ---------------- PROMOS & NOUVEAUTÉS (regroupés 2026-11-17) : #promotions = cms-promotions.js (tables promotions + promotion_items),
+         #promotions/nouveautes = cms-nouveautes.js (ruban « Nouveau ») ----------------
          Le prix promo est appliqué par les vues products_public / products_dealer (schema-v2.sql § PROMOTIONS). -->
     <section class="tabpanel" data-panel="promotions" role="tabpanel" hidden>
      <div class="dock-main">
       <div class="panel-head">
         <div>
-          <h1>Promotions</h1>
-          <p class="muted">Prix spéciaux sur des couleurs, spacers et accessoires.</p>
+          <h1>Promos &amp; nouveautés</h1>
+          <p class="muted">Prix spéciaux et ruban « Nouveau » sur les produits et les packs.</p>
         </div>
         <span class="grow"></span>
-        <a class="btn btn-ghost btn-sm" href="./boutique" target="_blank" rel="noopener" data-ic="link">Voir la boutique</a>
-        <button class="btn btn-ghost btn-sm" id="pm-refresh" type="button" data-ic="refresh">Rafraîchir</button>
-        <button class="btn btn-accent" id="pm-new" type="button" data-ic="plus">Promotion</button>
+        <a class="btn btn-ghost btn-sm" href="./boutique/promotions" target="_blank" rel="noopener" data-ic="link">Voir la boutique</a>
+        <button class="btn btn-ghost btn-sm" id="pm-refresh" type="button" data-ic="refresh" data-pmsub-only="promos">Rafraîchir</button>
+        <button class="btn btn-ghost btn-sm" id="nv-refresh" type="button" data-ic="refresh" data-pmsub-only="nouveautes" hidden>Rafraîchir</button>
+        <button class="btn btn-accent" id="pm-new" type="button" data-ic="plus" data-pmsub-only="promos">Promotion</button>
       </div>
+
+      <div class="inv-subtabs" role="tablist" aria-label="Promos et nouveautés">
+        <button type="button" class="inv-subtab is-active" role="tab" data-pmsub="promos" aria-selected="true">Promotions</button>
+        <button type="button" class="inv-subtab" role="tab" data-pmsub="nouveautes" aria-selected="false">Nouveautés</button>
+      </div>
+
+      <div id="pm-sub-promos">
 
       <form class="editor" id="pm-editor" hidden>
         <h2 id="pm-editor-title">Promotion</h2>
@@ -380,23 +388,10 @@
       </form>
 
       <div class="pm-list" id="pm-list"><p class="muted">Chargement…</p></div>
-     </div><!-- /.dock-main -->
-     <aside class="dock" data-dock aria-label="Éditeur"></aside>
-    </section>
+      </div><!-- /#pm-sub-promos -->
 
-    <!-- ---------------- NOUVEAUTÉS (cms-nouveautes.js, products.attrs.new_until) ----------------
-         Le ruban « Nouveau » est lu par promo.js (isNew) sur boutique, spacers, dealer et accueil ; fin = attrs.new_until exposé par les vues. -->
-    <section class="tabpanel" data-panel="nouveautes" role="tabpanel" hidden>
-      <div class="panel-head">
-        <div>
-          <h1>Nouveautés</h1>
-          <p class="muted">Ruban « Nouveau » sur des produits, pour une durée choisie.</p>
-        </div>
-        <span class="grow"></span>
-        <a class="btn btn-ghost btn-sm" href="./boutique" target="_blank" rel="noopener" data-ic="link">Voir la boutique</a>
-        <button class="btn btn-ghost btn-sm" id="nv-refresh" type="button" data-ic="refresh">Rafraîchir</button>
-      </div>
-
+      <!-- Nouveautés (cms-nouveautes.js) : products.attrs.new_until + packs.new_until, lus par promo.js (isNew) -->
+      <div id="pm-sub-new" hidden>
       <div class="editor" id="nv-box">
         <div class="grid">
           <div class="field">
@@ -426,7 +421,11 @@
       </div>
 
       <div class="pm-list" id="nv-list"><p class="muted">Chargement…</p></div>
+      </div><!-- /#pm-sub-new -->
+     </div><!-- /.dock-main -->
+     <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
+
     <!-- ---------------- PACKS (cms-packs.js, table packs) ----------------
          Prix fixe composé par paires ; calcul serveur _pack_fill (schema-v2.sql § Packs de filament). -->
     <section class="tabpanel" data-panel="packs" role="tabpanel" hidden>
@@ -3289,7 +3288,7 @@
 <script src="assets/cms-aujourdhui.js?v=2"></script>
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-promotions.js?v=9"></script>
-<script src="assets/cms-nouveautes.js?v=1"></script>
+<script src="assets/cms-nouveautes.js?v=2"></script>
 <script src="assets/cms-packs.js?v=5"></script>
 <script src="assets/cms-recherche.js?v=4"></script>
 <script src="assets/aide.js?v=4"></script>

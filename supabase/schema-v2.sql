@@ -1963,6 +1963,8 @@ alter table public.packs alter column units set not null;
 alter table public.packs alter column pairs drop not null;
 alter table public.packs drop constraint if exists packs_units_check;
 alter table public.packs add constraint packs_units_check check (units between 1 and 20);
+-- 2026-11-17 : ruban « Nouveau » d'un pack (Admin › Nouveautés), comme products.attrs.new_until. Date passée = plus rien.
+alter table public.packs add column if not exists new_until timestamptz;
 
 -- Lignes des packs d'un panier : [{ pack_id, qty (nb de packs), comp: [{ product_id, qty (recharges par pack) }] }]
 -- (les entrées sans pack_id sont ignorées). Valide pack actif, couleurs permises, total d'unités,

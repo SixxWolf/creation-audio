@@ -11,7 +11,7 @@
    boutique/filaments.html puis lancer « node tools/build-en.js »
    (qui appelle ce script avant de traduire).
    Exporte aussi tabs() : la barre des rayons
-   (⌂ · Filaments · Packs · Spacers · Accessoires · Imprimantes 3D · Promotions).
+   (⌂ · Filaments · Packs · Spacers · Accessoires · Imprimantes 3D · Promos et nouveautés).
    ========================================================= */
 'use strict';
 const fs = require('fs');
@@ -29,7 +29,7 @@ function tabs(cur, pre, ind) {
     ['spacers', pre + 'spacers', 'Spacers'],
     ['accessoires', pre + 'accessoires', 'Accessoires'],
     ['imprimantes', pre + 'imprimantes', 'Imprimantes 3D'],
-    ['promo', pre + 'promotions', 'Promotions']
+    ['promo', pre + 'promotions', 'Promos et nouveautés']
   ];
   return ind + '<nav class="shop-tabs" id="shop-tabs" aria-label="Rayons de la boutique">\n' + T.map(([k, h, l]) => {
     const on = cur === k;
@@ -48,8 +48,8 @@ const PAGES = {
   },
   promotions: {
     tab: 'promo', screen: 'screen-promo',
-    title: 'Création Audio — Promotions',
-    desc: 'Filaments, accessoires et spacers en rabais — Création Audio, région de Québec.'
+    title: 'Création Audio — Promos et nouveautés',
+    desc: 'Filaments, packs, accessoires et spacers en rabais ou nouveaux — Création Audio, région de Québec.'
   },
   packs: {
     tab: 'packs', screen: 'screen-packs',

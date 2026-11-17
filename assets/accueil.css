@@ -535,3 +535,8 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
   .is-solo .promo-card .pop-media { flex:none; width:100%; border-right:0; border-bottom:1px solid var(--line); }
   .is-solo .promo-card .pop-body { padding:16px 18px 18px; }
 }
+
+/* ---- Promos et nouveautés (2026-11-17) : carte d'un pack — prix à l'unité gris et discret (comme le rayon Packs), pastilles sans photo ---- */
+.pk-unit { margin-left:6px; font-size:.82rem; font-weight:500; color:var(--muted); white-space:nowrap; }
+.pk-dots { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; max-width:80%; }
+.pk-dots i { width:clamp(26px, 4vw, 40px); aspect-ratio:1; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); }

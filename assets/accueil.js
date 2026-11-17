@@ -361,76 +361,82 @@
     if (aMin != null) { var am = $('#acc-meta'); if (am) am.innerHTML = _t('dès <b>{p}</b>', { p: money(aMin) }); }
   }
 
-  /* ---- En promotion : cartes groupees (marque + materiau pour les filaments), meilleur rabais en tete ---- */
-  function renderPromos(rows) {
+  /* ---- Promos et nouveautés (regroupées le 2026-11-17) : une grille, promos d'abord (meilleur rabais en tête),
+     puis les packs nouveaux, puis les autres nouveautés. Filaments groupés par marque + matériau.
+     Promo + nouveau = une carte, ruban % ET pastille « Nouveau » (choix de Théo). ---- */
+  function packIsNew(pk, P) { return P.isNew({ attrs: { new_until: pk && pk.new_until } }); }
+  function packImg(pk) {
+    var pr = (pk.presets || []).filter(function (x) { return x && x.img; })[0];
+    return pk.image_path || (pr && pr.img) || '';
+  }
+  function renderDeals(rows, pks) {
     var sec = $('#promotions'), grid = $('#promo-grid'), P = (window.CA || {}).promo;
     if (!sec || !grid || !P) return;
-    var groups = {}, order = [];
+    var groups = {}, order = [], byId = {};
     rows.forEach(function (p) {
-      if (!p.promo_id) return;
-      var on1 = p.promo_on && p.reg_price != null, on2 = p.promo_on_2 && p.reg_price_2 != null;
-      if (!on1 && !on2) return;
-      var reg = on1 ? +p.reg_price : +p.reg_price_2, now = on1 ? +p.sell_price : +p.sell_price_2;
-      var pc = P.pct(reg, now); if (!pc) return;
-      var key = p.type === 'filament' ? 'f|' + p.promo_id + '|' + (p.brand || '') + '|' + (p.material || '') : 'i|' + p.id;
-      var g = groups[key];
-      if (!g) { g = groups[key] = { p: p, n: 0, pc: 0, min: Infinity, reg: 0 }; order.push(key); }
-      g.n++; if (pc > g.pc) g.pc = pc;
-      if (now < g.min) { g.min = now; g.reg = reg; }
-    });
-    var list = order.map(function (k) { return groups[k]; }).sort(function (a, b) { return b.pc - a.pc; }).slice(0, 8);
-    if (!list.length) { sec.hidden = true; stripe(); return; }
-    var solo = list.length === 1;
-    grid.classList.toggle('is-solo', solo);
-    grid.innerHTML = list.map(function (g) {
-      var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
-      var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
-      var title = isF ? esc(p.material || _t('Filament')) : esc(p.name);
-      var href = p.type === 'spacer' ? 'boutique/spacers' : 'boutique/promotions';
-      var sub = isF ? tn(g.n, '{n} couleur', '{n} couleurs') : esc(P.nameOf(p));
-      var end = P.endText(p.promo_ends);
-      return '<a class="pop-card promo-card" href="' + esc(href) + '">' + P.ribbon(g.pc) +
-        '<span class="pop-media">' + media + (isF ? brandBadge(p.brand) : '') + '</span><span class="pop-body">' +
-        '<span class="pop-name">' + title + '</span>' +
-        '<span class="pop-meta"><span>' + sub + (end ? ' · ' + esc(end) : '') + '</span></span>' +
-        '<span class="pop-foot"><span>' + (isF ? _t('dès') + ' ' : '') + '<b>' + money(g.min) + '</b> <s class="promo-was">' + money(g.reg) + '</s></span></span>' +
-        (solo ? '<span class="promo-go">' + _t('Voir la promo') + ' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>' : '') +
-        '</span></a>';
-    }).join('');
-    sec.hidden = false;
-    stripe();
-  }
-
-  /* ---- Nouveautés : produits dont attrs.new_until est dans le futur ; filaments groupés par marque + matériau ---- */
-  function renderNew(rows) {
-    var sec = $('#nouveautes'), grid = $('#new-grid'), P = (window.CA || {}).promo;
-    if (!sec || !grid || !P) return;
-    var groups = {}, order = [];
-    rows.forEach(function (p) {
-      if (!P.isNew(p)) return;
+      byId[p.id] = p;
+      var nw = P.isNew(p), pc = 0, reg = null, now = p.type === 'filament' ? fromPrice(p) : (p.sell_price != null ? +p.sell_price : null);
+      if (p.promo_id) {
+        var on1 = p.promo_on && p.reg_price != null, on2 = p.promo_on_2 && p.reg_price_2 != null;
+        if (on1 || on2) {
+          var r = on1 ? +p.reg_price : +p.reg_price_2, n = on1 ? +p.sell_price : +p.sell_price_2;
+          pc = P.pct(r, n); if (pc) { reg = r; now = n; }
+        }
+      }
+      if (!pc && !nw) return;
       var key = p.type === 'filament' ? 'f|' + (p.brand || '') + '|' + (p.material || '') : 'i|' + p.id;
       var g = groups[key];
-      if (!g) { g = groups[key] = { p: p, n: 0, min: null, until: p.attrs.new_until }; order.push(key); }
-      g.n++;
-      var v = p.type === 'filament' ? fromPrice(p) : (p.sell_price != null ? +p.sell_price : null);
-      if (v != null && (g.min == null || v < g.min)) g.min = v;
+      if (!g) { g = groups[key] = { p: p, n: 0, np: 0, pc: 0, nw: false, pmin: null, preg: null, nmin: null }; order.push(key); }
+      g.n++; if (pc) g.np++; if (nw) g.nw = true;
+      if (pc > g.pc) g.pc = pc;
+      // prix montré : le plus bas en promo s'il y a une promo, sinon le plus bas
+      if (now != null) {
+        if (pc) { if (g.pmin == null || now < g.pmin) { g.pmin = now; g.preg = reg; } }
+        else if (g.nmin == null || now < g.nmin) g.nmin = now;
+      }
       if (!g.p.image_path && p.image_path) g.p = p;
     });
-    var list = order.map(function (k) { return groups[k]; }).slice(0, 8);
-    if (!list.length) { sec.hidden = true; stripe(); return; }
-    grid.innerHTML = list.map(function (g) {
-      var p = g.p, isF = p.type === 'filament', url = publicUrl(p.image_path);
+    var list = order.map(function (k) { var g = groups[k]; g.min = g.pc ? g.pmin : g.nmin; g.reg = g.pc ? g.preg : null; return g; });
+    var promos = list.filter(function (g) { return g.pc > 0; }).sort(function (a, b) { return b.pc - a.pc; });
+    var news = list.filter(function (g) { return !(g.pc > 0); });
+    var newPacks = (pks || []).filter(function (pk) { return packIsNew(pk, P) && (pk.colors || []).some(function (id) { return byId[id]; }); });
+    var total = promos.length + newPacks.length + news.length;
+    if (!total) { sec.hidden = true; stripe(); return; }
+    var solo = total === 1 && promos.length === 1;
+    grid.classList.toggle('is-solo', solo);
+    var go = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+    function itemCard(g) {
+      var p = g.p, isF = p.type === 'filament', promo = g.pc > 0, url = publicUrl(p.image_path);
       var media = url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="swatch" style="background:' + esc(swatchBg(p)) + '"></span>';
       var title = isF ? esc(p.material || _t('Filament')) : esc(p.name);
       var href = isF ? matUrl(p) : p.type === 'spacer' ? 'boutique/spacers' : 'boutique/accessoires#/a/' + encodeURIComponent(p.slug || slugify(p.name));
-      var sub = isF ? tn(g.n, '{n} couleur', '{n} couleurs') : '';
-      return '<a class="pop-card new-card" href="' + esc(href) + '">' +
-        '<span class="pop-media">' + media + P.newTag() + (isF ? brandBadge(p.brand) : '') + '</span><span class="pop-body">' +
+      var sub = isF ? (promo ? tn(g.np, '{n} couleur en promo', '{n} couleurs en promo') : tn(g.n, '{n} couleur', '{n} couleurs')) : (promo ? esc(P.nameOf(p)) : '');
+      var end = promo ? P.endText(p.promo_ends) : '';
+      return '<a class="pop-card ' + (promo ? 'promo-card' : 'new-card') + '" href="' + esc(href) + '">' + (promo ? P.ribbon(g.pc) : '') +
+        '<span class="pop-media">' + media + (g.nw ? P.newTag() : '') + (isF ? brandBadge(p.brand) : '') + '</span><span class="pop-body">' +
         '<span class="pop-name">' + title + '</span>' +
-        (sub ? '<span class="pop-meta"><span>' + sub + '</span></span>' : '') +
-        '<span class="pop-foot">' + (g.min != null ? '<span>' + (isF ? _t('dès') + ' ' : '') + '<b>' + money(g.min) + '</b></span>' : '<span></span>') + '</span>' +
+        (sub || end ? '<span class="pop-meta"><span>' + sub + (sub && end ? ' · ' : '') + (end ? esc(end) : '') + '</span></span>' : '') +
+        '<span class="pop-foot">' + (g.min != null ? '<span>' + (isF ? _t('dès') + ' ' : '') + '<b>' + money(g.min) + '</b>' +
+          (promo && g.reg != null ? ' <s class="promo-was">' + money(g.reg) + '</s>' : '') + '</span>' : '<span></span>') + '</span>' +
+        (solo ? '<span class="promo-go">' + _t('Voir la promo') + ' ' + go + '</span>' : '') +
         '</span></a>';
-    }).join('');
+    }
+    function packCard(pk) {
+      var units = (pk.units | 0) || 4, spool = pk.kind === 'spool', unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100;
+      var u = publicUrl(packImg(pk)), media;
+      if (u) media = '<img src="' + esc(u) + '" alt="" loading="lazy">';
+      else {
+        var hx = (pk.colors || []).map(function (id) { return byId[id]; }).filter(Boolean).map(swatchBg);
+        media = '<span class="pk-dots" aria-hidden="true">' + hx.slice(0, units).map(function (h) { return '<i style="background:' + esc(h) + '"></i>'; }).join('') + '</span>';
+      }
+      return '<a class="pop-card new-card" href="' + esc('boutique/packs#/p/' + encodeURIComponent(pk.slug || pk.id)) + '">' +
+        '<span class="pop-media">' + media + P.newTag() + '</span><span class="pop-body">' +
+        '<span class="pop-name">' + esc((CA0.lang === 'en' && pk.name_en) || pk.name) + '</span>' +
+        '<span class="pop-meta"><span>' + tn(units, spool ? '{n} bobine' : '{n} recharge', spool ? '{n} bobines' : '{n} recharges') + '</span></span>' +
+        '<span class="pop-foot"><span><b>' + money(+pk.price) + '</b> <span class="pk-unit">' + money(unit) + ' ' + (spool ? _t('la bobine') : _t('la recharge')) + '</span></span></span>' +
+        '</span></a>';
+    }
+    grid.innerHTML = promos.map(itemCard).concat(newPacks.map(packCard), news.map(itemCard)).slice(0, 8).join('');
     sec.hidden = false;
     stripe();
   }
@@ -466,7 +472,9 @@
     Promise.all([
       sb.from('products_public').select(cols).in('type', ['filament', 'spacer', 'accessory']).limit(2000),
       sb.from('brands').select('name,sort_order,slug,image_path'),
-      sb.from('product_popularity').select('product_id,qty_sold')
+      sb.from('product_popularity').select('product_id,qty_sold'),
+      // packs en ligne (filtre explicite : la session admin passe la RLS) — pour les packs marqués « Nouveau »
+      sb.from('packs').select('id,slug,name,name_en,kind,units,price,colors,presets,image_path,new_until,sort_order').eq('enabled', true).order('sort_order', { ascending: true })
     ]).then(function (res) {
       var pr = res[0], br = res[1], po = res[2];
       if (!pr || pr.error || !pr.data) { fail(); return; }
@@ -496,8 +504,7 @@
       var nMats = renderMaterials(fils);
       renderPopular(fils, pop);
       renderExtras(rows);
-      renderNew(rows);
-      renderPromos(rows);
+      renderDeals(rows, (res[3] && !res[3].error && res[3].data) || []);
       renderStats(fils, nMats);
     }, fail);
   }

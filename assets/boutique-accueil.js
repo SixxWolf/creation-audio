@@ -1,8 +1,9 @@
 /* =========================================================
    Création Audio — accueil de la boutique (boutique.html, 2026-11-14)
    « Que cherchez-vous aujourd'hui ? » : une tuile par rayon (photo +
-   chiffre lus dans products_public), puis « En promotion » et
-   « Nouveautés » tous rayons confondus (cartes .mcard de boutique.css).
+   chiffre lus dans products_public), puis « Promos et nouveautés » tous
+   rayons confondus, packs inclus (une grille, promos d'abord — 2026-11-17 ;
+   cartes .mcard de boutique.css).
    Liens relatifs à la page (boutique/…) : la version /en/ garde sa langue.
    Rayons : boutique/filaments#/m/<marque>/<matériau> ·
             boutique/accessoires#/a/<slug> · boutique/spacers#/s/<slug>
@@ -89,54 +90,85 @@
       var info = keep(p); if (!info) return;
       var key = p.type === 'filament' ? 'f|' + (p.brand || '') + '|' + (p.material || '') : 'i|' + p.id;
       var g = map[key];
-      if (!g) { g = map[key] = { p: p, n: 0, pc: 0, min: null, reg: null }; order.push(key); }
+      if (!g) { g = map[key] = { p: p, n: 0, np: 0, pc: 0, nw: false, min: null, reg: null }; order.push(key); }
       g.n++;
+      if (info.pc > 0) g.np++;
+      if (info.nw) g.nw = true;
       if (info.pc > g.pc) g.pc = info.pc;
       if (info.now != null && (g.min == null || info.now < g.min)) { g.min = info.now; g.reg = info.reg; }
       if (!g.p.material_image && !g.p.image_path && (p.material_image || p.image_path)) g.p = p;
     });
     return order.map(function (k) { return map[k]; });
   }
-  function card(g, kind) {
-    var p = g.p, isF = p.type === 'filament';
+  // une carte : ruban % si promo, pastille « Nouveau » si nouveau (les deux possibles, choix de Théo 2026-11-17)
+  function card(g) {
+    var p = g.p, isF = p.type === 'filament', promo = g.pc > 0;
     var name = isF ? (p.material || _t('Filament')) : p.name;
-    var sub = isF ? (kind === 'promo' ? tn(g.n, '{n} couleur en promo', '{n} couleurs en promo') : tn(g.n, '{n} couleur', '{n} couleurs'))
+    var sub = isF ? (promo ? tn(g.np, '{n} couleur en promo', '{n} couleurs en promo') : tn(g.n, '{n} couleur', '{n} couleurs'))
       : p.type === 'spacer' ? _t('Spacer') : _t('Accessoire');
-    return '<a class="mcard' + (kind === 'promo' ? ' is-promo' : '') + '" href="' + esc(hrefOf(p)) + '">' +
-      '<span class="mcard-media">' + media(p) + (kind === 'promo' ? PR.ribbon(g.pc) : PR.newTag()) + (isF ? brandBadge(p.brand) : '') + '</span>' +
+    return '<a class="mcard' + (promo ? ' is-promo' : '') + '" href="' + esc(hrefOf(p)) + '">' +
+      '<span class="mcard-media">' + media(p) + (promo ? PR.ribbon(g.pc) : '') + (g.nw ? PR.newTag() : '') + (isF ? brandBadge(p.brand) : '') + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(name) + '</span>' +
-        '<span class="' + (kind === 'promo' && isF ? 'mcard-promo' : 'mcard-tag') + '">' + esc(sub) + '</span>' +
+        '<span class="' + (promo && isF ? 'mcard-promo' : 'mcard-tag') + '">' + esc(sub) + '</span>' +
         '<span class="mcard-foot"><span class="mcard-price">' + (g.min != null
-          ? (isF ? _t('dès') + ' ' : '') + (kind === 'promo' && g.reg != null ? '<s>' + money(g.reg) + '</s> ' : '') + '<b>' + money(g.min) + '</b>' : '') +
+          ? (isF ? _t('dès') + ' ' : '') + (promo && g.reg != null ? '<s>' + money(g.reg) + '</s> ' : '') + '<b>' + money(g.min) + '</b>' : '') +
         '</span></span>' +
       '</span>' +
     '</a>';
   }
-  function renderPromos(rows) {
+  // ruban « Nouveau » d'un pack : packs.new_until (Admin › Promos & nouveautés › Nouveautés)
+  function packIsNew(pk) { return PR.isNew({ attrs: { new_until: pk && pk.new_until } }); }
+  function packHexes(pk, byId) {
+    return (pk.colors || []).map(function (id) { var p = byId[id]; var c = p && p.attrs && Array.isArray(p.attrs.colors) && p.attrs.colors[0]; return c || (p && p.hex) || null; })
+      .filter(function (h) { return /^#[0-9a-fA-F]{6}$/.test(h || ''); });
+  }
+  // carte .mcard d'un pack : photo (sinon une pastille par recharge), unités, prix + prix à l'unité gris (comme le rayon Packs)
+  function packCard(pk, byId) {
+    var units = (pk.units | 0) || 4, spool = pk.kind === 'spool', unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100;
+    var u = publicUrl(packImg(pk)), art;
+    if (u) art = '<img src="' + esc(u) + '" alt="" loading="lazy">';
+    else {
+      var hx = packHexes(pk, byId), dots = '';
+      for (var i = 0; i < units && hx.length; i++) dots += '<i style="background:' + esc(hx[i % hx.length]) + '"></i>';
+      art = '<span class="pack-dots" aria-hidden="true">' + dots + '</span>';
+    }
+    return '<a class="mcard pack-mcard" href="' + esc('boutique/packs#/p/' + encodeURIComponent(pk.slug || pk.id)) + '">' +
+      '<span class="mcard-media">' + art + (packIsNew(pk) ? PR.newTag() : '') + '</span>' +
+      '<span class="mcard-body">' +
+        '<span class="mcard-name">' + esc((CA.lang === 'en' && pk.name_en) || pk.name) + '</span>' +
+        '<span class="mcard-tag">' + tn(units, spool ? '{n} bobine' : '{n} recharge', spool ? '{n} bobines' : '{n} recharges') + '</span>' +
+        '<span class="mcard-foot"><span class="mcard-price"><b>' + money(+pk.price) + '</b> <span class="pack-mc-unit">' +
+          money(unit) + ' ' + (spool ? _t('la bobine') : _t('la recharge')) + '</span></span></span>' +
+      '</span>' +
+    '</a>';
+  }
+  // Promos et nouveautés : une seule grille, promos d'abord (meilleur rabais en tête), puis nouveautés (packs d'abord)
+  function renderDeals(rows, pks) {
     var sec = $('#bq-promos'), grid = $('#bq-promos-grid');
     if (!sec || !grid || !PR) return;
+    var byId = {}; rows.forEach(function (p) { byId[p.id] = p; });
     var list = groups(rows, function (p) {
-      if (!p.promo_id) return null;
-      var on1 = p.promo_on && p.reg_price != null, on2 = p.promo_on_2 && p.reg_price_2 != null;
-      if (!on1 && !on2) return null;
-      var reg = on1 ? +p.reg_price : +p.reg_price_2, now = on1 ? +p.sell_price : +p.sell_price_2;
-      var pc = PR.pct(reg, now);
-      return pc ? { pc: pc, now: now, reg: reg } : null;
-    }).sort(function (a, b) { return b.pc - a.pc; });
-    if (!list.length) { sec.hidden = true; return; }
+      var nw = PR.isNew(p), pc = 0, now = fromPrice(p), reg = null;
+      if (p.promo_id) {
+        var on1 = p.promo_on && p.reg_price != null, on2 = p.promo_on_2 && p.reg_price_2 != null;
+        if (on1 || on2) {
+          reg = on1 ? +p.reg_price : +p.reg_price_2; now = on1 ? +p.sell_price : +p.sell_price_2;
+          pc = PR.pct(reg, now);
+          if (!pc) reg = null;
+        }
+      }
+      return pc || nw ? { pc: pc, nw: nw, now: now, reg: pc ? reg : null } : null;
+    });
+    var promos = list.filter(function (g) { return g.pc > 0; }).sort(function (a, b) { return b.pc - a.pc; });
+    var news = list.filter(function (g) { return !(g.pc > 0); });
+    var newPacks = (pks || []).filter(function (pk) { return packIsNew(pk) && (pk.colors || []).some(function (id) { return byId[id]; }); });
+    var cards = promos.map(card).concat(newPacks.map(function (pk) { return packCard(pk, byId); }), news.map(card));
+    if (!cards.length) { sec.hidden = true; return; }
     var ends = null;
-    list.forEach(function (g) { var e = g.p.promo_ends; if (e && (!ends || e < ends)) ends = e; });
+    promos.forEach(function (g) { var e = g.p.promo_ends; if (e && (!ends || e < ends)) ends = e; });
     $('#bq-promos-meta').textContent = ends ? PR.endText(ends) : '';
-    grid.innerHTML = list.slice(0, 8).map(function (g) { return card(g, 'promo'); }).join('');
-    sec.hidden = false;
-  }
-  function renderNew(rows) {
-    var sec = $('#bq-new'), grid = $('#bq-new-grid');
-    if (!sec || !grid || !PR) return;
-    var list = groups(rows, function (p) { return PR.isNew(p) ? { pc: 0, now: fromPrice(p), reg: null } : null; });
-    if (!list.length) { sec.hidden = true; return; }
-    grid.innerHTML = list.slice(0, 8).map(function (g) { return card(g, 'new'); }).join('');
+    grid.innerHTML = cards.slice(0, 8).join('');
     sec.hidden = false;
   }
 
@@ -205,9 +237,9 @@
       });
       var rows = pr.data;
       renderTiles(rows);
-      renderPromos(rows);
-      renderNew(rows);
-      if (res[2] && !res[2].error) renderPack(res[2].data, rows);
+      var pks = (res[2] && !res[2].error && res[2].data) || [];
+      renderDeals(rows, pks);
+      if (pks.length) renderPack(pks, rows);
       if (res[2] && res[2].data && res[2].data.length) { var tp = $('a[data-tab="packs"]'); if (tp) tp.hidden = false; }
     }, function () {});
   }
