@@ -931,8 +931,9 @@ body.cart-lock { overflow:hidden; }
 .pack-mini-body { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
 .pack-mini-name { font-family:var(--display); font-weight:700; font-size:1.22rem; line-height:1.15; letter-spacing:-.02em; }
 .pack-mini-sub { font-size:.86rem; color:var(--muted); }
-.pack-mini-price { margin-top:4px; font-size:.86rem; color:var(--ember-ink); font-weight:700; font-variant-numeric:tabular-nums; }
-.pack-mini-price b { margin-right:6px; font-size:1.15rem; color:var(--ink); }
+/* même règle que .pack-tile-price et .pack-price span : prix à l'unité gris et discret (choix de Théo 2026-11-16) */
+.pack-mini-price { margin-top:4px; font-size:.86rem; color:var(--muted); font-weight:500; font-variant-numeric:tabular-nums; }
+.pack-mini-price b { margin-right:clamp(14px, 4vw, 22px); font-size:1.15rem; font-weight:700; color:var(--ink); }
 .pack-mini-go { flex:none; display:grid; place-items:center; width:38px; height:38px; border-radius:50%; color:var(--ink);
   background:var(--wash); border:1px solid var(--line); }
 .pack-mini-go svg { width:18px; height:18px; }
@@ -977,7 +978,7 @@ body.cart-lock { overflow:hidden; }
 .pack-note { margin:0; line-height:1.5; color:var(--ink-2); }
 .pack-price { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 12px; }
 .pack-price b { font-family:var(--display); font-size:2rem; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
-.pack-price span { font-weight:700; color:var(--ember-ink); font-variant-numeric:tabular-nums; }
+.pack-price span { font-weight:500; color:var(--muted); font-variant-numeric:tabular-nums; }
 .pack-pres { display:grid; grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); gap:10px; }
 .pack-pre { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; padding:12px 10px 11px; min-width:0;
   font:inherit; color:var(--ink); text-align:center; cursor:pointer; background:var(--paper); border:1px solid var(--line-2); border-radius:14px;
