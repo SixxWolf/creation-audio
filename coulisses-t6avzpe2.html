@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=170">
+<link rel="stylesheet" href="assets/admin.css?v=172">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
@@ -113,6 +113,7 @@
       <button class="tab" type="button" data-tab="accessoires" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.3V4.5a1 1 0 0 1 1-1h7.8l8.2 8.2a1 1 0 0 1 0 1.4l-6.9 6.9a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.5"/></svg><span>Accessoires</span></button>
       <button class="tab" type="button" data-tab="promotions" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5L5 19"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg><span>Promotions</span></button>
       <button class="tab" type="button" data-tab="nouveautes" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 5.3 5.3.5-4 3.6 1.2 5.4L12 15l-4.7 2.8 1.2-5.4-4-3.6 5.3-.5z"/></svg><span>Nouveautés</span></button>
+      <button class="tab" type="button" data-tab="packs" data-group="Catalogue"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 12h18M9 8V5h6v3"/></svg><span>Packs</span></button>
 
       <p class="side-group" aria-hidden="true">Stock</p>
       <button class="tab" type="button" data-tab="inventaire" data-group="Stock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/></svg><span>Inventaire</span></button>
@@ -425,6 +426,95 @@
       </div>
 
       <div class="pm-list" id="nv-list"><p class="muted">Chargement…</p></div>
+    </section>
+    <!-- ---------------- PACKS (cms-packs.js, table packs) ----------------
+         Prix fixe composé par paires ; calcul serveur _pack_fill (schema-v2.sql § Packs de filament). -->
+    <section class="tabpanel" data-panel="packs" role="tabpanel" hidden>
+     <div class="dock-main">
+      <div class="panel-head">
+        <div>
+          <h1>Packs</h1>
+          <p class="muted">Recharges à prix fixe, composées par paires.</p>
+        </div>
+        <span class="grow"></span>
+        <a class="btn btn-ghost btn-sm" href="./boutique/packs" target="_blank" rel="noopener" data-ic="link">Voir la boutique</a>
+        <button class="btn btn-ghost btn-sm" id="pk-refresh" type="button" data-ic="refresh">Rafraîchir</button>
+        <button class="btn btn-accent" id="pk-new" type="button" data-ic="plus">Pack</button>
+      </div>
+
+      <form class="editor" id="pk-editor" hidden>
+        <h2 id="pk-editor-title">Pack</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="pk-name">Nom</label>
+            <input type="text" id="pk-name" maxlength="50" placeholder="Ex. Pack Essentiels" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pk-name-en">Nom en anglais</label>
+            <input type="text" id="pk-name-en" maxlength="50" placeholder="Ex. Essentials Pack" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pk-note">Phrase courte</label>
+            <input type="text" id="pk-note" maxlength="90" autocomplete="off">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pk-note-en">Phrase en anglais</label>
+            <input type="text" id="pk-note-en" maxlength="90" autocomplete="off">
+          </div>
+          <div class="field">
+            <span class="lbl" id="pk-kind-l">Format</span>
+            <div class="fx-seg pr-seg" id="pk-kind" role="radiogroup" aria-labelledby="pk-kind-l">
+              <button type="button" class="fx-seg-btn" data-kind="refill" role="radio" aria-checked="true">Recharges</button>
+              <button type="button" class="fx-seg-btn" data-kind="spool" role="radio" aria-checked="false">Avec bobine</button>
+            </div>
+          </div>
+          <div class="field">
+            <label class="lbl" for="pk-pairs">Paires</label>
+            <input type="number" id="pk-pairs" min="1" max="10" step="1" value="2" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pk-price">Prix du pack ($)</label>
+            <input type="number" id="pk-price" min="1" step="0.01" inputmode="decimal">
+          </div>
+          <div class="field">
+            <span class="lbl">Par unité</span>
+            <div class="pk-calc" id="pk-calc"></div>
+          </div>
+          <div class="field col-2">
+            <span class="lbl">Options</span>
+            <div class="ac-show">
+              <label class="inline"><input type="checkbox" id="pk-custom" checked> Personnaliser</label>
+              <label class="inline"><input type="checkbox" id="pk-featured" checked> En haut de Filaments</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="pm-sec">
+          <h3>Couleurs permises</h3>
+          <input type="search" id="pk-q" class="pm-q" placeholder="Chercher" autocomplete="off">
+          <div class="pk-colors" id="pk-colors"></div>
+        </div>
+        <div class="pm-sec">
+          <h3>Compositions</h3>
+          <div class="pk-presets" id="pk-presets"></div>
+          <button type="button" class="btn btn-ghost btn-sm" id="pk-preset-add" data-ic="plus">Composition</button>
+        </div>
+        <div class="pm-sec">
+          <h3>Photo</h3>
+          <div class="pk-photo" id="pk-photo"></div>
+          <input type="file" id="pk-file" accept="image/*" hidden>
+        </div>
+
+        <div class="editor-actions">
+          <button class="btn btn-accent" type="submit" id="pk-save" data-ic="save">Enregistrer</button>
+          <button class="btn btn-ghost" type="button" id="pk-cancel">Annuler</button>
+          <span class="status" id="pk-status"></span>
+        </div>
+      </form>
+
+      <div class="pk-list" id="pk-list"><p class="muted">Chargement…</p></div>
+     </div><!-- /.dock-main -->
+     <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
 
     <section class="tabpanel" data-panel="filaments" role="tabpanel">
@@ -1866,6 +1956,7 @@
 
           <!-- Bouton ligne libre -->
           <button type="button" class="btn btn-ghost btn-sm fx-freeline" id="fx-add-free" data-ic="plus">Ligne libre</button>
+          <button type="button" class="btn btn-ghost btn-sm fx-freeline" id="fx-add-pack" data-ic="plus">Pack</button>
         </aside>
 
         <!-- Colonne droite : la facture -->
@@ -3182,11 +3273,11 @@
 <script src="assets/cms-dealers.js?v=13"></script>
 <script src="assets/cms-clients.js?v=14"></script>
 <script src="assets/cms-messages.js?v=9"></script>
-<script src="assets/cms-facturation.js?v=66"></script>
+<script src="assets/cms-facturation.js?v=67"></script>
 <script src="assets/cms-historique.js?v=22"></script>
 <script src="assets/commande-client.js?v=13"></script>
-<script src="assets/cms-commandes-clients.js?v=28"></script>
-<script src="assets/cms-reservations.js?v=9"></script>
+<script src="assets/cms-commandes-clients.js?v=29"></script>
+<script src="assets/cms-reservations.js?v=10"></script>
 <script src="assets/cms-cueillettes.js?v=9"></script>
 <script src="assets/demande-fil.js?v=2"></script>
 <script src="assets/cms-demandes.js?v=4"></script>
@@ -3211,6 +3302,7 @@
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-promotions.js?v=9"></script>
 <script src="assets/cms-nouveautes.js?v=1"></script>
+<script src="assets/cms-packs.js?v=1"></script>
 <script src="assets/cms-recherche.js?v=4"></script>
 <script src="assets/aide.js?v=4"></script>
 <script src="assets/cms-aide.js?v=8"></script>

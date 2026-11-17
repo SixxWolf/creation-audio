@@ -355,7 +355,8 @@
         items += l.qty | 0; missing += OPEN[o.status] ? miss : 0;
         return '<tr>' +
           '<td class="l"><span class="co-prod">' + thumb(l.product_id && stock[l.product_id], kd) +
-            '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(CA.kindMeta(l.meta)) + '</small>' : '') + '</span>' +
+            '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(CA.kindMeta(l.meta)) + '</small>' : '') +
+            (l.pack ? '<small class="cc-meta cc-pack">' + esc(l.pack.name || 'Pack') + '</small>' : '') + '</span>' +
             CA.kindPill(CA.kindOf(l.meta, l.kind)) + '</span></td>' +
           '<td class="n" data-l="Qté"><b>' + (l.qty | 0) + '</b></td>' +
           '<td class="n" data-l="À commander">' + (!OPEN[o.status] ? '—' : miss ? '<span class="co-print-n">' + miss + '</span>' : '<span class="co-ok">en stock</span>') + '</td>' +
@@ -424,9 +425,18 @@
     return catPending;
   }
   function startEdit(o) {
-    var dropped = 0, items = [];
+    var dropped = 0, items = [], packs = {};
     linesOf(o).forEach(function (l) {
       if (!l.product_id) { dropped++; return; }
+      // pack (2026-11-16) : ses lignes restent groupées ; seule la quantité de packs se modifie
+      if (l.pack && l.pack.k) {
+        var g = packs[l.pack.k];
+        if (!g) { g = packs[l.pack.k] = { pack: l.pack, kind: 'pack', pid: l.pack.id, name: l.pack.name || 'Pack', meta: '', qty: +l.pack.n || 1, comp: [] }; items.push(g); }
+        var per = Math.round((l.qty | 0) / (+l.pack.n || 1));
+        g.comp.push({ product_id: l.product_id, qty: per });
+        g.meta = (g.meta ? g.meta + ' · ' : '') + per + ' × ' + l.name;
+        return;
+      }
       var k = CA.kindOf(l.meta, l.kind);
       items.push({ pid: l.product_id, kind: k === 'refill' || k === 'spool' ? k : 'unit', name: l.name, meta: l.meta || '', qty: l.qty | 0 });
     });
@@ -438,10 +448,10 @@
   function stopEdit() { editing = null; render(); }
   function editCard(o, who) {
     var rows = editing.items.map(function (it, i) {
-      var c = catalog && catalog.filter(function (x) { return x.pid === it.pid && x.kind === it.kind; })[0];
+      var c = it.kind !== 'pack' && catalog && catalog.filter(function (x) { return x.pid === it.pid && x.kind === it.kind; })[0];
       var st = c ? (c.stock > 0 ? c.stock + ' en stock' : 'sur commande') : '';
       return '<tr data-i="' + i + '"><td class="l"><span class="co-prod">' + thumb(c ? c.p : stock[it.pid], it.kind) + '<span><b>' + esc(it.name) + '</b>' +
-          (it.meta ? '<small class="cc-meta">' + esc(CA.kindMeta(it.meta)) + '</small>' : '') + '</span>' + CA.kindPill(it.kind) + '</span></td>' +
+          (it.meta ? '<small class="cc-meta">' + esc(it.kind === 'pack' ? it.meta : CA.kindMeta(it.meta)) + '</small>' : '') + '</span>' + (it.kind === 'pack' ? '' : CA.kindPill(it.kind)) + '</span></td>' +
         '<td class="n"><input type="number" class="cof-qty" min="1" max="999" step="1" inputmode="numeric" value="' + it.qty + '" aria-label="Quantité ' + esc(it.name) + '"></td>' +
         '<td class="n cof-opt">' + esc(st) + '</td>' +
         '<td class="n"><button type="button" class="btn btn-ghost btn-sm btn-icon ce-del" data-ic="trash" aria-label="Retirer ' + esc(it.name) + '"></button></td></tr>';
@@ -505,7 +515,8 @@
     save.addEventListener('click', function () {
       if (!editing.items.length) { status.textContent = 'Ajoute au moins un article.'; return; }
       save.disabled = true; status.textContent = 'Enregistrement…';
-      sb.rpc('admin_update_customer_order', { p_id: o.id, p_lines: editing.items.map(function (it) { return { product_id: it.pid, kind: it.kind, qty: it.qty }; }) })
+      sb.rpc('admin_update_customer_order', { p_id: o.id, p_lines: editing.items.map(function (it) {
+        return it.kind === 'pack' ? { pack_id: it.pid, qty: it.qty, comp: it.comp } : { product_id: it.pid, kind: it.kind, qty: it.qty }; }) })
         .then(function (res) {
           if (res.error) throw res.error;
           if (!res.data || !res.data.id) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');

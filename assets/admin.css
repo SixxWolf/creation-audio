@@ -2320,6 +2320,48 @@ a.ms-b-file:hover { border-color:var(--ink); }
   .pm-pick { max-height:340px; }
 }
 
+/* Catalogue › Packs (cms-packs.js) — cartes glissables, couleurs permises, compositions par paires */
+.pk-list { display:flex; flex-direction:column; gap:10px; }
+.pk-row { display:flex; align-items:center; gap:14px; padding:12px 16px; background:var(--paper); border:1px solid var(--line); border-radius:14px; cursor:grab; }
+.pk-row.is-off { opacity:.72; }
+.pk-row.dragging { opacity:.4; }
+.pk-row.drop-target { border-color:var(--ember); box-shadow:0 0 0 2px color-mix(in srgb, var(--ember) 30%, transparent); }
+.pk-thumb { flex:none; width:96px; height:64px; display:grid; place-items:center; border-radius:10px; background:var(--wash); overflow:hidden; }
+.pk-thumb img { width:100%; height:100%; object-fit:contain; }
+.pk-thumb svg { width:88px; height:52px; }
+.pk-cols, .pk-pres { display:flex; flex-wrap:wrap; gap:6px; }
+.pk-col { display:inline-flex; align-items:center; gap:6px; font-size:.82rem; }
+.pk-pre { padding:2px 9px; font-size:.78rem; border:1px solid var(--line-2); border-radius:100px; }
+.pk-pre em { font-style:normal; color:var(--good); }
+.pk-pre.is-out em { color:var(--bad); }
+.pk-calc { min-height:40px; display:flex; flex-wrap:wrap; align-items:center; gap:4px; font-size:.88rem; font-variant-numeric:tabular-nums; }
+.pk-calc .pos, .pk-pcf .pos { color:var(--good); } .pk-calc .neg, .pk-pcf .neg { color:var(--bad); }
+.pk-colors { display:flex; flex-direction:column; gap:10px; max-height:360px; overflow:auto; padding:2px; }
+.pk-cgl { margin:0 0 6px; font-size:.78rem; font-weight:600; color:var(--muted); }
+.pk-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.pk-chip { display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:0 11px; font:inherit; font-size:.84rem; color:var(--ink); cursor:pointer; background:var(--wash); border:1px solid var(--line-2); border-radius:100px; }
+.pk-chip em { font-style:normal; font-size:.76rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.pk-chip.is-on { border-color:var(--ember); background:color-mix(in srgb, var(--ember) 12%, transparent); }
+.pk-presets { display:flex; flex-direction:column; gap:10px; margin:0 0 10px; }
+.pk-pc { padding:12px 14px; border:1px solid var(--line); border-radius:14px; background:var(--paper); cursor:grab; }
+.pk-pc.dragging { opacity:.4; }
+.pk-pch { display:flex; gap:8px; align-items:center; }
+.pk-pch input { flex:1; min-width:0; }
+.pk-steps { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 6px; }
+.pk-step { display:inline-flex; align-items:center; gap:7px; padding:4px 6px 4px 10px; border:1px solid var(--line-2); border-radius:100px; font-size:.84rem; }
+.pk-step.is-on { border-color:var(--ember); }
+.pk-step button { width:28px; height:28px; display:grid; place-items:center; font:inherit; font-weight:700; color:var(--ink); cursor:pointer; background:var(--wash); border:1px solid var(--line-2); border-radius:50%; }
+.pk-step b { min-width:1.2em; text-align:center; font-variant-numeric:tabular-nums; }
+.pk-pcf { font-size:.82rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.pk-photo { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.pk-photo img { width:140px; height:96px; object-fit:contain; border-radius:10px; background:var(--wash); }
+@media (max-width:640px) {
+  .pk-row { flex-direction:column; align-items:stretch; }
+  .pk-row .pm-acts { justify-content:flex-start; }
+  .pk-pch { flex-wrap:wrap; }
+  .pk-pch input { flex:1 1 100%; }
+}
+
 /* Commandes › Demandes (cms-demandes.js) : liste + fiche côte à côte, fiche plein écran sous 900 px */
 .dm-filters { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 14px; }
 .dm-f { min-height:36px; padding:0 14px; font:inherit; font-size:.9rem; font-weight:600; color:var(--ink-2); cursor:pointer; background:var(--paper); border:1px solid var(--line-2); border-radius:100px; }
@@ -2426,3 +2468,16 @@ a.ms-b-file:hover { border-color:var(--ink); }
 .en-res .is-bad { color:#c0392b; font-weight:600; }
 .en-res .en-note { margin:10px 0 0; }
 @media (max-width:640px) { .en-mat { grid-template-columns:1fr 1fr; } .en-mat .field:first-child { grid-column:1/-1; } }
+
+/* Packs dans Commandes / Réservations / Facturation (2026-11-16) */
+.cc-meta.cc-pack { color:var(--ember-ink); font-weight:700; }
+.fx-packtag { color:var(--ember-ink); font-weight:700; }
+.fx-packpick { display:flex; flex-direction:column; gap:8px; max-height:52vh; overflow:auto; }
+.fx-packopt { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; font:inherit; color:var(--ink); text-align:left;
+  cursor:pointer; background:var(--paper); border:1px solid var(--line-2); border-radius:12px; }
+.fx-packopt:hover { border-color:var(--ink-2); }
+.fx-packopt.is-on { border-color:var(--ember); box-shadow:inset 0 0 0 1px var(--ember); }
+.fx-packdots { display:flex; flex:none; gap:2px; }
+.fx-packn { flex:1; min-width:0; }
+.fx-packn em { font-style:normal; font-size:.8rem; color:var(--muted); }
+.fx-packp { flex:none; font-weight:700; font-variant-numeric:tabular-nums; }

@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 42;
+window.CA_EN_V = 43;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -1174,5 +1174,27 @@ window.CA_EN = (function (pairs) {
   [`{n} article`, `{n} item`],
   [`{n} articles`, `{n} items`],
   [`{n} couleur en promo`, `{n} colour on sale`],
-  [`{n} couleurs en promo`, `{n} colours on sale`]
+  [`{n} couleurs en promo`, `{n} colours on sale`],
+  // ---- boutique.js : packs (2026-11-16)
+  [`Création Audio — Packs`, `Création Audio — Packs`],
+  [`la bobine`, `per spool`],
+  [`la recharge`, `per refill`],
+  [`Packs`, `Packs`],
+  [`Prix fixe, par paires de couleurs`, `Fixed price, in colour pairs`],
+  [`Aucun pack pour le moment.`, `No packs right now.`],
+  [`Voir les filaments`, `See filaments`],
+  [`Personnaliser`, `Customize`],
+  [`Choisis tes paires`, `Pick your pairs`],
+  [`Retirer une paire`, `Remove a pair`],
+  [`Ajouter une paire`, `Add a pair`],
+  [`Choisis `, `Pick `],
+  [` bobines`, ` spools`],
+  [` recharges`, ` refills`],
+  [`Maximum au panier`, `Maximum in cart`],
+  [`Composition`, `Mix`],
+  [`Le pack compte pour le rabais quantité de tes autres filaments `, `The pack counts toward the volume discount on your other filaments from `],
+  [`Plus assez de stock pour ce pack.`, `Not enough stock left for this pack.`],
+  [` le pack`, ` per pack`],
+  [`*** PACKS ***\n`, `*** PACKS ***\n`],
+  [`Pack`, `Pack`]
 ]);

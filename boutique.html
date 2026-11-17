@@ -35,8 +35,8 @@ else if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
 <link rel="stylesheet" href="assets/site.css?v=29">
-<link rel="stylesheet" href="assets/boutique.css?v=63">
-<link rel="stylesheet" href="assets/boutique-accueil.css?v=2">
+<link rel="stylesheet" href="assets/boutique.css?v=64">
+<link rel="stylesheet" href="assets/boutique-accueil.css?v=3">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="assets/fetes.css?v=9">
 <script>(function(){try{var q=/[?&]fetes=([01])/.exec(location.search),v=q?q[1]:sessionStorage.getItem('ca-fetes-voir'),f=JSON.parse(localStorage.getItem('ca-fetes')),t=Date.now();if(v?v==='1':f&&t>=f.a&&t<f.b&&localStorage.getItem('ca-fetes-off')!=='1')document.documentElement.classList.add('fetes')}catch(e){}})();</script>
@@ -88,6 +88,7 @@ else if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.
   <nav class="shop-tabs" id="shop-tabs" aria-label="Rayons de la boutique">
     <a href="boutique" data-tab="home" class="shop-tab-home is-active" aria-label="Accueil de la boutique" title="Accueil de la boutique" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.2 12 4.5l8 6.7"/><path d="M6.2 9.6V19.5h11.6V9.6"/><path d="M10 19.5v-5h4v5"/></svg></a>
     <a href="boutique/filaments" data-tab="filaments">Filaments</a>
+    <a href="boutique/packs" data-tab="packs" hidden>Packs</a>
     <a href="boutique/spacers" data-tab="spacers">Spacers</a>
     <a href="boutique/accessoires" data-tab="accessoires">Accessoires</a>
     <a href="boutique/imprimantes" data-tab="imprimantes">Imprimantes 3D</a>
@@ -151,6 +152,17 @@ else if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.
       <span class="bq-go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
     </a>
   </div>
+
+  <!-- Pack mis en avant (table packs, rempli par boutique-accueil.js ; caché s'il n'y en a aucun) -->
+  <a class="bq-pack" id="bq-pack" href="boutique/packs" hidden>
+    <span class="bq-pack-art" id="bq-pack-art" aria-hidden="true"></span>
+    <span class="bq-pack-body">
+      <span class="bq-pack-kicker">Packs</span>
+      <span class="bq-pack-name" id="bq-pack-name"></span>
+      <span class="bq-pack-meta" id="bq-pack-meta"></span>
+    </span>
+    <span class="bq-go" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>
 
   <section class="cat-group bq-sec promo-sec" id="bq-promos" aria-labelledby="bq-promos-t" hidden>
     <header class="cat-ghead">
@@ -258,6 +270,6 @@ else if(/\.html$/.test(location.pathname))history.replaceState(null,'',location.
 <script src="assets/supabase-client.js?v=1"></script>
 <script src="assets/nav.js?v=23"></script>
 <script src="assets/promo.js?v=2"></script>
-<script src="assets/boutique-accueil.js?v=1"></script>
+<script src="assets/boutique-accueil.js?v=2"></script>
 </body>
 </html>

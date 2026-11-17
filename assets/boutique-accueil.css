@@ -54,3 +54,26 @@
   .bq-soon { top:8px; left:8px; font-size:.64rem; padding:3px 8px; }
   .bq-perks li { font-size:.82rem; padding:5px 11px; }
 }
+
+/* ---- pack mis en avant (2026-11-16) ---- */
+.bq-pack { position:relative; display:flex; align-items:center; gap:clamp(16px, 2.6vw, 32px); margin-top:18px;
+  padding:clamp(16px, 2.2vw, 24px) 70px clamp(16px, 2.2vw, 24px) clamp(16px, 2.2vw, 24px); text-decoration:none; color:var(--ink);
+  background:var(--paper); border:1px solid var(--line); border-radius:20px; transition:transform .2s, box-shadow .2s, border-color .2s; }
+.bq-pack[hidden] { display:none; }
+.bq-pack:hover { transform:translateY(-3px); border-color:var(--line-2); box-shadow:0 26px 48px -28px rgba(20,22,26,.42); }
+.bq-pack:focus-visible { outline:3px solid var(--ember-dim); outline-offset:3px; }
+.bq-pack-art { flex:none; display:flex; padding-left:14px; }
+.bq-pack-art i { width:clamp(46px, 5vw, 64px); aspect-ratio:1; margin-left:-14px; border-radius:50%;
+  box-shadow:0 0 0 2px var(--paper), inset 0 0 0 1px rgba(0,0,0,.18); }
+.bq-pack-body { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.bq-pack-kicker { font-size:.74rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--ember-ink); }
+.bq-pack-name { font-family:var(--display); font-weight:700; font-size:1.42rem; line-height:1.1; letter-spacing:-.02em; }
+.bq-pack-meta { font-size:.92rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.bq-pack-meta b { color:var(--ink); }
+.bq-pack .bq-go { top:50%; bottom:auto; margin-top:-17px; }
+.bq-pack:hover .bq-go { color:var(--on-ember); background:var(--ember); border-color:var(--ember); transform:translateX(2px); }
+@media (max-width:560px) {
+  .bq-pack { flex-direction:column; align-items:flex-start; padding-right:16px; }
+  .bq-pack .bq-go { top:auto; bottom:16px; margin-top:0; }
+  .bq-pack-name { font-size:1.18rem; }
+}

@@ -922,6 +922,7 @@ select cron.schedule('waitlist-cleanup', '0 4 * * *', 'select public.waitlist_cl
 -- Une facture annulée ne se modifie pas. updated_at = dernière modif.
 -- ------------------------------------------------------------
 alter table public.invoices add column if not exists updated_at timestamptz;
+alter table public.invoice_lines add column if not exists pack jsonb;   -- ligne d'un pack de filament (2026-11-16) : { id, k, n, name, name_en, price, kind }
 
 create or replace function public.update_invoice(p_id uuid, p_invoice jsonb, p_lines jsonb, p_deduct boolean)
 returns public.invoices language plpgsql security definer set search_path = public as $$
@@ -990,11 +991,12 @@ begin
       end if;
     end if;
     insert into public.invoice_lines
-      (invoice_id, product_id, label, meta, kind, ptype, qty, unit_price, unit_cost, line_total, sort_order, qty_deducted, qty_pending)
+      (invoice_id, product_id, label, meta, kind, ptype, qty, unit_price, unit_cost, line_total, sort_order, qty_deducted, qty_pending, pack)
     values
       (p_id, v_prod, v_line ->> 'label', v_line ->> 'meta', v_kind, v_line ->> 'ptype', v_qty,
        coalesce((v_line ->> 'unit_price')::numeric, 0), coalesce((v_line ->> 'unit_cost')::numeric, 0),
-       coalesce((v_line ->> 'line_total')::numeric, 0), v_i, v_taken, v_pend);
+       coalesce((v_line ->> 'line_total')::numeric, 0), v_i, v_taken, v_pend,
+       case when jsonb_typeof(v_line -> 'pack') = 'object' then v_line -> 'pack' end);
     v_i := v_i + 1;
   end loop;
 
@@ -1717,7 +1719,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
       'lines', coalesce((
         select jsonb_agg(jsonb_build_object(
           'label', l.label, 'meta', l.meta, 'kind', l.kind, 'ptype', l.ptype, 'qty', l.qty,
-          'unit_price', l.unit_price, 'line_total', l.line_total, 'qty_pending', coalesce(l.qty_pending, 0),
+          'unit_price', l.unit_price, 'line_total', l.line_total, 'qty_pending', coalesce(l.qty_pending, 0), 'pack', l.pack,
           'hex', (select p.hex from public.products p where p.id = l.product_id)
         ) order by l.sort_order, l.id)
         from public.invoice_lines l where l.invoice_id = i.id), '[]'::jsonb)) as x
@@ -1907,6 +1909,111 @@ drop policy if exists customer_order_lines_admin_all on public.customer_order_li
 create policy customer_order_lines_admin_all on public.customer_order_lines for all to authenticated
   using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
 
+-- ============ Packs de filament (2026-11-16) ============
+-- Offre à prix fixe (ex. « Pack Essentiels » : 4 recharges PLA Basic noir/blanc pour 60 $).
+-- Composition par PAIRES parmi `colors` (ids de produits filament, dans l'ordre affiché) :
+-- compositions toutes faites (`presets`) et/ou « Personnaliser » (`allow_custom`).
+-- Le prix du pack ne suit aucun palier, mais ses recharges COMPTENT dans le palier de la
+-- marque pour les autres filaments du panier (choix de Théo, option B). Limité au stock.
+-- Une ligne de commande/facture par couleur, avec `pack` = { id, k, n, name, name_en, price }
+-- (k = repère du pack dans la commande, n = nombre de packs) pour l'affichage groupé.
+create table if not exists public.packs (
+  id           uuid primary key default gen_random_uuid(),
+  slug         text unique,
+  name         text not null,
+  name_en      text,
+  note         text,                                   -- phrase courte (carte / fiche)
+  note_en      text,
+  kind         text not null default 'refill' check (kind in ('refill', 'spool')),
+  pairs        integer not null default 2 check (pairs between 1 and 10),
+  price        numeric(10,2) not null check (price > 0),
+  colors       uuid[] not null default '{}',
+  presets      jsonb not null default '[]'::jsonb,     -- [{ id, name, name_en, lines: [{ p: uuid, n: paires }] }]
+  allow_custom boolean not null default true,
+  enabled      boolean not null default false,
+  featured     boolean not null default true,          -- mis en avant en haut de Filaments
+  image_path   text,                                   -- photo facultative (sinon bobines dessinées)
+  sort_order   integer not null default 0,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+alter table public.packs enable row level security;
+drop policy if exists packs_admin_all on public.packs;
+create policy packs_admin_all on public.packs for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists packs_public_read on public.packs;
+create policy packs_public_read on public.packs for select to anon, authenticated using (enabled);
+grant select on public.packs to anon, authenticated;
+alter table public.customer_order_lines add column if not exists pack jsonb;
+
+-- Lignes des packs d'un panier : [{ pack_id, qty (nb de packs), comp: [{ product_id, qty (recharges par pack) }] }]
+-- (les entrées sans pack_id sont ignorées). Valide pack actif, couleurs permises, paires, total,
+-- composition toute faite si la personnalisation est fermée, et le STOCK (aucune commande au-delà).
+-- -> jsonb [{ product_id, ptype, kind, name, brand, material, sort_order, qty, unit_price, line_total, gkey, pack }]
+create or replace function public._pack_fill(p_lines jsonb)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare x jsonb; pk public.packs; v_n int; v_units int; v_unit numeric; v_comp jsonb; v_sum int;
+        v_out jsonb := '[]'::jsonb; v_idx int := 0; v_bad text; r record;
+        v_uuid text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+begin
+  for x in select e from jsonb_array_elements(p_lines) e loop
+    continue when coalesce(x ->> 'pack_id', '') = '';
+    if (x ->> 'pack_id') !~* v_uuid then raise exception 'Pack introuvable. Recharge la page puis réessaie.'; end if;
+    select * into pk from public.packs where id = (x ->> 'pack_id')::uuid and enabled;
+    if not found then raise exception 'Un pack de ton panier n''est plus offert. Recharge la page puis réessaie.'; end if;
+    if coalesce(x ->> 'qty', '') !~ '^\d{1,2}$' or (x ->> 'qty')::int < 1 then raise exception 'Quantité de pack invalide.'; end if;
+    v_n := (x ->> 'qty')::int;
+    v_units := pk.pairs * 2;
+    v_unit := round(pk.price / v_units, 2);
+    if v_unit * v_units <> pk.price then raise exception 'Prix du pack « % » à revoir. Écris-nous.', pk.name; end if;
+    select coalesce(jsonb_object_agg(pid, q), '{}'::jsonb), coalesce(sum(q), 0)::int into v_comp, v_sum
+      from (select lower(e ->> 'product_id') as pid, sum((e ->> 'qty')::int)::int as q
+              from jsonb_array_elements(case when jsonb_typeof(x -> 'comp') = 'array' then x -> 'comp' else '[]'::jsonb end) e
+             where (e ->> 'product_id') ~* v_uuid and coalesce(e ->> 'qty', '') ~ '^\d{1,3}$' and (e ->> 'qty')::int > 0
+             group by 1) z;
+    if v_sum <> v_units
+       or exists (select 1 from jsonb_each_text(v_comp) c where c.value::int % 2 <> 0)
+       or exists (select 1 from jsonb_object_keys(v_comp) k where not (k::uuid = any (pk.colors))) then
+      raise exception 'Composition du pack « % » invalide. Recharge la page puis réessaie.', pk.name;
+    end if;
+    if not pk.allow_custom and not exists (
+      select 1 from jsonb_array_elements(pk.presets) pr
+       where (select coalesce(jsonb_object_agg(lower(l ->> 'p'), (l ->> 'n')::int * 2), '{}'::jsonb)
+                from jsonb_array_elements(case when jsonb_typeof(pr -> 'lines') = 'array' then pr -> 'lines' else '[]'::jsonb end) l
+               where coalesce(l ->> 'n', '') ~ '^\d+$' and (l ->> 'n')::int > 0) = v_comp) then
+      raise exception 'Composition du pack « % » invalide. Recharge la page puis réessaie.', pk.name;
+    end if;
+    v_idx := v_idx + 1;
+    for r in
+      select pp.id, pp.name, pp.brand, pp.material, pp.sort_order, c.value::int as q
+        from jsonb_each_text(v_comp) c
+        left join public.products_public pp on pp.id = c.key::uuid and pp.type = 'filament'
+         and (case when pk.kind = 'refill' then pp.sell_price_2 else pp.sell_price end) is not null
+       order by pp.sort_order nulls last, pp.name
+    loop
+      if r.id is null then raise exception 'Une couleur du pack « % » n''est plus offerte. Recharge la page.', pk.name; end if;
+      v_out := v_out || jsonb_build_array(jsonb_build_object(
+        'product_id', r.id, 'ptype', 'filament', 'kind', pk.kind, 'name', r.name, 'brand', r.brand, 'material', r.material,
+        'sort_order', r.sort_order, 'qty', r.q * v_n, 'unit_price', v_unit, 'line_total', round(v_unit * r.q * v_n, 2),
+        'gkey', 'fil|' || coalesce(nullif(r.brand, ''), nullif(r.material, ''), ''),
+        'pack', jsonb_build_object('id', pk.id, 'k', 'k' || v_idx, 'n', v_n, 'name', pk.name, 'name_en', pk.name_en,
+                                   'price', pk.price, 'kind', pk.kind)));
+    end loop;
+    if v_idx > 20 then raise exception 'Trop de packs dans une seule commande.'; end if;
+  end loop;
+  -- stock : le pack ne part jamais « à commander »
+  select string_agg(pp.name, ', ') into v_bad
+    from (select (y ->> 'product_id')::uuid as pid, y ->> 'kind' as kind, sum((y ->> 'qty')::int) as q
+            from jsonb_array_elements(v_out) y group by 1, 2) d
+    join public.products_public pp on pp.id = d.pid
+   where d.q > greatest(case when d.kind = 'refill' then coalesce(pp.qty_2, 0) else coalesce(pp.qty, 0) end, 0);
+  if v_bad is not null then
+    raise exception 'Pack : plus assez de stock pour %. Ajuste ton panier.', v_bad;
+  end if;
+  return v_out;
+end $$;
+revoke all on function public._pack_fill(jsonb) from public, anon, authenticated;
+
 -- Prix au palier (même règle que la boutique : le plus haut palier atteint, sinon le prix de base).
 create or replace function public._tier_price(p_base numeric, p_tiers jsonb, p_qty integer)
 returns numeric language sql immutable set search_path = '' as $$
@@ -1924,20 +2031,27 @@ $$;
 -- meta, qty, unit_price, line_total, qty_to_order, sort_order}]
 create or replace function public._customer_fill_lines(p_lines jsonb)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
-declare v_in int; v_ok int; v_out jsonb;
+declare v_in int; v_ok int; v_out jsonb; v_pk jsonb;
 begin
   if jsonb_typeof(p_lines) is distinct from 'array' or jsonb_array_length(p_lines) = 0 then
     raise exception 'Ton panier est vide.';
   end if;
   if jsonb_array_length(p_lines) > 60 then raise exception 'Trop d''articles dans une seule commande.'; end if;
+  -- packs (prix fixe, limités au stock) : leurs recharges comptent dans le palier de la marque (gkey)
+  v_pk := public._pack_fill(p_lines);
   with l as (
     select (x ->> 'product_id')::uuid as pid,
            case when x ->> 'kind' in ('spool', 'refill') then x ->> 'kind' else 'unit' end as kind,
            sum(least((x ->> 'qty')::int, 999))::int as qty
       from jsonb_array_elements(p_lines) x
-     where (x ->> 'product_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+     where coalesce(x ->> 'pack_id', '') = ''
+       and (x ->> 'product_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
        and coalesce(x ->> 'qty', '') ~ '^\d{1,4}$' and (x ->> 'qty')::int > 0
      group by 1, 2
+  ), pk as (
+    select (y ->> 'product_id')::uuid as pid, y ->> 'kind' as kind, (y ->> 'qty')::int as qty, y ->> 'gkey' as gkey, y
+      from jsonb_array_elements(v_pk) y
+  ), pks as (select pid, kind, sum(qty)::int as q from pk group by 1, 2
   ), j as (
     select l.pid, l.kind, l.qty, pp.type, pp.name, pp.brand, pp.material, pp.sort_order,
            case when pp.type = 'filament' and l.kind = 'refill' then pp.sell_price_2 else pp.sell_price end as base,
@@ -1955,23 +2069,36 @@ begin
       join public.products_public pp on pp.id = l.pid
      where (pp.type = 'filament' and l.kind in ('spool', 'refill'))
         or (pp.type in ('accessory', 'spacer') and l.kind = 'unit')
-  ), g as (select gkey, sum(qty)::int as gq from j group by gkey),
+  ), g as (select gkey, sum(qty)::int as gq from (select gkey, qty from j union all select gkey, qty from pk) z group by gkey),
   priced as (
-    select j.*, round(public._tier_price(j.base, j.tiers, g.gq), 2) as unit
+    select j.*, round(public._tier_price(j.base, j.tiers, g.gq), 2) as unit, null::jsonb as pack
       from j join g using (gkey)
      where j.base is not null
-  ), s as (
-    select priced.*, row_number() over (order by case type when 'filament' then 0 when 'accessory' then 1 else 2 end,
-             brand nulls last, material nulls last, sort_order, name, kind) - 1 as rn
+  ), u as (
+    -- articles hors pack : le stock déjà pris par les packs du panier ne compte plus pour eux
+    select pid, kind, qty, type, name, brand, material, sort_order, unit, round(unit * qty, 2) as total, pack,
+           case when stock is null then 0
+                else greatest(0, qty - greatest(stock - coalesce((select q from pks where pks.pid = priced.pid and pks.kind = priced.kind), 0), 0)) end as tor,
+           1 as grp, '' as pk_k
       from priced
+    union all
+    select pid, kind, qty, 'filament', y ->> 'name', y ->> 'brand', y ->> 'material', (y ->> 'sort_order')::int,
+           (y ->> 'unit_price')::numeric, (y ->> 'line_total')::numeric, y -> 'pack', 0, 0, y -> 'pack' ->> 'k'
+      from pk
+  ), s as (
+    select u.*, row_number() over (order by grp, pk_k, case type when 'filament' then 0 when 'accessory' then 1 else 2 end,
+             brand nulls last, material nulls last, sort_order, name, kind) - 1 as rn
+      from u
   )
-  select (select count(*) from l), count(*), coalesce(jsonb_agg(jsonb_build_object(
+  select (select count(*) from l) + (select count(*) from pk), count(*), coalesce(jsonb_agg(jsonb_build_object(
            'product_id', pid, 'ptype', type, 'kind', kind, 'name', name,
-           'meta', case when type = 'filament'
+           'meta', case when pack is not null
+                        then concat_ws(' · ', pack ->> 'name', nullif(material, ''), case when kind = 'refill' then 'Recharge' else 'Avec bobine' end)
+                        when type = 'filament'
                         then concat_ws(' · ', nullif(brand, ''), nullif(material, ''), case when kind = 'refill' then 'Recharge' else 'Avec bobine' end)
                         when type = 'accessory' then 'Accessoire' else 'Spacer · paire' end,
-           'qty', qty, 'unit_price', unit, 'line_total', round(unit * qty, 2),
-           'qty_to_order', case when stock is null then 0 else greatest(0, qty - greatest(stock, 0)) end,
+           'qty', qty, 'unit_price', unit, 'line_total', total,
+           'qty_to_order', tor, 'pack', pack,
            'sort_order', rn) order by rn), '[]'::jsonb)
     into v_in, v_ok, v_out
     from s;
@@ -2010,9 +2137,9 @@ begin
           (v_pk ->> 'd')::date, (v_pk ->> 's')::time, (v_pk ->> 'e')::time, true,
           case when not v_bo and v_pk is null then now() + interval '24 hours' end)
   returning id into v_id;
-  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
+  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order, pack)
   select v_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
-         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int, x -> 'pack'
     from jsonb_array_elements(v_lines) x;
   return jsonb_build_object('id', v_id, 'number', v_num, 'total', v_total, 'has_backorder', v_bo);
 end $$;
@@ -2033,9 +2160,9 @@ begin
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
   if not v_bo and p_pickup is not null then v_pk := public._pickup_check(p_pickup, null, p_id, false); end if;
   delete from public.customer_order_lines where order_id = p_id;
-  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
+  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order, pack)
   select p_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
-         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int, x -> 'pack'
     from jsonb_array_elements(v_lines) x;
   update public.customer_orders
      set total = v_total, has_backorder = v_bo, note = nullif(left(btrim(coalesce(p_note, '')), 500), ''),
@@ -2080,7 +2207,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
       'lines', coalesce((
         select jsonb_agg(jsonb_build_object(
           'product_id', l.product_id, 'ptype', l.ptype, 'kind', l.kind, 'name', l.name, 'meta', l.meta, 'qty', l.qty,
-          'unit_price', l.unit_price, 'line_total', l.line_total, 'qty_to_order', l.qty_to_order,
+          'unit_price', l.unit_price, 'line_total', l.line_total, 'qty_to_order', l.qty_to_order, 'pack', l.pack,
           'hex', (select p.hex from public.products p where p.id = l.product_id)) order by l.sort_order)
         from public.customer_order_lines l where l.order_id = o.id), '[]'::jsonb)
     ) order by o.created_at desc), '[]'::jsonb)
@@ -2134,9 +2261,9 @@ begin
   select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
   delete from public.customer_order_lines where order_id = p_id;
-  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order)
+  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order, pack)
   select p_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
-         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int, x -> 'pack'
     from jsonb_array_elements(v_lines) x;
   update public.customer_orders set total = v_total, has_backorder = v_bo, stock_hold = (o.stock_hold or o.status = 'new'), updated_at = now() where id = p_id;
   return jsonb_build_object('id', p_id, 'number', o.number, 'total', v_total, 'has_backorder', v_bo);
@@ -2220,6 +2347,7 @@ create table if not exists public.customer_reservation_lines (
 );
 create index if not exists customer_reservation_lines_res_idx on public.customer_reservation_lines (reservation_id);
 create index if not exists customer_reservation_lines_prod_idx on public.customer_reservation_lines (product_id);
+alter table public.customer_reservation_lines add column if not exists pack jsonb;   -- packs (2026-11-16)
 alter table public.customer_reservations enable row level security;
 alter table public.customer_reservation_lines enable row level security;
 drop policy if exists customer_reservations_admin_all on public.customer_reservations;
@@ -2289,9 +2417,9 @@ begin
   values (v_num, v_uid, c.email, c.name, c.phone, nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_exp,
           (v_pk ->> 'd')::date, (v_pk ->> 's')::time, (v_pk ->> 'e')::time)
   returning id into v_id;
-  insert into public.customer_reservation_lines (reservation_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, sort_order)
+  insert into public.customer_reservation_lines (reservation_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, sort_order, pack)
   select v_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
-         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'sort_order')::int
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'sort_order')::int, x -> 'pack'
     from jsonb_array_elements(v_lines) x;
   return jsonb_build_object('id', v_id, 'number', v_num, 'total', v_total, 'expires_at', v_exp);
 end $$;
@@ -2330,7 +2458,7 @@ returns jsonb language sql stable security definer set search_path = '' as $$
           'lines', coalesce((
             select jsonb_agg(jsonb_build_object(
               'product_id', l.product_id, 'ptype', l.ptype, 'kind', l.kind, 'name', l.name, 'meta', l.meta, 'qty', l.qty,
-              'unit_price', l.unit_price, 'line_total', l.line_total,
+              'unit_price', l.unit_price, 'line_total', l.line_total, 'pack', l.pack,
               'hex', (select p.hex from public.products p where p.id = l.product_id)) order by l.sort_order)
             from public.customer_reservation_lines l where l.reservation_id = r.id), '[]'::jsonb)
         ) order by r.created_at desc)

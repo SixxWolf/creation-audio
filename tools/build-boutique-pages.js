@@ -6,11 +6,12 @@
    Ce script en tire :
      boutique/accessoires.html  (data-shop="accessoires")
      boutique/promotions.html   (data-shop="promotions")
+     boutique/packs.html        (data-shop="packs", 2026-11-16)
    → ne jamais éditer ces deux fichiers à la main : modifier
    boutique/filaments.html puis lancer « node tools/build-en.js »
    (qui appelle ce script avant de traduire).
    Exporte aussi tabs() : la barre des rayons
-   (⌂ · Filaments · Spacers · Accessoires · Imprimantes 3D · Promotions).
+   (⌂ · Filaments · Packs · Spacers · Accessoires · Imprimantes 3D · Promotions).
    ========================================================= */
 'use strict';
 const fs = require('fs');
@@ -24,6 +25,7 @@ function tabs(cur, pre, ind) {
   const T = [
     ['home', pre.replace(/\/$/, ''), HOME_IC],
     ['filaments', pre + 'filaments', 'Filaments'],
+    ['packs', pre + 'packs', 'Packs'],
     ['spacers', pre + 'spacers', 'Spacers'],
     ['accessoires', pre + 'accessoires', 'Accessoires'],
     ['imprimantes', pre + 'imprimantes', 'Imprimantes 3D'],
@@ -33,7 +35,8 @@ function tabs(cur, pre, ind) {
     const on = cur === k;
     const cls = k === 'home' ? ' class="shop-tab-home' + (on ? ' is-active' : '') + '" aria-label="Accueil de la boutique" title="Accueil de la boutique"'
       : on ? ' class="is-active"' : '';
-    return ind + '  <a href="' + h + '" data-tab="' + k + '"' + cls + (on ? ' aria-current="page"' : '') + '>' + l + '</a>';
+        // Packs : caché tant qu'aucun pack n'est en ligne (boutique.js le montre)
+    return ind + '  <a href="' + h + '" data-tab="' + k + '"' + cls + (on ? ' aria-current="page"' : '') + (k === 'packs' && !on ? ' hidden' : '') + '>' + l + '</a>';
   }).join('\n') + '\n' + ind + '</nav>';
 }
 
@@ -47,6 +50,11 @@ const PAGES = {
     tab: 'promo', screen: 'screen-promo',
     title: 'Création Audio — Promotions',
     desc: 'Filaments, accessoires et spacers en rabais — Création Audio, région de Québec.'
+  },
+  packs: {
+    tab: 'packs', screen: 'screen-packs',
+    title: 'Création Audio — Packs',
+    desc: 'Packs de recharges de filament à prix réduit, à composer par paires — Création Audio, région de Québec.'
   }
 };
 

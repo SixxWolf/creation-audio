@@ -10,6 +10,7 @@
    boutique/filaments   #/ · #/m/<marque> · #/m/<marque>/<matériau>[/<couleur>]
    boutique/accessoires #/ · #/c/<catégorie> · #/a/<accessoire>
    boutique/promotions  #/ (filaments + accessoires + spacers en promo)
+   boutique/packs       #/ · #/p/<slug> (packs à prix fixe, table packs — 2026-11-16)
    Un lien d'un autre rayon pointe vers sa page (« accessoires#/a/x ») ;
    un ancien lien (#/accessoires…) arrivé sur la mauvaise page y est renvoyé.
    ========================================================= */
@@ -27,7 +28,8 @@
   var UP = '../';                         // les trois pages vivent dans boutique/ (FR et /en/) : liens vers les autres pages, langue gardée
   var PAGE = document.body.getAttribute('data-shop') || 'filaments';
   var FIL_PRE = PAGE === 'filaments' ? '' : 'filaments', ACC_PRE = PAGE === 'accessoires' ? '' : 'accessoires';
-  var BASE_TITLE = PAGE === 'promotions' ? _t('Création Audio — Promotions') : _t('Création Audio — Filaments');
+  var BASE_TITLE = PAGE === 'promotions' ? _t('Création Audio — Promotions') : PAGE === 'packs' ? _t('Création Audio — Packs') : _t('Création Audio — Filaments');
+  var PACK_PRE = PAGE === 'packs' ? '' : 'packs';
 
   // Accessoires « bobine vide réutilisable » (repli si aucun accessoire dans l'admin).
   var ACC = {
@@ -213,9 +215,9 @@
       crumbsEl = $('#crumbs'), configEl = $('#config');
   var screenAccs = $('#screen-accs'), screenAcc = $('#screen-acc'),
       accGroupsEl = $('#acc-groups'), accChipsEl = $('#acc-chips'), accCrumbsEl = $('#acc-crumbs'), accConfigEl = $('#acc-config');
-  var screenPromo = $('#screen-promo');
-  // écran de la page en attendant les données (accessoires / promotions : pas de flash du catalogue filaments)
-  if (PAGE !== 'filaments') showScreen(PAGE === 'accessoires' ? 'accs' : 'promo');
+  var screenPromo = $('#screen-promo'), screenPacks = $('#screen-packs');
+  // écran de la page en attendant les données (accessoires / promotions / packs : pas de flash du catalogue filaments)
+  if (PAGE !== 'filaments') showScreen(PAGE === 'accessoires' ? 'accs' : PAGE === 'packs' ? 'packs' : 'promo');
   // un seul écran visible à la fois ; l'onglet du menu suit (Filaments / Accessoires)
   function showScreen(name) {
     screenCatalog.hidden = name !== 'catalog';
@@ -223,12 +225,13 @@
     screenAccs.hidden = name !== 'accs';
     screenAcc.hidden = name !== 'acc';
     if (screenPromo) screenPromo.hidden = name !== 'promo';
+    if (screenPacks) screenPacks.hidden = name !== 'packs';
     var acc = name === 'accs' || name === 'acc';
     // onglets des rayons : visibles sur les listes, pas sur une fiche
     var tabs = $('#shop-tabs');
     if (tabs) {
       tabs.hidden = name === 'product' || name === 'acc';
-      var cur = name === 'promo' ? 'promo' : acc ? 'accessoires' : 'filaments';
+      var cur = name === 'promo' ? 'promo' : name === 'packs' ? 'packs' : acc ? 'accessoires' : 'filaments';
       $$('a', tabs).forEach(function (a) {
         var on = a.getAttribute('data-tab') === cur;
         a.classList.toggle('is-active', on);
@@ -237,7 +240,7 @@
     }
     $$('.nav-dd-m a, .drawer-sub a').forEach(function (a) {
       var h = a.getAttribute('href') || '';
-      var on = new RegExp('(^|/)' + (name === 'promo' ? 'promotions' : acc ? 'accessoires' : 'filaments') + '$').test(h);
+      var on = new RegExp('(^|/)' + (name === 'promo' ? 'promotions' : name === 'packs' ? 'packs' : acc ? 'accessoires' : 'filaments') + '$').test(h);
       a.classList.toggle('is-active', on);
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -337,6 +340,7 @@
     }
     if (parts[0] === 'a') return { acc: parts[1] ? resolveAcc(parts[1]) : null, accRoute: true };
     if (!parts[0] && PAGE === 'promotions') return { promo: true };
+    if (parts[0] === 'p' || (!parts[0] && PAGE === 'packs')) return { packs: true, slug: parts[1] ? unslug(parts[1]) : null };
     if (parts[0] !== 'm' || !parts[1]) return { brand: null };
     var brand = resolveBrand(parts[1]);
     if (!brand) return { brand: null, bad: true };
@@ -359,12 +363,13 @@
     if (!dataReady) return;                         // rejoué une fois les données chargées
     // lien d'un autre rayon (ancien lien, favori) : on va sur la bonne page, même adresse interne
     var h = location.hash, seg = h.replace(/^#\/?/, '').split('/')[0];
-    var want = seg === 'm' ? 'filaments' : (seg === 'a' || seg === 'c' || seg === 'accessoires') ? 'accessoires' : null;
+    var want = seg === 'm' ? 'filaments' : (seg === 'a' || seg === 'c' || seg === 'accessoires') ? 'accessoires' : seg === 'p' ? 'packs' : null;
     if (seg === 'accessoires') h = '#/' + (h.split('/')[2] ? 'c/' + h.split('/')[2] : '');
     if (want && want !== PAGE) { location.replace(want + h); return; }
     if (h !== location.hash) { history.replaceState(null, '', h); }
     var r = currentRoute();
     if (r.promo) { showPromo(); return; }
+    if (r.packs) { showPacks(r.slug); return; }
     if (r.accs) { if (r.badCat) { replaceRoute('#/'); return; } showAccs(r.cat); return; }
     if (r.accRoute) { if (!r.acc) { replaceRoute('#/'); return; } showAcc(r.acc); return; }
     if (r.bad) { replaceRoute('#/'); return; }
@@ -380,10 +385,18 @@
       sb.from('brands').select('*'),
       sb.from('products_public').select('*').eq('type', 'accessory').order('sort_order', { ascending: true }),
       // page Promotions seulement : les spacers en promo (leur fiche et leur panier sont sur boutique/spacers)
-      PAGE === 'promotions' ? sb.from('products_public').select('*').eq('type', 'spacer').order('sort_order', { ascending: true }) : Promise.resolve({ data: [] })
+      PAGE === 'promotions' ? sb.from('products_public').select('*').eq('type', 'spacer').order('sort_order', { ascending: true }) : Promise.resolve({ data: [] }),
+      // packs en ligne (RLS : enabled seulement) ; une erreur ne bloque pas la boutique
+      sb.from('packs').select('*').order('sort_order', { ascending: true })
     ]).then(function (res) {
       var pr = res[0], br = res[1], ac = res[2];
       spacers = (res[3] && !res[3].error && res[3].data) || [];
+      packsOk = !!(res[4] && !res[4].error);
+      packs = (packsOk && res[4].data) || [];
+      packById = {};
+      packs.forEach(function (pk) { packById[pk.id] = pk; });
+      // onglet Packs : caché dans le HTML tant qu'aucun pack n'est en ligne
+      if (packs.length) $$('a[data-tab="packs"]').forEach(function (a) { a.hidden = false; });
       if (pr.error) { failCatalog(_t('Impossible de charger la boutique.')); return; }
       products = pr.data || [];
       byId = {};
@@ -404,6 +417,7 @@
       });
       buildAccCats();
       buildCatalog();
+      purgePacks();
       dataReady = true;
       applyRoute();          // honore l'URL courante (lien direct / retour navigateur)
       renderCart();
@@ -413,8 +427,8 @@
   }
   function failCatalog(msg) {
     // le message va dans la liste de la page (filaments, accessoires ou promotions)
-    var el = PAGE === 'accessoires' ? accGroupsEl : PAGE === 'promotions' ? $('#promo-groups') : catGroups;
-    if (PAGE === 'accessoires') showScreen('accs'); else if (PAGE === 'promotions') showScreen('promo');
+    var el = PAGE === 'accessoires' ? accGroupsEl : PAGE === 'promotions' ? $('#promo-groups') : PAGE === 'packs' ? $('#pack-groups') : catGroups;
+    if (PAGE === 'accessoires') showScreen('accs'); else if (PAGE === 'promotions') showScreen('promo'); else if (PAGE === 'packs') showScreen('packs');
     el.removeAttribute('aria-busy');
     el.innerHTML = '<p class="empty">' + esc(msg) + '</p>';
   }
@@ -546,7 +560,7 @@
     }
 
     var list = catBrand ? brands.filter(function (B) { return B.name === catBrand; }) : brands;
-    var html = promoSectionHtml(list) + list.map(function (B) {
+    var html = packSectionHtml() + promoSectionHtml(list) + list.map(function (B) {
       var mats = B.materials.filter(function (m) { return !onlyStock || m.items.some(anyStock); });
       if (!mats.length) return '';
       var nStock = B.items.filter(anyStock).length, id = 'g-' + slugify(B.name);
@@ -670,6 +684,272 @@
     var sa = $('.js-show-all', el);
     if (sa) sa.addEventListener('click', function () { setOnlyStock(false); });
   }
+
+  /* =========================================================
+     PACKS (table packs, Admin › Packs — 2026-11-16) : prix fixe, composé par
+     paires parmi les couleurs permises (compositions toutes faites + Personnaliser).
+     Panier : une ligne { id: pack, type: 'pack', key, comp: [{ id, n: unités }], qty }.
+     Le serveur (_pack_fill) revalide la composition, le prix et le stock ; les unités
+     du pack comptent pour le palier de la marque des autres filaments (option B).
+     Stock : le pack passe avant les autres lignes (jamais « à commander »).
+     ========================================================= */
+  var packs = [], packById = {}, packsOk = false, packSel = {};
+  function isPack(it) { return !!(it && it.type === 'pack'); }
+  function enOr(fr, en) { return (window.CA.lang === 'en' && en) ? en : (fr || ''); }
+  function packName(pk) { return enOr(pk.name, pk.name_en); }
+  function packNote(pk) { return enOr(pk.note, pk.note_en); }
+  function preName(pr) { return enOr(pr.name, pr.name_en); }
+  function packUnits(pk) { return (pk.pairs | 0) * 2; }
+  function packUnit(pk) { return Math.round(+pk.price / Math.max(1, packUnits(pk)) * 100) / 100; }
+  function unitWord(pk) { return pk.kind === 'spool' ? _t('la bobine') : _t('la recharge'); }
+  function unitsText(pk, n) { return pk.kind === 'spool' ? plural(n, 'bobine', 'bobines') : plural(n, 'recharge', 'recharges'); }
+  // couleurs permises encore offertes dans ce format, dans l'ordre de la section Filaments
+  function packCols(pk) {
+    var ok = {}; (pk.colors || []).forEach(function (id) { ok[id] = 1; });
+    return products.filter(function (p) { return ok[p.id] && offered(p, pk.kind); });
+  }
+  function lineOf(pk) { var f = packCols(pk)[0]; return f ? ((f.brand ? f.brand + ' ' : '') + (f.material || '')).trim() : ''; }
+  function brandOf(pk) { var f = packCols(pk)[0]; return f ? (f.brand || f.material || '') : ''; }
+  function compValid(pk, comp) {
+    var ids = {}, sum = 0, ok = Array.isArray(comp) && comp.length > 0;
+    packCols(pk).forEach(function (p) { ids[p.id] = 1; });
+    (comp || []).forEach(function (c) { if (!c || !ids[c.id] || !(c.n > 0) || c.n % 2) ok = false; else sum += c.n; });
+    return ok && sum === packUnits(pk);
+  }
+  function preComp(pr) {
+    return (Array.isArray(pr.lines) ? pr.lines : []).filter(function (l) { return l && (l.n | 0) > 0; })
+      .map(function (l) { return { id: l.p, n: (l.n | 0) * 2 }; });
+  }
+  function presetsOf(pk) {
+    return (Array.isArray(pk.presets) ? pk.presets : []).filter(function (pr) { return pr && compValid(pk, preComp(pr)); });
+  }
+  function compKey(comp) {
+    return comp.slice().sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; })
+      .map(function (c) { return c.id + ':' + c.n; }).join(',');
+  }
+  function packKey(pk, comp) { return 'pack|' + pk.id + '|' + compKey(comp); }
+  function compText(comp) {
+    return comp.map(function (c) { var p = byId[c.id]; return c.n + ' × ' + (p ? p.name : '?'); }).join(' · ');
+  }
+  // unités d'une couleur (format) prises par les packs du panier, sauf la ligne `skip`
+  function packUse(pid, kind, skip) {
+    return entries().reduce(function (s, it) {
+      if (!isPack(it) || it.key === skip) return s;
+      var pk = packById[it.id]; if (!pk || pk.kind !== kind) return s;
+      return s + (it.comp || []).reduce(function (t, c) { return t + (c.id === pid ? c.n * it.qty : 0); }, 0);
+    }, 0);
+  }
+  // stock restant pour les lignes ordinaires (les packs passent avant)
+  function freeStock(p, type) { return stockOf(p, type) - packUse(p.id, type, null); }
+  function regQty(pid, kind) { var it = cart[keyOf(pid, kind)]; return it ? it.qty : 0; }
+  // nombre de packs de cette composition possibles (bare = stock seul, sans le panier)
+  function packRoom(pk, comp, skip, bare) {
+    var room = 99;
+    comp.forEach(function (c) {
+      var p = byId[c.id];
+      if (!p) { room = 0; return; }
+      var free = stockOf(p, pk.kind) - (bare ? 0 : packUse(p.id, pk.kind, skip) + (canBackorder() ? 0 : regQty(p.id, pk.kind)));
+      room = Math.min(room, Math.floor(Math.max(0, free) / c.n));
+    });
+    return room;
+  }
+  function packAnyStock(pk) {
+    return presetsOf(pk).some(function (pr) { return packRoom(pk, preComp(pr), null, true) > 0; }) ||
+      (pk.allow_custom && packCols(pk).reduce(function (s, p) { return s + 2 * Math.floor(stockOf(p, pk.kind) / 2); }, 0) >= packUnits(pk));
+  }
+  function defComp(pk) {
+    var pres = presetsOf(pk);
+    var hit = pres.filter(function (pr) { return packRoom(pk, preComp(pr), null, true) > 0; })[0] || pres[0];
+    return hit ? preComp(hit) : null;
+  }
+  function packHref(pk) { return PACK_PRE + '#/p/' + encodeURIComponent(pk.slug || pk.id); }
+  // panier : lignes de pack dont le pack n'est plus offert ou la composition plus valide → retirées
+  function purgePacks() {
+    var bad = false;
+    Object.keys(cart).forEach(function (k) {
+      var it = cart[k]; if (!isPack(it)) return;
+      var pk = packById[it.id];
+      if (!pk || !compValid(pk, it.comp)) { delete cart[k]; bad = true; } else it.key = k;
+    });
+    if (bad) saveCart();
+  }
+
+  /* ---- bobines dessinées aux vraies couleurs (photo facultative dans l'admin) ---- */
+  function coilSvg(cx, cy, r, hex, kind) {
+    var w = kind === 'spool' ? r * 0.84 : r, o = '';
+    if (kind === 'spool') o += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#2b2f36"/>';
+    o += '<circle cx="' + cx + '" cy="' + cy + '" r="' + w + '" fill="' + esc(hex) + '" stroke="rgba(0,0,0,.2)" stroke-width="1.5"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (w * 0.8) + '" fill="none" stroke="rgba(0,0,0,.08)" stroke-width="1"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (w * 0.6) + '" fill="none" stroke="rgba(0,0,0,.08)" stroke-width="1"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 0.36) + '" fill="' + (kind === 'spool' ? '#2b2f36' : '#f3f3f0') + '" stroke="rgba(0,0,0,.18)" stroke-width="1.2"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 0.13) + '" fill="#d9d9d4"/>';
+    return o;
+  }
+  function packArt(pk, comp) {
+    var hexes = [];
+    if (comp) comp.forEach(function (c) { var p = byId[c.id]; for (var i = 0; i < c.n; i++) hexes.push(p ? colorsOf(p)[0] : '#cccccc'); });
+    else {
+      var cols = packCols(pk);
+      for (var i = 0; i < packUnits(pk); i++) hexes.push(cols.length ? colorsOf(cols[i % cols.length])[0] : '#cccccc');
+    }
+    var n = hexes.length, R = 40, step = n > 6 ? 44 : 56, W = (n - 1) * step + 2 * R + 8, H = 2 * R + 8;
+    return '<svg class="pack-art" viewBox="0 0 ' + W + ' ' + H + '" aria-hidden="true">' +
+      hexes.map(function (h, i) { return coilSvg(R + 4 + i * step, R + 4, R, h, pk.kind); }).join('') + '</svg>';
+  }
+  function packMedia(pk, comp) {
+    var u = pk.image_path ? publicUrl(pk.image_path) : '';
+    return u ? '<img src="' + esc(u) + '" alt="" loading="lazy">' : packArt(pk, comp);
+  }
+
+  /* ---- mise en avant en haut de Filaments ---- */
+  function packSectionHtml() {
+    var list = packs.filter(function (pk) {
+      var cols = packCols(pk);
+      if (!pk.featured || !cols.length) return false;
+      if (catBrand && !cols.some(function (p) { return norm(p.brand) === catBrand; })) return false;
+      return !(onlyStock && !packAnyStock(pk));
+    });
+    if (!list.length) return '';
+    return '<section class="cat-group pack-sec" aria-labelledby="g-packs">' +
+      '<header class="cat-ghead">' +
+        '<h2 class="cat-gtitle" id="g-packs">' + _t('Packs') + '</h2>' +
+        '<span class="cat-gmeta">' + _t('Prix fixe, par paires de couleurs') + '</span>' +
+        '<span class="cat-grule" aria-hidden="true"></span>' +
+      '</header>' +
+      '<div class="pack-minis">' + list.map(packMini).join('') + '</div>' +
+    '</section>';
+  }
+  function packMini(pk) {
+    var out = !packAnyStock(pk);
+    return '<a class="pack-mini' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
+      '<span class="pack-mini-art">' + packMedia(pk, defComp(pk)) + '</span>' +
+      '<span class="pack-mini-body">' +
+        '<span class="pack-mini-name">' + esc(packName(pk)) + '</span>' +
+        '<span class="pack-mini-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
+        '<span class="pack-mini-price"><b>' + money(+pk.price) + '</b> <span>' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></span>' +
+      '</span>' +
+      (out ? '<span class="pack-mini-out">' + _t('Épuisé') + '</span>' : '<span class="pack-mini-go" aria-hidden="true">' + IC.arrow + '</span>') +
+    '</a>';
+  }
+
+  /* ---- page boutique/packs ---- */
+  function showPacks(slugSeg) {
+    renderPacksPage();
+    showScreen('packs');
+    curMat = null; curColor = null; curAcc = null; updateBuybar();
+    document.title = BASE_TITLE;
+    var pk = slugSeg && packs.filter(function (x) { return x.slug === slugSeg || x.id === slugSeg; })[0];
+    var el = pk && document.getElementById('pk-' + pk.id);
+    if (el) window.scrollTo(0, Math.max(0, el.getBoundingClientRect().top + window.pageYOffset - topOffset() - 12));
+    else if (lastScreen !== 'packs') window.scrollTo(0, 0);
+    lastScreen = 'packs';
+  }
+  function selOf(pk) {
+    var s = packSel[pk.id];
+    if (!s) {
+      var pres = presetsOf(pk);
+      var first = pres.filter(function (pr) { return packRoom(pk, preComp(pr), null, true) > 0; })[0] || pres[0];
+      s = packSel[pk.id] = { sel: first ? first.id : (pk.allow_custom ? 'custom' : null), custom: {} };
+    }
+    return s;
+  }
+  function selComp(pk) {
+    var s = selOf(pk);
+    if (s.sel === 'custom') {
+      var comp = Object.keys(s.custom).filter(function (id) { return s.custom[id] > 0; })
+        .map(function (id) { return { id: id, n: s.custom[id] * 2 }; });
+      return compValid(pk, comp) ? comp : null;
+    }
+    var pr = presetsOf(pk).filter(function (x) { return x.id === s.sel; })[0];
+    return pr ? preComp(pr) : null;
+  }
+  function renderPacksPage() {
+    var el = $('#pack-groups'); if (!el) return;
+    var list = packs.filter(function (pk) { return packCols(pk).length > 0; });
+    el.removeAttribute('aria-busy');
+    el.innerHTML = list.length ? list.map(packCardHtml).join('')
+      : '<p class="empty">' + _t('Aucun pack pour le moment.') + ' <a href="' + esc(FIL_PRE || '#/') + '">' + _t('Voir les filaments') + '</a></p>';
+  }
+  function packCardHtml(pk) {
+    var s = selOf(pk), pres = presetsOf(pk), comp = selComp(pk), units = packUnits(pk);
+    var tiles = pres.map(function (pr) {
+      var c = preComp(pr), ok = packRoom(pk, c, null, true) > 0, on = s.sel === pr.id;
+      return '<button type="button" class="pack-pre' + (on ? ' is-on' : '') + (ok ? '' : ' is-out') + '" data-pk="' + esc(pk.id) + '" data-pre="' + esc(pr.id) + '"' +
+        ' aria-pressed="' + on + '"' + (ok ? '' : ' disabled') + '>' +
+        '<span class="pack-pre-art">' + packArt(pk, c) + '</span>' +
+        '<span class="pack-pre-name">' + esc(preName(pr)) + '</span>' +
+        (ok ? '' : '<span class="pack-pre-out">' + _t('Épuisé') + '</span>') +
+      '</button>';
+    });
+    if (pk.allow_custom) {
+      var on = s.sel === 'custom';
+      tiles.push('<button type="button" class="pack-pre pack-pre-custom' + (on ? ' is-on' : '') + '" data-pk="' + esc(pk.id) + '" data-pre="custom" aria-pressed="' + on + '">' +
+        '<span class="pack-pre-art pack-pre-dots" aria-hidden="true">' + packCols(pk).slice(0, 8).map(function (p) {
+          return '<i style="background:' + esc(swatchBg(p)) + '"></i>'; }).join('') + '</span>' +
+        '<span class="pack-pre-name">' + _t('Personnaliser') + '</span>' +
+      '</button>');
+    }
+    var custom = '';
+    if (s.sel === 'custom') {
+      var used = 0; Object.keys(s.custom).forEach(function (id) { used += (s.custom[id] | 0) * 2; });
+      custom = '<div class="pack-custom">' +
+        '<div class="pack-custom-h"><span>' + _t('Choisis tes paires') + '</span><b class="' + (used === units ? 'is-full' : '') + '">' + used + ' / ' + units + '</b></div>' +
+        packCols(pk).map(function (p) {
+          var n = (s.custom[p.id] | 0) * 2;
+          // reste du stock pour cette couleur (panier compris), une fois les paires déjà choisies
+          var free = stockOf(p, pk.kind) - packUse(p.id, pk.kind, null) - (canBackorder() ? 0 : regQty(p.id, pk.kind));
+          var canInc = used + 2 <= units && n + 2 <= free;
+          return '<div class="pack-crow' + (free < 2 && !n ? ' is-out' : '') + '">' +
+            '<span class="pack-csw" style="background:' + esc(swatchBg(p)) + '"></span>' +
+            '<span class="pack-cname">' + esc(p.name) + (free < 2 && !n ? ' <em>' + _t('Épuisé') + '</em>' : '') + '</span>' +
+            '<span class="pack-step">' +
+              '<button type="button" data-pk="' + esc(pk.id) + '" data-p="' + esc(p.id) + '" data-d="-1" aria-label="' + _t('Retirer une paire') + '"' + (n ? '' : ' disabled') + '>&minus;</button>' +
+              '<b>' + n + '</b>' +
+              '<button type="button" data-pk="' + esc(pk.id) + '" data-p="' + esc(p.id) + '" data-d="1" aria-label="' + _t('Ajouter une paire') + '"' + (canInc ? '' : ' disabled') + '>+</button>' +
+            '</span>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    }
+    var room = comp ? packRoom(pk, comp, null) : 0, bare = comp ? packRoom(pk, comp, null, true) : 0;
+    var btn = !comp ? (s.sel === 'custom' ? _t('Choisis ') + units + (pk.kind === 'spool' ? _t(' bobines') : _t(' recharges')) : _t('Épuisé'))
+      : bare < 1 ? _t('Épuisé') : room < 1 ? _t('Maximum au panier') : _t('Ajouter au panier');
+    var note = packNote(pk), brand = brandOf(pk);
+    return '<article class="pack-card" id="pk-' + esc(pk.id) + '">' +
+      '<div class="pack-hero">' + packMedia(pk, comp || defComp(pk)) + '</div>' +
+      '<div class="pack-body">' +
+        '<h2 class="pack-name">' + esc(packName(pk)) + '</h2>' +
+        '<p class="pack-sub">' + unitsText(pk, units) + ' · ' + esc(lineOf(pk)) + '</p>' +
+        (note ? '<p class="pack-note">' + esc(note) + '</p>' : '') +
+        '<div class="pack-price"><b>' + money(+pk.price) + '</b><span>' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></div>' +
+        '<div class="pack-pres" role="group" aria-label="' + _t('Composition') + '">' + tiles.join('') + '</div>' +
+        custom +
+        '<button type="button" class="pack-add btn-add" data-pk="' + esc(pk.id) + '"' + (comp && room > 0 ? '' : ' disabled') + '>' + IC.cart + '<span>' + btn + '</span></button>' +
+        (brand ? '<p class="pack-tier">' + _t('Le pack compte pour le rabais quantité de tes autres filaments ') + esc(brand) + '.</p>' : '') +
+      '</div>' +
+    '</article>';
+  }
+  function addPack(pk, comp) {
+    if (!comp || !compValid(pk, comp)) return;
+    if (packRoom(pk, comp, null) < 1) { toast(_t('Plus assez de stock pour ce pack.')); renderPacksPage(); return; }
+    var k = packKey(pk, comp), cur = cart[k] ? cart[k].qty : 0;
+    cart[k] = { id: pk.id, type: 'pack', key: k, comp: comp.map(function (c) { return { id: c.id, n: c.n }; }), qty: cur + 1 };
+    saveCart(); renderCart(); renderPacksPage(); pulseCart();
+    toast(packName(pk) + _t(' ajouté au panier.'));
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest ? e.target.closest('.pack-pre, .pack-step button, .pack-add') : null;
+    if (!t || t.disabled || !screenPacks || !screenPacks.contains(t)) return;
+    var pk = packById[t.getAttribute('data-pk')]; if (!pk) return;
+    var s = selOf(pk);
+    if (t.classList.contains('pack-pre')) { s.sel = t.getAttribute('data-pre'); renderPacksPage(); return; }
+    if (t.classList.contains('pack-add')) { addPack(pk, selComp(pk)); return; }
+    var pid = t.getAttribute('data-p'), d = +t.getAttribute('data-d');
+    s.custom[pid] = Math.max(0, (s.custom[pid] | 0) + d);
+    renderPacksPage();
+    var again = $('.pack-step button[data-p="' + pid + '"][data-d="' + d + '"]', screenPacks);
+    if (again && !again.disabled) again.focus();
+  });
 
   function matCard(m) {
     var stock = m.items.filter(anyStock).sort(hueSort);
@@ -1498,7 +1778,15 @@
   function saveCart() { try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) {} }
   function keyOf(id, type) { return id + '|' + type; }
 
-  function metaOf(it) { return it.type === 'accessory' ? accById[it.id] : byId[it.id]; }
+  function metaOf(it) { return it.type === 'accessory' ? accById[it.id] : isPack(it) ? packById[it.id] : byId[it.id]; }
+  function cartKeyOf(it) { return it.key || keyOf(it.id, it.type); }
+  // unités de pack de la marque `g` dans le panier : comptent pour le palier des autres filaments (option B)
+  function packGroupUnits(g) {
+    return entries().reduce(function (s, it) {
+      if (!isPack(it)) return s;
+      return s + (it.comp || []).reduce(function (t, c) { var p = byId[c.id]; return t + (p && groupKey(p) === g ? c.n * it.qty : 0); }, 0);
+    }, 0);
+  }
   // Rabais quantité : palier calculé sur le TOTAL de la même marque dans le panier
   // (couleurs, matériaux et formats mélangés : 1 bobine + 3 recharges Bambu = palier 4+), comme en facturation
   function groupKey(p) { return p.brand || p.material || ''; }
@@ -1506,6 +1794,7 @@
   // les autres lignes ne comptent pas dedans — comme le serveur (_customer_fill_lines, clé « promo| »).
   function cartPromoId(it) {
     if (it.type === 'accessory') { var a = accById[it.id]; return a && a.promoOn ? a.promoId : null; }
+    if (isPack(it)) return null;
     var p = byId[it.id]; return promoOn(p, it.type) ? p.promo_id : null;
   }
   function promoQty(id) {
@@ -1515,9 +1804,9 @@
     if (promoOn(p, type)) return promoQty(p.promo_id);
     var g = groupKey(p);
     return Object.keys(cart).reduce(function (s, k) {
-      var it = cart[k], q = it.type !== 'accessory' && byId[it.id];
+      var it = cart[k], q = it.type !== 'accessory' && !isPack(it) && byId[it.id];
       return s + (q && !cartPromoId(it) && groupKey(q) === g ? it.qty : 0);
-    }, 0);
+    }, 0) + packGroupUnits(g);
   }
   // Accessoires : palier calculé sur le TOTAL de la même catégorie dans le panier
   // (ex. bobines Bambu 70 °C + Sunlu = une seule quantité), chaque modèle garde sa grille
@@ -1531,18 +1820,20 @@
   }
   function unitOf(it) {
     if (it.type === 'accessory') { var a = accById[it.id]; return a ? tierPrice(a.price, a.tiers, accGroupQty(a)) : 0; }
+    if (isPack(it)) { var pk = packById[it.id]; return pk ? +pk.price : 0; }
     var p = byId[it.id]; if (!p) return 0;
     return tierPrice(baseOf(p, it.type), tiersOf(p, it.type), groupQty(p, it.type));
   }
   function maxOf(it) {
     if (it.type === 'accessory') { var a = accById[it.id]; return accCanBO(a) ? BO_MAX : a && a.qty != null ? a.qty : Infinity; }
+    if (isPack(it)) { var pk = packById[it.id]; return pk ? packRoom(pk, it.comp, it.key) : 0; }
     if (canBackorder()) return BO_MAX;
-    var p = byId[it.id]; return p ? stockOf(p, it.type) : it.qty;
+    var p = byId[it.id]; return p ? freeStock(p, it.type) : it.qty;
   }
 
   function addToCart(id, type, qty) {
     var p = byId[id]; if (!p) return;
-    var max = canBackorder() ? BO_MAX : stockOf(p, type), k = keyOf(id, type), cur = cart[k] ? cart[k].qty : 0;
+    var max = canBackorder() ? BO_MAX : freeStock(p, type), k = keyOf(id, type), cur = cart[k] ? cart[k].qty : 0;
     if (cur >= max) { toast(_t('Maximum ') + max + _t(' en stock.')); return; }
     var next = Math.min(cur + (qty || 1), max);
     cart[k] = { id: id, type: type, qty: next };
@@ -1598,7 +1889,7 @@
       return p && p.empty_spool_id === a.id && hasSpool(p) && spoolFree(p) > 0;
     }).map(function (it) { return { it: it, p: byId[it.id] }; });
   }
-  function spoolFree(p) { var s = cart[keyOf(p.id, 'spool')]; return stockOf(p, 'spool') - (s ? s.qty : 0); }
+  function spoolFree(p) { var s = cart[keyOf(p.id, 'spool')]; return freeStock(p, 'spool') - (s ? s.qty : 0); }
   function filLabel(p) { return ((p.material ? p.material + ' ' : '') + p.name).trim(); }
   // n recharges → n bobines ; la bobine vide `a` (si donnée) baisse d'autant
   function doSwap(p, n, a) {
@@ -1679,6 +1970,7 @@
   function typeLabel(it) { return it.type === 'accessory' ? 'accessoire' : fmtShort(it.type); }
   function thumbHtml(it) {
     var m = metaOf(it);
+    if (isPack(it)) return '<span class="citem-pack">' + packMedia(m, it.comp) + '</span>';
     if (it.type === 'accessory') return m && m.img ? '<img src="' + esc(m.img) + '" alt="">' : '<span class="citem-sw" style="background:#ddd"></span>';
     var a = m.attrs || {}, url = publicUrl(a['img_' + it.type] || m.image_path);
     return url ? '<img src="' + esc(url) + '" alt="">' : '<span class="citem-sw" style="background:' + esc(swatchBg(m)) + '"></span>';
@@ -1686,9 +1978,9 @@
 
   // ligne au-delà du stock (client connecté) : « N à commander » (bobine vide : « N à compléter · sans garantie »)
   function boTag(it) {
-    if (!canBackorder()) return '';
+    if (!canBackorder() || isPack(it)) return '';
     var m = metaOf(it); if (!m) return '';
-    var st = it.type === 'accessory' ? m.qty : stockOf(m, it.type);
+    var st = it.type === 'accessory' ? m.qty : freeStock(m, it.type);
     var n = st == null ? 0 : it.qty - Math.max(0, st | 0);
     if (n <= 0) return '';
     return ' · <span class="citem-bo">' + (it.type === 'accessory' && isEmptySpool(m) ? boLabel(n, true) : n + _t(' à commander · 3 à 14 jours')) + '</span>';
@@ -1704,6 +1996,7 @@
       cartItems.innerHTML = '';
       // accessoires en dernier
       var bRank = function (it) {
+        if (isPack(it)) return -1;   // packs en premier
         if (it.type === 'accessory') return 1e6;
         var p = byId[it.id], b = p && brandInfo[p.brand];
         return b && b.sort_order != null ? b.sort_order : 9999;
@@ -1714,22 +2007,24 @@
         .map(function (x) { return x.it; })
         .forEach(function (it) {
           var m = metaOf(it); if (!m) return;
-          var head = it.type === 'accessory' ? _t('Accessoires') : (m.brand || _t('Autres'));
+          var pack = isPack(it);
+          var head = pack ? _t('Packs') : it.type === 'accessory' ? _t('Accessoires') : (m.brand || _t('Autres'));
           if (head !== lastHead) {
             lastHead = head;
             var h = document.createElement('div'); h.className = 'cgroup-h';
-            h.innerHTML = (it.type === 'accessory' ? '' : brandBadge(m.brand, 'cgroup-logo')) + '<span>' + esc(head) + '</span>';
+            h.innerHTML = (it.type === 'accessory' || pack ? '' : brandBadge(m.brand, 'cgroup-logo')) + '<span>' + esc(head) + '</span>';
             cartItems.appendChild(h);
           }
           var max = maxOf(it);
-          var row = document.createElement('div'); row.className = 'citem';
+          var row = document.createElement('div'); row.className = 'citem' + (pack ? ' is-pack' : '');
+          var name = pack ? packName(m) : m.name;
           row.innerHTML =
             '<div class="citem-thumb">' + thumbHtml(it) + '</div>' +
             '<div class="citem-main">' +
-              '<div class="citem-name">' + esc(m.name) + '</div>' +
-              '<div class="citem-type">' + (it.type === 'accessory' ? esc(m.cat || _t('Accessoire'))
-                : esc(m.material || '') + ' · ' + typeLabel(it)) +
-                ' · <span class="citem-unit">' + money(unitOf(it)) + '/u</span>' + boTag(it) + '</div>' +
+              '<div class="citem-name">' + esc(name) + '</div>' +
+              '<div class="citem-type">' + (pack ? esc(compText(it.comp)) + ' · <span class="citem-unit">' + money(unitOf(it)) + _t(' le pack') + '</span>'
+                : (it.type === 'accessory' ? esc(m.cat || _t('Accessoire')) : esc(m.material || '') + ' · ' + typeLabel(it)) +
+                ' · <span class="citem-unit">' + money(unitOf(it)) + '/u</span>' + boTag(it)) + '</div>' +
               '<div class="citem-qty">' +
                 _t('<button type="button" class="cq-minus" aria-label="Retirer un">&minus;</button>') +
                 _t('<input type="number" class="cq-val" aria-label="Quantité" min="0" ') + (isFinite(max) ? 'max="' + max + '" ' : '') + 'value="' + it.qty + '" inputmode="numeric">' +
@@ -1737,10 +2032,10 @@
               '</div>' +
             '</div>' +
             '<div class="citem-right">' +
-              _t('<button type="button" class="citem-del" aria-label="Supprimer ') + esc(m.name) + '">&times;</button>' +
+              _t('<button type="button" class="citem-del" aria-label="Supprimer ') + esc(name) + '">&times;</button>' +
               '<div class="citem-line">' + money(lineTotal(it)) + '</div>' +
             '</div>';
-          var k = keyOf(it.id, it.type);
+          var k = cartKeyOf(it);
           $('.cq-minus', row).addEventListener('click', function () { changeQty(k, -1); });
           $('.cq-plus', row).addEventListener('click', function () { changeQty(k, 1); });
           var inp = $('.cq-val', row);
@@ -1753,6 +2048,7 @@
     }
     cartTotal.textContent = money(total());
     if (onCartChange && (lastScreen === 'product' || lastScreen === 'acc')) onCartChange();
+    if (dataReady && screenPacks && !screenPacks.hidden && !focusedIn(screenPacks)) renderPacksPage();
     orderBtn.classList.toggle('is-disabled', n === 0);
     if (emailBtn) emailBtn.classList.toggle('is-disabled', n === 0);
     refreshAcctUi();
@@ -1800,9 +2096,10 @@
 
   /* ---------- commande Messenger / courriel ---------- */
   function orderText() {
-    var groups = {}, order = [], extras = [];
+    var groups = {}, order = [], extras = [], packLines = [];
     entries().forEach(function (it) {
       var m = metaOf(it); if (!m) return;
+      if (isPack(it)) { packLines.push('- ' + packName(m) + ' ×' + it.qty + ' — ' + money(lineTotal(it)) + '\n  ' + compText(it.comp) + ' (' + (m.kind === 'spool' ? _t('Avec bobine') : _t('Recharge')) + ')'); return; }
       if (it.type === 'accessory') { extras.push('- ' + m.name + ' ×' + it.qty + ' — ' + money(lineTotal(it))); return; }
       var mat = (m.brand ? m.brand + ' ' : '') + (m.material || _t('Autres'));
       if (!groups[mat]) { groups[mat] = []; order.push(mat); }
@@ -1810,6 +2107,7 @@
       groups[mat].push('- ' + label + ' ×' + it.qty + ' — ' + money(lineTotal(it)));
     });
     var blocks = order.map(function (mat) { return '*** ' + String(mat).toUpperCase() + ' ***\n' + groups[mat].join('\n'); });
+    if (packLines.length) blocks.unshift(_t('*** PACKS ***\n') + packLines.join('\n'));
     if (extras.length) blocks.push(_t('*** ACCESSOIRES ***\n') + extras.join('\n'));
     return _t('Bonjour,\n\nJe souhaite commander le filament suivant :\n\n') + blocks.join('\n\n') +
       _t('\n\nTotal estimé : ') + money(total()) + _t('\nRamassage : région de Québec.\n\nMerci !');
@@ -1838,8 +2136,8 @@
   // Réservation 72 h (client approuvé) : articles EN STOCK seulement -> lignes au-delà du stock listées
   function overStock() {
     return entries().filter(function (it) {
-      var m = metaOf(it); if (!m) return false;
-      var st = it.type === 'accessory' ? m.qty : stockOf(m, it.type);
+      var m = metaOf(it); if (!m || isPack(it)) return false;
+      var st = it.type === 'accessory' ? m.qty : freeStock(m, it.type);
       return st != null && it.qty > Math.max(0, st | 0);
     });
   }
@@ -1889,7 +2187,7 @@
       message: _t('Si tu ne passes pas à temps, elle compte comme non récupérée (2 = réservations suspendues 60 jours). Tu peux l\'annuler dans ton compte.'),
       ok: _t('Réserver'), icon: 'cart' }).then(function (ok) {
       if (!ok) return;
-      var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
+      var lines = orderLines();
       resvBtn.disabled = true; cartMsg.textContent = _t('Réservation…');
       window.CA.custOrder.reserve(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
         cart = {}; saveCart(); if (noteIn) noteIn.value = '';
@@ -1903,7 +2201,7 @@
     var bo = overStock();
     if (!bo.length) { sendOrder(); return; }
     // articles au-delà du stock : le client confirme avoir compris le délai avant l'envoi
-    var boN = function (it) { var m = metaOf(it), st = it.type === 'accessory' ? m.qty : stockOf(m, it.type); return it.qty - Math.max(0, st | 0); };
+    var boN = function (it) { var m = metaOf(it), st = it.type === 'accessory' ? m.qty : freeStock(m, it.type); return it.qty - Math.max(0, st | 0); };
     var label = function (it) {
       var m = metaOf(it);
       return m.name + ' — ' + (it.type === 'accessory' ? (m.cat || 'accessoire')
@@ -1927,8 +2225,15 @@
     }).then(function (ok) { if (ok) sendOrder(); });
   });
   function isEmptyLine(it) { return it.type === 'accessory' && isEmptySpool(accById[it.id]); }
+  // lignes envoyées au serveur ; un pack = { pack_id, qty, comp: [{ product_id, qty: unités par pack }] }
+  function orderLines() {
+    return entries().map(function (it) {
+      if (isPack(it)) return { pack_id: it.id, qty: it.qty, comp: it.comp.map(function (c) { return { product_id: c.id, qty: c.n }; }) };
+      return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty };
+    });
+  }
   function sendOrder() {
-    var lines = entries().map(function (it) { return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty }; });
+    var lines = orderLines();
     sendBtn.disabled = true; cartMsg.textContent = _t('Envoi…');
     window.CA.custOrder.send(lines, noteIn ? noteIn.value.trim() : '').then(function (r) {
       cart = {}; saveCart(); if (noteIn) noteIn.value = '';
@@ -1979,7 +2284,7 @@
       Object.keys(cart).forEach(function (k) {
         var it = cart[k], max = maxOf(it);
         if (it.qty > max) {
-          var m = metaOf(it); trimmed.push(m ? m.name : '');
+          var m = metaOf(it); trimmed.push(m ? (isPack(it) ? packName(m) : m.name) : '');
           if (max <= 0) delete cart[k]; else it.qty = max;
         }
       });
@@ -1990,6 +2295,7 @@
       if (trimmed.length || !focusedIn(cartItems)) renderCart();
       if (!screenCatalog.hidden && !focusedIn(catGroups)) renderCatalog();
       if (screenPromo && !screenPromo.hidden) renderPromoPage();
+      if (screenPacks && !screenPacks.hidden && !focusedIn(screenPacks)) renderPacksPage();
       // fiche : rafraîchit stock / ruptures, sans interrompre une saisie
       if (curColor && !screenProduct.hidden && !focusedIn(configEl)) {
         var st = stockOf(curColor, curType);

@@ -168,7 +168,7 @@
         var hex = l.product_id && stock[l.product_id] && stock[l.product_id].hex;
         return '<tr>' +
           '<td class="l"><span class="co-prod">' + (hex ? '<span class="cc-sw" style="background:' + esc(hex) + '"></span>' : '<span class="co-noimg"></span>') +
-            '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(l.meta) + '</small>' : '') + '</span></span></td>' +
+            '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(l.meta) + '</small>' : '') + (l.pack ? '<small class="cc-meta cc-pack">' + esc(l.pack.name || 'Pack') + '</small>' : '') + '</span></span></td>' +
           '<td class="n"><b>' + (l.qty | 0) + '</b></td>' +
           '<td class="n">' + (s == null ? '—' : s) + '</td>' +
           '<td class="n">' + money(l.unit_price) + '</td>' +

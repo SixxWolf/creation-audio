@@ -886,6 +886,61 @@
       }
     });
   }
+  /* ---- packs (table packs, Admin › Packs — 2026-11-16) : une composition = une ligne par couleur,
+     prix fixe (prix du pack / unités), unités comptées dans le palier de la marque (tierKey) ---- */
+  var fxPacks = null;
+  function loadFxPacks() {
+    if (fxPacks) return Promise.resolve(fxPacks);
+    return sb.from('packs').select('*').order('sort_order', { ascending: true })
+      .then(function (r) { fxPacks = (!r.error && r.data) || []; return fxPacks; }, function () { return []; });
+  }
+  function addPackDialog() {
+    Promise.all([loadFxPacks(), loadCatalog('filament', true)]).then(null, function () {}).then(function () {
+      var opts = [];
+      (fxPacks || []).forEach(function (pk) {
+        (Array.isArray(pk.presets) ? pk.presets : []).forEach(function (pr) { opts.push({ pk: pk, pr: pr }); });
+      });
+      if (!opts.length) { caDialog.toast('Aucun pack. Crée-le dans Packs.'); return; }
+      var body = document.createElement('div'); body.className = 'fx-packpick';
+      body.innerHTML = opts.map(function (o, i) {
+        var dots = (o.pr.lines || []).map(function (l) { var h = findProduct(l.p); return h ? swatchSVG(h.p.hex) : ''; }).join('');
+        return '<button type="button" class="fx-packopt' + (i ? '' : ' is-on') + '" data-i="' + i + '">' +
+          '<span class="fx-packdots">' + dots + '</span>' +
+          '<span class="fx-packn"><b>' + esc(o.pk.name) + '</b> · ' + esc(o.pr.name) + (o.pk.enabled ? '' : ' <em>hors ligne</em>') + '</span>' +
+          '<span class="fx-packp">' + money(o.pk.price) + '</span></button>';
+      }).join('');
+      var pick = 0;
+      $$('.fx-packopt', body).forEach(function (b) {
+        b.addEventListener('click', function () {
+          pick = +b.getAttribute('data-i');
+          $$('.fx-packopt', body).forEach(function (x) { x.classList.toggle('is-on', x === b); });
+        });
+      });
+      caDialog.confirm({ title: 'Ajouter un pack', message: '', body: body, ok: 'Ajouter', icon: 'plus' }).then(function (ok) {
+        if (ok === true) addPackLines(opts[pick].pk, opts[pick].pr);
+      });
+    });
+  }
+  function addPackLines(pk, pr) {
+    var units = (pk.pairs | 0) * 2, unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100, kind = pk.kind || 'refill';
+    var maxK = 0;
+    lines.forEach(function (l) { var m = l.pack && /^k(\d+)$/.exec(l.pack.k || ''); if (m) maxK = Math.max(maxK, +m[1]); });
+    var pack = { id: pk.id, k: 'k' + (maxK + 1), n: 1, name: pk.name, name_en: pk.name_en || null, price: +pk.price, kind: kind };
+    var added = 0;
+    (pr.lines || []).forEach(function (pl) {
+      var hit = findProduct(pl.p); if (!hit || !(pl.n > 0)) return;
+      var p = hit.p;
+      lines.push({ id: uid(), productId: String(p.id), ptype: 'filament', kind: kind, label: p.name,
+        meta: [p.brand, p.material, kind === 'refill' ? 'Recharge' : 'Avec bobine'].filter(Boolean).join(' · '),
+        hex: p.hex, qty: pl.n * 2, base: unit, tiers: [], cost: +filCost(p, kind) || 0, tierKey: filTierKey(p),
+        price: unit, manual: true, sp: null, pack: pack });
+      added += pl.n * 2;
+    });
+    if (added !== units) caDialog.toast('Composition incomplète : vérifie le pack dans Packs.');
+    afterChange();
+  }
+  var elPackBtn = $('#fx-add-pack');
+  if (elPackBtn) elPackBtn.addEventListener('click', addPackDialog);
   function addFreeLine(preset) {
     preset = preset || {};
     lines.push({ id: uid(), productId: null, ptype: cat === 'maintenance' ? 'divers' : cat, kind: 'free',
@@ -967,7 +1022,7 @@
             (marginShown ? '<span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
               (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span>' : '') +
           '</div>'
-        : swatchSVG(l.hex) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(CA.kindMeta(l.meta)) + '</span> ' + CA.kindPill(CA.kindOf(l.meta, l.kind)) : '') + pendPill +
+        : swatchSVG(l.hex) + esc(l.label) + (l.pack ? ' <span class="inv-mat fx-packtag">' + esc(l.pack.name || 'Pack') + '</span>' : '') + (l.meta ? ' <span class="inv-mat">' + esc(CA.kindMeta(l.meta)) + '</span> ' + CA.kindPill(CA.kindOf(l.meta, l.kind)) : '') + pendPill +
           // coût unitaire modifiable (privé) : seulement quand la marge est affichée
           (marginShown ? '<div class="inv-sub no-print"><span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
             (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span></div>' : '');
@@ -1144,7 +1199,7 @@
   function lineRow(l, i) {
     return { product_id: l.productId, label: l.label || null, meta: l.meta || null,
       kind: l.kind, ptype: l.ptype || null, qty: l.qty, unit_price: round2(l.price), unit_cost: round2(l.cost),
-      line_total: round2(l.qty * l.price), sort_order: i, qty_pending: Math.max(0, Math.min(l.pending || 0, l.qty)) };
+      line_total: round2(l.qty * l.price), sort_order: i, qty_pending: Math.max(0, Math.min(l.pending || 0, l.qty)), pack: l.pack || null };
   }
   // après un enregistrement : stocks du catalogue, historique et statistiques à jour
   function refreshAfterSave() {
@@ -1386,7 +1441,7 @@
     var l = { id: uid(), productId: s.product_id ? String(s.product_id) : null, ptype: ptype, kind: kind,
       label: s.label || '', meta: s.meta || '', hex: null, qty: +s.qty || 0, base: +s.unit_price || 0, tiers: [],
       cost: +s.unit_cost || 0, tierKey: null, price: +s.unit_price || 0, manual: true, sp: null, live: false,
-      pending: Math.max(0, Math.min(+s.qty_pending || 0, +s.qty || 0)) };
+      pending: Math.max(0, Math.min(+s.qty_pending || 0, +s.qty || 0)), pack: s.pack || null };
     if (hit) {
       var p = hit.p;
       if (hit.c === 'filament') {
@@ -1398,7 +1453,7 @@
         l.base = +p.sell_price || 0; l.tiers = p.tiers || [];
         l.tierKey = accTierKey(p);
       }
-      l.live = true;
+      l.live = !l.pack;   // ligne de pack : prix fixe du pack (ses unités comptent quand même pour le palier de la marque)
     }
     return l;
   }
@@ -1574,7 +1629,7 @@
             var hit = l.product_id ? findProduct(l.product_id) : null;
             var st = hit ? (l.kind === 'refill' ? hit.p.qty_2 : hit.p.qty) : null;
             var ln = lineFromSaved({ product_id: l.product_id, kind: l.kind, ptype: l.ptype, label: l.name, meta: l.meta,
-              qty: l.qty, unit_price: l.unit_price, unit_cost: 0,
+              qty: l.qty, unit_price: l.unit_price, unit_cost: 0, pack: l.pack || null,
               // ce qui manque encore en stock part « À venir » (remis plus tard, Historique › Remis)
               qty_pending: st == null ? (l.qty_to_order | 0) : Math.max(0, (l.qty | 0) - (st | 0)) });
             if (hit) ln.cost = hit.c === 'filament' ? (+filCost(hit.p, l.kind) || 0) : itemCost(hit.p);

@@ -29,8 +29,8 @@ const ROOT = path.resolve(__dirname, '..');
 const SITE = 'https://creationaudio.ca/';
 const PAGES = ['index.html', 'boutique.html', 'compte.html', 'dealer.html', 'aide.html',
   'conditions.html', 'confidentialite.html', 'retours.html', '404.html', 'revendeur.html', 'entretien.html', 'impression.html', 'boutique/imprimantes.html',
-  // rayons de la boutique (2026-11-14) : accessoires + promotions tirés de filaments par tools/build-boutique-pages.js
-  'boutique/filaments.html', 'boutique/accessoires.html', 'boutique/promotions.html'];
+  // rayons de la boutique (2026-11-14) : accessoires + promotions (+ packs 2026-11-16) tirés de filaments par tools/build-boutique-pages.js
+  'boutique/filaments.html', 'boutique/accessoires.html', 'boutique/promotions.html', 'boutique/packs.html'];
 const DICT_FILE = path.join(ROOT, 'tools/i18n/pages.en.json');
 const MISSING_FILE = path.join(ROOT, 'tools/i18n/missing.json');
 

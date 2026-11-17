@@ -370,7 +370,7 @@
       var open = o.status !== 'invoiced' && o.status !== 'cancelled';
       var pill = '<span class="ord-pill st-' + esc(o.status) + '">' + esc(ORD_ST[o.status] || o.status) +
         (o.status === 'invoiced' && o.invoice_number ? ' · ' + esc(o.invoice_number) : '') + '</span>';
-      var lines = (o.lines || []).map(function (l) { return lineLi(l, open ? (+l.qty_to_order || 0) : 0); }).join('');
+      var lines = packLines(o.lines, 'name').map(function (l) { return lineLi(l, open ? (+l.qty_to_order || 0) : 0); }).join('');
       return '<details class="ord' + (o.status === 'cancelled' ? ' is-off' : '') + '" data-oid="' + esc(o.id) + '"' + (o.status === 'new' ? ' open' : '') + '>' +
         '<summary>' +
           '<span class="ord-main"><b class="ord-no">' + esc(o.number) + '</b>' +
@@ -395,6 +395,29 @@
       if (ca) ca.addEventListener('click', function () { cancelOrder(o, ca); });
     });
   }
+  // Packs (2026-11-16) : les lignes d'un même pack (l.pack.k) deviennent une seule ligne + le détail des couleurs
+  function packLines(lines, lab) {
+    var out = [], seen = {};
+    (lines || []).forEach(function (l) {
+      var pk = l && l.pack;
+      if (!pk || !pk.k) { out.push(l); return; }
+      var g = seen[pk.k];
+      if (!g) {
+        g = seen[pk.k] = { pack: pk, product_id: null, qty: +pk.n || 1, unit_price: +pk.price || 0, line_total: 0,
+          qty_to_order: 0, qty_pending: 0, members: [], hexes: [] };
+        g[lab] = (CA.lang === 'en' && pk.name_en) || pk.name || _t('Pack');
+        out.push(g);
+      }
+      g.line_total += +l.line_total || 0;
+      g.qty_pending += +l.qty_pending || 0;
+      g.members.push(Math.round((+l.qty || 0) / (+pk.n || 1)) + ' × ' + (l.name || l.label || ''));
+      if (l.hex) g.hexes.push(l.hex);
+      g.meta = g.members.join(' · ');
+      g.hex = g.hexes.length > 1 ? 'linear-gradient(90deg, ' + g.hexes.map(function (h, i) {
+        return h + ' ' + (100 * i / g.hexes.length) + '% ' + (100 * (i + 1) / g.hexes.length) + '%'; }).join(', ') + ')' : g.hexes[0] || null;
+    });
+    return out;
+  }
   // ligne d'article (commandes, réservations, écran « Ma cueillette ») ; bo : quantité encore à commander
   function lineLi(l, bo) {
     return '<li>' + swatch(l.hex, (l.name || '') + ' ' + (l.meta || '')) +
@@ -414,12 +437,23 @@
     caDialog.confirm({ title: _t('Remplacer ton panier ?'), message: _t('Ton panier actuel sera remplacé par la commande ') + o.number + '.',
       ok: _t('Remplacer'), icon: 'cart' }).then(function (ok) { if (ok) loadIntoCart(); });
     function loadIntoCart() {
-      var cart = {};
+      var cart = {}, packs = {};
       lines.forEach(function (l) {
         if (spacersOnly) { cart[l.product_id] = { id: l.product_id, qty: +l.qty }; return; }
         if (l.ptype === 'spacer') return;
+        if (l.pack && l.pack.k) {   // pack : une ligne de panier par pack (même clé que boutique.js)
+          var pg = packs[l.pack.k] || (packs[l.pack.k] = { id: l.pack.id, type: 'pack', comp: [], qty: +l.pack.n || 1 });
+          pg.comp.push({ id: l.product_id, n: Math.round(+l.qty / (+l.pack.n || 1)) });
+          return;
+        }
         var t = l.kind === 'unit' ? 'accessory' : l.kind;
         cart[l.product_id + '|' + t] = { id: l.product_id, type: t, qty: +l.qty };
+      });
+      Object.keys(packs).forEach(function (k) {
+        var g = packs[k];
+        g.comp.sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
+        g.key = 'pack|' + g.id + '|' + g.comp.map(function (c) { return c.id + ':' + c.n; }).join(',');
+        if (cart[g.key]) cart[g.key].qty += g.qty; else cart[g.key] = g;
       });
       try {
         localStorage.setItem(key, JSON.stringify(cart));
@@ -465,7 +499,7 @@
     var sub = isF ? _t('Facture ') + x.number + ' · ' + plural(x.count, 'article', 'articles')
       : isC ? fmtDate(x.created_at) + ' · ' + plural(itemsOf(x), 'article', 'articles') + (x.linked && x.linked.length ? ' · ' + _t('Avec') + ' ' + x.linked.join(', ') : '')
       : _t('Gardée jusqu\'au ') + whenTxt(x.expires_at);
-    var lines = (x.lines || []).map(function (l) { return lineLi(l, isC ? (+l.qty_to_order || 0) : 0); }).join('');
+    var lines = packLines(x.lines, 'name').map(function (l) { return lineLi(l, isC ? (+l.qty_to_order || 0) : 0); }).join('');
     host.innerHTML = '<div class="pkv">' +
       '<section class="pkv-ord">' +
         '<h2 class="pkv-h">' + esc(title) + '</h2><p class="pkv-sub">' + esc(sub) + '</p>' +
@@ -689,7 +723,7 @@
           : r.status === 'expired' ? (r.penalized ? _t('non récupérée') : fmtDate(r.created_at))
           : fmtDate(r.created_at);
         var items = (r.lines || []).reduce(function (s, l) { return s + (+l.qty || 0); }, 0);
-        var lines = (r.lines || []).map(function (l) { return lineLi(l, 0); }).join('');
+        var lines = packLines(r.lines, 'name').map(function (l) { return lineLi(l, 0); }).join('');
         return '<details class="ord' + (off ? ' is-off' : '') + '" data-rid="' + esc(r.id) + '"' + (active ? ' open' : '') + '>' +
           '<summary>' +
             '<span class="ord-main"><b class="ord-no">' + esc(r.number) + '</b>' +
@@ -745,7 +779,7 @@
       var pend = pendingOf(inv), n = itemsOf(inv), off = inv.status === 'cancelled';
       var pill = off ? _t('<span class="ord-pill off">Annulée</span>')
         : pend ? '<span class="ord-pill pend">' + pend + _t(' à venir</span>') : '';
-      var lines = (inv.lines || []).map(function (l) {
+      var lines = packLines(inv.lines, 'label').map(function (l) {
         var lp = +l.qty_pending || 0;
         return '<li>' + swatch(l.hex, (l.label || '') + ' ' + (l.meta || '')) +
           '<span class="ol-tx"><b>' + esc(l.label || '') + '</b>' + (l.meta ? '<small>' + esc(l.meta) + '</small>' : '') +
@@ -806,7 +840,7 @@
         (inv.client_city ? '<div>' + esc(inv.client_city) + '</div>' : '') +
         (inv.client_contact ? '<div>' + esc(inv.client_contact) + '</div>' : '') + '</div>'
       : '';
-    var rows = (inv.lines || []).map(function (l) {
+    var rows = packLines(inv.lines, 'label').map(function (l) {
       return '<tr><td>' + esc(l.label || '') + (l.meta ? ' <span class="inv-mat">' + esc(l.meta) + '</span>' : '') + '</td>' +
         '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num">' + money(l.line_total) + '</td></tr>';
     }).join('');

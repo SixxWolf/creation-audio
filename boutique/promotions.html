@@ -29,7 +29,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/tokens.css?v=5">
 <link rel="stylesheet" href="../assets/site.css?v=29">
-<link rel="stylesheet" href="../assets/boutique.css?v=63">
+<link rel="stylesheet" href="../assets/boutique.css?v=64">
 <link rel="stylesheet" href="../assets/dialog.css?v=2">
 <!-- Thème des fêtes (Réglages › Apparence de l'admin, nav.js) : classe html.fetes posée avant le rendu (cache local ou aperçu ?fetes=1) -->
 <link rel="stylesheet" href="../assets/fetes.css?v=9">
@@ -87,6 +87,7 @@
   <nav class="shop-tabs" id="shop-tabs" aria-label="Rayons de la boutique">
     <a href="../boutique" data-tab="home" class="shop-tab-home" aria-label="Accueil de la boutique" title="Accueil de la boutique"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.2 12 4.5l8 6.7"/><path d="M6.2 9.6V19.5h11.6V9.6"/><path d="M10 19.5v-5h4v5"/></svg></a>
     <a href="../boutique/filaments" data-tab="filaments">Filaments</a>
+    <a href="../boutique/packs" data-tab="packs" hidden>Packs</a>
     <a href="../boutique/spacers" data-tab="spacers">Spacers</a>
     <a href="../boutique/accessoires" data-tab="accessoires">Accessoires</a>
     <a href="../boutique/imprimantes" data-tab="imprimantes">Imprimantes 3D</a>
@@ -188,6 +189,20 @@
 
     <div class="cat-groups" id="promo-groups" aria-busy="true">
       <div class="cat-grid"><div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+    </div>
+  </section>
+
+  <section id="screen-packs" aria-labelledby="pks-title" hidden>
+    <header class="cat-hero">
+      <div class="cat-hero-tx">
+        <p class="eyebrow">Boutique</p>
+        <h1 id="pks-title">Packs</h1>
+        <p class="cat-sub">Des recharges à prix réduit, à composer par paires de couleurs. <strong>Prix finaux, aucune taxe en plus.</strong></p>
+      </div>
+    </header>
+
+    <div class="pack-list" id="pack-groups" aria-busy="true">
+      <div class="skel pack-skel"></div>
     </div>
   </section>
 </main>
@@ -327,6 +342,6 @@
 <script src="../assets/commande-client.js?v=13"></script>
 <script src="../assets/panier-compte.js?v=28"></script>
 <script src="../assets/promo.js?v=2"></script>
-<script src="../assets/boutique.js?v=61"></script>
+<script src="../assets/boutique.js?v=62"></script>
 </body>
 </html>

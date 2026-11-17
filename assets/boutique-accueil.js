@@ -140,13 +140,36 @@
     sec.hidden = false;
   }
 
+  /* ---------- pack mis en avant (table packs, 2026-11-16) : bandeau sous les tuiles ---------- */
+  function renderPack(pks, rows) {
+    var el = $('#bq-pack'), en = CA.lang === 'en';
+    var byId = {}; rows.forEach(function (p) { byId[p.id] = p; });
+    var pk = (pks || []).filter(function (x) { return x.featured && (x.colors || []).some(function (id) { return byId[id]; }); })[0];
+    if (!el || !pk) return;
+    var units = (pk.pairs | 0) * 2, unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100, spool = pk.kind === 'spool';
+    var hexes = (pk.colors || []).map(function (id) { var p = byId[id]; var c = p && p.attrs && Array.isArray(p.attrs.colors) && p.attrs.colors[0]; return c || (p && p.hex) || null; })
+      .filter(function (h) { return /^#[0-9a-fA-F]{6}$/.test(h || ''); });
+    var art = '';
+    for (var i = 0; i < units && hexes.length; i++) {
+      var h = hexes[i % hexes.length];
+      art += '<i style="background:' + (spool ? 'radial-gradient(circle, #f3f3f0 0 17%, ' + h + ' 18% 70%, #2b2f36 71%)' : 'radial-gradient(circle, #f3f3f0 0 22%, ' + h + ' 23%)') + '"></i>';
+    }
+    $('#bq-pack-art').innerHTML = art;
+    $('#bq-pack-name').textContent = (en && pk.name_en) || pk.name;
+    $('#bq-pack-meta').innerHTML = tn(units, spool ? '{n} bobine' : '{n} recharge', spool ? '{n} bobines' : '{n} recharges') + ' · <b>' + money(+pk.price) + '</b> · ' +
+      money(unit) + ' ' + (spool ? _t('la bobine') : _t('la recharge'));
+    if (pk.slug) el.href = 'boutique/packs#/p/' + encodeURIComponent(pk.slug);
+    el.hidden = false;
+  }
+
   function load() {
     if (!sb) return;
     var cols = 'id,type,name,brand,material,hex,attrs,image_path,material_image,slug,material_slug,sell_price,sell_price_2,qty,qty_2,sort_order,' +
       'promo_id,promo_ends,promo_on,promo_on_2,reg_price,reg_price_2';
     Promise.all([
       sb.from('products_public').select(cols).in('type', ['filament', 'spacer', 'accessory']).order('sort_order', { ascending: true }).limit(2000),
-      sb.from('brands').select('name,sort_order,slug,image_path')
+      sb.from('brands').select('name,sort_order,slug,image_path'),
+      sb.from('packs').select('*').order('sort_order', { ascending: true })
     ]).then(function (res) {
       var pr = res[0], br = res[1];
       if (!pr || pr.error || !pr.data) return;
@@ -159,6 +182,8 @@
       renderTiles(rows);
       renderPromos(rows);
       renderNew(rows);
+      if (res[2] && !res[2].error) renderPack(res[2].data, rows);
+      if (res[2] && res[2].data && res[2].data.length) { var tp = $('a[data-tab="packs"]'); if (tp) tp.hidden = false; }
     }, function () {});
   }
   load();
