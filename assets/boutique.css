@@ -89,17 +89,8 @@
 .chip[aria-current="true"] .chip-n { color:rgba(255,255,255,.66); }
 .home-page .chip:focus-visible { border-radius:100px; }
 
-/* Interrupteur « En stock seulement » */
-.switch { position:relative; display:inline-flex; align-items:center; gap:10px; flex:none; cursor:pointer; user-select:none;
-  white-space:nowrap; font-weight:600; font-size:.9rem; color:var(--ink-2); }
-.switch input { position:absolute; width:1px; height:1px; opacity:0; margin:0; }
-.switch-ui { position:relative; width:38px; height:22px; flex:none; border-radius:100px; background:var(--line-2); transition:background .18s; }
-.switch-ui::after { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%;
-  background:var(--paper); box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .18s; }
-.switch input:checked + .switch-ui { background:var(--good); }
-.switch input:checked + .switch-ui::after { transform:translateX(16px); }
-.switch input:focus-visible + .switch-ui { outline:3px solid var(--ember-dim); outline-offset:2px; }
-.switch:hover { color:var(--ink); }
+/* Une seule marque/catégorie : pas de puces → pas de barre vide */
+.cat-bar:not(:has(.chip)) { display:none; }
 
 /* Groupes par marque */
 .cat-groups { display:flex; flex-direction:column; gap:clamp(36px, 4.6vw, 56px); }
@@ -230,19 +221,12 @@
   font-size:.72rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
 .pdp-label b { font-size:.95rem; letter-spacing:0; text-transform:none; color:var(--ink); }
 .pdp-label .lbl-sub { font-size:.86rem; font-weight:500; letter-spacing:0; text-transform:none; color:var(--muted); }
-.pdp-label .switch { font-size:.84rem; letter-spacing:0; text-transform:none; }
-/* Couleur · nom (ligne 1) + stock (ligne 2) à gauche, « En stock seulement » à droite : hauteur fixe quel que
-   soit le nom survolé (sinon l'interrupteur passe à la ligne, les pastilles descendent sous la souris → va-et-vient sans fin) */
+/* Couleur · nom sur une ligne : hauteur fixe quel que soit le nom survolé (sinon les pastilles bougent sous la souris) */
 .sw-head { flex-wrap:nowrap; }
 .sw-head-tx { flex:1 1 auto; min-width:0; }
 .sw-head-tx > span { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .sw-head .lbl-sub { margin-top:2px; }
 .sw-head .lbl-sub::first-letter { text-transform:uppercase; }
-.sw-sec { container-type:inline-size; }
-@container (max-width:460px) {      /* colonne étroite (mobile, 2 colonnes serrées) : interrupteur toujours sur sa propre ligne */
-  .sw-head { flex-wrap:wrap; }
-  .sw-head-tx { flex-basis:100%; }
-}
 
 /* Format : recharge / avec bobine */
 .fmt { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
@@ -275,9 +259,6 @@
 .sw.is-out::after { content:''; position:absolute; left:5px; right:5px; top:calc(50% - 1px); height:2px; border-radius:2px;
   background:var(--ink-2); box-shadow:0 0 0 1px color-mix(in srgb, var(--paper) 85%, transparent); transform:rotate(-45deg); pointer-events:none; }
 .home-page .sw:focus-visible { outline:3px solid var(--ember-dim); outline-offset:4px; border-radius:50%; }
-.sws-note { margin:10px 0 0; font-size:.84rem; color:var(--muted); }
-.sws-note button { font:inherit; font-weight:700; color:var(--ink); background:none; border:none; padding:0; cursor:pointer;
-  text-decoration:underline; text-decoration-color:var(--ember); text-underline-offset:3px; }
 
 /* Achat */
 .cfg-buy { display:flex; gap:10px; margin-top:24px; }

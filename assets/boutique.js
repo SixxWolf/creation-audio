@@ -23,7 +23,6 @@
   var EMAIL = 'contact@creationaudio.ca';
   var BUCKET = 'products';
   var CART_KEY = 'ca_v2_cart';
-  var STOCK_KEY = 'ca_shop_only_stock';
   var ROOT = window.CA.siteRoot || '';   // racine du dépôt (assets) — FR même sur /en/
   var UP = '../';                         // les trois pages vivent dans boutique/ (FR et /en/) : liens vers les autres pages, langue gardée
   var PAGE = document.body.getAttribute('data-shop') || 'filaments';
@@ -247,22 +246,8 @@
     });
   }
 
-  // Préférence « en stock seulement » (confort par visiteur : jamais bloquant si le stockage échoue)
-  var onlyStock = false;
-  try { onlyStock = localStorage.getItem(STOCK_KEY) === '1'; } catch (e) {}
-  function setOnlyStock(v) {
-    onlyStock = !!v;
-    try { localStorage.setItem(STOCK_KEY, onlyStock ? '1' : '0'); } catch (e) {}
-    $$('.js-only-stock').forEach(function (i) { i.checked = onlyStock; });
-    if (!screenCatalog.hidden) renderCatalog();
-    if (!screenProduct.hidden && curColor) renderConfig();
-    if (!screenAccs.hidden) renderAccs();
-    if (screenPromo && !screenPromo.hidden) renderPromoPage();
-  }
-  document.addEventListener('change', function (e) {
-    if (e.target && e.target.classList && e.target.classList.contains('js-only-stock')) setOnlyStock(e.target.checked);
-  });
-  $$('.js-only-stock').forEach(function (i) { i.checked = onlyStock; });
+  // Interrupteur « En stock seulement » retiré (Théo, 2026-11-17) : tout est toujours affiché, ruptures comprises.
+  try { localStorage.removeItem('ca_shop_only_stock'); } catch (e) {}
 
   /* =========================================================
      Routage : chaque étape a sa propre adresse. #/m/<marque> = catalogue
@@ -544,7 +529,7 @@
     $('#st-brands').textContent = brands.length;
 
     // puces de marque (liens réels : clic milieu / partage OK)
-    var count = function (items) { return onlyStock ? items.filter(anyStock).length : items.length; };
+    var count = function (items) { return items.length; };
     catChips.innerHTML = '<a class="chip" href="#/"' + (!catBrand ? ' aria-current="true"' : '') + _t('>Toutes <span class="chip-n">') + count(products) + '</span></a>' +
       brands.map(function (B) {
         return '<a class="chip" href="' + esc(routeFor(B.name)) + '"' + (catBrand === B.name ? ' aria-current="true"' : '') + '>' +
@@ -562,7 +547,7 @@
 
     var list = catBrand ? brands.filter(function (B) { return B.name === catBrand; }) : brands;
     var html = packSectionHtml() + promoSectionHtml(list) + list.map(function (B) {
-      var mats = B.materials.filter(function (m) { return !onlyStock || m.items.some(anyStock); });
+      var mats = B.materials;
       if (!mats.length) return '';
       var nStock = B.items.filter(anyStock).length, id = 'g-' + slugify(B.name);
       return '<section class="cat-group" aria-labelledby="' + id + '">' +
@@ -578,14 +563,9 @@
     }).join('');
     catGroups.removeAttribute('aria-busy');
     if (!html) {
-      html = '<p class="empty">' + (onlyStock
-        ? _t('Rien en stock ') + (catBrand ? _t('chez ') + esc(catBrand) + ' ' : '') + _t('pour le moment. ') +
-          _t('<button type="button" class="js-show-all">Voir aussi les ruptures</button> — tu pourras demander à être avisé.')
-        : _t('Aucun filament disponible pour le moment.')) + '</p>';
+      html = '<p class="empty">' + _t('Aucun filament disponible pour le moment.') + '</p>';
     }
     catGroups.innerHTML = html;
-    var sa = $('.js-show-all', catGroups);
-    if (sa) sa.addEventListener('click', function () { setOnlyStock(false); });
   }
 
   // Section « En promotion » en tête de boutique : matériaux ayant des couleurs en promo + accessoires en promo
@@ -594,12 +574,11 @@
     list.forEach(function (B) {
       B.materials.forEach(function (m) {
         if (!matPromo(m)) return;
-        if (onlyStock && !m.items.some(function (p) { return anyStock(p) && (promoOn(p, 'spool') || promoOn(p, 'refill')); })) return;
         mats.push(m);
       });
     });
     mats.sort(function (a, b) { return matPromo(b).pct - matPromo(a).pct; });
-    var accs = catBrand ? [] : accessories.filter(function (a) { return a.promoOn && !(onlyStock && accOut(a)); });
+    var accs = catBrand ? [] : accessories.filter(function (a) { return a.promoOn; });
     if (!mats.length && !accs.length) return '';
     var ends = null;
     mats.forEach(function (m) { var e = matPromo(m).row.promo_ends; if (e && (!ends || e < ends)) ends = e; });
@@ -650,13 +629,12 @@
     brands.forEach(function (B) {
       B.materials.forEach(function (m) {
         if (!matPromo(m)) return;
-        if (onlyStock && !m.items.some(function (p) { return anyStock(p) && (promoOn(p, 'spool') || promoOn(p, 'refill')); })) return;
         mats.push(m);
       });
     });
     mats.sort(function (a, b) { return matPromo(b).pct - matPromo(a).pct; });
-    var accs = accessories.filter(function (a) { return a.promoOn && !(onlyStock && accOut(a)); });
-    var sps = spacers.filter(function (p) { return spacerPromoPct(p) > 0 && !(onlyStock && (p.qty | 0) <= 0); });
+    var accs = accessories.filter(function (a) { return a.promoOn; });
+    var sps = spacers.filter(function (p) { return spacerPromoPct(p) > 0; });
     function group(id, title, cards, n) {
       if (!cards) return '';
       return '<section class="cat-group" aria-labelledby="' + id + '">' +
@@ -679,11 +657,7 @@
     sps.forEach(function (p) { best = Math.max(best, spacerPromoPct(p)); });
     $('#pr-st-best').textContent = best ? PR.pctText(best) : '—';
     el.removeAttribute('aria-busy');
-    el.innerHTML = html || '<p class="empty">' + (onlyStock
-      ? _t('Aucune promotion en stock pour le moment. ') + _t('<button type="button" class="js-show-all">Voir aussi les ruptures</button>')
-      : _t('Aucune promotion en ce moment.') + ' <a href="' + esc(UP + 'boutique') + '">' + _t('Voir toute la boutique') + '</a>') + '</p>';
-    var sa = $('.js-show-all', el);
-    if (sa) sa.addEventListener('click', function () { setOnlyStock(false); });
+    el.innerHTML = html || '<p class="empty">' + _t('Aucune promotion en ce moment.') + ' <a href="' + esc(UP + 'boutique') + '">' + _t('Voir toute la boutique') + '</a></p>';
   }
 
   /* =========================================================
@@ -825,7 +799,7 @@
       var cols = packCols(pk);
       if (!pk.featured || !cols.length) return false;
       if (catBrand && !cols.some(function (p) { return norm(p.brand) === catBrand; })) return false;
-      return !(onlyStock && !packAnyStock(pk));
+      return true;
     });
     if (!list.length) return '';
     return '<section class="cat-group pack-sec" aria-labelledby="g-packs">' +
@@ -1304,14 +1278,8 @@
     if (curImg >= curImgs.length) curImg = 0;
 
 
-    // pastilles dans l'ordre de l'admin (sort_order) ; « en stock seulement » garde toujours la couleur affichée
+    // pastilles dans l'ordre de l'admin (sort_order), ruptures comprises (barrées)
     var items = m.items.slice();
-    var hiddenN = 0;
-    if (onlyStock) items = items.filter(function (it) {
-      var keep = it === p || inStockAs(it, curType);
-      if (!keep) hiddenN++;
-      return keep;
-    });
     var swatches = items.map(function (it) {
       var on = it === p, o = !inStockAs(it, curType);
       return '<button type="button" class="sw' + (on ? ' is-active' : '') + (o ? ' is-out' : '') + (promoOn(it, curType) ? ' is-promo' : '') + '" data-id="' + esc(it.id) + '"' +
@@ -1373,11 +1341,8 @@
           '<div class="pdp-sec sw-sec">' +
             '<div class="pdp-label sw-head">' +
               _t('<span class="sw-head-tx"><span>Couleur · <b class="js-sw-name">') + esc(p.name) + '</b></span></span>' +
-              '<label class="switch"><input type="checkbox" class="js-only-stock"' + (onlyStock ? ' checked' : '') + _t('><span class="switch-ui" aria-hidden="true"></span>En stock seulement</label>') +
             '</div>' +
             _t('<div class="sws" role="group" aria-label="Couleurs ') + esc(m.name) + '">' + swatches + '</div>' +
-            (hiddenN ? '<p class="sws-note">' + plural(hiddenN, 'couleur en rupture masquée', 'couleurs en rupture masquées') +
-              _t(' · <button type="button" class="js-show-all">Tout afficher</button></p>') : '') +
           '</div>' +
           '</div>' +
 
@@ -1615,8 +1580,6 @@
       box.classList.add('is-flash'); setTimeout(function () { box.classList.remove('is-flash'); }, 1600);
       var first = $('.acc-add:not([disabled])', box); if (first) first.focus({ preventScroll: true });
     });
-    var showAll = $('.js-show-all', configEl);
-    if (showAll) showAll.addEventListener('click', function () { setOnlyStock(false); });
 
     wireTabs(configEl, '', function (id) { curTab = id; });
     var galUrls = galleryOf(curMat).map(publicUrl);
@@ -1652,7 +1615,7 @@
     $('#acc-st-items').textContent = accessories.length;
     $('#acc-st-stock').textContent = inStock;
     $('#acc-st-cats').textContent = accCats.length;
-    var shown = function (items) { return onlyStock ? items.filter(function (a) { return !accOut(a); }) : items; };
+    var shown = function (items) { return items; };
     accChipsEl.innerHTML = accCats.length < 2 ? '' :
       '<a class="chip" href="' + esc(accRouteFor()) + '"' + (!accCat ? ' aria-current="true"' : '') + _t('>Toutes <span class="chip-n">') + shown(accessories).length + '</span></a>' +
       accCats.map(function (c) {
@@ -1674,14 +1637,9 @@
       '</section>';
     }).join('');
     if (!html) {
-      html = '<p class="empty">' + (onlyStock && accessories.length
-        ? _t('Rien en stock ') + (accCat ? _t('dans « ') + esc(accCat.name) + ' » ' : '') + _t('pour le moment. ') +
-          _t('<button type="button" class="js-show-all">Voir aussi les ruptures</button>')
-        : _t('Aucun accessoire pour le moment.')) + '</p>';
+      html = '<p class="empty">' + _t('Aucun accessoire pour le moment.') + '</p>';
     }
     accGroupsEl.innerHTML = html;
-    var sa = $('.js-show-all', accGroupsEl);
-    if (sa) sa.addEventListener('click', function () { setOnlyStock(false); });
   }
 
   function accCard(a) {
