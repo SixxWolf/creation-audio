@@ -2150,7 +2150,7 @@
               <div class="al-card-head"><span class="al-ic al-step">3</span> Batch sur mesure <span class="al-note">calibration forcée, même si off dans Bambu</span></div>
               <div class="al-batch">
                 <label class="al-cal-bk" for="al-loops">Loops</label>
-                <span class="al-inline"><input type="number" id="al-loops" min="1" step="1" value="12" class="num"></span>
+                <span class="al-inline"><input type="number" id="al-loops" min="2" step="1" value="12" class="num"></span>
                 <span></span>
                 <label class="al-cal-bk" for="al-cal-flow-every">Flow</label>
                 <span class="al-inline">tous les <input type="number" id="al-cal-flow-every" min="0" step="1" value="2" class="num"></span>
@@ -2215,10 +2215,6 @@
                     <span class="unit" data-unit="F"><input type="number" id="al-push-speed" min="1" step="1" value="10000" class="num"></span>
                   </div>
                   <div class="field">
-                    <label class="lbl" for="al-clearz">Dégagement Z</label>
-                    <span class="unit" data-unit="mm"><input type="number" id="al-clearz" min="0" step="1" value="105" class="num"></span>
-                  </div>
-                  <div class="field">
                     <label class="lbl" for="al-push-passes">Poussées</label>
                     <input type="number" id="al-push-passes" min="1" max="5" step="1" value="1" class="num">
                   </div>
@@ -2260,6 +2256,10 @@
                   </div>
                   <div class="field field-wide" id="al-cool-fresh-wrap">
                     <label class="al-msw"><input type="checkbox" id="al-cool-fresh" checked> Air frais du dehors</label>
+                  </div>
+                  <div class="field" id="al-cool-z-wrap">
+                    <label class="lbl" for="al-cool-z">Plateau au refroidissement</label>
+                    <span class="unit" data-unit="mm"><input type="number" id="al-cool-z" min="0" step="1" value="" placeholder="—" class="num"></span>
                   </div>
                   <div class="field" id="al-cool-temp-wrap">
                     <label class="lbl" for="al-cool-temp">Cible</label>
@@ -3293,7 +3293,8 @@
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
 <script src="assets/cms-autoloop-files.js?v=1"></script>
-<script src="assets/cms-autoloop.js?v=53"></script>
+<script src="assets/autoloop-core.js?v=3"></script>
+<script src="assets/cms-autoloop.js?v=56"></script>
 <!-- Silhouettes : le ?v= du moteur sert aussi au worker (cms-silhouettes.js le lit ici) -->
 <script src="assets/silhouette-engine.js?v=17"></script>
 <script src="assets/cms-silhouettes.js?v=16"></script>
