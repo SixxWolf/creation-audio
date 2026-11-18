@@ -150,6 +150,13 @@ Deno.serve(async (req) => {
   } catch (e) { results.client = "error: " + String((e as Error).message || e); }
 
   // ---- à Création Audio ----
+  // commande dont l'avis « nouvelle commande » attend encore (15 min, admin_due_at) : on l'avance à maintenant,
+  // il part dans la minute avec la cueillette (customer-order-notify, order_admin_mail_tick) — un seul courriel
+  if (kind === "order" && x.admin_due_at && !x.admin_mailed_at) {
+    const { data: merged } = await db.from("customer_orders").update({ admin_due_at: new Date().toISOString() })
+      .eq("id", id).is("admin_mailed_at", null).select("id");
+    if (merged?.length) return json({ result: "done", ...results, admin: "merged" });
+  }
   const who = x.name || x.email;
   const aText = "Plage de cueillette choisie — " + what + "\n" + who + " · " + x.email + (x.phone ? " · " + x.phone : "") +
     "\n\nCueillette : " + pk + "\n\nOuvrir dans l'admin : " + adminUrl + "\n";

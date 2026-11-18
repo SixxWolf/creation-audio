@@ -14,6 +14,8 @@
 // (ready : JWT de l'admin, double authentification aal2).
 // Sécurité : JWT vérifié ; la commande doit appartenir au client (customer_id = son id).
 // Anti-rafale : « new » une seule fois ; modification / annulation au plus 1 fois / 2 min.
+// Avis admin d'une nouvelle commande sans cueillette : différé 15 min (admin_due_at) ; si la cueillette
+// est choisie entre-temps (pickup-notify), un seul courriel commande + cueillette (tick { cron: "admin" }).
 // Adresses de test Resend (…@resend.dev) : l'avis admin part aussi vers le puits de test.
 // Secrets : RESEND_API_KEY ; MAIL_FROM et ORDER_NOTIFY_TO optionnels.
 // =========================================================
@@ -141,11 +143,13 @@ Deno.serve(async (req) => {
   // 0) tick pg_cron (reservations_tick, aux 10 min) : rappel « choisis ta cueillette » et avis d'annulation automatique
   if (req.headers.get("x-cron-key")) {
     const body = await req.clone().json().catch(() => ({}));
-    if (body?.cron === true) {
+    if (body?.cron === true || body?.cron === "admin") {
       const db0 = createClient(url, service);
       const { data: ok } = await db0.rpc("reservation_cron_ok", { p_key: req.headers.get("x-cron-key") || "" });
       if (ok !== true) return json({ error: "Clé invalide." }, 401);
       if (!resendKey) return json({ error: "Envoi non configuré : secret RESEND_API_KEY manquant." }, 503);
+      // order_admin_mail_tick (chaque minute) : avis admin différés de 15 min, avec la cueillette si choisie
+      if (body.cron === "admin") return json({ result: "done", ...(await runAdminDue(db0, resendKey, from, adminTo)) });
       return json({ result: "done", ...(await runCron(db0, resendKey, from)) });
     }
   }
@@ -192,12 +196,9 @@ Deno.serve(async (req) => {
   await loadEmptyIds(db, L);
   await M.loadCompany(db);
   const pics = await M.thumbs(db, L);
-  const items = L.reduce((s, l) => s + (Number(l.qty) || 0), 0);
   const toOrder = L.filter((l) => (Number(l.qty_to_order) || 0) > 0);
   const first = String(order.name || "").trim().split(/\s+/)[0] || "";
-  const adminUrl = SITE + "/coulisses-t6avzpe2#commandes/clients";
   const results: Record<string, string> = {};
-  const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end);
 
   // ---- courriel au client (envoi et modification), dans sa langue ----
   if (event !== "cancelled") {
@@ -263,6 +264,31 @@ Deno.serve(async (req) => {
   }
 
   // ---- avis à Création Audio ----
+  // nouvelle commande sans cueillette : avis différé de 15 min (order_admin_mail_tick) pour y joindre la
+  // cueillette si le client la choisit entre-temps — un seul courriel au lieu de deux
+  const pending = !!order.admin_due_at && !order.admin_mailed_at;
+  if (event === "new" && !order.pickup_date) {
+    await db.from("customer_orders").update({ admin_due_at: new Date(Date.now() + 15 * 60 * 1000).toISOString() }).eq("id", orderId);
+    results.admin = "deferred";
+  } else if (pending) {
+    results.admin = "deferred";   // modifiée / annulée avant l'avis : l'avis différé partira avec l'état à jour (ou sautera si annulée)
+  } else {
+    results.admin = await adminMail(db, order, event, L, pics, resendKey, from, adminTo);
+    if (event === "new") await db.from("customer_orders").update({ admin_mailed_at: new Date().toISOString() }).eq("id", orderId);
+  }
+
+  await db.from("customer_orders").update({ notified_at: new Date().toISOString() }).eq("id", orderId);
+  return json({ result: "done", ...results });
+});
+
+// ---- avis à Création Audio (nouvelle / modifiée / annulée) ; cueillette jointe si choisie ----
+// deno-lint-ignore no-explicit-any
+async function adminMail(db: any, order: any, event: string, L: Line[], pics: M.Thumb[], resendKey: string, from: string, adminTo: string) {
+  const items = L.reduce((s, l) => s + (Number(l.qty) || 0), 0);
+  const toOrder = L.filter((l) => (Number(l.qty_to_order) || 0) > 0);
+  const adminUrl = SITE + "/coulisses-t6avzpe2#commandes/clients";
+  const pk = fmtPickup(order.pickup_date, order.pickup_start, order.pickup_end);
+  const pkTxt = pk ? pk + (order.pickup_confirmed_at ? "" : " (à confirmer)") : "";
   const pids = L.map((l) => l.product_id).filter(Boolean) as string[];
   const { data: prods } = pids.length
     ? await db.from("products").select("id, qty, qty_2").in("id", pids)
@@ -271,7 +297,8 @@ Deno.serve(async (req) => {
   const label = ADMIN_LABEL[event];
   const who = order.name || order.email;
   const aSubject = label + " " + order.number + " — " + who + (event === "cancelled" ? "" : " (" + plural(items, "article", "articles") +
-    (toOrder.length ? ", " + toOrder.length + " à commander" : "") + ")");
+    (toOrder.length ? ", " + toOrder.length + " à commander" : "") + ")") +
+    (pk && event !== "cancelled" ? " · cueillette " + pk : "");
   const aRows = L.map((l) => {
     const p = l.product_id ? stockOf.get(l.product_id) : null;
     const st = p ? (l.kind === "refill" ? Number(p.qty_2) || 0 : Number(p.qty) || 0) : 0;
@@ -281,7 +308,7 @@ Deno.serve(async (req) => {
     label + " " + order.number + "\n" + who + " · " + order.email + (order.phone ? " · " + order.phone : "") + "\n\n" +
     aRows.map((r) => "- " + r.l.name + (r.l.meta ? " (" + r.l.meta + ")" : "") + " × " + r.l.qty + " — " + money(r.l.line_total) +
       (r.miss ? "  (" + (isEmpty(r.l) ? "à compléter" : "à commander") + " : " + r.miss + ")" : "  (en stock)")).join("\n") +
-    "\n\nTotal : " + money(order.total) + "\n" + (pk ? "Cueillette : " + pk + "\n" : "") +
+    "\n\nTotal : " + money(order.total) + "\n" + (pkTxt ? "Cueillette : " + pkTxt + "\n" : "") +
     (order.note ? "\nNote du client : " + order.note + "\n" : "") +
     "\nOuvrir dans l'admin : " + adminUrl + "\n";
   const aHtml = M.page({
@@ -291,7 +318,7 @@ Deno.serve(async (req) => {
     body:
       M.who(who, order.email, order.phone) +
       (event === "cancelled" ? M.notice("Le client a annulé cette commande.", "bad") : "") +
-      (pk ? M.notice("Cueillette : " + esc(pk), "ok") : "") +
+      (pkTxt ? M.notice("Cueillette : " + esc(pkTxt), order.pickup_confirmed_at ? "ok" : "info") : "") +
       M.items(aRows.map((r, i) => ({
         label: r.l.name, meta: r.l.meta, thumb: pics[i],
         sub: esc(r.l.qty) + " × " + esc(money(r.l.unit_price)),
@@ -300,16 +327,35 @@ Deno.serve(async (req) => {
       }))) +
       M.totalBox("Total", money(order.total)) +
       (order.note ? M.quote(order.note, "Note du client :") : "") +
-      M.button(adminUrl, "Ouvrir dans l'admin", 18),
+      M.button(adminUrl, pkTxt && !order.pickup_confirmed_at ? "Confirmer dans l'admin" : "Ouvrir dans l'admin", 18),
   });
   try {
     await send(resendKey, from, { to: [adminTo], reply_to: order.email, subject: aSubject, html: aHtml, text: aText });
-    results.admin = "sent";
-  } catch (e) { results.admin = "error: " + String((e as Error).message || e); }
+    return "sent";
+  } catch (e) { return "error: " + String((e as Error).message || e); }
 
-  await db.from("customer_orders").update({ notified_at: new Date().toISOString() }).eq("id", orderId);
-  return json({ result: "done", ...results });
-});
+}
+
+// ---- tick : avis admin différés arrivés à échéance (15 min, ou tout de suite quand la cueillette est choisie) ----
+// deno-lint-ignore no-explicit-any
+async function runAdminDue(db: any, resendKey: string, from: string, adminTo0: string) {
+  const out = { admin: 0, skipped: 0 };
+  const { data: due } = await db.from("customer_orders").update({ admin_mailed_at: new Date().toISOString() })
+    .is("admin_mailed_at", null).not("admin_due_at", "is", null).lte("admin_due_at", new Date().toISOString()).select("*");
+  for (const order of due || []) {
+    if (order.status === "cancelled") { out.skipped++; continue; }   // annulée avant l'avis : rien à signaler
+    const { data: lines } = await db.from("customer_order_lines")
+      .select("name, meta, qty, unit_price, line_total, qty_to_order, product_id, kind, ptype, pack").eq("order_id", order.id).order("sort_order");
+    const L = M.packGroup((lines || []) as Line[]);
+    await loadEmptyIds(db, L);
+    await M.loadCompany(db);
+    const pics = await M.thumbs(db, L);
+    const to = /@resend\.dev$/i.test(order.email || "") ? "delivered@resend.dev" : adminTo0;
+    const r = await adminMail(db, order, order.edited_at ? "updated" : "new", L, pics, resendKey, from, to);
+    if (r === "sent") out.admin++;
+  }
+  return out;
+}
 
 // bobines vides présentes dans ces lignes (accessoires visés par materials.empty_spool_id)
 // deno-lint-ignore no-explicit-any

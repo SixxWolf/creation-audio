@@ -6196,3 +6196,32 @@ grant execute on function public.take_stock_snapshot(date) to authenticated;
 
 select cron.unschedule(jobid) from cron.job where jobname = 'stock-snapshot';
 select cron.schedule('stock-snapshot', '0 5 * * *', 'select public.take_stock_snapshot()');
+
+-- ============================================================
+-- AVIS ADMIN D'UNE COMMANDE EN LIGNE : UN SEUL COURRIEL (2026-11-18)
+-- À l'envoi (EF customer-order-notify, event 'new') sans cueillette choisie, l'avis à
+-- Création Audio attend 15 min (admin_due_at). Si le client choisit sa cueillette entre-temps,
+-- pickup-notify avance l'échéance à maintenant et ne fait pas son propre avis : le tick
+-- ci-dessous envoie alors UN courriel commande + cueillette. Délai écoulé sans cueillette :
+-- avis commande seul, puis l'avis « Plage à confirmer » habituel plus tard.
+-- admin_mailed_at = avis parti (ou sauté : commande annulée avant l'envoi).
+-- ============================================================
+alter table public.customer_orders add column if not exists admin_due_at    timestamptz;
+alter table public.customer_orders add column if not exists admin_mailed_at timestamptz;
+create index if not exists customer_orders_admin_due_idx on public.customer_orders (admin_due_at) where admin_mailed_at is null and admin_due_at is not null;
+
+create or replace function public.order_admin_mail_tick()
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.customer_orders where admin_mailed_at is null and admin_due_at is not null and admin_due_at <= now()) then
+    perform net.http_post(
+      url := 'https://cqfmvdknppscazfynoiy.supabase.co/functions/v1/customer-order-notify',
+      body := '{"cron":"admin"}'::jsonb,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                   'x-cron-key', (select value from private.secrets where key = 'cron_key')),
+      timeout_milliseconds := 20000);
+  end if;
+end $$;
+revoke all on function public.order_admin_mail_tick() from public, anon, authenticated;
+select cron.unschedule(jobid) from cron.job where jobname = 'order-admin-mail-tick';
+select cron.schedule('order-admin-mail-tick', '* * * * *', 'select public.order_admin_mail_tick()');
