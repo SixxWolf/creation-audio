@@ -268,20 +268,58 @@ function fit(sz: { w: number; h: number } | null, box = 52) {
   return { w: Math.max(1, Math.round(sz.w * k)), h: Math.max(1, Math.round(sz.h * k)) };
 }
 // deno-lint-ignore no-explicit-any
-export async function thumbs(db: any, rows: { product_id?: string | null; kind?: string | null }[]): Promise<Thumb[]> {
+// Ligne de pack (après packGroup) : photo de la composition achetée (presets[].img, comme la boutique),
+// sinon photo du pack (packs.image_path) — jamais celle du 1er filament. Renvoie un chemin par ligne ("" = pas un pack).
+// deno-lint-ignore no-explicit-any
+export async function packImagePaths(db: any, rows: { pack?: any; pack_comp?: Record<string, number> }[]): Promise<string[]> {
+  const res = rows.map(() => "");
+  const ids = [...new Set(rows.map((r) => r?.pack?.k && r.pack.id).filter(Boolean))] as string[];
+  if (!ids.length) return res;
+  // deno-lint-ignore no-explicit-any
+  const packs: Record<string, any> = {};
+  try {
+    const { data } = await db.from("packs").select("id, image_path, presets").in("id", ids);
+    for (const p of data || []) packs[p.id] = p;
+  } catch { return res; }
+  const key = (m: Record<string, number>) => Object.keys(m).filter((k) => m[k] > 0).sort().map((k) => k + ":" + m[k]).join(",");
+  rows.forEach((r, i) => {
+    const pk = r?.pack?.k ? packs[r.pack.id] : null;
+    if (!pk) return;
+    let path = "";
+    const k = r.pack_comp ? key(r.pack_comp) : "";
+    if (k) {
+      for (const pr of Array.isArray(pk.presets) ? pk.presets : []) {
+        if (!pr?.img) continue;
+        const m: Record<string, number> = {};
+        for (const l of Array.isArray(pr.lines) ? pr.lines : []) if (l?.p && (l.n | 0) > 0) m[l.p] = (m[l.p] || 0) + (l.n | 0);
+        if (key(m) === k) { path = String(pr.img); break; }
+      }
+    }
+    res[i] = path || String(pk.image_path || "");
+  });
+  return res;
+}
+// deno-lint-ignore no-explicit-any
+export async function thumbs(db: any, rows: { product_id?: string | null; kind?: string | null; pack?: any }[]): Promise<Thumb[]> {
   try {
     const base = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
     const ids = [...new Set(rows.map((r) => r.product_id).filter(Boolean))] as string[];
-    if (!ids.length) return rows.map(() => null);
+    const packImg = await packImagePaths(db, rows);
+    if (!ids.length && !packImg.some(Boolean)) return rows.map(() => null);
     // deno-lint-ignore no-explicit-any
     const prods: Record<string, any> = {};
-    const { data } = await db.from("products").select("id, type, image_path, attrs").in("id", ids);
-    for (const p of data || []) prods[p.id] = p;
-    const urlOf = (r: { product_id?: string | null; kind?: string | null }) => {
+    if (ids.length) {
+      const { data } = await db.from("products").select("id, type, image_path, attrs").in("id", ids);
+      for (const p of data || []) prods[p.id] = p;
+    }
+    // deno-lint-ignore no-explicit-any
+    const urlOf = (r: { product_id?: string | null; kind?: string | null; pack?: any }, i: number) => {
+      const pk = packImg[i];
       const p = r.product_id ? prods[r.product_id] : null;
-      if (!p) return "";
-      const a = p.attrs || {};
-      const path = String((p.type === "filament" && (r.kind === "refill" ? a.img_refill : a.img_spool)) || p.image_path || "");
+      if (!pk && !p) return "";
+      const a = p?.attrs || {};
+      let path = String(pk || (p.type === "filament" && (r.kind === "refill" ? a.img_refill : a.img_spool)) || p.image_path || "");
+      if (/^assets\//.test(path)) path = "/" + path;
       if (!path) return "";
       if (/^https?:\/\//i.test(path)) return path;
       if (path.startsWith("/")) return SITE + path.replace(/\.webp$/i, ".png");
@@ -301,7 +339,7 @@ export async function thumbs(db: any, rows: { product_id?: string | null; kind?:
         return { src, w: sz.w, h: sz.h };
       } catch { return null; }
     })();
-    return await Promise.all(rows.map((r) => { const u = urlOf(r); return u ? get(u) : Promise.resolve(null); }));
+    return await Promise.all(rows.map((r, i) => { const u = urlOf(r, i); return u ? get(u) : Promise.resolve(null); }));
   } catch { return rows.map(() => null); }
 }
 
@@ -319,18 +357,21 @@ export function packGroup<T extends Record<string, any>>(lines: T[], en = false)
     const p = l && l.pack;
     if (!p || !p.k) { out.push(l); continue; }
     const n = Math.max(1, Number(p.n) || 1);
-    const col = Math.round((Number(l.qty) || 0) / n) + " × " + String(l.name ?? l.label ?? "");
+    const per = Math.round((Number(l.qty) || 0) / n);
+    const col = per + " × " + String(l.name ?? l.label ?? "");
     if (at[p.k] == null) {
       at[p.k] = out.length;
       const name = (en && p.name_en) || p.name || "Pack";
       out.push({ ...l, name, label: name, qty: n, unit_price: Number(p.price) || 0, line_total: Number(l.line_total) || 0,
-        qty_to_order: 0, qty_pending: Number(l.qty_pending) || 0, _cols: [col] });
+        qty_to_order: 0, qty_pending: Number(l.qty_pending) || 0, _cols: [col], pack_comp: {} });
     } else {
       const g = out[at[p.k]];
       g.line_total = r2(g.line_total + (Number(l.line_total) || 0));
       g.qty_pending += Number(l.qty_pending) || 0;
       g._cols.push(col);
     }
+    // composition d'UN pack (produit → nombre) : sert à trouver la photo de la composition choisie
+    if (l.product_id) { const g = out[at[p.k]]; g.pack_comp[l.product_id] = (g.pack_comp[l.product_id] || 0) + per; }
   }
   for (const g of out) {
     if (!g || !g._cols) continue;

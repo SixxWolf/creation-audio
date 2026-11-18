@@ -16,7 +16,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { buildInvoicePdf, dateTxt, money, type Fonts, type InvoiceLine } from "./pdf.ts";
 import { buildInvoiceEmail, fitBox, imageSize } from "./email.ts";
-import { packGroup } from "../_shared/mail.ts";   // packs de filament : une ligne par pack
+import { packGroup, packImagePaths } from "../_shared/mail.ts";   // packs de filament : une ligne par pack
 
 const SITE = "https://creationaudio.ca";
 const REPLY_TO = "contact@creationaudio.ca";
@@ -68,10 +68,14 @@ async function lineImages(db: any, rows: any[]): Promise<{ url: string; bytes: U
     const { data } = await db.from("maintenance_printers").select("brand, name, photo");
     printers = data || [];
   }
-  const urlOf = (r: Record<string, unknown>): string => {
+  const packImg = await packImagePaths(db, rows);   // ligne de pack = photo du pack
+  const urlOf = (r: Record<string, unknown>, i: number): string => {
     let path = "";
+    const pk = packImg[i];
     const p = r.product_id ? prods[r.product_id as string] : null;
-    if (p) {
+    if (pk) {
+      path = /^assets\//.test(pk) ? "/" + pk : pk;
+    } else if (p) {
       const a = p.attrs || {};
       path = (p.type === "filament" && (r.kind === "refill" ? a.img_refill : a.img_spool)) || p.image_path || "";
     } else {
@@ -96,7 +100,7 @@ async function lineImages(db: any, rows: any[]): Promise<{ url: string; bytes: U
       return b.length > 0 && b.length < 3_000_000 ? b : null;
     } catch { return null; }
   })();
-  return await Promise.all(rows.map(async (r) => { const u = urlOf(r); return { url: u, bytes: u ? await get(u) : null }; }));
+  return await Promise.all(rows.map(async (r, i) => { const u = urlOf(r, i); return { url: u, bytes: u ? await get(u) : null }; }));
 }
 
 // polices : chargées au premier envoi, gardées en mémoire ; null = repli Helvetica
