@@ -54,7 +54,9 @@
       sb.from('packs').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
       sb.from('products').select('*').eq('type', 'filament').eq('active', true),
       sb.from('materials').select('*'),
-      sb.from('brands').select('name,sort_order')
+      sb.from('brands').select('name,sort_order'),
+      // stock offert (réel − réservations en cours), comme la boutique
+      sb.from('products_public').select('id,qty,qty_2').eq('type', 'filament')
     ]).then(function (r) {
       var bad = r.filter(function (x) { return x.error; })[0];
       if (bad) { listEl.innerHTML = '<p class="empty">Impossible de charger les packs.<br>' + esc(bad.error.message || bad.error) + '</p>'; return; }
@@ -64,6 +66,7 @@
       (r[3].data || []).forEach(function (b, i) { brandOrder[b.name] = b.sort_order != null ? b.sort_order : i; });
       fils = (r[1].data || []).slice().sort(filCmp);
       byId = {}; fils.forEach(function (p) { byId[p.id] = p; });
+      (r[4].data || []).forEach(function (v) { var p = byId[v.id]; if (p) { p.avail = v.qty; p.avail_2 = v.qty_2; } });
       loaded = true;
       render();
     });
@@ -75,7 +78,11 @@
     return (bo(a) - bo(b)) || (mo(a) - mo(b)) || ((a.sort_order || 0) - (b.sort_order || 0)) || String(a.name).localeCompare(String(b.name));
   }
   function offers(p, kind) { return kind === 'refill' ? p.offer_refill !== false : p.offer_spool !== false; }
-  function stockOf(p, kind) { return Math.max(0, (kind === 'refill' ? p.qty_2 : p.qty) || 0); }
+  // stock offert : la vue publique soustrait les réservations en cours ; repli sur le stock brut
+  function stockOf(p, kind) {
+    var v = kind === 'refill' ? (p.avail_2 !== undefined ? p.avail_2 : p.qty_2) : (p.avail !== undefined ? p.avail : p.qty);
+    return Math.max(0, v || 0);
+  }
   function regPrice(p, kind) {
     var m = mats[p.brand + '|' + p.material];
     return num(kind === 'refill' ? (m ? m.sell_refill : p.sell_price_2) : (m ? m.sell_spool : p.sell_price));
