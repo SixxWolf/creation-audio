@@ -2477,7 +2477,7 @@ a.ms-b-file:hover { border-color:var(--ink); }
 @media (max-width:640px) { .en-mat { grid-template-columns:1fr 1fr; } .en-mat .field:first-child { grid-column:1/-1; } }
 
 /* Packs dans Commandes / Réservations / Facturation (2026-11-16) */
-.cc-meta.cc-pack { color:var(--ember-ink); font-weight:700; }
+.cc-meta.cc-pack, .cc-meta .cc-pack { color:var(--ember-ink); font-weight:700; }
 .fx-packtag { color:var(--ember-ink); font-weight:700; }
 .fx-packpick { grid-column:1 / -1; margin-top:16px; display:flex; flex-direction:column; gap:8px; max-height:52vh; overflow:auto; }
 .fx-packopt { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; font:inherit; color:var(--ink); text-align:left;

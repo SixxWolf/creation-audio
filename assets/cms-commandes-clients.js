@@ -368,8 +368,9 @@
         items += l.qty | 0; missing += OPEN[o.status] ? miss : 0;
         return '<tr>' +
           '<td class="l"><span class="co-prod">' + thumb(l.product_id && stock[l.product_id], kd) +
-            '<span><b>' + esc(l.name) + '</b>' + (l.meta ? '<small class="cc-meta">' + esc(CA.kindMeta(l.meta)) + '</small>' : '') +
-            (l.pack ? '<small class="cc-meta cc-pack">' + esc(l.pack.name || 'Pack') + '</small>' : '') + '</span>' +
+            '<span><b>' + esc(l.name) + '</b>' + ((l.meta || l.pack) ? '<small class="cc-meta">' +
+              (l.pack ? '<span class="cc-pack">' + esc(l.pack.name || 'Pack') + '</span>' + (l.meta ? ' · ' : '') : '') +
+              (l.meta ? esc(CA.kindMeta(l.meta)) : '') + '</small>' : '') + '</span>' +
             CA.kindPill(CA.kindOf(l.meta, l.kind)) + '</span></td>' +
           '<td class="n" data-l="Qté"><b>' + (l.qty | 0) + '</b></td>' +
           '<td class="n" data-l="À commander">' + (!OPEN[o.status] ? '—' : miss ? '<span class="co-print-n">' + miss + '</span>' : '<span class="co-ok">en stock</span>') + '</td>' +
