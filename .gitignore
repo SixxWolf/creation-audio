@@ -32,3 +32,11 @@ result.json
 # Relais de la ferme d imprimantes : dépendances npm (la config avec les codes est hors dépôt)
 tools/farm-relay/node_modules/
 tools/farm-relay/package-lock.json
+
+# Annonces Marketplace (textes + images de travail) — jamais en ligne
+marketplace/
+
+# Fichiers générés / caches locaux
+supabase/.temp/
+tools/i18n/missing-js.json
+00000.log
