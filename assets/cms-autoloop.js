@@ -349,7 +349,16 @@
     L.push('M104 S0 ; turn off hotend');
     // Cooldown
     if (opts.coolMode !== 'none') {
-      L.push('M106 P2 S255 ; turn on remote part cooling fan');
+      if (opts.coolFresh) {
+        // P2S : en mode chauffage (ABS/ASA, chambre ≥ 40 °C) le volet recycle l'air chaud de la chambre.
+        // M145 P0 = mode ventilation (comme le start gcode PLA) : l'auxiliaire tire l'air frais du dehors.
+        // Le start gcode du loop suivant remet lui-même son mode (M145 P1 pour l'ABS).
+        L.push('M145 P0 ; AutoLoop : volet en mode ventilation (air frais du dehors)');
+        L.push('M106 P2 S255 ; turn on auxiliary fan for cooling');
+        L.push('M106 P3 S255 ; turn on chamber fan for cooling');
+      } else {
+        L.push('M106 P2 S255 ; turn on remote part cooling fan');
+      }
       L.push('');
       L.push(';Cooldown Start');
       if (opts.coolMode === 'temp') {
@@ -605,6 +614,7 @@
       purgeLen: Math.max(0, num($('#al-purge-len').value, 50)),
       wipePasses: Math.min(10, Math.max(0, intOr($('#al-wipe-passes').value, 2))),
       coolMode: $('#al-cool-mode').value,
+      coolFresh: $('#al-cool-fresh').checked,
       coolTemp: num($('#al-cool-temp').value, 45),
       coolSec: num($('#al-cool-sec').value, 60),
       coolEst: num($('#al-cool-est').value, 5),
@@ -691,6 +701,7 @@
     var o = readOpts();
     var cool = o.coolMode === 'temp' ? Math.round(o.coolTemp) + ' °C'
              : o.coolMode === 'delay' ? Math.round(o.coolSec) + ' s' : 'sans cooldown';
+    if (o.coolMode !== 'none' && o.coolFresh) cool += ' air frais';
     el.textContent = [o.bendEnable ? 'flexion ×' + o.bendCycles : 'sans flexion',
                       'push −' + o.pushOffset + ' mm', 'purge ' + o.purgeLen + ' mm', cool].join(' · ');
   }
@@ -1258,6 +1269,7 @@
       $('#al-cool-temp-wrap').hidden = coolMode.value !== 'temp';
       $('#al-cool-sec-wrap').hidden = coolMode.value !== 'delay';
       $('#al-cool-est-wrap').hidden = coolMode.value !== 'temp';   // délai / aucun : durée calculée
+      $('#al-cool-fresh-wrap').hidden = coolMode.value === 'none';
     }
     coolMode.addEventListener('change', syncCool); syncCool();
     // Flexion : activer/désactiver les champs.
@@ -1492,7 +1504,7 @@
     gcode: ['al-loops', 'al-cal-flow-every', 'al-cal-bed-every', 'al-bend-enable', 'al-bend-high', 'al-bend-low',
             'al-bend-speed', 'al-bend-cycles', 'al-push-offset', 'al-push-speed', 'al-clearz',
             'al-push-passes', 'al-push-back', 'al-push-front', 'al-purge-len',
-            'al-wipe-passes', 'al-cool-mode', 'al-cool-temp', 'al-cool-sec', 'al-cool-est'],
+            'al-wipe-passes', 'al-cool-mode', 'al-cool-fresh', 'al-cool-temp', 'al-cool-sec', 'al-cool-est'],
     prix: ['ap-cooldown', 'ap-failure', 'ap-filament-kg', 'ap-consumables', 'ap-deprec', 'ap-elec', 'ap-rate',
            'ap-prep-model', 'ap-prep-slice', 'ap-prep-transfer', 'ap-post-removal', 'ap-post-support', 'ap-post-additional']
   };
