@@ -217,36 +217,50 @@
     function intCard(title, u) {
       return u.n ? card(title, money(u.cost), u.qty + ' article' + (u.qty > 1 ? 's' : '') + ' pris · au coûtant') : '';
     }
+    // crédit boutique dealer (choix de Théo, 2026-11-18) : la part payée en crédit n'est PAS une vente
+    // (remboursement d'une dette en marchandise) → retirée des ventes, de la marge et de l'encaissé,
+    // montrée à part dans la carte « Payé en crédit boutique ». Facture partielle : prorata (crédit ÷ total).
+    var cred = { amount: 0, cost: 0, n: 0 };
+    function credShare(inv) {
+      var c = +inv.credit_used || 0, t = +inv.total || 0;
+      return c > 0 && t > 0 ? Math.min(1, c / t) : 0;
+    }
+    rows = rows.filter(function (inv) {
+      var f = credShare(inv);
+      if (f > 0) { cred.n++; cred.amount += +inv.credit_used || 0; cred.cost += f * ((+inv.cost_total) || 0); }
+      return f < 1;   // payée en entier par crédit = aucune vente
+    });
     var n = rows.length;
     var ca = 0, cost = 0, collected = 0;
     var byCat = {}, catCost = {}, catQty = {}, prod = {};
     rows.forEach(function (inv) {
-      ca += (+inv.subtotal) || 0; cost += (+inv.cost_total) || 0; collected += (+inv.total) || 0;
+      var k = 1 - credShare(inv);   // part réellement vendue (1 sans crédit)
+      ca += k * ((+inv.subtotal) || 0); cost += k * ((+inv.cost_total) || 0); collected += k * ((+inv.total) || 0);
       var lns = linesByInv[inv.id] || [];
       if (lns.length) {
         lns.forEach(function (l) {
           // ventilation par gabarit AU NIVEAU DE LA LIGNE : une facture mixte
           // répartit ses filaments et ses accessoires dans les bonnes cases.
           var lc = lineCat(l, inv);
-          byCat[lc] = (byCat[lc] || 0) + ((+l.line_total) || 0);
-          catCost[lc] = (catCost[lc] || 0) + ((+l.unit_cost) || 0) * ((+l.qty) || 0);
+          byCat[lc] = (byCat[lc] || 0) + k * ((+l.line_total) || 0);
+          catCost[lc] = (catCost[lc] || 0) + k * ((+l.unit_cost) || 0) * ((+l.qty) || 0);
           catQty[lc] = (catQty[lc] || 0) + ((+l.qty) || 0);
           // regroupe par produit ET format (bobine/recharge/unité) — sinon on
           // fusionnerait à tort les ventes bobine et recharge d'une même couleur.
           var key = l.product_id ? (l.product_id + '|' + (l.kind || '')) : ('free:' + (l.label || ''));
           var p = prod[key] || (prod[key] = { label: l.label || '(ligne)', meta: l.meta || '', qty: 0, rev: 0, cost: 0,
                                               pid: l.product_id || null, group: groupOf(lc) });
-          p.qty += (+l.qty) || 0; p.rev += (+l.line_total) || 0; p.cost += ((+l.unit_cost) || 0) * ((+l.qty) || 0);
+          p.qty += (+l.qty) || 0; p.rev += k * ((+l.line_total) || 0); p.cost += k * ((+l.unit_cost) || 0) * ((+l.qty) || 0);
         });
       } else {
         // repli : facture dont les lignes n'ont pas pu être chargées
-        var c = inv.category || 'mixte'; byCat[c] = (byCat[c] || 0) + ((+inv.subtotal) || 0);
-        catCost[c] = (catCost[c] || 0) + ((+inv.cost_total) || 0);
+        var c = inv.category || 'mixte'; byCat[c] = (byCat[c] || 0) + k * ((+inv.subtotal) || 0);
+        catCost[c] = (catCost[c] || 0) + k * ((+inv.cost_total) || 0);
       }
     });
     var margin = ca - cost, avg = n ? ca / n : 0;
 
-    if (!n && !intInv.length) {
+    if (!n && !intInv.length && !cred.n) {
       var emptyHtml = '<div class="empty">Aucune facture sur cette période' +
         (invoices.length ? '.' : ' — commence par créer des factures.') + '</div>';
       bodyEl.innerHTML = emptyHtml;
@@ -262,6 +276,7 @@
       card('Panier moyen', money(avg), 'par facture') +
       card('Encaissé', money(collected), 'taxes incluses') +
       intCard('Interne · production', intUse.production) + intCard('Interne · autre', intUse.other) +
+      (cred.n ? card('Payé en crédit boutique', money(cred.amount), 'coût ' + money(cred.cost) + ' · ' + cred.n + ' facture' + (cred.n > 1 ? 's' : '')) : '') +
       (intUse.amazon.n ? card('Envoyé chez Amazon', money(intUse.amazon.cost), intUse.amazon.qty + ' unité' + (intUse.amazon.qty > 1 ? 's' : '') +
         ' · ' + money(intUse.amazon.qty ? intUse.amazon.cost / intUse.amazon.qty : 0) + ' / unité') : '');
 
