@@ -107,18 +107,24 @@
   CA.editPickup = function (x, kind, reload, card) {
     var old = card.querySelector('.co-pkedit');
     if (old) { old.remove(); return; }
-    var CO = CA.custOrder, cur = x.pickup_date ? { d: String(x.pickup_date), s: String(x.pickup_start || '').slice(0, 5) } : null;
+    var CO = CA.custOrder, cur = x.pickup_date ? { d: String(x.pickup_date), s: String(x.pickup_start || '').slice(0, 5), e: String(x.pickup_end || '').slice(0, 5) } : null;
+    var range = kind === 'order';   // fourchette (fin facultative) : commandes seulement
     var panel = document.createElement('div');
     panel.className = 'co-pkedit';
     panel.innerHTML = '<h3 class="co-pkedit-h">Changer la cueillette</h3><div class="co-pkedit-cal"><p class="muted">Chargement des plages…</p></div>' +
-      '<div class="co-pkedit-free" hidden><input type="date" id="pke-d" value="' + esc(cur ? cur.d : '') + '"><input type="time" id="pke-s" step="900" value="' + esc(cur ? cur.s : '') + '"></div>' +
+      '<div class="co-pkedit-free" hidden><input type="date" id="pke-d" aria-label="Jour" value="' + esc(cur ? cur.d : '') + '">' +
+        '<input type="time" id="pke-s" step="900" aria-label="De" value="' + esc(cur ? cur.s : '') + '">' +
+        (range ? '<span class="co-pkedit-to">à</span><input type="time" id="pke-e" step="900" aria-label="À" value="' + esc(cur ? cur.e : '') + '">' : '') + '</div>' +
       '<div class="co-pkedit-foot"><button type="button" class="btn btn-accent btn-sm" data-ic="check" data-k="ok">Enregistrer</button>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-k="free">Autre jour ou heure</button>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-k="no">Annuler</button></div>';
     var anchor = card.querySelector('.co-table-wrap');
     anchor.parentNode.insertBefore(panel, anchor);
     var calEl = panel.querySelector('.co-pkedit-cal'), freeEl = panel.querySelector('.co-pkedit-free'), p = null;
-    sb.rpc('pickup_slots', { p_until: kind === 'reservation' ? x.expires_at : null, p_self: x.id }).then(function (res) {
+    if (x.manual) {   // commande hors site : fourchette libre, pas de plages
+      calEl.hidden = true; freeEl.hidden = false;
+      var fb = panel.querySelector('[data-k="free"]'); if (fb) fb.remove();
+    } else sb.rpc('pickup_slots', { p_until: kind === 'reservation' ? x.expires_at : null, p_self: x.id }).then(function (res) {
       calEl.innerHTML = '';
       if (res.error || !(res.data || []).length) { calEl.innerHTML = '<p class="muted">Aucune plage offerte : utilise « Autre jour ou heure ».</p>'; return; }
       p = CO.picker(calEl, { big: true });
@@ -130,12 +136,17 @@
       var k = btn.getAttribute('data-k');
       if (k === 'no') { panel.remove(); return; }
       if (k === 'free') { freeEl.hidden = !freeEl.hidden; calEl.hidden = !freeEl.hidden; return; }
-      var d, s;
-      if (!freeEl.hidden) { d = panel.querySelector('#pke-d').value; s = panel.querySelector('#pke-s').value; }
-      else { var v = p && p.value(); d = v && v.d; s = v && v.s; }
+      var d, s, en = null;
+      if (!freeEl.hidden) {
+        d = panel.querySelector('#pke-d').value; s = panel.querySelector('#pke-s').value;
+        var eEl = panel.querySelector('#pke-e'); en = eEl && eEl.value || null;
+      } else { var v = p && p.value(); d = v && v.d; s = v && v.s; }
       if (!d || !s) { caDialog.toast('Choisis un jour et une heure.', 'bad'); return; }
+      if (en && en <= s) { caDialog.toast('L\'heure de fin doit suivre l\'heure de début.', 'bad'); return; }
       btn.disabled = true;
-      sb.rpc('admin_set_pickup', { p_kind: kind, p_id: x.id, p_d: d, p_s: s }).then(function (res) {
+      var args = { p_kind: kind, p_id: x.id, p_d: d, p_s: s };
+      if (range) args.p_e = en;
+      sb.rpc('admin_set_pickup', args).then(function (res) {
         if (res.error) throw res.error;
         caDialog.toast('Cueillette modifiée.');
         reload();
@@ -239,7 +250,7 @@
   if (CA.onAdminReady) CA.onAdminReady(refreshBadge);
   setInterval(function () {
     if (document.visibilityState !== 'visible') return;
-    if (document.querySelector('.co-pkedit')) return;
+    if (document.querySelector('.co-pkedit') || editing) return;
     if (tabOpen && (sub === 'clients' || isWide())) load(); else refreshBadge();
   }, 30000);
 
@@ -296,9 +307,11 @@
     return o.link_id && OPEN[o.status] ? orders.filter(function (x) { return x.link_id === o.link_id && x.id !== o.id && OPEN[x.status]; }) : [];
   }
   function candsOf(o) {
-    var em = String(o.email || '').toLowerCase();
+    // même client = même fiche (commande hors site) ou même courriel (comme admin_link_orders)
+    var key = function (x) { return x.client_id ? 'k' + x.client_id : x.email ? 'e' + String(x.email).toLowerCase() : ''; }, me = key(o);
+    if (!me) return [];
     return orders.filter(function (x) {
-      return x.id !== o.id && OPEN[x.status] && String(x.email || '').toLowerCase() === em && (!o.link_id || x.link_id !== o.link_id);
+      return x.id !== o.id && OPEN[x.status] && key(x) === me && (!o.link_id || x.link_id !== o.link_id);
     });
   }
   function samePickup(a, b) { return a.pickup_date && a.pickup_date === b.pickup_date && String(a.pickup_start || '').slice(0, 5) === String(b.pickup_start || '').slice(0, 5); }
@@ -321,7 +334,7 @@
           : '<button type="button" class="btn btn-accent btn-sm" data-act="confirm" data-ic="check" disabled>Confirmer la cueillette</button>';
         return go + hold + bill() + b('cancel', 'Annuler', 'btn-ghost co-danger');
       }
-      case 'ready': return bill('btn-accent') + hold + b('new', '↩ Remettre « Nouvelle »') + b('cancel', 'Annuler', 'btn-ghost co-danger');
+      case 'ready': return bill('btn-accent') + hold + (o.manual ? '' : b('new', '↩ Remettre « Nouvelle »')) + b('cancel', 'Annuler', 'btn-ghost co-danger');
       case 'invoiced': return o.invoice_id ? b('see-invoice', 'Voir la facture') : '';
       case 'cancelled': return b('new', 'Rouvrir') + b('delete', 'Supprimer', 'btn-ghost co-danger');
     }
@@ -339,13 +352,15 @@
   function render() {
     var open = orders.filter(function (o) { return OPEN[o.status]; });
     var list = filter === 'open' ? open : orders;
+    var nc = editing && editing.id === 'new' ? newCard() : '';
     if (!list.length) {
-      listEl.innerHTML = '<p class="empty">' + (filter === 'open'
+      listEl.innerHTML = nc + '<p class="empty">' + (filter === 'open'
         ? 'Aucune commande client en cours.' + (orders.length ? '<br>Les commandes facturées ou annulées sont sous « Toutes ».' : '<br>Les commandes envoyées depuis la boutique par les clients connectés arriveront ici.')
         : 'Aucune commande client pour l\'instant.') + '</p>';
+      bindNew();
       return;
     }
-    listEl.innerHTML = list.map(function (o) {
+    listEl.innerHTML = nc + list.map(function (o) {
       var lines = linesOf(o), items = 0, missing = 0;
       var nRef = 0, nSpl = 0;
       var rows = lines.map(function (l) {
@@ -369,6 +384,7 @@
       return '<article class="co-card is-' + esc(o.status) + '" data-id="' + esc(o.id) + '">' +
         '<header class="co-head">' +
           '<div class="co-id"><b>' + esc(o.number) + '</b><span class="co-status is-' + esc(o.status) + '">' + esc(STATUS[o.status] || o.status) + '</span>' +
+            (o.manual ? '<span class="co-edited">hors site</span>' : '') +
             (o.edited_at && OPEN[o.status] ? '<span class="co-edited">modifiée par le client ' + esc(ago(o.edited_at)) + '</span>' : '') +
             (o.stock_hold && OPEN[o.status] ? '<span class="co-status is-preparing">Stock en attente</span>' : '') +
             linkChip(o) +
@@ -376,7 +392,7 @@
             (o.status === 'new' && !o.pickup_date && !o.has_backorder && o.pickup_due ? '<span class="co-edited">annulée ' + esc(dueIn(o.pickup_due)) + ' sans cueillette</span>' : '') +
           '</div>' +
           '<div class="co-who">' + (CA.avatar ? CA.avatar(who) : '') +
-            '<span><b>' + esc(who) + '</b><small>' + CA.pv(o.email) + (o.phone ? ' · ' + CA.pv(o.phone) : '') + ' · ' + esc(ago(o.created_at)) + '</small></span></div>' +
+            '<span><b>' + esc(who) + '</b><small>' + [CA.pv(o.email), CA.pv(o.phone), esc(ago(o.created_at))].filter(Boolean).join(' · ') + '</small></span></div>' +
         '</header>' +
         (OPEN[o.status] ? CA.pickupLine(o) : '') +
         (o.note ? '<p class="co-note"><b>Note :</b> ' + esc(o.note) + '</p>' : '') +
@@ -392,7 +408,8 @@
         '</footer>' +
       '</article>';
     }).join('');
-    $$('.co-card', listEl).forEach(function (card) {
+    bindNew();
+    $$('.co-card:not(.is-new)', listEl).forEach(function (card) {
       var o = orders.filter(function (x) { return x.id === card.getAttribute('data-id'); })[0];
       if (card.classList.contains('is-editing')) { bindEditor(card, o); return; }
       CA.bindPickupReq(card, o, 'order', load);
@@ -513,10 +530,10 @@
     });
     $('.ce-cancel', card).addEventListener('click', stopEdit);
     save.addEventListener('click', function () {
+      if (!o) { saveNew(card, status, save); return; }
       if (!editing.items.length) { status.textContent = 'Ajoute au moins un article.'; return; }
       save.disabled = true; status.textContent = 'Enregistrement…';
-      sb.rpc('admin_update_customer_order', { p_id: o.id, p_lines: editing.items.map(function (it) {
-        return it.kind === 'pack' ? { pack_id: it.pid, qty: it.qty, comp: it.comp } : { product_id: it.pid, kind: it.kind, qty: it.qty }; }) })
+      sb.rpc('admin_update_customer_order', { p_id: o.id, p_lines: linesPayload() })
         .then(function (res) {
           if (res.error) throw res.error;
           if (!res.data || !res.data.id) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
@@ -528,6 +545,103 @@
           status.textContent = 'Erreur : ' + m;
         });
     });
+  }
+
+  function linesPayload() {
+    return editing.items.map(function (it) {
+      return it.kind === 'pack' ? { pack_id: it.pid, qty: it.qty, comp: it.comp } : { product_id: it.pid, kind: it.kind, qty: it.qty };
+    });
+  }
+
+  /* ---- « Nouvelle commande » : client hors site (fiche Clients), articles, fourchette de passage ----
+     RPC admin_create_customer_order : Prête d'office, stock en attente, aucun courriel (manual). */
+  var newBtn = $('#cc-new');
+  if (newBtn) newBtn.addEventListener('click', function () {
+    if (editing && editing.id === 'new') { var s = $('.cn-client', listEl); if (s) s.focus(); return; }
+    if (filter !== 'open') { filter = 'open'; $$('.cc-filter').forEach(function (x) { x.classList.toggle('is-active', x.getAttribute('data-f') === 'open'); }); }
+    editing = { id: 'new', items: [], status: '', client: null, d: '', s: '', e: '', note: '' };
+    render();
+    var go = function () { render(); var s = $('.cn-client', listEl); if (s) s.focus({ preventScroll: true }); };
+    Promise.all([loadCatalog(), CA.clients && CA.clients.loaded ? null : CA.loadClients && CA.loadClients()]).then(go,
+      function (e) { if (editing) { editing.status = 'Chargement impossible : ' + (e && e.message || e); render(); } });
+    listEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+  function newCard() {
+    var c = editing.client, who = c ? (CA.personName ? CA.personName(c) : c.name) : '';
+    var fake = { id: 'new', number: 'Nouvelle commande', status: 'ready', email: '' };
+    var html = editCard(fake, who);
+    var cli = '<div class="cn-row"><div class="field cn-who"><label>Client</label>' + (c
+        ? '<div class="cn-picked">' + (CA.avatar ? CA.avatar(who) : '') + '<b>' + esc(who) + '</b><button type="button" class="btn btn-ghost btn-sm cn-change">Changer</button></div>'
+        : '<div class="fx-combo"><input type="search" class="cn-client" placeholder="Chercher un client…" autocomplete="off"><div class="fx-combo-list cn-results" hidden></div></div>') +
+      '</div></div>' +
+      '<div class="cn-row cn-pk"><div class="field"><label for="cn-d">Passage</label><input type="date" id="cn-d" value="' + esc(editing.d) + '"></div>' +
+        '<div class="field"><label for="cn-s">De</label><input type="time" id="cn-s" step="900" value="' + esc(editing.s) + '"></div>' +
+        '<div class="field"><label for="cn-e">À</label><input type="time" id="cn-e" step="900" value="' + esc(editing.e) + '"></div></div>';
+    var note = '<div class="field cn-note"><label for="cn-note">Note</label><input type="text" id="cn-note" maxlength="500" value="' + esc(editing.note) + '"></div>';
+    // en-tête simplifié + champs client / passage avant la recherche d'articles, note avant le pied
+    html = html.replace('class="co-card is-editing', 'class="co-card is-new is-editing')
+      .replace(/<div class="co-who">[\s\S]*?<\/header>/, '</header>' + cli)
+      .replace('<footer class="co-foot">', note + '<footer class="co-foot">')
+      .replace('>Modification<', '>Hors site<');
+    return html;
+  }
+  function bindNew() {
+    var card = $('.co-card.is-new', listEl);
+    if (!card) return;
+    bindEditor(card, null);
+    ['d', 's', 'e', 'note'].forEach(function (k) {
+      var el = $('#cn-' + k, card); if (el) el.addEventListener('input', function () { editing[k] = el.value; });
+    });
+    var ch = $('.cn-change', card);
+    if (ch) ch.addEventListener('click', function () { editing.client = null; render(); var s = $('.cn-client', listEl); if (s) s.focus(); });
+    var inp = $('.cn-client', card), res = $('.cn-results', card), hits = [], act = -1;
+    if (!inp) return;
+    function pick(c) { if (!c) return; editing.client = c; editing.status = ''; render(); var s = $('.ce-search', listEl); if (s) s.focus({ preventScroll: true }); }
+    function show() {
+      var q = inp.value, list = (CA.clients && CA.clients.list) || [];
+      hits = list.filter(function (c) { return !q.trim() || CA.searchMatch([CA.personName ? CA.personName(c) : c.name, c.name, c.company, c.phone, c.email].join(' '), q); }).slice(0, 30);
+      act = hits.length ? 0 : -1;
+      res.innerHTML = !hits.length ? '<div class="fx-combo-empty">Aucun client. Ajoute-le dans <a href="#clients">Clients</a>.</div>' : hits.map(function (c, i) {
+        var nm = CA.personName ? CA.personName(c) : c.name;
+        return '<button type="button" class="fx-combo-item' + (i === act ? ' is-active' : '') + '" data-i="' + i + '"><span class="ce-tx"><span class="nm">' + esc(nm) + '</span>' +
+          (c.phone || c.city ? '<span class="ct">' + esc([c.phone, c.city].filter(Boolean).join(' · ')) + '</span>' : '') + '</span></button>';
+      }).join('');
+      $$('.fx-combo-item', res).forEach(function (b) { b.addEventListener('mousedown', function (e) { e.preventDefault(); pick(hits[+b.getAttribute('data-i')]); }); });
+      res.hidden = false;
+    }
+    inp.addEventListener('input', show);
+    inp.addEventListener('click', function () { if (res.hidden) show(); });
+    inp.addEventListener('blur', function () { res.hidden = true; });
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); if (!res.hidden && hits[act]) pick(hits[act]); }
+      else if (e.key === 'Escape') res.hidden = true;
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault(); if (res.hidden) { show(); return; }
+        if (!hits.length) return;
+        act = (act + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length;
+        $$('.fx-combo-item', res).forEach(function (b, i) { b.classList.toggle('is-active', i === act); if (i === act) b.scrollIntoView({ block: 'nearest' }); });
+      }
+    });
+  }
+  function saveNew(card, status, save) {
+    var e = editing;
+    if (!e.client) { status.textContent = 'Choisis un client.'; return; }
+    if (!e.items.length) { status.textContent = 'Ajoute au moins un article.'; return; }
+    if (e.d && !e.s) { status.textContent = 'Choisis l\'heure de passage.'; return; }
+    if (e.s && e.e && e.e <= e.s) { status.textContent = 'L\'heure de fin doit suivre l\'heure de début.'; return; }
+    save.disabled = true; status.textContent = 'Enregistrement…';
+    sb.rpc('admin_create_customer_order', { p_client: e.client.id, p_lines: linesPayload(), p_note: e.note || null,
+      p_pickup: e.d ? { d: e.d, s: e.s, e: e.e || null } : null })
+      .then(function (res) {
+        if (res.error) throw res.error;
+        if (!res.data || !res.data.id) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
+        editing = null; caDialog.toast('Commande ' + res.data.number + ' créée.'); load();
+      }).then(null, function (err) {
+        save.disabled = false;
+        var m = err && err.message ? err.message : String(err);
+        if (/admin_create_customer_order|schema cache/i.test(m)) m = 'relance schema-v2.sql (commandes hors site).';
+        status.textContent = 'Erreur : ' + m;
+      });
   }
 
   // « dans 5 h » / « dans 40 min » avant l'annulation automatique

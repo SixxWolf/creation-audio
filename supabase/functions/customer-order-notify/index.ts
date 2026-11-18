@@ -416,7 +416,7 @@ async function runCron(db: any, resendKey: string, from: string) {
   const nowMs = Date.now();
   const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
   const { data: soonPk } = await db.from("customer_orders").select("*")
-    .in("status", ["new", "preparing", "ready"]).not("pickup_date", "is", null).not("pickup_start", "is", null)
+    .in("status", ["new", "preparing", "ready"]).eq("manual", false).not("pickup_date", "is", null).not("pickup_start", "is", null)
     .gte("pickup_date", day(nowMs - 86400000)).lte("pickup_date", day(nowMs + 86400000));
   for (const o of soonPk || []) {
     const startMs = torontoMs(o.pickup_date, o.pickup_start);

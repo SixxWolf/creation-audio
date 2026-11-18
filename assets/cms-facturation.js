@@ -1636,7 +1636,7 @@
             return ln;
           });
           settleLoadedPrices();
-          elNote.value = (order.kind === 'reservation' ? 'Réservation ' : order.also && order.also.length ? 'Commandes en ligne ' : 'Commande en ligne ') + orderNums(order) + (order.note ? ' — ' + order.note : '');
+          elNote.value = (order.kind === 'reservation' ? 'Réservation ' : order.also && order.also.length ? (order.manual ? 'Commandes ' : 'Commandes en ligne ') : order.manual ? 'Commande ' : 'Commande en ligne ') + orderNums(order) + (order.note ? ' — ' + order.note : '');
           var c0 = lines[0] && ['filament', 'spacer', 'accessory'].indexOf(lines[0].ptype) !== -1 ? lines[0].ptype : 'filament';
           setCat(c0);
           unlock();

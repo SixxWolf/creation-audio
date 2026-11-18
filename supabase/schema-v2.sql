@@ -1882,6 +1882,11 @@ alter table public.customer_orders add column if not exists pickup_due timestamp
 alter table public.customer_orders add column if not exists pickup_reminded_at timestamptz;  -- rappel « choisis ta cueillette » envoyé
 alter table public.customer_orders add column if not exists pickup_hour_reminded_for timestamptz;  -- rappel « cueillette dans 1 h » : début de plage pour lequel il est parti
 alter table public.customer_orders add column if not exists auto_mailed_at timestamptz;      -- courriel d'annulation automatique envoyé
+-- commande entrée par l'admin pour un client hors site (2026-11-18) : fiche clients, aucun courriel, aucun rappel, pas d'annulation auto
+alter table public.customer_orders add column if not exists manual    boolean not null default false;
+alter table public.customer_orders add column if not exists client_id uuid references public.clients(id) on delete set null;
+alter table public.customer_orders alter column email drop not null;
+create index if not exists customer_orders_client_idx on public.customer_orders (client_id) where client_id is not null;
 update public.customer_orders set status = 'new' where status = 'preparing';   -- « En préparation » n'existe plus côté clients en ligne
 create index if not exists customer_orders_customer_idx on public.customer_orders (customer_id, created_at desc);
 create index if not exists customer_orders_status_idx on public.customer_orders (status);
@@ -2263,6 +2268,9 @@ begin
       end if;
     end if;
     if v_cid is not null then update public.invoices set client_id = v_cid where id = p_invoice; end if;
+  elsif o.client_id is not null then   -- commande entrée par l'admin : facture sur la fiche choisie
+    v_cid := o.client_id;
+    update public.invoices set client_id = v_cid where id = p_invoice;
   end if;
   return jsonb_build_object('client_id', v_cid);
 end $$;
@@ -2291,6 +2299,42 @@ begin
 end $$;
 revoke all on function public.admin_update_customer_order(uuid, jsonb) from public, anon;
 grant execute on function public.admin_update_customer_order(uuid, jsonb) to authenticated;
+
+-- Commande entrée par l'admin pour un client hors site (Commandes › Clients › « Nouvelle commande », 2026-11-18).
+-- p_client = fiche clients ; p_pickup { d, s, e } facultatif et libre (ni plages, ni capacité). Prête d'office, stock en attente,
+-- jamais annulée par le tick, aucun courriel ni rappel (manual = true). Facturer = même chemin que les commandes du site.
+create or replace function public.admin_create_customer_order(p_client uuid, p_lines jsonb, p_note text default null, p_pickup jsonb default null)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare k public.clients; v_lines jsonb; v_id uuid; v_num text; v_total numeric; v_bo boolean; v_d date; v_s time; v_e time;
+begin
+  if not (select public.is_admin()) then raise exception 'Réservé à l''admin.' using errcode = '42501'; end if;
+  select * into k from public.clients where id = p_client;
+  if not found then raise exception 'Choisis un client.'; end if;
+  if p_pickup is not null and coalesce(p_pickup ->> 'd', '') <> '' then
+    v_d := (p_pickup ->> 'd')::date;
+    v_s := nullif(p_pickup ->> 's', '')::time;
+    v_e := nullif(p_pickup ->> 'e', '')::time;
+    if v_s is null then raise exception 'Choisis l''heure de passage.'; end if;
+    if v_e is not null and v_e <= v_s then raise exception 'L''heure de fin doit suivre l''heure de début.'; end if;
+  end if;
+  v_lines := public._customer_fill_lines(p_lines);
+  select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
+    into v_total, v_bo from jsonb_array_elements(v_lines) x;
+  v_num := 'C-' || lpad(nextval('public.customer_order_seq')::text, 4, '0');
+  insert into public.customer_orders (number, customer_id, client_id, manual, email, name, phone, note, total, has_backorder, status,
+                                      pickup_date, pickup_start, pickup_end, pickup_confirmed_at, ready_notified_at, stock_hold, pickup_due)
+  values (v_num, null, k.id, true, nullif(lower(btrim(coalesce(k.email, ''))), ''), k.name, nullif(btrim(coalesce(k.phone, '')), ''),
+          nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_bo, 'ready',
+          v_d, v_s, v_e, case when v_d is not null then now() end, now(), true, null)
+  returning id into v_id;
+  insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order, pack)
+  select v_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int, x -> 'pack'
+    from jsonb_array_elements(v_lines) x;
+  return jsonb_build_object('id', v_id, 'number', v_num, 'total', v_total, 'has_backorder', v_bo);
+end $$;
+revoke all on function public.admin_create_customer_order(uuid, jsonb, text, jsonb) from public, anon;
+grant execute on function public.admin_create_customer_order(uuid, jsonb, text, jsonb) to authenticated;
 
 revoke all on function public.customer_submit_order(jsonb, text, jsonb)       from public, anon;
 revoke all on function public.customer_update_order(uuid, jsonb, text, jsonb) from public, anon;
@@ -2610,7 +2654,7 @@ begin
               where (status = 'new' and pickup_date is null and pickup_due is not null and pickup_reminded_at is null
                      and pickup_due <= now() + interval '6 hours')
                  or (status = 'cancelled' and cancelled_by = 'auto' and auto_mailed_at is null and updated_at > now() - interval '2 days')
-                 or (status in ('new', 'preparing', 'ready') and pickup_date is not null and pickup_start is not null
+                 or (status in ('new', 'preparing', 'ready') and not manual and pickup_date is not null and pickup_start is not null
                      and ((pickup_date + pickup_start) at time zone 'America/Toronto') between now() and now() + interval '1 hour'
                      and pickup_hour_reminded_for is distinct from ((pickup_date + pickup_start) at time zone 'America/Toronto'))) then
     perform net.http_post(
@@ -2884,12 +2928,15 @@ begin
 end $$;
 -- Changement direct par l'admin (carte de la commande / réservation) : jour et heure libres, sans regarder
 -- plages, préavis ni capacité. Une demande d'exception en attente est classée (la nouvelle plage la remplace).
-create or replace function public.admin_set_pickup(p_kind text, p_id uuid, p_d date, p_s time)
+-- p_e (2026-11-18) : fin de la fourchette, facultative (commandes) ; commande manuelle = cueillette confirmée d'office
+drop function if exists public.admin_set_pickup(text, uuid, date, time);
+create or replace function public.admin_set_pickup(p_kind text, p_id uuid, p_d date, p_s time, p_e time default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare n int;
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   if p_d is null or p_s is null then raise exception 'Choisis un jour et une heure.'; end if;
+  if p_e is not null and p_e <= p_s then raise exception 'L''heure de fin doit suivre l''heure de début.'; end if;
   if p_kind = 'invoice' then
     update public.invoices set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_confirmed_at = null
      where id = p_id and status = 'final'
@@ -2902,7 +2949,8 @@ begin
     update public.customer_reservations set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_req = null, pickup_confirmed_at = null, updated_at = now()
      where id = p_id and status = 'active';
   else
-    update public.customer_orders set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_req = null, pickup_confirmed_at = null, updated_at = now()
+    update public.customer_orders set pickup_date = p_d, pickup_start = p_s, pickup_end = p_e, pickup_req = null,
+           pickup_confirmed_at = case when manual then now() end, updated_at = now()
      where id = p_id and status in ('new', 'preparing', 'ready');
   end if;
   get diagnostics n = row_count;
@@ -2981,7 +3029,7 @@ declare v_link uuid; v_n int; v_who int; v_src uuid;
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
   if coalesce(array_length(p_ids, 1), 0) < 2 then raise exception 'Choisis au moins deux commandes.'; end if;
-  select count(*), count(distinct lower(o.email)) into v_n, v_who
+  select count(*), count(distinct coalesce('k' || o.client_id::text, 'e' || lower(o.email))) into v_n, v_who
     from public.customer_orders o where o.id = any(p_ids) and o.status in ('new', 'preparing', 'ready');
   if v_n <> array_length(p_ids, 1) then raise exception 'Seules des commandes en cours peuvent être liées.'; end if;
   if v_who <> 1 then raise exception 'Les commandes doivent être du même client.'; end if;
@@ -3059,8 +3107,8 @@ revoke all on function public.admin_pending_invoices() from public, anon;
 revoke all on function public.admin_invoice_ready(uuid) from public, anon;
 grant execute on function public.admin_pending_invoices() to authenticated;
 grant execute on function public.admin_invoice_ready(uuid) to authenticated;
-revoke all on function public.admin_set_pickup(text, uuid, date, time) from public, anon;
-grant execute on function public.admin_set_pickup(text, uuid, date, time) to authenticated;
+revoke all on function public.admin_set_pickup(text, uuid, date, time, time) from public, anon;
+grant execute on function public.admin_set_pickup(text, uuid, date, time, time) to authenticated;
 revoke all on function public.customer_request_pickup(text, uuid, jsonb) from public, anon;
 revoke all on function public.admin_decide_pickup(text, uuid, boolean, text) from public, anon;
 grant execute on function public.customer_request_pickup(text, uuid, jsonb) to authenticated;
