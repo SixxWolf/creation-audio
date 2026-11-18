@@ -745,7 +745,7 @@
       else { b.classList.remove('sel'); if (badge) badge.textContent = ''; }
     });
   }
-  if (elSearch) elSearch.addEventListener('input', function () { applyFilter(this.value); });
+  if (elSearch) elSearch.addEventListener('input', function () { applyFilter(this.value); renderPackHits(this.value); });
 
   /* ---------- ajout de lignes ---------- */
   function prodById(id) { var arr = catalog[cat] || []; return arr.filter(function (p) { return String(p.id) === String(id); })[0] || null; }
@@ -941,6 +941,43 @@
   }
   var elPackBtn = $('#fx-add-pack');
   if (elPackBtn) elPackBtn.addEventListener('click', addPackDialog);
+  // packs trouvés par la barre de recherche (« pack », nom, code, composition) : un clic = toutes leurs lignes
+  var elPackHits = null;
+  function renderPackHits(q) {
+    q = norm(q);
+    if (!elPackHits && elCatalog) {
+      elPackHits = document.createElement('div');
+      elPackHits.className = 'fx-packhits'; elPackHits.hidden = true;
+      elCatalog.parentNode.insertBefore(elPackHits, elCatalog);
+      elPackHits.addEventListener('click', function (e) {
+        var b = e.target.closest('.fx-packopt'); if (!b) return;
+        var pk = (fxPacks || []).filter(function (x) { return String(x.id) === b.getAttribute('data-pk'); })[0];
+        var pr = pk && (pk.presets || [])[+b.getAttribute("data-pr")];
+        if (pk && pr) { addPackLines(pk, pr); caDialog.toast(pk.name + ' · ' + pr.name + ' ajouté.'); }
+      });
+    }
+    if (!elPackHits) return;
+    if (q.length < 2) { elPackHits.hidden = true; elPackHits.innerHTML = ''; return; }
+    Promise.all([loadFxPacks(), loadCatalog('filament', true)]).then(null, function () {}).then(function () {
+      if (norm(elSearch.value) !== q) return;   // la recherche a changé entre-temps
+      var hits = [];
+      (fxPacks || []).forEach(function (pk) {
+        (Array.isArray(pk.presets) ? pk.presets : []).forEach(function (pr, i) {
+          // pas les couleurs : chercher « noir » ne doit pas sortir tous les packs
+          var hay = ['pack', pk.name, pk.name_en, pk.code, pr.name].join(' ');
+          if (window.CA.searchMatch ? window.CA.searchMatch(hay, q) : hay.toLowerCase().indexOf(q.toLowerCase()) !== -1) hits.push({ pk: pk, pr: pr, i: i });
+        });
+      });
+      elPackHits.hidden = !hits.length;
+      elPackHits.innerHTML = !hits.length ? '' : '<div class="pk-group-title"><span class="pk-gt-brand">Packs</span></div>' + hits.slice(0, 12).map(function (o) {
+        var dots = (o.pr.lines || []).map(function (l) { var h = findProduct(l.p); return h ? swatchSVG(h.p.hex) : ''; }).join('');
+        return '<button type="button" class="fx-packopt" data-pk="' + esc(o.pk.id) + '" data-pr="' + o.i + '">' +
+          '<span class="fx-packdots">' + dots + '</span>' +
+          '<span class="fx-packn"><b>' + esc(o.pk.name) + '</b> · ' + esc(o.pr.name) + (o.pk.enabled ? '' : ' <em>hors ligne</em>') + '</span>' +
+          '<span class="fx-packp">' + money(o.pk.price) + '</span></button>';
+      }).join('');
+    });
+  }
   function addFreeLine(preset) {
     preset = preset || {};
     lines.push({ id: uid(), productId: null, ptype: cat === 'maintenance' ? 'divers' : cat, kind: 'free',
@@ -980,6 +1017,7 @@
   function render() {
     repriceLines();   // applique le rabais quantité (cumulé par marque pour les filaments)
     paintCredit(totals());
+    syncToOrder();
     if (!lines.length) {
       elInvoice.innerHTML = '<p class="inv-empty">Ajoute des articles depuis le catalogue (ou une ligne libre).</p>';
       elMargin.hidden = true;
@@ -1174,6 +1212,7 @@
   function unlock() {
     saved = false; elSave.disabled = false;
     elSave.textContent = editing ? 'Enregistrer les modifications' : isInternal() ? 'Enregistrer la sortie' : 'Enregistrer la facture';
+    syncToOrder();
   }
 
   // en-tête commun (création ET modification) — le n° et le statut sont gérés à part
@@ -1360,6 +1399,69 @@
   }
   if (elSave) elSave.addEventListener('click', onSave);
 
+  /* ---------- « Envoyer dans les commandes » (client hors site, 2026-11-18) ----------
+     La facture en cours devient une commande C-xxxx Prête dans Commandes › Clients (stock retenu, aucun courriel),
+     prix tels quels (RPC admin_save_manual_order). Rouverte depuis Commandes (Facturer / Modifier) :
+     « Mettre à jour C-xxxx » remplace ses lignes ; « Enregistrer la facture » la facture comme d'habitude. */
+  var elToOrder = $('#fx-to-order');
+  function manualTarget() { return fromOrder && fromOrder.kind === 'client' && fromOrder.manual && !fromOrder.also.length ? fromOrder : null; }
+  function syncToOrder() {
+    if (!elToOrder) return;
+    var tg = manualTarget();
+    elToOrder.hidden = !!editing || isInternal() || (!!fromOrder && !tg);
+    elToOrder.textContent = tg ? 'Mettre à jour ' + tg.number : 'Envoyer dans les commandes';
+    elToOrder.disabled = !lines.length;
+  }
+  function pickupBody(cur) {
+    var b = document.createElement('div');
+    b.className = 'fx-topick';
+    b.innerHTML = '<input type="date" id="fxo-d" aria-label="Jour" value="' + esc(cur ? cur.d : '') + '">' +
+      '<input type="time" id="fxo-s" step="900" aria-label="De" value="' + esc(cur ? cur.s : '') + '">' +
+      '<span class="fx-topick-to">à</span><input type="time" id="fxo-e" step="900" aria-label="À" value="' + esc(cur ? cur.e : '') + '">';
+    return b;
+  }
+  function sendToOrders() {
+    var valid = lines.filter(function (l) { return l.qty > 0; });
+    if (!valid.length) { elStatus.textContent = 'Ajoute au moins une ligne (quantité > 0).'; return; }
+    if (!norm(elCliName.value)) { elStatus.textContent = 'Entre le nom du client.'; if (elClientSearch) elClientSearch.focus(); return; }
+    var tg = manualTarget(), body = pickupBody(tg ? tg.pickup : null);
+    caDialog.confirm({ title: tg ? 'Mettre à jour ' + tg.number : 'Envoyer dans les commandes', message: 'Passage du client', body: body,
+      ok: tg ? 'Mettre à jour' : 'Envoyer', icon: 'clock' }).then(function (ok) {
+      if (ok !== true) return;
+      var d = $('#fxo-d', body).value, s = $('#fxo-s', body).value, e = $('#fxo-e', body).value;
+      if (d && !s) { caDialog.toast('Choisis l\'heure de passage.', 'bad'); return; }
+      if (s && e && e <= s) { caDialog.toast('L\'heure de fin doit suivre l\'heure de début.', 'bad'); return; }
+      elToOrder.disabled = true; elStatus.textContent = 'Envoi…';
+      // la note rechargée commence par « Commande C-0041 — » : on ne garde que la note du client
+      var note = elNote.value.trim().replace(/^Commandes? (en ligne )?C-\d+( \+ C-\d+)*(\s+—\s+)?/, '');
+      var payload = valid.map(function (l) {
+        return { product_id: l.productId || null, kind: l.kind, ptype: l.ptype || null, name: l.label || '', meta: l.meta || '',
+          qty: l.qty, unit_price: round2(l.price), pack: l.pack || null };
+      });
+      var remember = window.CA.rememberClient ? window.CA.rememberClient(clientFields()) : Promise.resolve(null);
+      remember.then(function (c) {
+        if (!c || !c.id) throw new Error('Fiche client impossible à enregistrer.');
+        return sb.rpc('admin_save_manual_order', { p_order: tg ? tg.id : null, p_client: c.id, p_lines: payload, p_note: note || null,
+          p_pickup: d ? { d: d, s: s, e: e || null } : null });
+      }).then(function (res) {
+        if (res.error) throw res.error;
+        if (!res.data || !res.data.id) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
+        resetInvoice();
+        elStatus.textContent = '✓ Commande ' + res.data.number + (tg ? ' mise à jour.' : ' envoyée dans les commandes.') + ' ';
+        statusButton('Voir les commandes', function () { location.hash = '#commandes'; });
+        if (window.CA.reloadCustomerOrders) window.CA.reloadCustomerOrders();
+        if (window.CA.reserved) window.CA.reserved.reload();
+        refreshStock();
+      }).then(null, function (err) {
+        syncToOrder();
+        var m = err && err.message ? err.message : String(err);
+        if (/admin_save_manual_order|schema cache/i.test(m)) m = 'relance schema-v2.sql (commandes hors site).';
+        elStatus.textContent = 'Erreur : ' + m;
+      });
+    });
+  }
+  if (elToOrder) elToOrder.addEventListener('click', sendToOrders);
+
   /* ---------- réinitialiser ---------- */
   function resetInvoice() {
     if (editing && deductBeforeEdit != null) elDeduct.checked = deductBeforeEdit;   // case « Déduire » d'avant la modification
@@ -1529,7 +1631,8 @@
   // commandes en ligne liées facturées ensemble : « C-0019 + C-0018 » (order.also = les autres commandes du groupe)
   function orderNums(o) { return [o.number].concat((o.also || []).map(function (x) { return x.number; })).join(' + '); }
   function setFromOrder(o) {
-    fromOrder = o ? { id: o.id, number: o.number, kind: o.kind || 'dealer', also: o.also || [] } : null;
+    fromOrder = o ? { id: o.id, number: o.number, kind: o.kind || 'dealer', also: o.also || [], manual: !!o.manual,
+      pickup: o.pickup_date ? { d: String(o.pickup_date), s: String(o.pickup_start || '').slice(0, 5), e: String(o.pickup_end || '').slice(0, 5) } : null } : null;
     if (elOrderBanner) elOrderBanner.hidden = !fromOrder;
     if (elOrderNum) elOrderNum.textContent = fromOrder ? (fromOrder.kind === 'reservation' ? 'de la réservation ' : fromOrder.kind === 'service' ? 'de la demande ' : fromOrder.also.length ? 'des commandes ' : 'de la commande ') + orderNums(fromOrder) : '';
   }

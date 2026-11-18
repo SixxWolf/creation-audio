@@ -352,15 +352,13 @@
   function render() {
     var open = orders.filter(function (o) { return OPEN[o.status]; });
     var list = filter === 'open' ? open : orders;
-    var nc = editing && editing.id === 'new' ? newCard() : '';
     if (!list.length) {
-      listEl.innerHTML = nc + '<p class="empty">' + (filter === 'open'
+      listEl.innerHTML = '<p class="empty">' + (filter === 'open'
         ? 'Aucune commande client en cours.' + (orders.length ? '<br>Les commandes facturées ou annulées sont sous « Toutes ».' : '<br>Les commandes envoyées depuis la boutique par les clients connectés arriveront ici.')
         : 'Aucune commande client pour l\'instant.') + '</p>';
-      bindNew();
       return;
     }
-    listEl.innerHTML = nc + list.map(function (o) {
+    listEl.innerHTML = list.map(function (o) {
       var lines = linesOf(o), items = 0, missing = 0;
       var nRef = 0, nSpl = 0;
       var rows = lines.map(function (l) {
@@ -408,8 +406,7 @@
         '</footer>' +
       '</article>';
     }).join('');
-    bindNew();
-    $$('.co-card:not(.is-new)', listEl).forEach(function (card) {
+    $$('.co-card', listEl).forEach(function (card) {
       var o = orders.filter(function (x) { return x.id === card.getAttribute('data-id'); })[0];
       if (card.classList.contains('is-editing')) { bindEditor(card, o); return; }
       CA.bindPickupReq(card, o, 'order', load);
@@ -530,7 +527,6 @@
     });
     $('.ce-cancel', card).addEventListener('click', stopEdit);
     save.addEventListener('click', function () {
-      if (!o) { saveNew(card, status, save); return; }
       if (!editing.items.length) { status.textContent = 'Ajoute au moins un article.'; return; }
       save.disabled = true; status.textContent = 'Enregistrement…';
       sb.rpc('admin_update_customer_order', { p_id: o.id, p_lines: linesPayload() })
@@ -553,97 +549,6 @@
     });
   }
 
-  /* ---- « Nouvelle commande » : client hors site (fiche Clients), articles, fourchette de passage ----
-     RPC admin_create_customer_order : Prête d'office, stock en attente, aucun courriel (manual). */
-  var newBtn = $('#cc-new');
-  if (newBtn) newBtn.addEventListener('click', function () {
-    if (editing && editing.id === 'new') { var s = $('.cn-client', listEl); if (s) s.focus(); return; }
-    if (filter !== 'open') { filter = 'open'; $$('.cc-filter').forEach(function (x) { x.classList.toggle('is-active', x.getAttribute('data-f') === 'open'); }); }
-    editing = { id: 'new', items: [], status: '', client: null, d: '', s: '', e: '', note: '' };
-    render();
-    var go = function () { render(); var s = $('.cn-client', listEl); if (s) s.focus({ preventScroll: true }); };
-    Promise.all([loadCatalog(), CA.clients && CA.clients.loaded ? null : CA.loadClients && CA.loadClients()]).then(go,
-      function (e) { if (editing) { editing.status = 'Chargement impossible : ' + (e && e.message || e); render(); } });
-    listEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
-  });
-  function newCard() {
-    var c = editing.client, who = c ? (CA.personName ? CA.personName(c) : c.name) : '';
-    var fake = { id: 'new', number: 'Nouvelle commande', status: 'ready', email: '' };
-    var html = editCard(fake, who);
-    var cli = '<div class="cn-row"><div class="field cn-who"><label>Client</label>' + (c
-        ? '<div class="cn-picked">' + (CA.avatar ? CA.avatar(who) : '') + '<b>' + esc(who) + '</b><button type="button" class="btn btn-ghost btn-sm cn-change">Changer</button></div>'
-        : '<div class="fx-combo"><input type="search" class="cn-client" placeholder="Chercher un client…" autocomplete="off"><div class="fx-combo-list cn-results" hidden></div></div>') +
-      '</div></div>' +
-      '<div class="cn-row cn-pk"><div class="field"><label for="cn-d">Passage</label><input type="date" id="cn-d" value="' + esc(editing.d) + '"></div>' +
-        '<div class="field"><label for="cn-s">De</label><input type="time" id="cn-s" step="900" value="' + esc(editing.s) + '"></div>' +
-        '<div class="field"><label for="cn-e">À</label><input type="time" id="cn-e" step="900" value="' + esc(editing.e) + '"></div></div>';
-    var note = '<div class="field cn-note"><label for="cn-note">Note</label><input type="text" id="cn-note" maxlength="500" value="' + esc(editing.note) + '"></div>';
-    // en-tête simplifié + champs client / passage avant la recherche d'articles, note avant le pied
-    html = html.replace('class="co-card is-editing', 'class="co-card is-new is-editing')
-      .replace(/<div class="co-who">[\s\S]*?<\/header>/, '</header>' + cli)
-      .replace('<footer class="co-foot">', note + '<footer class="co-foot">')
-      .replace('>Modification<', '>Hors site<');
-    return html;
-  }
-  function bindNew() {
-    var card = $('.co-card.is-new', listEl);
-    if (!card) return;
-    bindEditor(card, null);
-    ['d', 's', 'e', 'note'].forEach(function (k) {
-      var el = $('#cn-' + k, card); if (el) el.addEventListener('input', function () { editing[k] = el.value; });
-    });
-    var ch = $('.cn-change', card);
-    if (ch) ch.addEventListener('click', function () { editing.client = null; render(); var s = $('.cn-client', listEl); if (s) s.focus(); });
-    var inp = $('.cn-client', card), res = $('.cn-results', card), hits = [], act = -1;
-    if (!inp) return;
-    function pick(c) { if (!c) return; editing.client = c; editing.status = ''; render(); var s = $('.ce-search', listEl); if (s) s.focus({ preventScroll: true }); }
-    function show() {
-      var q = inp.value, list = (CA.clients && CA.clients.list) || [];
-      hits = list.filter(function (c) { return !q.trim() || CA.searchMatch([CA.personName ? CA.personName(c) : c.name, c.name, c.company, c.phone, c.email].join(' '), q); }).slice(0, 30);
-      act = hits.length ? 0 : -1;
-      res.innerHTML = !hits.length ? '<div class="fx-combo-empty">Aucun client. Ajoute-le dans <a href="#clients">Clients</a>.</div>' : hits.map(function (c, i) {
-        var nm = CA.personName ? CA.personName(c) : c.name;
-        return '<button type="button" class="fx-combo-item' + (i === act ? ' is-active' : '') + '" data-i="' + i + '"><span class="ce-tx"><span class="nm">' + esc(nm) + '</span>' +
-          (c.phone || c.city ? '<span class="ct">' + esc([c.phone, c.city].filter(Boolean).join(' · ')) + '</span>' : '') + '</span></button>';
-      }).join('');
-      $$('.fx-combo-item', res).forEach(function (b) { b.addEventListener('mousedown', function (e) { e.preventDefault(); pick(hits[+b.getAttribute('data-i')]); }); });
-      res.hidden = false;
-    }
-    inp.addEventListener('input', show);
-    inp.addEventListener('click', function () { if (res.hidden) show(); });
-    inp.addEventListener('blur', function () { res.hidden = true; });
-    inp.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); if (!res.hidden && hits[act]) pick(hits[act]); }
-      else if (e.key === 'Escape') res.hidden = true;
-      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault(); if (res.hidden) { show(); return; }
-        if (!hits.length) return;
-        act = (act + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length;
-        $$('.fx-combo-item', res).forEach(function (b, i) { b.classList.toggle('is-active', i === act); if (i === act) b.scrollIntoView({ block: 'nearest' }); });
-      }
-    });
-  }
-  function saveNew(card, status, save) {
-    var e = editing;
-    if (!e.client) { status.textContent = 'Choisis un client.'; return; }
-    if (!e.items.length) { status.textContent = 'Ajoute au moins un article.'; return; }
-    if (e.d && !e.s) { status.textContent = 'Choisis l\'heure de passage.'; return; }
-    if (e.s && e.e && e.e <= e.s) { status.textContent = 'L\'heure de fin doit suivre l\'heure de début.'; return; }
-    save.disabled = true; status.textContent = 'Enregistrement…';
-    sb.rpc('admin_create_customer_order', { p_client: e.client.id, p_lines: linesPayload(), p_note: e.note || null,
-      p_pickup: e.d ? { d: e.d, s: e.s, e: e.e || null } : null })
-      .then(function (res) {
-        if (res.error) throw res.error;
-        if (!res.data || !res.data.id) throw new Error('Refusé (permissions). Es-tu connecté en admin ?');
-        editing = null; caDialog.toast('Commande ' + res.data.number + ' créée.'); load();
-      }).then(null, function (err) {
-        save.disabled = false;
-        var m = err && err.message ? err.message : String(err);
-        if (/admin_create_customer_order|schema cache/i.test(m)) m = 'relance schema-v2.sql (commandes hors site).';
-        status.textContent = 'Erreur : ' + m;
-      });
-  }
-
   // « dans 5 h » / « dans 40 min » avant l'annulation automatique
   function dueIn(t) {
     var m = Math.round((new Date(t).getTime() - Date.now()) / 60000);
@@ -655,6 +560,7 @@
   function act(o, what, btn) {
     if (what === 'confirm') { confirmOrder(o, btn); return; }
     if (what === 'pickup') { CA.editPickup(o, 'order', load, btn.closest('.co-card')); return; }
+    if (what === 'edit' && o.manual) what = 'invoice';   // commande envoyée par la Facturation : on la retouche là-bas
     if (what === 'invoice' || what === 'invoice-all') {
       if (!CA.invoiceFromOrder) { caDialog.error('Facturation indisponible.'); return; }
       var sibs = what === 'invoice-all' ? sibsOf(o) : [], ord = Object.assign({ kind: 'client' }, o), ls = linesOf(o);

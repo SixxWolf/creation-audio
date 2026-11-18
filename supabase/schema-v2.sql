@@ -2300,16 +2300,22 @@ end $$;
 revoke all on function public.admin_update_customer_order(uuid, jsonb) from public, anon;
 grant execute on function public.admin_update_customer_order(uuid, jsonb) to authenticated;
 
--- Commande entrée par l'admin pour un client hors site (Commandes › Clients › « Nouvelle commande », 2026-11-18).
--- p_client = fiche clients ; p_pickup { d, s, e } facultatif et libre (ni plages, ni capacité). Prête d'office, stock en attente,
--- jamais annulée par le tick, aucun courriel ni rappel (manual = true). Facturer = même chemin que les commandes du site.
-create or replace function public.admin_create_customer_order(p_client uuid, p_lines jsonb, p_note text default null, p_pickup jsonb default null)
+-- Commande hors site envoyée depuis la Facturation (« Envoyer dans les commandes », 2026-11-18 ; remplace la
+-- « Nouvelle commande » de Commandes › Clients). p_client = fiche clients (créée/mise à jour par la Facturation) ;
+-- p_lines = lignes de la facture TELLES QUELLES (prix saisis, lignes libres, packs) ; p_pickup { d, s, e } libre.
+-- p_order = commande hors site déjà envoyée -> lignes, note, client et passage remplacés (bouton « Mettre à jour »).
+-- Prête d'office, stock en attente, jamais annulée par le tick, aucun courriel ni rappel (manual = true).
+-- Facturer (Commandes) recharge ces lignes dans la Facturation, prix verrouillés.
+drop function if exists public.admin_create_customer_order(uuid, jsonb, text, jsonb);
+create or replace function public.admin_save_manual_order(p_order uuid, p_client uuid, p_lines jsonb, p_note text default null, p_pickup jsonb default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare k public.clients; v_lines jsonb; v_id uuid; v_num text; v_total numeric; v_bo boolean; v_d date; v_s time; v_e time;
+declare k public.clients; o public.customer_orders; v_lines jsonb; v_id uuid; v_num text; v_total numeric; v_bo boolean; v_d date; v_s time; v_e time;
 begin
   if not (select public.is_admin()) then raise exception 'Réservé à l''admin.' using errcode = '42501'; end if;
   select * into k from public.clients where id = p_client;
-  if not found then raise exception 'Choisis un client.'; end if;
+  if not found then raise exception 'Entre le nom du client.'; end if;
+  if jsonb_typeof(p_lines) is distinct from 'array' or jsonb_array_length(p_lines) = 0 then raise exception 'Ajoute au moins une ligne.'; end if;
+  if jsonb_array_length(p_lines) > 100 then raise exception 'Trop de lignes.'; end if;
   if p_pickup is not null and coalesce(p_pickup ->> 'd', '') <> '' then
     v_d := (p_pickup ->> 'd')::date;
     v_s := nullif(p_pickup ->> 's', '')::time;
@@ -2317,24 +2323,65 @@ begin
     if v_s is null then raise exception 'Choisis l''heure de passage.'; end if;
     if v_e is not null and v_e <= v_s then raise exception 'L''heure de fin doit suivre l''heure de début.'; end if;
   end if;
-  v_lines := public._customer_fill_lines(p_lines);
+  if p_order is not null then
+    select * into o from public.customer_orders where id = p_order for update;
+    if not found or not o.manual then raise exception 'Commande introuvable.'; end if;
+    if o.status not in ('new', 'preparing', 'ready') then
+      raise exception 'Commande % déjà %.', o.number, case o.status when 'invoiced' then 'facturée' else 'annulée' end;
+    end if;
+    delete from public.customer_order_lines where order_id = p_order;   -- le stock retenu se recalcule sans ces lignes
+  end if;
+  -- prix tels que saisis ; « à commander » = au-delà du stock offert (products_public, déjà net des autres retenues)
+  with l as (
+    select t.x, (t.ord - 1)::int as so,
+           case when (t.x ->> 'product_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then (t.x ->> 'product_id')::uuid end as pid,
+           case when coalesce(t.x ->> 'qty', '') ~ '^\d{1,4}$' then (t.x ->> 'qty')::int else 0 end as qty,
+           case when coalesce(t.x ->> 'unit_price', '') ~ '^-?\d{1,7}(\.\d+)?$' then round((t.x ->> 'unit_price')::numeric, 2) else 0 end as unit
+      from jsonb_array_elements(p_lines) with ordinality t(x, ord)
+  ), c as (
+    select l.so, l.qty, l.unit, p.id as pid, left(coalesce(nullif(btrim(l.x ->> 'kind'), ''), 'free'), 20) as kind,
+           left(coalesce(nullif(btrim(l.x ->> 'ptype'), ''), p.type, 'divers'), 20) as ptype,
+           left(coalesce(nullif(btrim(l.x ->> 'name'), ''), p.name, 'Article'), 200) as name,
+           left(nullif(btrim(coalesce(l.x ->> 'meta', '')), ''), 200) as meta,
+           case when jsonb_typeof(l.x -> 'pack') = 'object' then l.x -> 'pack' end as pack,
+           case when p.id is null then null when l.x ->> 'kind' = 'refill' then coalesce(pp.qty_2, 0) else pp.qty end as stock
+      from l
+      left join public.products p on p.id = l.pid
+      left join public.products_public pp on pp.id = l.pid
+     where l.qty > 0
+  )
+  select jsonb_agg(jsonb_build_object('product_id', pid, 'ptype', ptype, 'kind', kind, 'name', name, 'meta', meta, 'qty', qty,
+           'unit_price', unit, 'line_total', round(unit * qty, 2), 'sort_order', so, 'pack', pack,
+           'qty_to_order', case when stock is null then 0 else greatest(0, qty - greatest(stock, 0)) end) order by so)
+    into v_lines from c;
+  if v_lines is null then raise exception 'Ajoute au moins une ligne (quantité > 0).'; end if;
   select coalesce(sum((x ->> 'line_total')::numeric), 0), coalesce(bool_or((x ->> 'qty_to_order')::int > 0), false)
     into v_total, v_bo from jsonb_array_elements(v_lines) x;
-  v_num := 'C-' || lpad(nextval('public.customer_order_seq')::text, 4, '0');
-  insert into public.customer_orders (number, customer_id, client_id, manual, email, name, phone, note, total, has_backorder, status,
-                                      pickup_date, pickup_start, pickup_end, pickup_confirmed_at, ready_notified_at, stock_hold, pickup_due)
-  values (v_num, null, k.id, true, nullif(lower(btrim(coalesce(k.email, ''))), ''), k.name, nullif(btrim(coalesce(k.phone, '')), ''),
-          nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_bo, 'ready',
-          v_d, v_s, v_e, case when v_d is not null then now() end, now(), true, null)
-  returning id into v_id;
+  if p_order is null then
+    v_num := 'C-' || lpad(nextval('public.customer_order_seq')::text, 4, '0');
+    insert into public.customer_orders (number, customer_id, client_id, manual, email, name, phone, note, total, has_backorder, status,
+                                        pickup_date, pickup_start, pickup_end, pickup_confirmed_at, ready_notified_at, stock_hold, pickup_due)
+    values (v_num, null, k.id, true, nullif(lower(btrim(coalesce(k.email, ''))), ''), k.name, nullif(btrim(coalesce(k.phone, '')), ''),
+            nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_bo, 'ready',
+            v_d, v_s, v_e, case when v_d is not null then now() end, now(), true, null)
+    returning id into v_id;
+  else
+    v_id := p_order; v_num := o.number;
+    update public.customer_orders set client_id = k.id, email = nullif(lower(btrim(coalesce(k.email, ''))), ''), name = k.name,
+           phone = nullif(btrim(coalesce(k.phone, '')), ''), note = nullif(left(btrim(coalesce(p_note, '')), 500), ''),
+           total = v_total, has_backorder = v_bo, pickup_date = v_d, pickup_start = v_s, pickup_end = v_e,
+           pickup_confirmed_at = case when v_d is not null then now() end, stock_hold = true, updated_at = now()
+     where id = p_order;
+  end if;
   insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order, pack)
   select v_id, (x ->> 'product_id')::uuid, x ->> 'ptype', x ->> 'kind', x ->> 'name', x ->> 'meta', (x ->> 'qty')::int,
-         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int, x -> 'pack'
+         (x ->> 'unit_price')::numeric, (x ->> 'line_total')::numeric, (x ->> 'qty_to_order')::int, (x ->> 'sort_order')::int,
+         case when jsonb_typeof(x -> 'pack') = 'object' then x -> 'pack' end
     from jsonb_array_elements(v_lines) x;
   return jsonb_build_object('id', v_id, 'number', v_num, 'total', v_total, 'has_backorder', v_bo);
 end $$;
-revoke all on function public.admin_create_customer_order(uuid, jsonb, text, jsonb) from public, anon;
-grant execute on function public.admin_create_customer_order(uuid, jsonb, text, jsonb) to authenticated;
+revoke all on function public.admin_save_manual_order(uuid, uuid, jsonb, text, jsonb) from public, anon;
+grant execute on function public.admin_save_manual_order(uuid, uuid, jsonb, text, jsonb) to authenticated;
 
 revoke all on function public.customer_submit_order(jsonb, text, jsonb)       from public, anon;
 revoke all on function public.customer_update_order(uuid, jsonb, text, jsonb) from public, anon;

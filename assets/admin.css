@@ -313,7 +313,7 @@ label.lbl { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-
 /* Champs — style « Creusé » (oct. 2026, choisi par Théo sur planche) : le champ est
    enfoncé dans la carte (fond plus sombre + ombre intérieure) ; au focus il s'éclaire
    et prend l'anneau de la couleur d'accent. */
-input[type=text], input[type=number], input[type=email], input[type=search], input[type=password], input[type=date], select, textarea {
+input[type=text], input[type=number], input[type=email], input[type=search], input[type=password], input[type=date], input[type=time], select, textarea {
   width:100%; padding:9px 12px; font:inherit; font-size:.94rem; color:var(--ink);
   background:var(--field-bg); border:1px solid var(--field-line); border-radius:var(--radius-ctl); box-shadow:var(--field-inset);
   transition-property:border-color, box-shadow, background-color; transition-duration:.15s; transition-timing-function:ease-out; }
@@ -645,17 +645,7 @@ details.editor:not([open]) { padding-top:16px; padding-bottom:16px; box-shadow:n
 .cpt-res input { width:auto; }
 .cpt-linker .cpt-fiche-f { max-width:440px; margin-bottom:16px; }
 /* Commandes › Clients en ligne (cms-commandes-clients.js) */
-.cc-bar { display:flex; justify-content:flex-end; align-items:center; flex-wrap:wrap; gap:8px 10px; margin:-8px 0 12px; }
-/* Nouvelle commande hors site : client + fourchette de passage + note */
-.co-card.is-new { border-color:color-mix(in srgb, var(--ember) 45%, var(--line)); }
-.cn-row { display:flex; flex-wrap:wrap; gap:10px 12px; margin:12px 0 0; }
-.cn-row .field { margin:0; }
-.cn-who { flex:1 1 260px; }
-.cn-pk .field { flex:1 1 130px; min-width:0; }
-.cn-picked { display:flex; align-items:center; gap:10px; min-height:42px; }
-.cn-picked b { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.cn-note { margin:12px 0 0; }
-.co-card.is-new > .field { margin-top:12px; }
+.cc-bar { display:flex; justify-content:flex-end; margin:-8px 0 12px; }
 .cc-sw { width:22px; height:22px; flex:none; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,.14); }
 /* Pastille de format (CA.kindPill) : Recharge = bleu, Avec bobine = vert — lisible d'un coup d'œil */
 .kind-pill { --kc:#3b82f6; display:inline-flex; align-items:center; gap:5px; flex:none; white-space:nowrap; vertical-align:middle;
@@ -1518,7 +1508,7 @@ span.ro-sw.ro-sw-none { background:none; box-shadow:none; }
 .co-link::before { content:'⇄'; margin-right:6px; }
 button.co-link { cursor:pointer; border-style:dashed; }
 button.co-link:hover { background:color-mix(in srgb, var(--ember) 24%, transparent); }
-.co-linkpick { display:flex; flex-direction:column; gap:10px; margin:12px 0 4px; text-align:left; }
+.co-linkpick { grid-column:1 / -1; display:flex; flex-direction:column; gap:10px; margin:12px 0 4px; text-align:left; }
 .co-linkpick label { display:flex; align-items:center; gap:8px; cursor:pointer; }
 .co-who { display:flex; align-items:center; gap:10px; }
 .co-who .person-av { width:36px; height:36px; font-size:.8rem; }
@@ -2489,7 +2479,7 @@ a.ms-b-file:hover { border-color:var(--ink); }
 /* Packs dans Commandes / Réservations / Facturation (2026-11-16) */
 .cc-meta.cc-pack { color:var(--ember-ink); font-weight:700; }
 .fx-packtag { color:var(--ember-ink); font-weight:700; }
-.fx-packpick { display:flex; flex-direction:column; gap:8px; max-height:52vh; overflow:auto; }
+.fx-packpick { grid-column:1 / -1; margin-top:16px; display:flex; flex-direction:column; gap:8px; max-height:52vh; overflow:auto; }
 .fx-packopt { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; font:inherit; color:var(--ink); text-align:left;
   cursor:pointer; background:var(--paper); border:1px solid var(--line-2); border-radius:12px; }
 .fx-packopt:hover { border-color:var(--ink-2); }
@@ -2498,3 +2488,14 @@ a.ms-b-file:hover { border-color:var(--ink); }
 .fx-packn { flex:1; min-width:0; }
 .fx-packn em { font-style:normal; font-size:.8rem; color:var(--muted); }
 .fx-packp { flex:none; font-weight:700; font-variant-numeric:tabular-nums; }
+/* packs trouvés par la barre de recherche de la Facturation */
+.fx-packhits { display:flex; flex-direction:column; gap:6px; margin:0 0 12px; }
+.fx-packhits .fx-packopt { padding:8px 10px; }
+.fx-packhits .fx-packopt:hover { border-color:var(--ember); }
+/* « Envoyer dans les commandes » : passage du client (jour, De à À) */
+.fx-topick { grid-column:1 / -1; display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px; }
+.fx-topick input { flex:1 1 110px; min-width:0; }
+.fx-topick #fxo-d { flex-basis:100%; }
+.fx-topick-to { flex:none; color:var(--muted); font-weight:600; }
+.fx-rail .fx-actions-2 #fx-to-order { grid-column:1 / -1; }   /* grand écran : sa propre rangée */
+@media (max-width:640px) { .fx-actions-2 #fx-to-order { flex-basis:100%; } }
