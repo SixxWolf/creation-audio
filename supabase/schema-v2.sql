@@ -2140,7 +2140,7 @@ begin
   select (select count(*) from l) + (select count(*) from pk), count(*), coalesce(jsonb_agg(jsonb_build_object(
            'product_id', pid, 'ptype', type, 'kind', kind, 'name', name,
            'meta', case when pack is not null
-                        then concat_ws(' · ', pack ->> 'name', nullif(material, ''), case when kind = 'refill' then 'Recharge' else 'Avec bobine' end)
+                        then concat_ws(' · ', nullif(brand, ''), nullif(material, ''), case when kind = 'refill' then 'Recharge' else 'Avec bobine' end)
                         when type = 'filament'
                         then concat_ws(' · ', nullif(brand, ''), nullif(material, ''), case when kind = 'refill' then 'Recharge' else 'Avec bobine' end)
                         when type = 'accessory' then 'Accessoire' else 'Spacer · paire' end,
