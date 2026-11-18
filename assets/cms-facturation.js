@@ -65,8 +65,9 @@
   var loaded = false;
   var cat = 'filament';          // gabarit courant (pilote la colonne gauche)
   var maintRate = 60;            // taux horaire de l'onglet Entretien (gabarit « maintenance »)
-  var clientType = 'client';     // 'client' | 'dealer' | 'internal' (usage interne : prix 0 $, n° INT-)
-  var INTERNAL_NAME = 'Usage interne';
+  var clientType = 'client';     // 'client' | 'dealer' | 'internal' (usage interne : prix 0 $, n° INT-) | 'amazon' (envoi FBA, n° AMZ-)
+  // « amazon » = un usage interne (client_type 'internal' en base, internal_use 'amazon') : déjà exclu des ventes partout
+  var INTERNAL_NAME = 'Usage interne', AMAZON_NAME = 'Envoi Amazon';
   var taxEnabled = false;
   var internalUse = null;        // usage interne : 'production' (filament pour imprimer des spacers) | 'other' (perso, projets) ; obligatoire en « Interne »
   var payMethod = null;          // 'cash' (comptant) | 'interac' (virement) | null ; obligatoire à l'enregistrement, sauf usage interne
@@ -91,7 +92,7 @@
 
   /* ---------- éléments ---------- */
   var elReset = $('#fx-reset'), elNextHint = $('#fx-nexthint'),
-      elTax = $('#fx-tax'), elPay = $('#fx-pay'), elUse = $('#fx-use'),
+      elTax = $('#fx-tax'), elPay = $('#fx-pay'), elUse = $('#fx-use'), elAmz = $('#fx-amz'),
       elCliName = $('#fx-cli-name'), elCliEmail = $('#fx-cli-email'), elCliPhone = $('#fx-cli-phone'),
       elCliAddress = $('#fx-cli-address'), elCliCity = $('#fx-cli-city'),
       elDealerField = $('#fx-dealer-field'), elDealerSelect = $('#fx-dealer-select'),
@@ -326,11 +327,11 @@
 
   function loadNextNumberHint() {
     var year = new Date().getFullYear();
-    var prefix = isInternal() ? 'INT-' : 'F-';   // usage interne : série à part (les F- restent sans trou)
+    var prefix = numPrefix();   // usage interne / envoi Amazon : séries à part (les F- restent sans trou)
     sb.from('invoices').select('number').like('number', prefix + year + '-%')
       .order('number', { ascending: false }).limit(1)
       .then(function (res) {
-        if (prefix !== (isInternal() ? 'INT-' : 'F-')) return;   // type changé entre-temps
+        if (prefix !== numPrefix()) return;   // type changé entre-temps
         var seq = 1;
         if (!res.error && res.data && res.data.length) {
           var m = /-(\d+)$/.exec(res.data[0].number || '');
@@ -408,8 +409,33 @@
   $$('.fx-use-btn').forEach(function (b) {
     b.addEventListener('click', function () { setUse(b.getAttribute('data-use')); });
   });
+  // envoi Amazon : n° FBA, centre, transport UPS, préparation (coût total = pièces au coûtant + transport + préparation)
+  function amzField(k) { return elAmz ? $('[data-amz="' + k + '"]', elAmz) : null; }
+  function amzData() {
+    var g = function (k) { var el = amzField(k); return el ? el.value.trim() : ''; };
+    return { fba: g('fba').toUpperCase() || null, center: g('center').toUpperCase() || null,
+      ship: round2(Math.max(0, +g('ship') || 0)), prep: round2(Math.max(0, +g('prep') || 0)) };
+  }
+  function setAmz(a) {
+    a = a || {};
+    ['fba', 'center', 'ship', 'prep'].forEach(function (k) {
+      var el = amzField(k); if (!el) return;
+      el.value = a[k] == null || a[k] === 0 ? '' : String(a[k]);
+    });
+  }
+  if (elAmz) elAmz.addEventListener('input', function () { render(); });
+  // lignes du document (aperçu, réimpression de l'Historique) : envoi + détail du coût
+  function amzDocRows(a, cost) {
+    a = a || {};
+    var ship = +a.ship || 0, prep = +a.prep || 0, all = round2((+cost || 0) + ship + prep);
+    var ref = [a.fba, a.center].filter(Boolean).join(' · ');
+    return (ref ? '<div class="inv-pay"><span class="lbl">Envoi FBA</span>' + esc(ref) + '</div>' : '') +
+      '<div class="inv-pay"><span class="lbl">Coût</span>' + esc('Pièces ' + money(cost) +
+        (ship ? ' + transport ' + money(ship) : '') + (prep ? ' + préparation ' + money(prep) : '') + ' = ' + money(all)) + '</div>';
+  }
+  window.CA.amzDocRows = amzDocRows;
   function useMissing() {
-    if (!isInternal() || internalUse) return false;
+    if (!isInternal() || isAmazon() || internalUse) return false;
     if (elUse) { elUse.classList.add('is-missing'); elUse.scrollIntoView({ block: 'nearest' }); }
     elStatus.textContent = 'Choisis : Production ou Autre.';
     return true;
@@ -571,27 +597,29 @@
 
   function setClientType(type, keepFields) {
     var prevType = clientType;
-    clientType = type === 'dealer' ? 'dealer' : type === 'internal' ? 'internal' : 'client';
+    var prevPrefix = numPrefix();
+    clientType = type === 'dealer' || type === 'internal' || type === 'amazon' ? type : 'client';
     $$('.fx-cli-btn').forEach(function (x) {
       var v = x.getAttribute('data-cli');
       x.classList.toggle('is-active', v === clientType);
     });
-    var isDlr = clientType === 'dealer', isInt = clientType === 'internal';
+    var isDlr = clientType === 'dealer', isInt = isInternal(), isAmz = isAmazon();
     if (elDealerField) elDealerField.hidden = !isDlr;
-    if (elPay) elPay.hidden = isInt;        // usage interne : aucun paiement
-    if (elUse) elUse.hidden = !isInt;       // usage interne : production ou autre
+    if (elPay) elPay.hidden = isInt;        // usage interne / Amazon : aucun paiement
+    if (elUse) elUse.hidden = !isInt || isAmz;   // usage interne : production ou autre
+    if (elAmz) elAmz.hidden = !isAmz;       // envoi Amazon : n° FBA, centre, transport, préparation
     if (elClientField) elClientField.hidden = isDlr || isInt;
     if (elClientSearch) elClientSearch.value = '';
     hideClientResults();
     if (!keepFields) {
-      setClientFields(isInt ? { name: INTERNAL_NAME } : {});
+      setClientFields(isAmz ? { name: AMAZON_NAME } : isInt ? { name: INTERNAL_NAME } : {});
       if (elDealerSelect) elDealerSelect.value = '';
-    }
+    } else if (isInt && elCliName && !elCliName.value) elCliName.value = isAmz ? AMAZON_NAME : INTERNAL_NAME;
     if (elCliName) elCliName.readOnly = isInt;   // usage interne : nom fixe
     repriceSpacers();                       // bascule prix client <-> dealer sur les lignes spacer
     if (cat === 'spacer') buildPicker();    // rafraîchit les prix affichés dans le catalogue
     unlock();                               // déverrouille + libellé du bouton (facture / sortie)
-    if (!editing && (prevType === 'internal') !== isInt) loadNextNumberHint();   // série F- <-> INT-
+    if (!editing && prevPrefix !== numPrefix()) loadNextNumberHint();   // série F- / INT- / AMZ-
     render();
   }
   $$('.fx-type-btn').forEach(function (b) {
@@ -751,7 +779,10 @@
   function prodById(id) { var arr = catalog[cat] || []; return arr.filter(function (p) { return String(p.id) === String(id); })[0] || null; }
 
   function isDealer() { return clientType === 'dealer'; }
-  function isInternal() { return clientType === 'internal'; }
+  function isInternal() { return clientType === 'internal' || clientType === 'amazon'; }
+  function isAmazon() { return clientType === 'amazon'; }
+  function numPrefix() { return isAmazon() ? 'AMZ-' : isInternal() ? 'INT-' : 'F-'; }
+  function docTitle() { return isAmazon() ? 'ENVOI AMAZON' : isInternal() ? 'USAGE INTERNE' : 'FACTURE'; }
   // spacer : prix client (à plat) OU prix dealer (+ rabais quantité) selon le type de client
   function spacerDual(p) {
     var pc = promoOf(p, 'spool', 'public'), pd = promoOf(p, 'spool', 'dealer');
@@ -1099,7 +1130,7 @@
           '<div class="inv-co-name">' + esc(co.name || 'Entreprise') + '</div>' +
           (co.tagline ? '<div class="inv-co-tag">' + esc(co.tagline) + '</div>' : '') +
           (meta.length ? '<div class="inv-co-meta">' + esc(meta.join('\n')) + '</div>' : '') + '</div>' +
-        '<div class="inv-title"><h1>' + (internal ? 'USAGE INTERNE' : 'FACTURE') + '</h1><div class="inv-meta">' +
+        '<div class="inv-title"><h1>' + docTitle() + '</h1><div class="inv-meta">' +
           'N° ' + esc(elNumber.value || '—') + '<br>' + fmtDateFR(elDate.value || todayISO()) + '</div></div>' +
       '</div>' +
       billto +
@@ -1113,6 +1144,7 @@
         creditLines +
       '</div>' +
       (payVal ? '<div class="inv-pay"><span class="lbl">Paiement</span>' + esc(payVal) + '</div>' : '') +
+      (isAmazon() ? amzDocRows(amzData(), t.cost) : '') +
       (noteVal ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(noteVal) + '</div>' : '') +
       (internal ? '' : '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
 
@@ -1171,6 +1203,15 @@
     elMargin.hidden = false;
     if (internal) {   // usage interne : pas de marge, juste ce que vaut ce qu'on prend (au coûtant)
       elMargin.classList.remove('is-masked');
+      if (isAmazon()) {   // envoi Amazon : coût total = pièces + transport + préparation, et par unité
+        var a = amzData(), units = lines.reduce(function (s, l) { return s + (l.qty > 0 ? +l.qty : 0); }, 0),
+            all = round2(t.cost + a.ship + a.prep);
+        elMargin.innerHTML = '<span class="fx-margin-k">Coût de l\'envoi</span>' +
+          '<span class="fx-margin-v">' + money(all) + '</span>' +
+          '<span class="fx-margin-sub">' + (units ? money(all / units) + ' / unité · ' : '') + 'pièces ' + money(t.cost) + '</span>';
+        refreshPickerBadges();
+        return;
+      }
       elMargin.innerHTML = '<span class="fx-margin-k">Valeur au coûtant</span>' +
         '<span class="fx-margin-v">' + money(t.cost) + '</span>';
       refreshPickerBadges();
@@ -1211,7 +1252,7 @@
   }
   function unlock() {
     saved = false; elSave.disabled = false;
-    elSave.textContent = editing ? 'Enregistrer les modifications' : isInternal() ? 'Enregistrer la sortie' : 'Enregistrer la facture';
+    elSave.textContent = editing ? 'Enregistrer les modifications' : isAmazon() ? 'Enregistrer l\'envoi' : isInternal() ? 'Enregistrer la sortie' : 'Enregistrer la facture';
     syncToOrder();
   }
 
@@ -1222,14 +1263,15 @@
       client_contact: contactStr() || null,
       client_address: elCliAddress.value.trim() || null,
       client_city: elCliCity.value.trim() || null,
-      client_type: clientType,
+      client_type: isInternal() ? 'internal' : clientType,
       category: currentCategory(),
       invoice_date: /^\d{4}-\d{2}-\d{2}$/.test(elDate.value) ? elDate.value : todayISO(),
       note: elNote.value.trim() || null,
       pay_method: isInternal() ? null : creditCovers(t) ? 'credit' : payMethod,
       credit_used: creditNow(t),
       credit_email: creditNow(t) > 0 ? creditEmail() : null,
-      internal_use: isInternal() ? internalUse : null,
+      internal_use: isAmazon() ? 'amazon' : isInternal() ? internalUse : null,
+      amazon: isAmazon() ? amzData() : null,
       tax_enabled: taxEnabled,
       subtotal: round2(t.sub), tax_gst: round2(t.gst), tax_qst: round2(t.qst),
       total: round2(t.total), cost_total: round2(t.cost)
@@ -1273,10 +1315,10 @@
     // E2 : n° manuel si l'admin a modifié le champ ; sinon numéro auto atomique.
     var manual = (elNumber.value || '').trim();
     var useManual = manual && manual !== lastAutoNumber;
-    var internal = isInternal();
+    var internal = isInternal(), amazon = isAmazon();
     var numberP = useManual
       ? Promise.resolve(manual)
-      : sb.rpc(internal ? 'next_internal_number' : 'next_invoice_number').then(function (res) {
+      : sb.rpc(amazon ? 'next_amazon_number' : internal ? 'next_internal_number' : 'next_invoice_number').then(function (res) {
           if (res.error || !res.data) throw (res.error || new Error('Numéro indisponible.'));
           return res.data;
         });
@@ -1297,7 +1339,7 @@
         return sb.from('invoice_lines').insert(lineRows).select('id,sort_order').then(function (r3) {
           if (r3.error) throw r3.error;
           if (!doDeduct) return inv;
-          return deductStock(valid, r3.data || [], invoice.client_type === 'internal' ? (invoice.internal_use === 'production' ? 'production' : 'internal') : 'invoice', number).then(function () {
+          return deductStock(valid, r3.data || [], invoice.client_type === 'internal' ? (invoice.internal_use === 'production' || invoice.internal_use === 'amazon' ? invoice.internal_use : 'internal') : 'invoice', number).then(function () {
             return sb.from('invoices').update({ stock_deducted: true }).eq('id', inv.id).then(function () { return inv; });
           });
         });
@@ -1310,7 +1352,7 @@
       var deducted = !!elDeduct.checked, pend = pendingCount();
       // la vente est enregistrée : on repart d'une facture vierge (réimpression possible ci-dessous ou dans l'Historique)
       resetInvoice();
-      elStatus.textContent = '✓ ' + (internal ? 'Sortie ' : 'Facture ') + inv.number + ' enregistrée' + (deducted ? ', stock déduit' : '') +
+      elStatus.textContent = '✓ ' + (amazon ? 'Envoi ' : internal ? 'Sortie ' : 'Facture ') + inv.number + ' enregistré' + (amazon ? '' : 'e') + (deducted ? ', stock déduit' : '') +
         (pend ? ' · ' + pend + ' à remettre' : '') + '. Nouvelle facture prête. ';
       if (window.CA.printInvoice) statusButton('Imprimer ' + inv.number, function () { window.CA.printInvoice(inv, savedRows); });
       if (order) linkOrder(order, inv);
@@ -1474,6 +1516,7 @@
     payMethod = null; $$('.fx-pay-btn').forEach(function (b) { b.classList.remove('is-active'); }); if (elPay) elPay.classList.remove('is-missing');
     creditUsed = 0; creditBack = 0; creditBackEmail = '';
     setUse(null);
+    setAmz(null);
     setClientType('client');   // vide les champs client (le profil dealer reste mémorisé)
     loadNextNumberHint();
     render();
@@ -1573,7 +1616,8 @@
   }
   function fillFromInvoice(inv, savedLines) {
     var dealer = inv.client_type === 'dealer';
-    setClientType(inv.client_type === 'internal' ? 'internal' : dealer ? 'dealer' : 'client', true);
+    setClientType(inv.client_type === 'internal' ? (inv.internal_use === 'amazon' ? 'amazon' : 'internal') : dealer ? 'dealer' : 'client', true);
+    setAmz(inv.amazon);
     var ct = splitContact(inv.client_contact);
     setClientFields({ name: inv.client_name || '', email: ct.email, phone: ct.phone,
       address: inv.client_address || '', city: inv.client_city || '' });
@@ -1695,6 +1739,29 @@
       }, function () {});
   }
   // Renvoie false si l'admin refuse de remplacer la facture en cours.
+  // Production › « Vers Amazon » (2026-11-18) : ouvre un envoi Amazon avec les paires qui viennent d'entrer
+  // en stock (items = [{ product_id, qty }]) ; coût = coût moyen du spacer relu après la production.
+  window.CA.amazonShipment = function (items, force) {
+    items = (items || []).filter(function (x) { return x && x.product_id && (x.qty | 0) > 0; });
+    if (!items.length) return false;
+    if (lines.length && !force) return askReplace(function () { return window.CA.amazonShipment(items, true); });
+    ensureLoad();
+    resetInvoice();
+    catalogLoaded.spacer = false;   // coût moyen à jour (la production vient de le changer)
+    setCat('spacer');
+    loadCatalog('spacer', true).then(null, function () {}).then(function () {
+      setClientType('amazon');
+      items.forEach(function (x) {
+        if (!addProduct(x.product_id, 'spacer')) return;
+        var l = lines.filter(function (y) { return y.productId === String(x.product_id) && y.kind === 'unit'; })[0];
+        if (l) l.qty = x.qty | 0;
+      });
+      afterChange();
+      var f = amzField('fba'); if (f) f.focus();
+    });
+    location.hash = '#facturation';
+    return true;
+  };
   window.CA.invoiceFromOrder = function (order, olines, force) {
     if (!order || !order.id) return false;
     if (fromOrder && fromOrder.id === order.id && lines.length) return true;   // déjà ouverte
@@ -1792,7 +1859,7 @@
     var co = readCompanyForm(), t = totals();
     var L = [];
     L.push(co.name); if (co.tagline) L.push(co.tagline);
-    L.push((isInternal() ? 'USAGE INTERNE ' : 'FACTURE ') + (elNumber.value || '') + '   ' + fmtDateFR(elDate.value || todayISO()));
+    L.push(docTitle() + ' ' + (elNumber.value || '') + '   ' + fmtDateFR(elDate.value || todayISO()));
     var cli = isInternal() ? '' : elCliName.value.trim(); if (cli) L.push('Facturé à : ' + cli + (clientType === 'dealer' ? ' (dealer)' : ''));
     if (elCliAddress.value.trim()) L.push(elCliAddress.value.trim());
     if (elCliCity.value.trim()) L.push(elCliCity.value.trim());

@@ -760,6 +760,13 @@
       if (res.error) { el.status.textContent = 'Erreur : ' + res.error.message; el.save.disabled = false; return; }
       var d = res.data || {};
       toast('Production enregistrée · ' + (d.pairs | 0) + ' paire' + ((d.pairs | 0) > 1 ? 's' : ''));
+      // « Vers Amazon » : les paires entrées sortent aussitôt dans un envoi Amazon (Facturation, série AMZ-)
+      var amz = $('#pr-amazon');
+      if (amz && amz.checked && (d.pairs | 0) > 0 && window.CA.amazonShipment) {
+        amz.checked = false;
+        var spId = r.sp.id, nPairs = d.pairs | 0;
+        setTimeout(function () { window.CA.amazonShipment([{ product_id: spId, qty: nPairs }]); }, 400);   // après le rechargement du stock
+      }
       if (file && file.name && !hasMap(file.name)) saveMap(file.name, r.sp.id);   // la prochaine fois, ce fichier = ce spacer
       file = null; rows = []; edited = { good: false, perPlate: false };
       el.fileWarn.hidden = true;

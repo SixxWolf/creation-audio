@@ -153,7 +153,7 @@
 
     invEl.innerHTML = card('Dernières factures', '#historique', d.last.length ? d.last.map(function (f) {
       return '<button type="button" class="td-row" data-inv="' + esc(f.id) + '"><span class="td-row-tx"><b>' + esc(f.number || '—') + '</b>' +
-        '<small>' + esc(f.client_type === 'internal' ? 'Usage interne' : (f.client_name || '')) + '</small></span>' +
+        '<small>' + esc(f.client_type === 'internal' ? (f.client_name || 'Usage interne') : (f.client_name || '')) + '</small></span>' +
         (f.status === 'cancelled' ? '<span class="td-st is-cancelled">Annulée</span>' : '') +
         '<span class="td-row-end"><b>' + esc(money(f.total)) + '</b><small>' + esc(dateFr(f.invoice_date)) + '</small></span></button>';
     }).join('') : '<p class="td-none">Aucune facture.</p>');

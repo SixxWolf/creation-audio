@@ -110,7 +110,7 @@
         out.push({ g: 'tab', title: lbl, meta: t.getAttribute('data-group') || '', hay: lbl + ' ' + (t.getAttribute('data-group') || ''), hash: '#' + t.getAttribute('data-tab') });
       });
       r[0].forEach(function (f) {
-        var who = f.client_type === 'internal' ? 'Usage interne' : (f.client_name || '');
+        var who = f.client_type === 'internal' ? (f.client_name || 'Usage interne') : (f.client_name || '');
         out.push({ g: 'inv', title: (f.number || '—') + (who ? ' · ' + who : ''), meta: (f.invoice_date || '') + ' · ' + money(f.total) + (f.status === 'cancelled' ? ' · annulée' : ''),
           hay: (f.number || '') + ' ' + who, num: f.number, inv: f.id });
       });

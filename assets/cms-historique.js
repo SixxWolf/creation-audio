@@ -139,12 +139,15 @@
     return (linesByInv[inv.id] || []).reduce(function (s, l) { return s + ((+l.qty_pending) || 0); }, 0);
   }
   // filtre statut + recherche (indépendant de la catégorie -> sert aussi aux compteurs)
+  // envoi Amazon : pièces au coûtant + transport + préparation
+  function amzTotal(inv) { var a = inv.amazon || {}; return Math.round(((+inv.cost_total || 0) + (+a.ship || 0) + (+a.prep || 0)) * 100) / 100; }
   function passStatusQuery(inv) {
     var cancelled = inv.status === 'cancelled';
     if (filter === 'active' && cancelled) return false;
     if (filter === 'cancelled' && !cancelled) return false;
     if (filter === 'pending' && !pendingOf(inv)) return false;
-    if (filter === 'internal' && inv.client_type !== 'internal') return false;   // ce que Théo a pris dans son stock
+    if (filter === 'internal' && (inv.client_type !== 'internal' || inv.internal_use === 'amazon')) return false;   // ce que Théo a pris dans son stock
+    if (filter === 'amazon' && inv.internal_use !== 'amazon') return false;   // envois FBA (série AMZ-)
     if (query) {
       var arts = (linesByInv[inv.id] || []).map(function (l) { return [l.label, l.meta].join(' '); });
       if (!window.CA.searchMatch([inv.number, inv.client_name, inv.client_contact].concat(arts).join(' '), query)) return false;
@@ -184,11 +187,13 @@
       var badge = '<span class="hist-cat">' + esc(CAT_LABEL[inv.category] || inv.category || '—') + '</span>';
       var internal = inv.client_type === 'internal';
       var dealer = inv.client_type === 'dealer' ? '<span class="hist-dealer">Dealer</span>'
-        : internal ? '<span class="hist-dealer hist-int">' + (inv.internal_use === 'production' ? 'Interne · production' : 'Interne') + '</span>' : '';
+        : internal ? '<span class="hist-dealer hist-int">' + (inv.internal_use === 'amazon' ? 'Amazon' + (inv.amazon && inv.amazon.fba ? ' · ' + esc(inv.amazon.fba) : '')
+          : inv.internal_use === 'production' ? 'Interne · production' : 'Interne') + '</span>' : '';
       var pend = pendingOf(inv);
       // usage interne : 0 $ -> on montre plutôt le nombre d'articles pris
       var nItems = (linesByInv[inv.id] || []).reduce(function (s, l) { return s + ((+l.qty) || 0); }, 0);
       var totalTx = internal ? nItems + ' article' + (nItems > 1 ? 's' : '') : money(inv.total);
+      if (inv.internal_use === 'amazon') totalTx += ' · ' + money(amzTotal(inv));   // envoi Amazon : coût total de l'envoi
       return '<div class="hist-row' + (cancelled ? ' is-cancelled' : '') + '" data-id="' + esc(inv.id) + '">' +
         '<div class="hist-head">' +
           '<span class="hist-id"><span class="hist-num">' + esc(inv.number || '—') + '</span>' + badge +
@@ -481,7 +486,7 @@
           '<div class="inv-co-name">' + esc(co.name) + '</div>' +
           (co.tagline ? '<div class="inv-co-tag">' + esc(co.tagline) + '</div>' : '') +
           (meta.length ? '<div class="inv-co-meta">' + esc(meta.join('\n')) + '</div>' : '') + '</div>' +
-        '<div class="inv-title"><h1>' + (internal ? 'USAGE INTERNE' : 'FACTURE') + '</h1><div class="inv-meta">N° ' + esc(inv.number || '—') + '<br>' + esc(fmtDateFR(inv.invoice_date)) + '</div></div>' +
+        '<div class="inv-title"><h1>' + (inv.internal_use === 'amazon' ? 'ENVOI AMAZON' : internal ? 'USAGE INTERNE' : 'FACTURE') + '</h1><div class="inv-meta">N° ' + esc(inv.number || '—') + '<br>' + esc(fmtDateFR(inv.invoice_date)) + '</div></div>' +
       '</div>' + cancelled + billto +
       '<table class="inv-table"><thead><tr><th>Description</th><th class="num">Qté</th><th class="num">Prix unit.</th><th class="num">Montant</th></tr></thead>' +
         '<tbody>' + rows + '</tbody></table>' +
@@ -493,6 +498,7 @@
       '</div>' +
       (!internal && PAY_LABEL[inv.pay_method] ? '<div class="inv-pay"><span class="lbl">Paiement</span>' +
         (credit > 0 && inv.pay_method !== 'credit' ? 'Crédit boutique + ' : '') + PAY_LABEL[inv.pay_method] + '</div>' : '') +
+      (inv.internal_use === 'amazon' && window.CA.amzDocRows ? window.CA.amzDocRows(inv.amazon, +inv.cost_total || 0) : '') +
       (inv.note ? '<div class="inv-pay"><span class="lbl">Note</span>' + esc(inv.note) + '</div>' : '') +
       (internal ? '' : '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
   }

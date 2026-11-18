@@ -206,10 +206,12 @@
     var rows = all.filter(function (inv) { return inv.client_type !== 'internal'; });
     var intInv = all.filter(function (inv) { return inv.client_type === 'internal'; });
     // deux usages, comptés à part : « production » (filament pris pour imprimer des spacers) et « autre » (perso, projets ; anciennes sorties comprises)
-    var intUse = { production: { cost: 0, qty: 0, n: 0 }, other: { cost: 0, qty: 0, n: 0 } };
+    // + « amazon » (envois FBA, série AMZ-) : coût = pièces au coûtant + transport + préparation
+    var intUse = { production: { cost: 0, qty: 0, n: 0 }, other: { cost: 0, qty: 0, n: 0 }, amazon: { cost: 0, qty: 0, n: 0 } };
     intInv.forEach(function (inv) {
-      var u = intUse[inv.internal_use === 'production' ? 'production' : 'other'];
-      u.n++; u.cost += (+inv.cost_total) || 0;
+      var k = inv.internal_use === 'production' || inv.internal_use === 'amazon' ? inv.internal_use : 'other', u = intUse[k];
+      var a = k === 'amazon' ? (inv.amazon || {}) : {};
+      u.n++; u.cost += ((+inv.cost_total) || 0) + ((+a.ship) || 0) + ((+a.prep) || 0);
       (linesByInv[inv.id] || []).forEach(function (l) { u.qty += (+l.qty) || 0; });
     });
     function intCard(title, u) {
@@ -259,7 +261,9 @@
       card('Factures', String(n), n > 1 ? n + ' factures' : n + ' facture') +
       card('Panier moyen', money(avg), 'par facture') +
       card('Encaissé', money(collected), 'taxes incluses') +
-      intCard('Interne · production', intUse.production) + intCard('Interne · autre', intUse.other);
+      intCard('Interne · production', intUse.production) + intCard('Interne · autre', intUse.other) +
+      (intUse.amazon.n ? card('Envoyé chez Amazon', money(intUse.amazon.cost), intUse.amazon.qty + ' unité' + (intUse.amazon.qty > 1 ? 's' : '') +
+        ' · ' + money(intUse.amazon.qty ? intUse.amazon.cost / intUse.amazon.qty : 0) + ' / unité') : '');
 
     // répartition par gabarit — la seule place où la marge est détaillée :
     //  Part (ventes) = ventes de la catégorie ÷ chiffre d'affaires ; Part (marge) = marge ÷ marge totale ;

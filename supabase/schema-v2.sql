@@ -614,7 +614,10 @@ alter table public.invoices add column if not exists pickup_ready_at timestamptz
 alter table public.invoices add column if not exists pickup_notified_at timestamptz;
 alter table public.invoices add column if not exists pickup_confirmed_at timestamptz;
 alter table public.invoices drop constraint if exists invoices_internal_use_chk;
-alter table public.invoices add constraint invoices_internal_use_chk check (internal_use in ('production', 'other'));
+alter table public.invoices add constraint invoices_internal_use_chk check (internal_use in ('production', 'other', 'amazon'));
+-- Envoi Amazon (2026-11-18) : client_type 'internal' + internal_use 'amazon', n° AMZ-AAAA-### (next_amazon_number) ;
+-- amazon = { fba, center, ship, prep } : n° d'envoi FBA, centre Amazon, transport UPS $, préparation $ (coût total = cost_total + ship + prep)
+alter table public.invoices add column if not exists amazon jsonb;
 
 create index if not exists invoices_date_idx        on public.invoices (invoice_date desc);
 create index if not exists invoices_category_idx     on public.invoices (category);
@@ -1014,6 +1017,7 @@ begin
     note           = p_invoice ->> 'note',
     pay_method     = case when p_invoice ? 'pay_method' then nullif(p_invoice ->> 'pay_method', '') else pay_method end,
     internal_use   = case when p_invoice ? 'internal_use' then nullif(p_invoice ->> 'internal_use', '') else internal_use end,
+    amazon         = case when p_invoice ? 'amazon' then case when jsonb_typeof(p_invoice -> 'amazon') = 'object' then p_invoice -> 'amazon' end else amazon end,
     -- crédit dealer (section CRÉDIT DEALER) : le trigger invoices_credit_sync ajuste le registre
     credit_used    = case when p_invoice ? 'credit_used' then coalesce((p_invoice ->> 'credit_used')::numeric, 0) else credit_used end,
     credit_email   = case when p_invoice ? 'credit_email' then nullif(lower(trim(p_invoice ->> 'credit_email')), '') else credit_email end,
@@ -1835,6 +1839,23 @@ begin
 end $$;
 revoke all on function public.next_internal_number() from public, anon;
 grant execute on function public.next_internal_number() to authenticated;
+
+-- Envoi Amazon (2026-11-18) : même principe, série AMZ-AAAA-### (compteur seq_amz)
+alter table public.invoice_counters add column if not exists seq_amz int not null default 0;
+create or replace function public.next_amazon_number()
+returns text language plpgsql security definer set search_path = public as $$
+declare y int := extract(year from current_date)::int; n int;
+begin
+  if not public.is_admin() then
+    raise exception 'Réservé à l''administrateur.';
+  end if;
+  insert into public.invoice_counters (year, seq, seq_amz) values (y, 0, 1)
+    on conflict (year) do update set seq_amz = public.invoice_counters.seq_amz + 1
+    returning seq_amz into n;
+  return 'AMZ-' || y::text || '-' || lpad(n::text, 3, '0');
+end $$;
+revoke all on function public.next_amazon_number() from public, anon;
+grant execute on function public.next_amazon_number() to authenticated;
 
 -- ============================================================
 -- COMMANDES EN LIGNE (comptes clients, étape 2)
@@ -6070,7 +6091,7 @@ grant execute on function public.admin_dealer_request_decide(uuid, boolean) to a
 -- RPC appelante (receive_stock / deduct_stock p_reason, update_invoice,
 -- deliver_invoice, productions, admin_set_stock) ; sinon 'manual'.
 -- Raisons : reception, reception_edit, invoice, invoice_cancel, invoice_edit,
--- deliver, internal, production, production_delete, count, manual, created.
+-- deliver, internal, amazon, production, production_delete, count, manual, created.
 -- stock_snapshots : photo du stock de tous les produits, chaque nuit (pg_cron
 -- 05:00 UTC = minuit/1 h à Québec), datée du jour qui vient de finir.
 -- ------------------------------------------------------------

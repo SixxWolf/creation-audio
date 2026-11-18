@@ -21,8 +21,8 @@
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
-<link rel="stylesheet" href="assets/facture.css?v=47">
-<link rel="stylesheet" href="assets/autoloop.css?v=33">
+<link rel="stylesheet" href="assets/facture.css?v=48">
+<link rel="stylesheet" href="assets/autoloop.css?v=34">
 <link rel="stylesheet" href="assets/silhouettes.css?v=12">
 <link rel="stylesheet" href="assets/boites.css?v=8">
 <link rel="stylesheet" href="assets/imprimantes.css?v=6">
@@ -1224,6 +1224,7 @@
           <div class="al-card al-report-card">
             <div class="al-run">
               <button class="btn btn-accent" id="pr-save" type="button" disabled data-ic="check">Enregistrer la production</button>
+              <label class="al-msw pr-amz" title="Après l'enregistrement : ouvre un envoi Amazon avec ces paires"><input type="checkbox" id="pr-amazon"> Vers Amazon</label>
             </div>
             <div id="pr-report"></div>
             <p class="status" id="pr-status" aria-live="polite"></p>
@@ -1860,6 +1861,7 @@
           <button type="button" class="fx-cli-btn is-active" data-cli="client">Client</button>
           <button type="button" class="fx-cli-btn" data-cli="dealer">Dealer</button>
           <button type="button" class="fx-cli-btn" data-cli="internal" title="Ce que tu prends dans ton stock : prix à 0 $ (production ou autre)">Interne</button>
+          <button type="button" class="fx-cli-btn" data-cli="amazon" title="Envoi FBA : sort du stock à 0 $, coût de l'envoi gardé">Amazon</button>
         </div>
       </div>
 
@@ -1990,6 +1992,18 @@
             <button type="button" class="fx-use-btn" data-use="other">Autre</button>
           </div>
 
+          <!-- Envoi Amazon (FBA) : coût total = pièces au coûtant + transport + préparation -->
+          <div class="fx-amz no-print" id="fx-amz" data-wide="fx-right" data-wide-order="4" hidden>
+            <div class="field"><label class="lbl" for="fx-amz-fba">N° d'envoi FBA</label>
+              <input type="text" id="fx-amz-fba" data-amz="fba" placeholder="FBA19TS6HNGW" autocomplete="off"></div>
+            <div class="field"><label class="lbl" for="fx-amz-center">Centre</label>
+              <input type="text" id="fx-amz-center" data-amz="center" placeholder="YHM1" autocomplete="off"></div>
+            <div class="field"><label class="lbl" for="fx-amz-ship">Transport</label>
+              <span class="unit" data-unit="$"><input type="number" id="fx-amz-ship" data-amz="ship" min="0" step="0.01" inputmode="decimal"></span></div>
+            <div class="field"><label class="lbl" for="fx-amz-prep">Préparation</label>
+              <span class="unit" data-unit="$"><input type="number" id="fx-amz-prep" data-amz="prep" min="0" step="0.01" inputmode="decimal"></span></div>
+          </div>
+
           <div class="fx-actions no-print" data-wide="fx-right" data-wide-order="5">
             <button class="btn btn-accent" id="fx-save" type="button" data-ic="save">Enregistrer la facture</button>
             <label class="fx-check" id="fx-deduct-wrap"><input type="checkbox" id="fx-deduct" checked> Déduire le stock</label>
@@ -2025,6 +2039,7 @@
           <button type="button" class="hist-fbtn is-active" data-f="active">Actives</button>
           <button type="button" class="hist-fbtn" data-f="pending">À remettre <span class="hist-pcnt" id="hist-pend-cnt" hidden></span></button>
           <button type="button" class="hist-fbtn" data-f="internal">Usage interne</button>
+          <button type="button" class="hist-fbtn" data-f="amazon">Amazon</button>
           <button type="button" class="hist-fbtn" data-f="cancelled">Annulées</button>
           <button type="button" class="hist-fbtn" data-f="all">Toutes</button>
         </div>
@@ -3256,7 +3271,7 @@
 <script src="assets/cms-accessories.js?v=14"></script>
 <script src="assets/ca-pick.js?v=3"></script>
 <script src="assets/cms-inventory.js?v=58"></script>
-<script src="assets/cms-stock-journal.js?v=1"></script>
+<script src="assets/cms-stock-journal.js?v=2"></script>
 <script src="assets/cms-attente.js?v=7"></script>
 <script src="assets/cms-reserves.js?v=4"></script>
 <script src="assets/cms-en-route.js?v=10"></script>
@@ -3264,8 +3279,8 @@
 <script src="assets/cms-dealers.js?v=13"></script>
 <script src="assets/cms-clients.js?v=14"></script>
 <script src="assets/cms-messages.js?v=9"></script>
-<script src="assets/cms-facturation.js?v=71"></script>
-<script src="assets/cms-historique.js?v=23"></script>
+<script src="assets/cms-facturation.js?v=72"></script>
+<script src="assets/cms-historique.js?v=24"></script>
 <script src="assets/commande-client.js?v=13"></script>
 <script src="assets/cms-commandes-clients.js?v=31"></script>
 <script src="assets/cms-reservations.js?v=10"></script>
@@ -3274,7 +3289,7 @@
 <script src="assets/cms-demandes.js?v=4"></script>
 <script src="assets/doc-print.js?v=4"></script>
 <script src="assets/cms-commandes.js?v=21"></script>
-<script src="assets/cms-statistiques.js?v=15"></script>
+<script src="assets/cms-statistiques.js?v=16"></script>
 <script src="assets/vendor/fflate-0.8.3.min.js"></script>
 <script src="assets/autoloop-3mf.js?v=2"></script>
 <script src="assets/cms-autoloop-files.js?v=1"></script>
@@ -3286,15 +3301,15 @@
 <script src="assets/box-engine.js?v=16"></script>
 <script src="assets/box-subs.js?v=4"></script>
 <script src="assets/cms-boites.js?v=24"></script>
-<script src="assets/cms-production.js?v=16"></script>
+<script src="assets/cms-production.js?v=17"></script>
 <script src="assets/cms-imprimantes.js?v=8"></script>
 <script src="assets/cms-entretien.js?v=9"></script>
-<script src="assets/cms-aujourdhui.js?v=2"></script>
+<script src="assets/cms-aujourdhui.js?v=3"></script>
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-promotions.js?v=9"></script>
 <script src="assets/cms-nouveautes.js?v=2"></script>
 <script src="assets/cms-packs.js?v=5"></script>
-<script src="assets/cms-recherche.js?v=4"></script>
+<script src="assets/cms-recherche.js?v=5"></script>
 <script src="assets/aide.js?v=4"></script>
 <script src="assets/cms-aide.js?v=8"></script>
 </body>

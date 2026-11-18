@@ -164,6 +164,7 @@
 /* boutons en tête de la colonne de droite, rapport dessous */
 .al-run { display:grid; gap:8px; }
 .al-run .btn { width:100%; }
+.al-run .pr-amz { justify-self:center; font-size:.9rem; font-weight:600; }
 #al-report { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
 .al-report-card .muted { margin:0; font-size:.85rem; }
 /* filament + temps : batch | par paire */

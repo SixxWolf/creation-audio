@@ -35,7 +35,7 @@
   var REASONS = {
     reception: ['Réception', 'in'], reception_edit: ['Réception modifiée', 'in'],
     invoice: ['Facture', 'out'], invoice_cancel: ['Facture annulée', 'out'], invoice_edit: ['Facture modifiée', 'out'], deliver: ['Remise « à venir »', 'out'],
-    internal: ['Usage interne', 'int'], production: ['Production', 'int'], production_delete: ['Production supprimée', 'int'],
+    internal: ['Usage interne', 'int'], amazon: ['Envoi Amazon', 'int'], production: ['Production', 'int'], production_delete: ['Production supprimée', 'int'],
     count: ['Comptage', 'cor'], manual: ['Modifié à la main', 'cor'], created: ['Création', 'cor']
   };
   function reasonOf(r) { return REASONS[r] || [r || '—', 'cor']; }
