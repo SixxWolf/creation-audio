@@ -1063,3 +1063,11 @@ button.chip { font-family:inherit; cursor:pointer; }
 .pack-mcard .mcard-media .pack-dots { --d:clamp(26px, 4vw, 40px); --g:8px; }
 .pack-mc-unit { margin-left:6px; font-size:.8rem; font-weight:500; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
 .pack-tile-art, .pack-mini-art { position:relative; }
+
+/* Packs « Avec bobine » (2026-11-19) : choix du format sur la fiche (.fmt-opt comme la fiche filament),
+   ligne grise « ou 70 $ avec bobine » sur les cartes, mention « à commander » */
+.pack-fmts { margin:2px 0; }
+.pack-fmt[data-fmt="spool"] .fmt-meta { color:var(--good-ink); font-weight:600; }
+.pack-alt { font-size:.84rem; font-weight:500; color:var(--muted); font-variant-numeric:tabular-nums; }
+.pack-mcard .pack-alt { display:block; margin-top:4px; }
+.pack-bo { margin:0; font-size:.92rem; font-weight:600; color:var(--warn-ink, var(--muted)); }

@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 52;
+window.CA_EN_V = 53;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -1187,6 +1187,12 @@ window.CA_EN = (function (pairs) {
   [`Création Audio — Packs`, `Création Audio — Packs`],
   [`la bobine`, `per spool`],
   [`la recharge`, `per refill`],
+  // packs « Avec bobine » (2026-11-19)
+  [`ou {p} avec bobine`, `or {p} with spools`],
+  [`Format`, `Format`],
+  [`+{p} seulement`, `only {p} more`],
+  [`À commander : réservé à la prochaine réception`, `On order: reserved from the next delivery`],
+  [`Pack avec bobine à commander`, `Pack with spools on order`],
   [`Packs`, `Packs`],
   [`Prix fixe, couleurs assorties`, `Fixed price, matched colours`],
   [`Aucun pack pour le moment.`, `No packs right now.`],

@@ -929,7 +929,10 @@
     Promise.all([loadFxPacks(), loadCatalog('filament', true)]).then(null, function () {}).then(function () {
       var opts = [];
       (fxPacks || []).forEach(function (pk) {
-        (Array.isArray(pk.presets) ? pk.presets : []).forEach(function (pr) { opts.push({ pk: pk, pr: pr }); });
+        (Array.isArray(pk.presets) ? pk.presets : []).forEach(function (pr) {
+          opts.push({ pk: pk, pr: pr });
+          if (fxHasSpool(pk)) opts.push({ pk: pk, pr: pr, sp: true });   // « Avec bobine » (2026-11-19)
+        });
       });
       if (!opts.length) { caDialog.toast('Aucun pack. Crée-le dans Packs.'); return; }
       var body = document.createElement('div'); body.className = 'fx-packpick';
@@ -937,8 +940,8 @@
         var dots = (o.pr.lines || []).map(function (l) { var h = findProduct(l.p); return h ? swatchSVG(h.p.hex) : ''; }).join('');
         return '<button type="button" class="fx-packopt' + (i ? '' : ' is-on') + '" data-i="' + i + '">' +
           '<span class="fx-packdots">' + dots + '</span>' +
-          '<span class="fx-packn"><b>' + esc(o.pk.name) + '</b> · ' + esc(o.pr.name) + (o.pk.enabled ? '' : ' <em>hors ligne</em>') + '</span>' +
-          '<span class="fx-packp">' + money(o.pk.price) + '</span></button>';
+          '<span class="fx-packn"><b>' + esc(o.pk.name) + '</b> · ' + esc(o.pr.name) + (o.sp ? ' · Avec bobine' : '') + (o.pk.enabled ? '' : ' <em>hors ligne</em>') + '</span>' +
+          '<span class="fx-packp">' + money(o.sp ? o.pk.spool_price : o.pk.price) + '</span></button>';
       }).join('');
       var pick = 0;
       $$('.fx-packopt', body).forEach(function (b) {
@@ -948,15 +951,17 @@
         });
       });
       caDialog.confirm({ title: 'Ajouter un pack', message: '', body: body, ok: 'Ajouter', icon: 'plus' }).then(function (ok) {
-        if (ok === true) addPackLines(opts[pick].pk, opts[pick].pr);
+        if (ok === true) addPackLines(opts[pick].pk, opts[pick].pr, opts[pick].sp);
       });
     });
   }
-  function addPackLines(pk, pr) {
-    var units = (pk.units | 0) || 4, unit = Math.round(+pk.price / Math.max(1, units) * 100) / 100, kind = pk.kind || 'refill';
+  function fxHasSpool(pk) { return pk.kind === 'refill' && pk.spool_price != null && +pk.spool_price > 0; }
+  function addPackLines(pk, pr, sp) {
+    var price = sp && fxHasSpool(pk) ? +pk.spool_price : +pk.price;
+    var units = (pk.units | 0) || 4, unit = Math.round(price / Math.max(1, units) * 100) / 100, kind = sp && fxHasSpool(pk) ? 'spool' : (pk.kind || 'refill');
     var maxK = 0;
     lines.forEach(function (l) { var m = l.pack && /^k(\d+)$/.exec(l.pack.k || ''); if (m) maxK = Math.max(maxK, +m[1]); });
-    var pack = { id: pk.id, k: 'k' + (maxK + 1), n: 1, name: pk.name, name_en: pk.name_en || null, code: pk.code || null, price: +pk.price, kind: kind };
+    var pack = { id: pk.id, k: 'k' + (maxK + 1), n: 1, name: pk.name, name_en: pk.name_en || null, code: pk.code || null, price: price, kind: kind };
     var added = 0;
     (pr.lines || []).forEach(function (pl) {
       var hit = findProduct(pl.p); if (!hit || !(pl.n > 0)) return;
@@ -1088,8 +1093,8 @@
         var b = e.target.closest('.fx-packopt'); if (!b) return;
         if (b.hasAttribute('data-custom')) { customPackDialog(); return; }
         var pk =(fxPacks || []).filter(function (x) { return String(x.id) === b.getAttribute('data-pk'); })[0];
-        var pr = pk && (pk.presets || [])[+b.getAttribute("data-pr")];
-        if (pk && pr) { addPackLines(pk, pr); caDialog.toast(pk.name + ' · ' + pr.name + ' ajouté.'); }
+        var pr = pk && (pk.presets || [])[+b.getAttribute("data-pr")], sp = b.hasAttribute('data-sp');
+        if (pk && pr) { addPackLines(pk, pr, sp); caDialog.toast(pk.name + ' · ' + pr.name + (sp ? ' · avec bobine' : '') + ' ajouté.'); }
       });
     }
     if (!elPackHits) return;
@@ -1101,7 +1106,10 @@
         (Array.isArray(pk.presets) ? pk.presets : []).forEach(function (pr, i) {
           // pas les couleurs : chercher « noir » ne doit pas sortir tous les packs
           var hay = ['pack', pk.name, pk.name_en, pk.code, pr.name].join(' ');
-          if (window.CA.searchMatch ? window.CA.searchMatch(hay, q) : hay.toLowerCase().indexOf(q.toLowerCase()) !== -1) hits.push({ pk: pk, pr: pr, i: i });
+          if (window.CA.searchMatch ? window.CA.searchMatch(hay, q) : hay.toLowerCase().indexOf(q.toLowerCase()) !== -1) {
+            hits.push({ pk: pk, pr: pr, i: i });
+            if (fxHasSpool(pk)) hits.push({ pk: pk, pr: pr, i: i, sp: true });
+          }
         });
       });
       var cHay = 'pack personnalise personnalisable custom sur mesure';
@@ -1113,10 +1121,10 @@
       elPackHits.hidden = !any;
       elPackHits.innerHTML = !any ? '' : '<div class="pk-group-title"><span class="pk-gt-brand">Packs</span></div>' + hits.slice(0, 12).map(function (o) {
         var dots = (o.pr.lines || []).map(function (l) { var h = findProduct(l.p); return h ? swatchSVG(h.p.hex) : ''; }).join('');
-        return '<button type="button" class="fx-packopt" data-pk="' + esc(o.pk.id) + '" data-pr="' + o.i + '">' +
+        return '<button type="button" class="fx-packopt" data-pk="' + esc(o.pk.id) + '" data-pr="' + o.i + '"' + (o.sp ? ' data-sp="1"' : '') + '>' +
           '<span class="fx-packdots">' + dots + '</span>' +
-          '<span class="fx-packn"><b>' + esc(o.pk.name) + '</b> · ' + esc(o.pr.name) + (o.pk.enabled ? '' : ' <em>hors ligne</em>') + '</span>' +
-          '<span class="fx-packp">' + money(o.pk.price) + '</span></button>';
+          '<span class="fx-packn"><b>' + esc(o.pk.name) + '</b> · ' + esc(o.pr.name) + (o.sp ? ' · Avec bobine' : '') + (o.pk.enabled ? '' : ' <em>hors ligne</em>') + '</span>' +
+          '<span class="fx-packp">' + money(o.sp ? o.pk.spool_price : o.pk.price) + '</span></button>';
       }).join('') + custom;
     });
   }

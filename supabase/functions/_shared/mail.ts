@@ -278,7 +278,7 @@ export async function packImagePaths(db: any, rows: { pack?: any; pack_comp?: Re
   // deno-lint-ignore no-explicit-any
   const packs: Record<string, any> = {};
   try {
-    const { data } = await db.from("packs").select("id, image_path, presets").in("id", ids);
+    const { data } = await db.from("packs").select("id, image_path, spool_image_path, presets").in("id", ids);
     for (const p of data || []) packs[p.id] = p;
   } catch { return res; }
   const key = (m: Record<string, number>) => Object.keys(m).filter((k) => m[k] > 0).sort().map((k) => k + ":" + m[k]).join(",");
@@ -286,16 +286,19 @@ export async function packImagePaths(db: any, rows: { pack?: any; pack_comp?: Re
     const pk = r?.pack?.k ? packs[r.pack.id] : null;
     if (!pk) return;
     let path = "";
+    // pack « Avec bobine » d'un pack recharge (2026-11-19) : photos *_spool, sinon celles du pack
+    const sp = r.pack.kind === "spool";
     const k = r.pack_comp ? key(r.pack_comp) : "";
     if (k) {
       for (const pr of Array.isArray(pk.presets) ? pk.presets : []) {
-        if (!pr?.img) continue;
+        const im = (sp && pr?.img_spool) || pr?.img;
+        if (!im) continue;
         const m: Record<string, number> = {};
         for (const l of Array.isArray(pr.lines) ? pr.lines : []) if (l?.p && (l.n | 0) > 0) m[l.p] = (m[l.p] || 0) + (l.n | 0);
-        if (key(m) === k) { path = String(pr.img); break; }
+        if (key(m) === k) { path = String(im); break; }
       }
     }
-    res[i] = path || String(pk.image_path || "");
+    res[i] = path || String((sp && pk.spool_image_path) || pk.image_path || "");
   });
   return res;
 }
@@ -361,7 +364,7 @@ export function packGroup<T extends Record<string, any>>(lines: T[], en = false)
     const col = per + " × " + String(l.name ?? l.label ?? "");
     if (at[p.k] == null) {
       at[p.k] = out.length;
-      const name = (en && p.name_en) || p.name || "Pack";
+      const name = ((en && p.name_en) || p.name || "Pack") + (p.kind === "spool" ? (en ? " · With spool" : " · Avec bobine") : "");
       out.push({ ...l, name, label: name, qty: n, unit_price: Number(p.price) || 0, line_total: Number(l.line_total) || 0,
         qty_to_order: 0, qty_pending: Number(l.qty_pending) || 0, _cols: [col], pack_comp: {} });
       // (qty_to_order du pack : calculé plus bas, pour toutes ses lignes)

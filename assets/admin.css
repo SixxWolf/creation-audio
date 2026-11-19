@@ -2368,6 +2368,10 @@ a.ms-b-file:hover { border-color:var(--ink); }
 .pk-step b { min-width:1.2em; text-align:center; font-variant-numeric:tabular-nums; }
 .pk-pcf { font-size:.82rem; color:var(--muted); font-variant-numeric:tabular-nums; }
 .pk-photo { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.pk-calc-row { display:flex; flex-wrap:wrap; align-items:center; gap:4px; flex-basis:100%; }
+.pk-calc-k { font-weight:600; color:var(--muted); margin-right:4px; }
+.pk-spool-l { display:flex; align-items:center; gap:6px; cursor:pointer; }
+.pk-spool-l input { width:auto; margin:0; }
 .pk-photo img { width:140px; height:96px; object-fit:contain; border-radius:10px; background:var(--wash); }
 @media (max-width:640px) {
   .pk-row { flex-direction:column; align-items:stretch; }

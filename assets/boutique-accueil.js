@@ -144,8 +144,15 @@
         '<span class="mcard-tag">' + tn(units, spool ? '{n} bobine' : '{n} recharge', spool ? '{n} bobines' : '{n} recharges') + '</span>' +
         '<span class="mcard-foot"><span class="mcard-price"><b>' + money(+pk.price) + '</b> <span class="pack-mc-unit">' +
           money(unit) + ' ' + (spool ? _t('la bobine') : _t('la recharge')) + '</span></span></span>' +
+        spoolAlt(pk) +
       '</span>' +
     '</a>';
+  }
+  // « ou 70 $ avec bobine » : pack recharge aussi offert avec bobine (packs.spool_price, 2026-11-19)
+  function spoolAlt(pk, inline) {
+    if (pk.kind !== 'refill' || pk.spool_price == null || !(+pk.spool_price > 0)) return '';
+    var t = _t('ou {p} avec bobine', { p: money(+pk.spool_price) });
+    return inline ? ' · ' + t : '<span class="pack-alt">' + t + '</span>';
   }
   // Promos et nouveautés : une seule grille, promos d'abord (meilleur rabais en tête), puis nouveautés (packs d'abord)
   function renderDeals(rows, pks) {
@@ -218,7 +225,7 @@
     $('#bq-pack-art').innerHTML = art;
     $('#bq-pack-name').textContent = (en && pk.name_en) || pk.name;
     $('#bq-pack-meta').innerHTML = tn(units, spool ? '{n} bobine' : '{n} recharge', spool ? '{n} bobines' : '{n} recharges') + ' · <b>' + money(+pk.price) + '</b> · ' +
-      money(unit) + ' ' + (spool ? _t('la bobine') : _t('la recharge'));
+      money(unit) + ' ' + (spool ? _t('la bobine') : _t('la recharge')) + spoolAlt(pk, true);
     if (pk.slug) el.href = 'boutique/packs#/p/' + encodeURIComponent(pk.slug);
     el.hidden = false;
   }

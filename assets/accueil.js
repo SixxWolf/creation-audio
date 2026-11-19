@@ -443,6 +443,7 @@
         '<span class="pop-name">' + esc((CA0.lang === 'en' && pk.name_en) || pk.name) + '</span>' +
         '<span class="pop-meta"><span>' + tn(units, spool ? '{n} bobine' : '{n} recharge', spool ? '{n} bobines' : '{n} recharges') + '</span></span>' +
         '<span class="pop-foot"><span><b>' + money(+pk.price) + '</b> <span class="pk-unit">' + money(unit) + ' ' + (spool ? _t('la bobine') : _t('la recharge')) + '</span></span></span>' +
+        (!spool && pk.spool_price != null && +pk.spool_price > 0 ? '<span class="pk-alt">' + _t('ou {p} avec bobine', { p: money(+pk.spool_price) }) + '</span>' : '') +
         '</span></a>';
     }
     grid.innerHTML = promos.map(itemCard).concat(newPacks.map(packCard), news.map(itemCard)).slice(0, 8).join('');

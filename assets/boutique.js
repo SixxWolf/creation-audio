@@ -698,6 +698,31 @@
      ========================================================= */
   var packs = [], packById = {}, packsOk = false, packSel = {};
   function isPack(it) { return !!(it && it.type === 'pack'); }
+  // « Avec bobine » d'un pack recharge (2026-11-19) : même pack, prix spool_price, photos *_spool.
+  // packAs(pk, 'spool') rend une copie au format bobine (même id) ; le reste du code lit pk.kind / pk.price.
+  var spoolVar = {};
+  function packHasSpool(pk) { return !!pk && pk.kind === 'refill' && pk.spool_price != null && +pk.spool_price > 0; }
+  function packAs(pk, fmt) {
+    if (!pk || fmt !== 'spool' || !packHasSpool(pk)) return pk;
+    var v = spoolVar[pk.id];
+    if (v && v._src === pk) return v;
+    v = {}; Object.keys(pk).forEach(function (k) { v[k] = pk[k]; });
+    v.kind = 'spool'; v.price = +pk.spool_price; v._src = pk; v._fmt = 'spool';
+    v.image_path = pk.spool_image_path || pk.image_path;
+    v.presets = (Array.isArray(pk.presets) ? pk.presets : []).map(function (pr) {
+      var c = {}; Object.keys(pr || {}).forEach(function (k) { c[k] = pr[k]; }); c.img = pr && (pr.img_spool || pr.img); return c;
+    });
+    return (spoolVar[pk.id] = v);
+  }
+  function baseOfPack(pk) { return pk && pk._src || pk; }
+  function packOf(it) { var pk = packById[it.id]; return it.kind === 'spool' && pk && pk.kind !== 'spool' ? (packHasSpool(pk) ? packAs(pk, 'spool') : null) : pk; }
+  // supplément « Avec bobine » (ex. +10 $) et ligne grise des cartes (« ou 70 $ avec bobine »)
+  function spoolPlus(pk) { return Math.round((+pk.spool_price - +pk.price) * 100) / 100; }
+  function spoolAlt(pk, cls) {
+    return packHasSpool(pk) ? '<span class="pack-alt' + (cls ? ' ' + cls : '') + '">' + _t('ou {p} avec bobine', { p: money(+pk.spool_price) }) + '</span>' : '';
+  }
+  function fmtOf(pk) { var s = packSel[pk.id]; return s && s.fmt === 'spool' && packHasSpool(pk) ? 'spool' : 'refill'; }
+  function viewPack(pk) { return packAs(pk, fmtOf(pk)); }
   function enOr(fr, en) { return (window.CA.lang === 'en' && en) ? en : (fr || ''); }
   function packName(pk) { return enOr(pk.name, pk.name_en); }
   function packNote(pk) { return enOr(pk.note, pk.note_en); }
@@ -737,7 +762,7 @@
     return comp.slice().sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; })
       .map(function (c) { return c.id + ':' + c.n; }).join(',');
   }
-  function packKey(pk, comp) { return 'pack|' + pk.id + '|' + compKey(comp); }
+  function packKey(pk, comp) { return 'pack|' + pk.id + (pk.kind === 'spool' && pk._src ? '|spool' : '') + '|' + compKey(comp); }
   function compText(comp) {
     return comp.map(function (c) { var p = byId[c.id]; return c.n + ' × ' + (p ? p.name : '?'); }).join(' · ');
   }
@@ -745,7 +770,7 @@
   function packUse(pid, kind, skip) {
     return entries().reduce(function (s, it) {
       if (!isPack(it) || it.key === skip) return s;
-      var pk = packById[it.id]; if (!pk || pk.kind !== kind) return s;
+      var pk = packOf(it); if (!pk || pk.kind !== kind) return s;
       return s + (it.comp || []).reduce(function (t, c) { return t + (c.id === pid ? c.n * it.qty : 0); }, 0);
     }, 0);
   }
@@ -789,6 +814,7 @@
           '<span class="mcard-price"><b>' + money(+pk.price) + '</b> <span class="pack-mc-unit">' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></span>' +
           packStockPill(pk) +
         '</span>' +
+        spoolAlt(pk) +
       '</span>' +
     '</a>';
   }
@@ -797,7 +823,7 @@
     var bad = false;
     Object.keys(cart).forEach(function (k) {
       var it = cart[k]; if (!isPack(it)) return;
-      var pk = packById[it.id];
+      var pk = packOf(it);
       if (!pk || !compValid(pk, it.comp)) { delete cart[k]; bad = true; } else it.key = k;
     });
     if (bad) saveCart();
@@ -865,6 +891,7 @@
         '<span class="pack-mini-name">' + esc(packName(pk)) + '</span>' +
         '<span class="pack-mini-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
         '<span class="pack-mini-price"><b>' + money(+pk.price) + '</b> <span>' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></span>' +
+        spoolAlt(pk) +
         packStockPill(pk) +
       '</span>' +
       '<span class="pack-mini-go" aria-hidden="true">' + IC.arrow + '</span>' +
@@ -933,6 +960,7 @@
         '<span class="pack-tile-name">' + esc(packName(pk)) + '</span>' +
         '<span class="pack-tile-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
         '<span class="pack-tile-price"><b>' + money(+pk.price) + '</b> ' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span>' +
+        spoolAlt(pk) +
         packStockPill(pk) +
         '<span class="pack-tile-go">' + _t('Voir le pack') + ' ' + IC.arrow + '</span>' +
       '</span>' +
@@ -968,6 +996,7 @@
     return path ? publicUrl(path) : '';
   }
   function packImgs(pk) {
+    pk = viewPack(baseOfPack(pk));
     var comp = selComp(pk), u = packPhoto(pk, comp);
     var list = [{ url: u, art: u ? '' : packArt(pk, comp), alt: packName(pk) }], seen = {};
     // toutes les couleurs du pack, en tout temps (règle de Théo 2026-11-16 : le blanc reste visible même avec « 4 noires »),
@@ -1012,10 +1041,15 @@
   var packPre = {};
   function preloadPack(pk) {
     if (packPre[pk.id]) return; packPre[pk.id] = 1;
-    presetsOf(pk).forEach(function (pr) { if (pr.img) { var im = new Image(); im.src = publicUrl(pr.img); } });
+    (pk.presets || []).forEach(function (pr) {
+      [pr && pr.img, pr && pr.img_spool].forEach(function (u) { if (u) { var im = new Image(); im.src = publicUrl(u); } });
+    });
+    if (pk.spool_image_path) { var im2 = new Image(); im2.src = publicUrl(pk.spool_image_path); }
   }
-  function packCardHtml(pk) {
-    preloadPack(pk);
+  function packCardHtml(pk0) {
+    pk0 = baseOfPack(pk0);
+    preloadPack(pk0);
+    var pk = viewPack(pk0);
     var s = selOf(pk), pres = presetsOf(pk), comp = selComp(pk), units = packUnits(pk), soldOut = !packAnyStock(pk);
     var tiles = pres.map(function (pr) {
       // hors stock : toujours choisissable, sans « Épuisé » (le pack part « à commander », Théo 2026-11-18)
@@ -1084,11 +1118,19 @@
         '<h1 class="pdp-name">' + esc(packName(pk)) + '</h1>' +
         (pk.code ? _t('<p class="pdp-ref">Réf. ') + esc(pk.code) + '</p>' : '') +
         '<div class="pack-price"><b>' + money(+pk.price) + '</b><span>' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></div>' +
+        (packHasSpool(pk0) ? '<div class="fmt pack-fmts" role="group" aria-label="' + _t('Format') + '">' +
+          [['refill', _t('Recharge'), money(+pk0.price)], ['spool', _t('Avec bobine'), _t('+{p} seulement', { p: money(spoolPlus(pk0)) })]].map(function (f) {
+            var on = fmtOf(pk0) === f[0];
+            return '<button type="button" class="fmt-opt pack-fmt' + (on ? ' is-active' : '') + '" data-fmt="' + f[0] + '" aria-pressed="' + on + '">' +
+              '<span class="fmt-name">' + f[1] + '</span><span class="fmt-meta">' + f[2] + '</span></button>';
+          }).join('') + '</div>' : '') +
         (sv ? '<p class="pack-save">' + saveText(pk, sv) + '</p>' : '') +
         _t('<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>') +
         (note ? '<p class="pack-note">' + esc(note) + '</p>' : '') +
         // une seule composition, sans Personnaliser : la photo suffit, pas de tuile à choisir
-        (soldOut ? '<div class="pack-oos"><p class="pack-oos-t">' + _t('Ce pack est indisponible pour l\'instant. Il reviendra sous peu.') + '</p>' +
+        // « Avec bobine » hors stock : commandable, sans « indisponible » ni M'aviser (choix de Théo 2026-11-19)
+        (soldOut && pk._src ? '<p class="pack-bo">' + _t('À commander : réservé à la prochaine réception') + '</p>'
+          : soldOut ? '<div class="pack-oos"><p class="pack-oos-t">' + _t('Ce pack est indisponible pour l\'instant. Il reviendra sous peu.') + '</p>' +
           notifyHtml(packNotify(pk)) + '</div>' : '') +
         (tiles.length > 1 ? '<div class="pack-pres" role="group" aria-label="' + _t('Composition') + '">' + tiles.join('') + '</div>' : '') +
         custom +
@@ -1112,7 +1154,7 @@
   function takePending() {
     var v = null; try { v = JSON.parse(sessionStorage.getItem(PEND_K) || 'null'); } catch (e) {}
     setPending(null);
-    var pk = v && packById[v.id];
+    var pk = v && packOf({ id: v.id, kind: v.kind });
     if (pk && v.comp && compValid(pk, v.comp)) putPack(pk, v.comp);
   }
   function addPack(pk, comp) {
@@ -1120,13 +1162,13 @@
     if (packRoom(pk, comp, null) >= 1) { putPack(pk, comp); return; }
     var on = canBackorder();
     caDialog.confirm({
-      title: _t('Pack indisponible pour l\'instant'),
+      title: pk._src ? _t('Pack avec bobine à commander') : _t('Pack indisponible pour l\'instant'),
       message: _t('Ajoute-le au panier et envoie ta commande avec ton compte : on te le réserve automatiquement dès la prochaine réception des packs.'),
       ok: on ? _t('Ajouter au panier') : _t('Me connecter'), cancel: _t('Retour'), icon: 'cart'
     }).then(function (ok) {
       if (ok !== true) return;
       if (on) { putPack(pk, comp); return; }
-      setPending({ id: pk.id, comp: comp.map(function (c) { return { id: c.id, n: c.n }; }) });
+      setPending({ id: pk.id, kind: pk.kind === 'spool' && pk._src ? 'spool' : undefined, comp: comp.map(function (c) { return { id: c.id, n: c.n }; }) });
       window.CA.panierCompte.open(false);
     });
   }
@@ -1134,13 +1176,15 @@
     var k = packKey(pk, comp), cur = cart[k] ? cart[k].qty : 0;
     if (cur >= 20) { toast(_t('Maximum au panier')); return; }
     cart[k] = { id: pk.id, type: 'pack', key: k, comp: comp.map(function (c) { return { id: c.id, n: c.n }; }), qty: cur + 1 };
-    saveCart(); renderCart(); updatePackCard(pk); pulseCart();
+    if (pk.kind === 'spool' && pk._src) cart[k].kind = 'spool';
+    saveCart(); renderCart(); updatePackCard(baseOfPack(pk)); pulseCart();
     toast(packName(pk) + _t(' ajouté au panier.'));
   }
   document.addEventListener('click', function (e) {
-    var t = e.target && e.target.closest ? e.target.closest('.pack-pre, .pack-step button, .pack-add, .pk-thumb, .pk-stage') : null;
+    var t = e.target && e.target.closest ? e.target.closest('.pack-pre, .pack-fmt, .pack-step button, .pack-add, .pk-thumb, .pk-stage') : null;
     if (!t || t.disabled || !screenPack || !screenPack.contains(t) || !curPack) return;
     var pk = curPack, s = selOf(pk);
+    if (t.classList.contains('pack-fmt')) { s.fmt = t.getAttribute('data-fmt'); pkImg = 0; updatePackCard(pk); return; }
     if (t.classList.contains('pk-stage')) {
       if (t.tagName !== 'BUTTON') return;
       var imgs = packImgs(pk), urls = [], at = 0;
@@ -1153,7 +1197,7 @@
       return;
     }
     if (t.classList.contains('pack-pre')) { s.sel = t.getAttribute('data-pre'); pkImg = 0; updatePackCard(pk); return; }
-    if (t.classList.contains('pack-add')) { addPack(pk, selComp(pk)); return; }
+    if (t.classList.contains('pack-add')) { addPack(viewPack(pk), selComp(pk)); return; }
     var pid = t.getAttribute('data-p'), d = +t.getAttribute('data-d');
     s.custom[pid] = Math.max(0, (s.custom[pid] | 0) + d);
     pkImg = 0;
@@ -1994,7 +2038,7 @@
   function saveCart() { try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) {} }
   function keyOf(id, type) { return id + '|' + type; }
 
-  function metaOf(it) { return it.type === 'accessory' ? accById[it.id] : isPack(it) ? packById[it.id] : byId[it.id]; }
+  function metaOf(it) { return it.type === 'accessory' ? accById[it.id] : isPack(it) ? packOf(it) : byId[it.id]; }
   function cartKeyOf(it) { return it.key || keyOf(it.id, it.type); }
   // unités de pack de la marque `g` dans le panier : comptent pour le palier des autres filaments (option B)
   function packGroupUnits(g) {
@@ -2036,13 +2080,13 @@
   }
   function unitOf(it) {
     if (it.type === 'accessory') { var a = accById[it.id]; return a ? tierPrice(a.price, a.tiers, accGroupQty(a)) : 0; }
-    if (isPack(it)) { var pk = packById[it.id]; return pk ? +pk.price : 0; }
+    if (isPack(it)) { var pk = packOf(it); return pk ? +pk.price : 0; }
     var p = byId[it.id]; if (!p) return 0;
     return tierPrice(baseOf(p, it.type), tiersOf(p, it.type), groupQty(p, it.type));
   }
   function maxOf(it) {
     if (it.type === 'accessory') { var a = accById[it.id]; return accCanBO(a) ? BO_MAX : a && a.qty != null ? a.qty : Infinity; }
-    if (isPack(it)) { var pk = packById[it.id]; return !pk ? 0 : canBackorder() ? 20 : packRoom(pk, it.comp, it.key); }
+    if (isPack(it)) { var pk = packOf(it); return !pk ? 0 : canBackorder() ? 20 : packRoom(pk, it.comp, it.key); }
     if (canBackorder()) return BO_MAX;
     var p = byId[it.id]; return p ? freeStock(p, it.type) : it.qty;
   }
@@ -2204,13 +2248,13 @@
   }
   // pack du panier au-delà du stock (les packs passent avant les lignes ordinaires, dans l'ordre du panier)
   function packOver(it) {
-    var pk = packById[it.id]; if (!pk || !it.comp) return false;
+    var pk = packOf(it); if (!pk || !it.comp) return false;
     return it.comp.some(function (c) {
       var p = byId[c.id]; if (!p) return true;
       var prior = 0;
       entries().some(function (o) {
         if (o.key === it.key) return true;
-        if (isPack(o) && packById[o.id] && packById[o.id].kind === pk.kind)
+        if (isPack(o) && packOf(o) && packOf(o).kind === pk.kind)
           (o.comp || []).forEach(function (x) { if (x.id === c.id) prior += x.n * o.qty; });
         return false;
       });
@@ -2254,7 +2298,7 @@
             '<div class="citem-thumb">' + thumbHtml(it) + '</div>' +
             '<div class="citem-main">' +
               '<div class="citem-name">' + esc(name) + '</div>' +
-              '<div class="citem-type">' + (pack ? esc(compText(it.comp)) + ' · <span class="citem-unit">' + money(unitOf(it)) + _t(' le pack') + '</span>' + boTag(it)
+              '<div class="citem-type">' + (pack ? esc(compText(it.comp)) + (m.kind === 'spool' || packHasSpool(m) ? ' · ' + (m.kind === 'spool' ? _t('Avec bobine') : _t('Recharge')) : '') + ' · <span class="citem-unit">' + money(unitOf(it)) + _t(' le pack') + '</span>' + boTag(it)
                 : (it.type === 'accessory' ? esc(m.cat || _t('Accessoire')) : esc(m.material || '') + ' · ' + typeLabel(it)) +
                 ' · <span class="citem-unit">' + money(unitOf(it)) + '/u</span>' + boTag(it)) + '</div>' +
               '<div class="citem-qty">' +
@@ -2464,7 +2508,7 @@
   // lignes envoyées au serveur ; un pack = { pack_id, qty, comp: [{ product_id, qty: unités par pack }] }
   function orderLines() {
     return entries().map(function (it) {
-      if (isPack(it)) return { pack_id: it.id, qty: it.qty, comp: it.comp.map(function (c) { return { product_id: c.id, qty: c.n }; }) };
+      if (isPack(it)) return { pack_id: it.id, kind: it.kind === 'spool' ? 'spool' : undefined, qty: it.qty, comp: it.comp.map(function (c) { return { product_id: c.id, qty: c.n }; }) };
       return { product_id: it.id, kind: it.type === 'accessory' ? 'unit' : it.type, qty: it.qty };
     });
   }

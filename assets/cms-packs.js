@@ -40,7 +40,8 @@
       kindSeg = $('#pk-kind'), unitsI = $('#pk-units'), priceI = $('#pk-price'), calcEl = $('#pk-calc'),
       customI = $('#pk-custom'), featI = $('#pk-featured'), qI = $('#pk-q'), colorsEl = $('#pk-colors'),
       presetsEl = $('#pk-presets'), photoEl = $('#pk-photo'), fileI = $('#pk-file'),
-      saveBtn = $('#pk-save'), statusEl = $('#pk-status');
+      saveBtn = $('#pk-save'), statusEl = $('#pk-status'),
+      spoolF = $('#pk-spool-f'), spoolOnI = $('#pk-spool-on'), spoolPriceI = $('#pk-spool-price'), photoSpoolEl = $('#pk-photo-spool');
 
   var packs = [], fils = [], byId = {}, matOrder = {}, brandOrder = {}, mats = {};
   var loaded = false, editingId = null;
@@ -125,6 +126,7 @@
             '<span class="pm-state' + (pk.enabled ? ' s-on' : '') + '">' + (pk.enabled ? 'En ligne' : 'Hors ligne') + '</span>' +
             (pk.featured ? '<span class="pm-tag">En haut de Filaments</span>' : '') + '</div>' +
           '<div class="pm-meta">' + (pk.code ? esc(pk.code) + ' · ' : '') + money(+pk.price) + ' · ' + units + ' ' + unitWord(pk.kind, units) + ' · ' + money(unit) + ' l\'unité' +
+            (pk.kind === 'refill' && pk.spool_price != null ? ' · avec bobine ' + money(+pk.spool_price) : '') +
             (pk.allow_custom ? ' · personnalisable' : '') + '</div>' +
           '<div class="pk-cols">' + cols.map(function (p) { return '<span class="pk-col">' + dot(p) + esc(p.name) + '</span>'; }).join('') + '</div>' +
           (pres ? '<div class="pk-pres">' + pres + '</div>' : '') +
@@ -219,6 +221,14 @@
       var on = b.getAttribute('data-kind') === st.kind;
       b.classList.toggle('is-active', on); b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
+    syncSpool();
+  }
+  // « Avec bobine » d'un pack recharge (2026-11-19) : prix à part, vide = pas offert
+  function spoolOn() { return !!st && st.kind === 'refill' && spoolOnI.checked; }
+  function syncSpool() {
+    spoolF.hidden = !(st && st.kind === 'refill');
+    spoolPriceI.disabled = !spoolOnI.checked;
+    photoSpoolEl.hidden = !spoolOn();
   }
   function openEditor(pk) {
     if (!loaded) return;
@@ -233,17 +243,20 @@
     priceI.value = pk ? +pk.price : '';
     customI.checked = pk ? pk.allow_custom : true;
     featI.checked = pk ? pk.featured : true;
+    spoolOnI.checked = !!(pk && pk.spool_price != null);
+    spoolPriceI.value = pk && pk.spool_price != null ? +pk.spool_price : '';
     st = {
       kind: 'refill',
       colors: pk ? (pk.colors || []).filter(function (id) { return byId[id]; }) : [],
-      presets: pk ? (pk.presets || []).map(function (pr) { return { id: pr.id || uid(), name: pr.name || '', name_en: pr.name_en || '', img: pr.img || null, lines: linesObj(pr) }; }) : [],
-      image: pk ? pk.image_path || null : null
+      presets: pk ? (pk.presets || []).map(function (pr) { return { id: pr.id || uid(), name: pr.name || '', name_en: pr.name_en || '', img: pr.img || null, img_spool: pr.img_spool || null, lines: linesObj(pr) }; }) : [],
+      image: pk ? pk.image_path || null : null,
+      spoolImage: pk ? pk.spool_image_path || null : null
     };
     setKind(pk ? pk.kind : 'refill');
     syncCustom();
     imgFile = null; if (imgBlob) { URL.revokeObjectURL(imgBlob); imgBlob = ''; }
     qI.value = ''; statusEl.textContent = '';
-    renderColors(); renderPresets(); renderCalc(); renderPhoto();
+    renderColors(); renderPresets(); renderCalc(); renderPhoto(); renderSpoolPhoto();
     var docked = !!(window.CA.dockEditor && window.CA.dockEditor(editor));
     editor.hidden = false;
     if (docked) { nameI.focus({ preventScroll: true }); editor.parentNode.scrollTop = 0; return; }
@@ -257,22 +270,27 @@
 
   function unitsVal() { var n = parseInt(unitsI.value, 10); return isFinite(n) ? Math.max(1, Math.min(20, n)) : 4; }
   function renderCalc() {
-    var price = num(priceI.value), units = unitsVal();
-    if (price == null || price <= 0) { calcEl.innerHTML = '<span class="muted">—</span>'; return; }
+    var a = '<span class="pk-calc-row">' + calcLine(num(priceI.value), st.kind) + '</span>';
+    if (spoolOn()) a += '<span class="pk-calc-row"><span class="pk-calc-k">Avec bobine</span> ' + calcLine(num(spoolPriceI.value), 'spool') + '</span>';
+    calcEl.innerHTML = a;
+  }
+  function calcLine(price, kind) {
+    var units = unitsVal();
+    if (price == null || price <= 0) return '<span class="muted">—</span>';
     var unit = r2(price / units), exact = Math.abs(unit * units - price) < 0.001;
     var cols = st.colors.map(function (id) { return byId[id]; }).filter(Boolean);
-    var costs = cols.map(function (p) { return costOf(p, st.kind); }).filter(function (c) { return c != null; });
+    var costs = cols.map(function (p) { return costOf(p, kind); }).filter(function (c) { return c != null; });
     var cost = costs.length ? costs.reduce(function (s, c) { return s + c; }, 0) / costs.length : null;
-    var regs = cols.map(function (p) { return regPrice(p, st.kind); }).filter(function (c) { return c != null; });
+    var regs = cols.map(function (p) { return regPrice(p, kind); }).filter(function (c) { return c != null; });
     var reg = regs.length ? Math.min.apply(null, regs) : null;
-    var h = '<b>' + money(unit) + '</b> la ' + (st.kind === 'spool' ? 'bobine' : 'recharge');
+    var h = '<b>' + money(unit) + '</b> la ' + (kind === 'spool' ? 'bobine' : 'recharge');
     if (!exact) h += ' · <span class="neg">ne tombe pas au cent près</span>';
     if (reg != null && unit < reg) h += ' · −' + Math.round((1 - unit / reg) * 100) + ' %';
     if (cost != null) {
       var m = (unit - cost) / unit * 100;
       h += ' · <span class="' + (m < 0 ? 'neg' : 'pos') + '">Marge ' + Math.round(m) + ' % (' + money(r2((unit - cost) * units)) + ')</span>';
     }
-    calcEl.innerHTML = h;
+    return h;
   }
 
   // « Personnaliser » : noir et blanc seulement (règle de Théo, 2026-11-16) — une couleur => compositions fixes
@@ -329,6 +347,9 @@
           (pr.img ? '<img class="pk-pimg" src="' + esc(publicUrl(pr.img)) + '" alt="">' : '') +
           '<button type="button" class="btn btn-ghost btn-sm" data-pimg="' + i + '" data-ic="plus">' + (pr.img ? 'Changer' : 'Photo') + '</button>' +
           (pr.img ? '<button type="button" class="btn btn-ghost btn-sm" data-pimgdel="' + i + '" aria-label="Retirer la photo">×</button>' : '') +
+          (spoolOn() ? (pr.img_spool ? '<img class="pk-pimg" src="' + esc(publicUrl(pr.img_spool)) + '" alt="" title="Avec bobine">' : '') +
+            '<button type="button" class="btn btn-ghost btn-sm" data-pimg="' + i + '" data-spool="1" data-ic="plus">' + (pr.img_spool ? 'Changer bobine' : 'Photo bobine') + '</button>' +
+            (pr.img_spool ? '<button type="button" class="btn btn-ghost btn-sm" data-pimgdel="' + i + '" data-spool="1" aria-label="Retirer la photo avec bobine">×</button>' : '') : '') +
           '<button type="button" class="btn btn-ghost btn-sm" data-pdel="' + i + '" data-ic="trash" aria-label="Retirer"></button>' +
         '</div>' +
         '<div class="pk-steps">' + (cols.length ? cols.map(function (p) {
@@ -351,8 +372,8 @@
   presetsEl.addEventListener('click', function (e) {
     var del = e.target.closest('[data-pdel]'), stp = e.target.closest('[data-st]');
     var pim = e.target.closest('[data-pimg]'), pimDel = e.target.closest('[data-pimgdel]');
-    if (pimDel) { st.presets[+pimDel.getAttribute('data-pimgdel')].img = null; renderPresets(); return; }
-    if (pim) { pickPresetImg(st.presets[+pim.getAttribute('data-pimg')], pim); return; }
+    if (pimDel) { st.presets[+pimDel.getAttribute('data-pimgdel')][pimDel.hasAttribute('data-spool') ? 'img_spool' : 'img'] = null; renderPresets(); return; }
+    if (pim) { pickPresetImg(st.presets[+pim.getAttribute('data-pimg')], pim, pim.hasAttribute('data-spool') ? 'img_spool' : 'img'); return; }
     if (del) { st.presets.splice(+del.getAttribute('data-pdel'), 1); renderPresets(); return; }
     if (stp) {
       var pr = st.presets[+stp.closest('.pk-pc').getAttribute('data-i')], pid = stp.getAttribute('data-p');
@@ -408,7 +429,7 @@
     renderPhoto();
   });
   // photo d'une composition (montrée quand le client la choisit) : envoyée tout de suite
-  function pickPresetImg(pr, btn) {
+  function pickPresetImg(pr, btn, field, done) {
     var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
     inp.addEventListener('change', function () {
       var f = inp.files && inp.files[0]; if (!f) return;
@@ -416,11 +437,23 @@
       var path = 'packs/' + Date.now() + '-' + uid() + '.' + ext;
       btn.disabled = true; statusEl.textContent = 'Envoi de la photo…';
       sb.storage.from(BUCKET).upload(path, f, { cacheControl: '3600', upsert: false, contentType: f.type || undefined })
-        .then(function (res) { if (res.error) throw res.error; pr.img = path; statusEl.textContent = ''; renderPresets(); })
+        .then(function (res) { if (res.error) throw res.error; pr[field || 'img'] = path; statusEl.textContent = ''; (done || renderPresets)(); })
         .catch(function (err) { statusEl.textContent = ''; btn.disabled = false; caDialog.error(err); });
     });
     inp.click();
   }
+  // photo du pack avec bobine : envoyée tout de suite, comme celles des compositions
+  function renderSpoolPhoto() {
+    var src = st.spoolImage ? publicUrl(st.spoolImage) : '';
+    photoSpoolEl.innerHTML = '<span class="pk-calc-k">Avec bobine</span>' + (src ? '<img src="' + esc(src) + '" alt="">' : '') +
+      '<button type="button" class="btn btn-ghost btn-sm" data-sph="pick" data-ic="plus">' + (src ? 'Changer' : 'Ajouter') + '</button>' +
+      (src ? '<button type="button" class="btn btn-ghost btn-sm" data-sph="del" data-ic="trash">Retirer</button>' : '');
+  }
+  photoSpoolEl.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-sph]'); if (!b) return;
+    if (b.getAttribute('data-sph') === 'del') { st.spoolImage = null; renderSpoolPhoto(); return; }
+    pickPresetImg(st, b, 'spoolImage', renderSpoolPhoto);
+  });
   function uploadImg() {
     if (!imgFile) return Promise.resolve(null);
     var ext = (imgFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
@@ -429,7 +462,12 @@
       .then(function (res) { if (res.error) throw res.error; return path; });
   }
 
-  [unitsI, priceI].forEach(function (el) { el.addEventListener('input', function () { renderCalc(); if (el === unitsI) renderPresets(); }); });
+  [unitsI, priceI, spoolPriceI].forEach(function (el) { el.addEventListener('input', function () { renderCalc(); if (el === unitsI) renderPresets(); }); });
+  spoolOnI.addEventListener('change', function () {
+    if (spoolOnI.checked && !spoolPriceI.value) { var p = num(priceI.value); if (p) spoolPriceI.value = r2(p + 10); }
+    syncSpool(); renderCalc(); renderPresets(); renderSpoolPhoto();
+    if (spoolOnI.checked) spoolPriceI.focus();
+  });
   kindSeg.addEventListener('click', function (e) {
     var b = e.target.closest('[data-kind]'); if (!b) return;
     setKind(b.getAttribute('data-kind')); renderColors(); renderPresets(); renderCalc();
@@ -443,9 +481,16 @@
     if (price == null || price <= 0) { statusEl.textContent = 'Prix requis.'; priceI.focus(); return; }
     price = r2(price);
     if (Math.abs(r2(price / units) * units - price) > 0.001) { statusEl.textContent = 'Le prix doit se diviser au cent près par ' + units + '.'; priceI.focus(); return; }
+    var spoolPrice = null;
+    if (spoolOn()) {
+      spoolPrice = num(spoolPriceI.value);
+      if (spoolPrice == null || spoolPrice <= 0) { statusEl.textContent = 'Prix avec bobine requis.'; spoolPriceI.focus(); return; }
+      spoolPrice = r2(spoolPrice);
+      if (Math.abs(r2(spoolPrice / units) * units - spoolPrice) > 0.001) { statusEl.textContent = 'Le prix avec bobine doit se diviser au cent près par ' + units + '.'; spoolPriceI.focus(); return; }
+    }
     if (!st.colors.length) { statusEl.textContent = 'Choisis au moins une couleur.'; return; }
     var presets = st.presets.map(function (pr) {
-      return { id: pr.id, name: pr.name.trim(), name_en: pr.name_en.trim() || null, img: pr.img || null,
+      return { id: pr.id, name: pr.name.trim(), name_en: pr.name_en.trim() || null, img: pr.img || null, img_spool: pr.img_spool || null,
         lines: st.colors.filter(function (id) { return pr.lines[id] > 0; }).map(function (id) { return { p: id, n: pr.lines[id] }; }) };
     });
     for (var i = 0; i < presets.length; i++) {
@@ -456,6 +501,7 @@
     if (!presets.length && !customI.checked) { statusEl.textContent = 'Ajoute une composition ou permets « Personnaliser ».'; return; }
     var cols = st.colors.map(function (id) { return byId[id]; });
     var below = cols.filter(function (p) { var c = costOf(p, st.kind); return c != null && r2(price / units) < c; }).map(function (p) { return p.name; });
+    if (spoolPrice != null) cols.forEach(function (p) { var c = costOf(p, 'spool'); if (c != null && r2(spoolPrice / units) < c) below.push(p.name + ' (bobine)'); });
     var go = below.length
       ? caDialog.confirm({ title: 'Prix sous le coût', message: below.join(', ') + ' se vendraient sous le coût moyen.', ok: 'Enregistrer quand même', cancel: 'Corriger', danger: true })
       : Promise.resolve(true);
@@ -465,7 +511,9 @@
       var row = {
         name: name, name_en: nameEnI.value.trim() || null, code: codeI.value.trim().toUpperCase() || null, note: noteI.value.trim() || null, note_en: noteEnI.value.trim() || null,
         kind: st.kind, units: units, price: price, colors: st.colors.slice(), presets: presets,
-        allow_custom: customI.checked && bwOnly(), featured: featI.checked, updated_at: new Date().toISOString()
+        allow_custom: customI.checked && bwOnly(), featured: featI.checked, updated_at: new Date().toISOString(),
+        spool_price: st.kind === 'refill' ? spoolPrice : null,
+        spool_image_path: st.kind === 'refill' && spoolPrice != null ? st.spoolImage || null : null
       };
       if (!old) {
         var base = slugify(name), slug = base, n = 2, taken = packs.map(function (x) { return x.slug; });

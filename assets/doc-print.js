@@ -154,7 +154,7 @@
       var n = Math.max(1, +pk.n || 1), col = Math.round((+l.qty || 0) / n) + ' × ' + (l.label || l.name || '');
       var g = at[pk.k];
       if (!g) {
-        g = at[pk.k] = { pack: pk, label: (window.CA.lang === 'en' && pk.name_en) || pk.name || 'Pack', qty: n, unit_price: +pk.price || 0,
+        g = at[pk.k] = { pack: pk, label: ((window.CA.lang === 'en' && pk.name_en) || pk.name || 'Pack') + (pk.kind === 'spool' ? (window.CA.lang === 'en' ? ' · With spool' : ' · Avec bobine') : ''), qty: n, unit_price: +pk.price || 0,
           line_total: 0, qty_pending: 0, cols: [], img: pk.img || l.img || null };
         out.push(g);
       }

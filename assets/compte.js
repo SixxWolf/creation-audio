@@ -405,7 +405,7 @@
       if (!g) {
         g = seen[pk.k] = { pack: pk, product_id: null, qty: +pk.n || 1, unit_price: +pk.price || 0, line_total: 0,
           qty_to_order: 0, qty_pending: 0, members: [], hexes: [] };
-        g[lab] = (CA.lang === 'en' && pk.name_en) || pk.name || _t('Pack');
+        g[lab] = ((CA.lang === 'en' && pk.name_en) || pk.name || _t('Pack')) + (pk.kind === 'spool' ? ' · ' + _t('Avec bobine') : '');
         out.push(g);
       }
       g.line_total += +l.line_total || 0;
@@ -446,6 +446,7 @@
         if (l.ptype === 'spacer') return;
         if (l.pack && l.pack.k && l.pack.id) {   // pack : une ligne de panier par pack (même clé que boutique.js) ; pack personnalisé (sans id) = lignes à l'unité
           var pg = packs[l.pack.k] || (packs[l.pack.k] = { id: l.pack.id, type: 'pack', comp: [], qty: +l.pack.n || 1 });
+          if (l.pack.kind === 'spool') pg.kind = 'spool';   // pack « Avec bobine » (2026-11-19) : même clé que boutique.js
           pg.comp.push({ id: l.product_id, n: Math.round(+l.qty / (+l.pack.n || 1)) });
           return;
         }
@@ -455,7 +456,7 @@
       Object.keys(packs).forEach(function (k) {
         var g = packs[k];
         g.comp.sort(function (a, b) { return a.id < b.id ? -1 : a.id > b.id ? 1 : 0; });
-        g.key = 'pack|' + g.id + '|' + g.comp.map(function (c) { return c.id + ':' + c.n; }).join(',');
+        g.key = 'pack|' + g.id + (g.kind === 'spool' ? '|spool' : '') + '|' + g.comp.map(function (c) { return c.id + ':' + c.n; }).join(',');
         if (cart[g.key]) cart[g.key].qty += g.qty; else cart[g.key] = g;
       });
       try {

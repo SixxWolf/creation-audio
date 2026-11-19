@@ -451,7 +451,7 @@
       // pack (2026-11-16) : ses lignes restent groupées ; seule la quantité de packs se modifie
       if (l.pack && l.pack.k && l.pack.id) {   // pack personnalisé de la Facturation (sans id) : lignes à l'unité
         var g = packs[l.pack.k];
-        if (!g) { g = packs[l.pack.k] = { pack: l.pack, kind: 'pack', pid: l.pack.id, name: l.pack.name || 'Pack', meta: '', qty: +l.pack.n || 1, comp: [] }; items.push(g); }
+        if (!g) { g = packs[l.pack.k] = { pack: l.pack, kind: 'pack', pid: l.pack.id, name: (l.pack.name || 'Pack') + (l.pack.kind === 'spool' ? ' · Avec bobine' : ''), meta: '', qty: +l.pack.n || 1, comp: [] }; items.push(g); }
         var per = Math.round((l.qty | 0) / (+l.pack.n || 1));
         g.comp.push({ product_id: l.product_id, qty: per });
         g.meta = (g.meta ? g.meta + ' · ' : '') + per + ' × ' + l.name;
@@ -551,7 +551,7 @@
 
   function linesPayload() {
     return editing.items.map(function (it) {
-      return it.kind === 'pack' ? { pack_id: it.pid, qty: it.qty, comp: it.comp } : { product_id: it.pid, kind: it.kind, qty: it.qty };
+      return it.kind === 'pack' ? { pack_id: it.pid, kind: it.pack && it.pack.kind === 'spool' ? 'spool' : undefined, qty: it.qty, comp: it.comp } : { product_id: it.pid, kind: it.kind, qty: it.qty };
     });
   }
 
