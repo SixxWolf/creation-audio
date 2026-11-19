@@ -87,5 +87,5 @@
     return '<span class="pop-tag' + (inline ? '' : ' is-abs') + '">' + STAR + _t('Populaire') + '</span>';
   }
   CA.promo = { pct: pct, pctText: pctText, endText: endText, nameOf: nameOf, ribbon: ribbon, banner: banner, isNew: isNew, newTag: newTag,
-               loadPopular: loadPopular, isPop: isPop, popTag: popTag, star: STAR, isBack: isBack, backTag: backTag };
+               loadPopular: loadPopular, isPop: isPop, popTag: popTag, star: STAR, isBack: isBack, backTag: backTag, backIcon: BACK };
 })();

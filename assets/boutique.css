@@ -875,6 +875,10 @@ body.cart-lock { overflow:hidden; }
 .sw-pop { position:absolute; left:-4px; top:-4px; width:17px; height:17px; display:grid; place-items:center; border-radius:50%; color:var(--on-pop);
   background:linear-gradient(135deg, var(--pop-2), var(--pop)); border:2px solid #fff; pointer-events:none; }
 .sw-pop svg { width:9px; height:9px; fill:currentColor; }
+/* « De retour » sur une couleur de la fiche (2026-11-19) : coin bas-droit (étoile = haut-gauche, point promo = haut-droit) */
+.sw-back { position:absolute; right:-4px; bottom:-4px; width:17px; height:17px; display:grid; place-items:center; border-radius:50%; color:var(--on-back);
+  background:linear-gradient(135deg, var(--back-2), var(--back)); border:2px solid #fff; pointer-events:none; }
+.sw-back svg { width:9px; height:9px; }
 @media (max-width:640px) {
   .pop-tag { padding:4px 8px 4px 7px; font-size:.66rem; } .pop-tag svg { width:10px; height:10px; }
   .pop-tag.is-abs { right:8px; top:8px; } .mcard-brand + .pop-tag.is-abs { top:36px; }

@@ -101,8 +101,8 @@
     return order.map(function (k) { return map[k]; });
   }
   // pastille « Populaire » (promo.js, chargée dans load()) : coin haut-droit, sous le logo de marque
-  // + pastille « De retour » (même chargement, coin bas-gauche, 2026-11-19)
-  function popT(kind, ref) { return (PR && PR.isPop && PR.isPop(kind, ref) ? PR.popTag() : '') + (PR && PR.isBack && PR.isBack(kind, ref) ? PR.backTag() : ''); }
+  // + pastille « De retour » (même chargement, coin bas-gauche, 2026-11-19) — jamais sur une carte matériau (Théo 2026-11-19)
+  function popT(kind, ref) { return (PR && PR.isPop && PR.isPop(kind, ref) ? PR.popTag() : '') + (kind !== 'material' && PR && PR.isBack && PR.isBack(kind, ref) ? PR.backTag() : ''); }
   // une carte : ruban % si promo, pastille « Nouveau » si nouveau (les deux possibles, choix de Théo 2026-11-17)
   function card(g) {
     var p = g.p, isF = p.type === 'filament', promo = g.pc > 0;

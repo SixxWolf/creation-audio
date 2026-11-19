@@ -286,11 +286,11 @@
   }
 
   // pastille « Populaire » (promo.js) : coin haut-droit de la photo (sous le logo), ou en ligne après le nom
-  // + pastille « De retour » (même chargement, coin bas-gauche ou en ligne, 2026-11-19)
+  // + pastille « De retour » (même chargement, coin bas-gauche ou en ligne, 2026-11-19) — jamais sur une carte matériau (Théo 2026-11-19)
   function popT(kind, ref, inline) {
     var P = window.CA.promo;
     return (P && P.isPop && P.isPop(kind, ref) ? (inline ? ' ' : '') + P.popTag(inline) : '') +
-      (P && P.isBack && P.isBack(kind, ref) ? (inline ? ' ' : '') + P.backTag(inline) : '');
+      (kind !== 'material' && P && P.isBack && P.isBack(kind, ref) ? (inline ? ' ' : '') + P.backTag(inline) : '');
   }
   function matCard(g) {
     var band = g.stock.slice().sort(hueSort).slice(0, 28).map(function (p, i) {

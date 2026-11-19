@@ -139,8 +139,9 @@
   /* ---------- promotions (vues products_public : sell_price = prix promo, reg_price = prix normal) ---------- */
   var PR = window.CA.promo;
   // pastille « Populaire » (promo.js, RPC popular_items, chargée dans load()) : coin haut-droit, sous le logo de marque
-  // + pastille « De retour » (même chargement, coin bas-gauche, 2026-11-19)
-  function popT(kind, ref) { return (PR.isPop && PR.isPop(kind, ref) ? PR.popTag() : '') + (PR.isBack && PR.isBack(kind, ref) ? PR.backTag() : ''); }
+  // + pastille « De retour » (même chargement, coin bas-gauche, 2026-11-19) — jamais sur une carte matériau :
+  // pour les filaments, elle va sur les pastilles de couleur de la fiche (.sw-back), comme l'étoile Populaire (Théo 2026-11-19)
+  function popT(kind, ref) { return (PR.isPop && PR.isPop(kind, ref) ? PR.popTag() : '') + (kind !== 'material' && PR.isBack && PR.isBack(kind, ref) ? PR.backTag() : ''); }
   function isBackIn(kind, ref) { return !!(PR.isBack && PR.isBack(kind, ref)); }
   function isPopular(kind, ref) { return !!(PR.isPop && PR.isPop(kind, ref)); }
   function promoOn(p, type) { return !!(p && p.promo_id && (type === 'refill' ? p.promo_on_2 : p.promo_on)); }
@@ -1363,11 +1364,13 @@
     // pastilles dans l'ordre de l'admin (sort_order), ruptures comprises (barrées)
     var items = m.items.slice();
     var swatches = items.map(function (it) {
-      var on = it === p, o = !inStockAs(it, curType), pop = isPopular('color', it.id);
+      var on = it === p, o = !inStockAs(it, curType), pop = isPopular('color', it.id), bk = isBackIn('color', it.id);
+      var tags = (pop ? ' · ' + _t('Populaire') : '') + (bk ? ' · ' + _t('De retour') : '');
       return '<button type="button" class="sw' + (on ? ' is-active' : '') + (o ? ' is-out' : '') + (promoOn(it, curType) ? ' is-promo' : '') + '" data-id="' + esc(it.id) + '"' +
-        ' style="--c:' + esc(swatchBg(it)) + '" aria-label="' + esc(it.name + (pop ? ' — ' + _t('Populaire') : '') + ' — ' + swStockText(it)) + '" aria-pressed="' + on + '"' +
-        (pop ? ' title="' + esc(it.name + ' · ' + _t('Populaire')) + '"' : '') +
-        ' tabindex="' + (on ? '0' : '-1') + '">' + (pop ? '<span class="sw-pop" aria-hidden="true">' + PR.star + '</span>' : '') + '</button>';
+        ' style="--c:' + esc(swatchBg(it)) + '" aria-label="' + esc(it.name + tags.replace(/ · /g, ' — ') + ' — ' + swStockText(it)) + '" aria-pressed="' + on + '"' +
+        (tags ? ' title="' + esc(it.name + tags) + '"' : '') +
+        ' tabindex="' + (on ? '0' : '-1') + '">' + (pop ? '<span class="sw-pop" aria-hidden="true">' + PR.star + '</span>' : '') +
+        (bk ? '<span class="sw-back" aria-hidden="true">' + PR.backIcon + '</span>' : '') + '</button>';
     }).join('');
 
     var descLines = String(m.desc || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
