@@ -725,7 +725,16 @@
   function viewPack(pk) { return packAs(pk, fmtOf(pk)); }
   function enOr(fr, en) { return (window.CA.lang === 'en' && en) ? en : (fr || ''); }
   function packName(pk) { return enOr(pk.name, pk.name_en); }
-  function packNote(pk) { return enOr(pk.note, pk.note_en); }
+  // note libre écrite en recharges : au format « Avec bobine », recharge(s) → bobine(s) / refill(s) → spool(s)
+  function packNote(pk) {
+    var t = enOr(pk.note, pk.note_en) || '';
+    if (pk.kind !== 'spool') return t;
+    var map = { recharge: 'bobine', refill: 'spool' };
+    return t.replace(/\b(recharge|refill)(s?)\b/gi, function (w, base, s) {
+      var r = map[base.toLowerCase()] + s;
+      return base[0] === base[0].toUpperCase() ? r[0].toUpperCase() + r.slice(1) : r;
+    });
+  }
   function preName(pr) { return enOr(pr.name, pr.name_en); }
   function packUnits(pk) { return (pk.units | 0) || 4; }
   function packUnit(pk) { return Math.round(+pk.price / Math.max(1, packUnits(pk)) * 100) / 100; }
