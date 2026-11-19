@@ -7,6 +7,9 @@
 //
 // Appel (admin seulement) : POST { ids: ["uuid", …] }
 // Réponse : { results: [{ id, result: 'sent'|'skipped'|'error', error? }] }
+// Packs (2026-11-18) : POST { cron: "packs" } + en-tête x-cron-key (pg_cron
+// pack_waitlist_tick) → avise tout seul les demandes de pack dont une
+// composition est de nouveau refaisable (RPC pack_waitlist_due).
 //
 // Secrets requis (Supabase -> Edge Functions -> Secrets) :
 //   RESEND_API_KEY   clé API Resend (domaine creationaudio.ca vérifié)
@@ -23,7 +26,7 @@ const REPLY_TO = "contact@creationaudio.ca";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 function json(body: unknown, status = 200) {
@@ -109,6 +112,86 @@ function emailContentEn(p: Product, kind: string | null, url: string, thumb: M.T
   return { subject, text, html };
 }
 
+type Pack = { id: string; slug: string | null; name: string; name_en: string | null; kind: string; units: number };
+
+function packUrl(pk: Pack, en = false) {
+  return SITE + (en ? "/en" : "") + "/boutique/packs#/p/" + encodeURIComponent(pk.slug || pk.id);
+}
+function packEmail(pk: Pack, url: string, en: boolean, thumb: M.Thumb) {
+  const name = (en && pk.name_en) || pk.name;
+  const spool = pk.kind === "spool";
+  if (en) {
+    const subject = "It's back: " + name + " is available again";
+    const text = "Hello,\n\nGood news: the " + name + " you were waiting for is available again at Création Audio.\n\n" +
+      "See the pack: " + url + "\n\nQuantities are limited. To get it, add it to your cart on the site or simply reply to this email.\n\n" +
+      "Thanks and see you soon!\nCréation Audio\n\n—\nYou're getting this email only once because you asked to be notified when this pack is back on creationaudio.ca. " +
+      "Your address has now been deleted from our waitlist.";
+    const html = M.page({
+      lang: "en", tag: "Waitlist", title: "It's back!", preheader: name + " is available again.",
+      body: M.text("Hello,") + M.text("Good news: the pack you were waiting for is available again.") +
+        M.items([{ label: name, meta: pk.units + (spool ? " spools" : " refills"), thumb, flag: { text: "in stock", tone: "ok" } }]) +
+        '<div style="height:18px;line-height:18px;font-size:0">&nbsp;</div>' +
+        M.button(url, "See the pack") +
+        M.text("Quantities are limited. To get it, add it to your cart on the site or simply reply to this email."),
+      foot: "Thanks and see you soon!",
+      after: "You're getting this email only once because you asked to be notified when this pack is back. " +
+        "Your address has now been deleted from our waitlist.",
+    });
+    return { subject, text, html };
+  }
+  const subject = "C'est de retour : " + name + " est de nouveau disponible";
+  const text = "Bonjour,\n\nBonne nouvelle : le " + name + " que tu attendais est de nouveau disponible chez Création Audio.\n\n" +
+    "Voir le pack : " + url + "\n\nLes quantités sont limitées. Pour le réserver, ajoute-le à ton panier sur le site ou réponds simplement à ce courriel.\n\n" +
+    "Merci et à bientôt !\nCréation Audio\n\n—\nTu reçois ce courriel une seule fois parce que tu as demandé à être avisé(e) du retour de ce pack sur creationaudio.ca. " +
+    "Ton adresse a maintenant été supprimée de notre liste d'attente.";
+  const html = M.page({
+    lang: "fr", tag: "Liste d'attente", title: "C'est de retour !", preheader: name + " est de nouveau disponible.",
+    body: M.text("Bonjour,") + M.text("Bonne nouvelle&nbsp;: le pack que tu attendais est de nouveau disponible.") +
+      M.items([{ label: name, meta: pk.units + (spool ? " bobines" : " recharges"), thumb, flag: { text: "en stock", tone: "ok" } }]) +
+      '<div style="height:18px;line-height:18px;font-size:0">&nbsp;</div>' +
+      M.button(url, "Voir le pack") +
+      M.text("Les quantités sont limitées. Pour le réserver, ajoute-le à ton panier sur le site ou réponds simplement à ce courriel."),
+    foot: "Merci et à bientôt&nbsp;!",
+    after: "Tu reçois ce courriel une seule fois parce que tu as demandé à être avisé(e) du retour de ce pack. " +
+      "Ton adresse a maintenant été supprimée de notre liste d'attente.",
+  });
+  return { subject, text, html };
+}
+
+// avis automatique des packs revenus (appel de pg_cron)
+// deno-lint-ignore no-explicit-any
+async function notifyPacks(db: any, resendKey: string, from: string) {
+  const { data: due, error } = await db.rpc("pack_waitlist_due");
+  if (error) return json({ error: error.message }, 500);
+  if (!due?.length) return json({ results: [] });
+  await M.loadCompany(db);
+  const ids = [...new Set((due as { pack_id: string }[]).map((r) => r.pack_id))];
+  const { data: packs } = await db.from("packs").select("id, slug, name, name_en, kind, units").in("id", ids);
+  const byId = new Map(((packs || []) as Pack[]).map((p) => [p.id, p]));
+  const results: { id: string; result: string; error?: string }[] = [];
+  for (const r of due as { id: string; pack_id: string; contact: string; lang: string }[]) {
+    const pk = byId.get(r.pack_id);
+    if (!pk) { results.push({ id: r.id, result: "skipped" }); continue; }
+    const en = r.lang === "en";
+    const [thumb] = await M.thumbs(db, [{ pack: { id: pk.id, k: "k1" } }]);
+    const mail = packEmail(pk, packUrl(pk, en), en, thumb);
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + resendKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [r.contact], reply_to: REPLY_TO, subject: mail.subject, html: mail.html, text: mail.text }),
+      });
+      if (!res.ok) { results.push({ id: r.id, result: "error", error: "Resend " + res.status }); continue; }
+      // avisé -> courriel effacé (Loi 25)
+      await db.from("waitlist").update({ status: "notified", notified_at: new Date().toISOString(), contact: null, name: null }).eq("id", r.id);
+      results.push({ id: r.id, result: "sent" });
+    } catch (e) {
+      results.push({ id: r.id, result: "error", error: String((e as Error)?.message || e) });
+    }
+  }
+  return json({ results });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Méthode non permise." }, 405);
@@ -118,6 +201,15 @@ Deno.serve(async (req) => {
   const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const resendKey = Deno.env.get("RESEND_API_KEY");
   const from = Deno.env.get("MAIL_FROM") || "Création Audio <avis@creationaudio.ca>";
+
+  // 0) appel de pg_cron : packs revenus en stock (clé partagée, pas de session admin)
+  if (req.headers.get("x-cron-key")) {
+    const db0 = createClient(url, service);
+    const { data: ok } = await db0.rpc("reservation_cron_ok", { p_key: req.headers.get("x-cron-key") || "" });
+    if (ok !== true) return json({ error: "Clé invalide." }, 401);
+    if (!resendKey) return json({ error: "Envoi non configuré : secret RESEND_API_KEY manquant dans Supabase." }, 503);
+    return notifyPacks(db0, resendKey, from);
+  }
 
   // 1) seul l'admin peut déclencher un envoi
   const authHeader = req.headers.get("Authorization") || "";

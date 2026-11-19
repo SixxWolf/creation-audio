@@ -918,6 +918,7 @@
   var alertsEl = $('#acct-alerts'), alertsN = $('#acct-n-alerts');
   var KIND = { spool: _t('avec bobine'), refill: 'recharge' };
   function productHref(a) {
+    if (a.type === 'pack') return 'boutique/packs#/p/' + encodeURIComponent(a.slug || '');
     if (a.type === 'spacer') return 'boutique/spacers';
     if (a.type === 'accessory') return 'boutique/accessoires#/a/' + encodeURIComponent(a.slug || slugify(a.name));
     return 'boutique/filaments#/m/' + (a.brand_slug || slugify(a.brand || _t('Autres'))) + '/' +
@@ -939,7 +940,9 @@
       return;
     }
     alertsEl.innerHTML = '<ul class="al-list">' + alerts.map(function (a) {
-      var sub = [a.type === 'filament' ? [a.brand, a.material].filter(Boolean).join(' ') : '', KIND[a.kind] || ''].filter(Boolean).join(' · ');
+      // pack (2026-11-18) : nom anglais sur /en/, sous-titre « Pack »
+      if (a.type === 'pack') { a = Object.assign({}, a, { name: (window.CA && CA.lang === 'en' && a.name_en) || a.name }); }
+      var sub = a.type === 'pack' ? _t('Pack') : [a.type === 'filament' ? [a.brand, a.material].filter(Boolean).join(' ') : '', KIND[a.kind] || ''].filter(Boolean).join(' · ');
       return '<li class="al" data-id="' + esc(a.id) + '">' + swatch(a.type === 'filament' ? a.hex : '', (a.material || '') + ' ' + (a.name || '')) +
         '<a class="al-tx" href="' + esc(productHref(a)) + '"><b>' + esc(a.name) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</a>' +
         _t('<span class="al-date">Depuis le ') + esc(fmtDate(a.created_at, false)) + '</span>' +

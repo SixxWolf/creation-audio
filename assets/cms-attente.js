@@ -35,8 +35,13 @@
   }
   // demandes par sujet (sans produit) : page publique boutique/imprimantes.html (RPC waitlist_topic_subscribe)
   var TOPIC_LABEL = { printers: 'Imprimantes 3D (bientôt)' };
-  function gkey(w) { return w.product_id || ('topic:' + w.topic); }
-  function groupLabel(key) { return key.indexOf('topic:') === 0 ? (TOPIC_LABEL[key.slice(6)] || key.slice(6)) : prodLabel(prodById[key]); }
+  // demandes d'un pack (fiche d'un pack épuisé, RPC waitlist_pack_subscribe) : avis AUTOMATIQUE (pg_cron → waitlist-notify)
+  var packName = {};
+  function gkey(w) { return w.product_id || (w.pack_id ? 'pack:' + w.pack_id : 'topic:' + w.topic); }
+  function groupLabel(key) {
+    if (key.indexOf('pack:') === 0) return 'Pack · ' + (packName[key.slice(5)] || '(pack supprimé)');
+    return key.indexOf('topic:') === 0 ? (TOPIC_LABEL[key.slice(6)] || key.slice(6)) : prodLabel(prodById[key]);
+  }
   var SOURCE_LABEL = { site: 'Site (courriel)', marketplace: 'Marketplace', autre: 'Autre' };
   function kindLabel(k) { return k === 'refill' ? 'Recharge' : k === 'spool' ? 'Avec bobine' : k === 'item' ? 'Article' : 'Peu importe'; }
   function shortDate(iso) {
@@ -58,11 +63,13 @@
         .in('type', ['filament', 'accessory', 'spacer'])
         .order('type', { ascending: true }).order('brand', { ascending: true })
         .order('material', { ascending: true }).order('name', { ascending: true }),
-      sb.from('waitlist').select('*').order('created_at', { ascending: true })
+      sb.from('waitlist').select('*').order('created_at', { ascending: true }),
+      sb.from('packs').select('id,name')
     ]).then(function (r) {
       if (r[0].error) throw r[0].error;
       if (r[1].error) throw r[1].error;
       products = r[0].data || [];
+      packName = {}; ((r[2] && r[2].data) || []).forEach(function (k) { packName[k.id] = k.name; });
       prodById = {}; products.forEach(function (p) { prodById[p.id] = p; });
       var rows = r[1].data || [];
       open = rows.filter(function (x) { return x.status === 'open'; });
@@ -119,7 +126,9 @@
     if (w.source !== 'site' && w.contact) bits.push(w.contact);
     if (w.source === 'site' && w.name && w.contact) bits.push(w.contact);
     var act;
-    if (w.topic) {
+    if (w.pack_id) {
+      act = '<span class="wl-auto">Avis automatique au retour</span>';
+    } else if (w.topic) {
       act = '<button type="button" class="btn btn-ghost btn-sm wl-copy-mail" data-ids="' + esc(w.id) + '">Copier le courriel</button>' +
             '<button type="button" class="btn btn-accent btn-sm wl-done" data-ic="check" data-id="' + esc(w.id) + '">Marquer avisé</button>';
     } else if (w.source === 'site') {
@@ -152,11 +161,12 @@
     var p = prodById[pid];
     var kinds = reqs.map(function (w) { return w.kind || null; });
     var sites = reqs.filter(function (w) { return w.source === 'site'; });
-    if (String(pid).indexOf('topic:') === 0) {
+    if (String(pid).indexOf('topic:') === 0 || String(pid).indexOf('pack:') === 0) {
+      var isPack = String(pid).indexOf('pack:') === 0;
       return '<div class="wl-group" data-pid="' + esc(pid) + '">' +
         '<div class="wl-group-head"><span class="wl-group-name">' + esc(groupLabel(pid)) + '</span>' +
           '<span class="wl-group-n">' + reqs.length + ' en attente</span><span class="grow"></span>' +
-          (reqs.length > 1 ? '<button type="button" class="btn btn-accent btn-sm wl-copy-mail" data-ic="copy" data-ids="' + esc(reqs.map(function (w) { return w.id; }).join(',')) + '">Copier les ' + reqs.length + ' courriels</button>' : '') +
+          (!isPack && reqs.length > 1 ? '<button type="button" class="btn btn-accent btn-sm wl-copy-mail" data-ic="copy" data-ids="' + esc(reqs.map(function (w) { return w.id; }).join(',')) + '">Copier les ' + reqs.length + ' courriels</button>' : '') +
         '</div>' + reqs.map(reqRow).join('') + '</div>';
     }
     var all = (opts && opts.bulk && sites.length > 1)
@@ -281,7 +291,7 @@
     var now = new Date().toISOString();
     open = open.filter(function (w) {
       if (ids.indexOf(w.id) < 0) return true;
-      history.push({ id: w.id, product_id: w.product_id, topic: w.topic, kind: w.kind, source: w.source, status: 'notified', created_at: w.created_at, notified_at: now });
+      history.push({ id: w.id, product_id: w.product_id, pack_id: w.pack_id, topic: w.topic, kind: w.kind, source: w.source, status: 'notified', created_at: w.created_at, notified_at: now });
       return false;
     });
   }

@@ -6327,3 +6327,109 @@ begin
 end $$;
 revoke all on function public.admin_popular() from public, anon;
 grant execute on function public.admin_popular() to authenticated;
+
+-- ============================================================
+-- LISTE D'ATTENTE D'UN PACK (2026-11-18)
+-- Fiche d'un pack épuisé : « M'aviser du retour » (courriel ou compte).
+-- Une demande = un produit OU un sujet OU un pack. Avis AUTOMATIQUE :
+-- pack_waitlist_tick (pg_cron, 5 min) appelle l'EF waitlist-notify
+-- { cron: 'packs' } dès qu'une composition du pack est refaisable.
+-- Mêmes règles Loi 25 (60 jours, courriel effacé à l'avis).
+-- ============================================================
+alter table public.waitlist add column if not exists pack_id uuid references public.packs(id) on delete cascade;
+alter table public.waitlist drop constraint if exists waitlist_target_chk;
+alter table public.waitlist add constraint waitlist_target_chk check (num_nonnulls(product_id, topic, pack_id) = 1);
+create index if not exists waitlist_pack_open_idx on public.waitlist (pack_id) where status = 'open' and pack_id is not null;
+
+-- un pack peut-il être refait avec le stock offert ? (même règle que la boutique : une composition
+-- toute faite complète, ou Personnaliser noir et blanc avec assez d'unités au total)
+create or replace function public._pack_has_room(p_pack uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+      select 1 from public.packs pk, jsonb_array_elements(pk.presets) pr
+       where pk.id = p_pack and pk.enabled
+         and jsonb_array_length(case when jsonb_typeof(pr -> 'lines') = 'array' then pr -> 'lines' else '[]'::jsonb end) > 0
+         and not exists (
+           select 1 from jsonb_array_elements(pr -> 'lines') l
+             left join public.products_public pp on pp.id::text = lower(l ->> 'p')
+            where coalesce(l ->> 'n', '') ~ '^\d+$' and (l ->> 'n')::int > 0
+              and coalesce(case when pk.kind = 'refill' then pp.qty_2 else pp.qty end, 0) < (l ->> 'n')::int))
+    or exists (
+      select 1 from public.packs pk
+       where pk.id = p_pack and pk.enabled and pk.allow_custom
+         and not exists (select 1 from public.products p where p.id = any (pk.colors)
+                            and upper(coalesce(p.hex, '')) not in ('#000000', '#FFFFFF'))
+         and (select coalesce(sum(greatest(case when pk.kind = 'refill' then pp.qty_2 else pp.qty end, 0)), 0)
+                from public.products_public pp where pp.id = any (pk.colors)) >= pk.units)
+$$;
+revoke all on function public._pack_has_room(uuid) from public, anon, authenticated;
+
+create or replace function public.waitlist_pack_subscribe(p_pack uuid, p_email text, p_hp text default '', p_lang text default 'fr')
+returns text language plpgsql security definer set search_path = public as $$
+declare v_email text := lower(trim(coalesce(p_email, '')));
+        v_lang  text := case when p_lang = 'en' then 'en' else 'fr' end;
+begin
+  if coalesce(p_hp, '') <> '' then return 'ok'; end if;
+  if length(v_email) > 254 or v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[a-z]{2,}$' then return 'invalid'; end if;
+  if not exists (select 1 from public.packs where id = p_pack and enabled) then return 'unavailable'; end if;
+  perform public.waitlist_cleanup();
+  if (select count(*) from public.waitlist where status = 'open' and source = 'site' and lower(contact) = v_email) >= 5
+     or (select count(*) from public.waitlist where source = 'site' and created_at > now() - interval '1 hour') >= 40 then
+    return 'busy';
+  end if;
+  if exists (select 1 from public.waitlist where status = 'open' and source = 'site' and lower(contact) = v_email and pack_id = p_pack) then
+    return 'exists';
+  end if;
+  insert into public.waitlist (pack_id, contact, source, lang) values (p_pack, v_email, 'site', v_lang);
+  return 'ok';
+end $$;
+revoke all on function public.waitlist_pack_subscribe(uuid, text, text, text) from public;
+grant execute on function public.waitlist_pack_subscribe(uuid, text, text, text) to anon, authenticated;
+
+-- demandes de pack prêtes à aviser (lu par l'EF waitlist-notify, clé de service)
+create or replace function public.pack_waitlist_due()
+returns table (id uuid, pack_id uuid, contact text, lang text)
+language sql stable security definer set search_path = '' as $$
+  select w.id, w.pack_id, w.contact, w.lang from public.waitlist w
+   where w.status = 'open' and w.source = 'site' and w.pack_id is not null and w.contact is not null
+     and public._pack_has_room(w.pack_id)
+   order by w.created_at limit 100
+$$;
+revoke all on function public.pack_waitlist_due() from public, anon, authenticated;
+grant execute on function public.pack_waitlist_due() to service_role;
+
+create or replace function public.pack_waitlist_tick()
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.pack_waitlist_due()) then
+    perform net.http_post(
+      url := 'https://cqfmvdknppscazfynoiy.supabase.co/functions/v1/waitlist-notify',
+      body := '{"cron":"packs"}'::jsonb,
+      headers := jsonb_build_object('Content-Type', 'application/json',
+                   'x-cron-key', (select value from private.secrets where key = 'cron_key')),
+      timeout_milliseconds := 20000);
+  end if;
+end $$;
+revoke all on function public.pack_waitlist_tick() from public, anon, authenticated;
+select cron.unschedule(jobid) from cron.job where jobname = 'pack-waitlist-tick';
+select cron.schedule('pack-waitlist-tick', '*/5 * * * *', 'select public.pack_waitlist_tick()');
+
+-- Mon compte › Alertes : produits ET packs (les sujets restent hors liste)
+create or replace function public.me_waitlist()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'id', w.id, 'kind', coalesce(w.kind, k.kind), 'created_at', w.created_at, 'expires_at', w.expires_at,
+      'type', case when k.id is not null then 'pack' else p.type end,
+      'name', coalesce(p.name, k.name), 'name_en', k.name_en, 'brand', p.brand, 'material', p.material, 'hex', p.hex,
+      'slug', coalesce(p.slug, k.slug, k.id::text), 'brand_slug', b.slug, 'material_slug', m.slug
+    ) order by w.created_at desc), '[]'::jsonb)
+  from public.waitlist w
+  left join public.products p on p.id = w.product_id
+  left join public.packs k on k.id = w.pack_id
+  left join public.brands b on b.name = p.brand
+  left join public.materials m on m.brand = p.brand and m.name = p.material
+  where w.status = 'open' and w.source = 'site' and (p.id is not null or k.id is not null)
+    and lower(w.contact) = lower((select auth.jwt()) ->> 'email');
+$$;
+revoke all on function public.me_waitlist() from public, anon;
+grant execute on function public.me_waitlist() to authenticated;

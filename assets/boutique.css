@@ -952,8 +952,6 @@ body.cart-lock { overflow:hidden; }
 .pack-mini-go { flex:none; display:grid; place-items:center; width:38px; height:38px; border-radius:50%; color:var(--ink);
   background:var(--wash); border:1px solid var(--line); }
 .pack-mini-go svg { width:18px; height:18px; }
-.pack-mini-out { flex:none; font-size:.8rem; font-weight:700; color:var(--muted); }
-.pack-mini.is-out .pack-mini-art { opacity:.5; filter:grayscale(.4); }
 
 .pack-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 270px), 1fr)); gap:clamp(14px, 2vw, 22px); }
 .pack-tile { display:flex; flex-direction:column; min-width:0; overflow:hidden; text-decoration:none; color:var(--ink);
@@ -971,8 +969,12 @@ body.cart-lock { overflow:hidden; }
 .pack-tile-save { align-self:flex-start; padding:3px 9px; font-size:.82rem; font-weight:700; color:var(--good-ink); background:var(--good-wash); border-radius:100px; }
 .pack-tile-go { display:inline-flex; align-items:center; gap:6px; margin-top:8px; font-weight:700; font-size:.95rem; }
 .pack-tile-go svg { width:16px; height:16px; }
-.pack-tile.is-out .pack-tile-art { opacity:.5; filter:grayscale(.4); }
-.pack-tile.is-out .pack-tile-go { color:var(--muted); }
+/* pack épuisé : rien sur la carte (règle de Théo 2026-11-18) ; « En stock » seulement quand c'est vrai */
+.pack-instock { align-self:flex-start; margin-top:6px; font-size:.78rem; font-weight:700; }
+.mcard-foot .pack-instock { margin-top:0; }
+/* fiche d'un pack épuisé : message + « M'aviser du retour » */
+.pack-oos { margin:6px 0 4px; }
+.pack-oos-t { margin:0; font-weight:600; }
 /* fiche d'un pack (#/p/<slug>) : mise en page de la fiche filament (.pdp) */
 .pack-save { margin:0; font-size:.95rem; color:var(--good-ink); }
 .pack-save b { font-weight:800; }
@@ -1035,7 +1037,7 @@ body.cart-lock { overflow:hidden; }
 @media (max-width:560px) {
   .pack-mini { flex-wrap:wrap; gap:12px; padding:14px; }
   .pack-mini-art { width:100%; }
-  .pack-mini-go, .pack-mini-out { position:absolute; right:14px; bottom:14px; }
+  .pack-mini-go { position:absolute; right:14px; bottom:14px; }
   .pack-pres { grid-template-columns:repeat(2, minmax(0, 1fr)); }
 }
 .shop-tabs a[hidden] { display:none; }

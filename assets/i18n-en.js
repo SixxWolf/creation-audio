@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 49;
+window.CA_EN_V = 50;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -170,6 +170,8 @@ window.CA_EN = (function (pairs) {
   [`✓ C'est noté ! On t'écrit dès que `, `✓ Got it! We'll email you as soon as `],
   [` est de retour.`, ` is back.`],
   [`Tu es déjà sur la liste pour ce produit — on t'écrit dès son arrivée.`, `You're already on the list for this product — we'll email you when it arrives.`],
+  [`Tu es déjà sur la liste pour ce pack — on t'écrit dès son retour.`, `You're already on the list for this pack — we'll email you when it's back.`],
+  [`Ce pack est indisponible pour l'instant. Il reviendra sous peu.`, `This pack is unavailable for now. It will be back soon.`],
   [`Ce courriel semble invalide.`, `This email looks invalid.`],
   [`Trop de demandes pour le moment — réessaie un peu plus tard.`, `Too many requests right now — try again a bit later.`],
   [`Impossible d'enregistrer ta demande pour le moment. Écris-nous à `, `Couldn't save your request right now. Write to us at `],

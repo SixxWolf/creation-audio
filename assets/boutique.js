@@ -773,16 +773,18 @@
   // ruban « Nouveau » d'un pack : packs.new_until (Admin › Promos & nouveautés › Nouveautés, 2026-11-17)
   function packIsNew(pk) { return PR.isNew({ attrs: { new_until: pk && pk.new_until } }); }
   // carte .mcard d'un pack (page Promos et nouveautés) : photo, unités, prix + prix à l'unité gris
+  // Pack épuisé : AUCUNE mention ni gris sur les cartes (règle de Théo 2026-11-18) — « En stock » seulement quand c'est vrai ;
+  // la fiche explique la rupture et propose « M'aviser du retour ».
+  function packStockPill(pk) { return packAnyStock(pk) ? '<span class="pill ok pack-instock">' + _t('En stock') + '</span>' : ''; }
   function packCard(pk) {
-    var out = !packAnyStock(pk);
-    return '<a class="mcard pack-mcard' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
+    return '<a class="mcard pack-mcard" href="' + esc(packHref(pk)) + '">' +
       '<span class="mcard-media">' + packMedia(pk, defComp(pk)) + (packIsNew(pk) ? PR.newTag() : '') + popT('pack', pk.id) + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(packName(pk)) + '</span>' +
         '<span class="mcard-tag">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
         '<span class="mcard-foot">' +
           '<span class="mcard-price"><b>' + money(+pk.price) + '</b> <span class="pack-mc-unit">' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></span>' +
-          (out ? '<span class="pill out">' + _t('Épuisé') + '</span>' : '') +
+          packStockPill(pk) +
         '</span>' +
       '</span>' +
     '</a>';
@@ -854,15 +856,15 @@
     '</section>';
   }
   function packMini(pk) {
-    var out = !packAnyStock(pk);
-    return '<a class="pack-mini' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
+    return '<a class="pack-mini" href="' + esc(packHref(pk)) + '">' +
       '<span class="pack-mini-art">' + packMedia(pk, defComp(pk)) + (packIsNew(pk) ? PR.newTag() : '') + popT('pack', pk.id) + '</span>' +
       '<span class="pack-mini-body">' +
         '<span class="pack-mini-name">' + esc(packName(pk)) + '</span>' +
         '<span class="pack-mini-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
         '<span class="pack-mini-price"><b>' + money(+pk.price) + '</b> <span>' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span></span>' +
+        packStockPill(pk) +
       '</span>' +
-      (out ? '<span class="pack-mini-out">' + _t('Épuisé') + '</span>' : '<span class="pack-mini-go" aria-hidden="true">' + IC.arrow + '</span>') +
+      '<span class="pack-mini-go" aria-hidden="true">' + IC.arrow + '</span>' +
     '</a>';
   }
 
@@ -920,15 +922,16 @@
       : '<p class="empty">' + _t('Aucun pack pour le moment.') + ' <a href="' + esc(FIL_PRE || '#/') + '">' + _t('Voir les filaments') + '</a></p>';
   }
   function packTile(pk) {
-    var out = !packAnyStock(pk), comp = defComp(pk);
+    var comp = defComp(pk);
     // pas d'économie sur la carte (choix de Théo 2026-11-16 : trop de prix au même endroit) → seulement sur la fiche
-    return '<a class="pack-tile' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
+    return '<a class="pack-tile" href="' + esc(packHref(pk)) + '">' +
       '<span class="pack-tile-art">' + packMedia(pk, comp) + (packIsNew(pk) ? PR.newTag() : '') + popT('pack', pk.id) + '</span>' +
       '<span class="pack-tile-body">' +
         '<span class="pack-tile-name">' + esc(packName(pk)) + '</span>' +
         '<span class="pack-tile-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
         '<span class="pack-tile-price"><b>' + money(+pk.price) + '</b> ' + money(packUnit(pk)) + ' ' + unitWord(pk) + '</span>' +
-        '<span class="pack-tile-go">' + (out ? _t('Épuisé') : _t('Voir le pack') + ' ' + IC.arrow) + '</span>' +
+        packStockPill(pk) +
+        '<span class="pack-tile-go">' + _t('Voir le pack') + ' ' + IC.arrow + '</span>' +
       '</span>' +
     '</a>';
   }
@@ -936,6 +939,15 @@
     var el = $('#pack-config'), cr = $('#pk-crumbs'), pk = curPack; if (!el || !pk) return;
     if (cr) cr.innerHTML = '<a href="#/">' + _t('Packs') + '</a>' + IC.chev + '<span aria-current="page">' + esc(packName(pk)) + '</span>';
     el.innerHTML = packCardHtml(pk);
+    wirePackNotify(pk);
+  }
+  // fiche d'un pack épuisé : « M'aviser du retour » (RPC waitlist_pack_subscribe, avis automatique au retour)
+  function packNotify(pk) {
+    return { id: pk.id, kind: 'pack', pack: true, what: packName(pk), the: _t('le ') + packName(pk), uid: 'pk' };
+  }
+  function wirePackNotify(pk) {
+    var root = document.getElementById('pk-' + pk.id); if (!root) return;
+    wireNotify(root, packNotify(pk), function () { if (curPack === pk) updatePackCard(pk); });
   }
   // composition montrée (photo, galerie, « Ce pack contient ») : la sélection, sinon ce qui est déjà choisi en Personnaliser
   function viewComp(pk) {
@@ -991,6 +1003,7 @@
     var th = old.querySelector('.pk-thumbs'); if (th) th.innerHTML = pkThumbsHtml(imgs);
     var tmp = document.createElement('div'); tmp.innerHTML = packCardHtml(pk);
     old.querySelector('.pack-body').replaceWith(tmp.firstElementChild.querySelector('.pack-body'));
+    wirePackNotify(pk);
   }
   // précharge les photos des compositions pour que le changement soit instantané
   var packPre = {};
@@ -1000,7 +1013,7 @@
   }
   function packCardHtml(pk) {
     preloadPack(pk);
-    var s = selOf(pk), pres = presetsOf(pk), comp = selComp(pk), units = packUnits(pk);
+    var s = selOf(pk), pres = presetsOf(pk), comp = selComp(pk), units = packUnits(pk), soldOut = !packAnyStock(pk);
     var tiles = pres.map(function (pr) {
       var c = preComp(pr), ok = packRoom(pk, c, null, true) > 0, on = s.sel === pr.id;
       return '<button type="button" class="pack-pre' + (on ? ' is-on' : '') + (ok ? '' : ' is-out') + '" data-pk="' + esc(pk.id) + '" data-pre="' + esc(pr.id) + '"' +
@@ -1074,10 +1087,12 @@
         _t('<p class="pdp-final">Prix final, aucune taxe en plus · pas de minimum d\'achat</p>') +
         (note ? '<p class="pack-note">' + esc(note) + '</p>' : '') +
         // une seule composition, sans Personnaliser : la photo suffit, pas de tuile à choisir
-        (tiles.length > 1 ? '<div class="pack-pres" role="group" aria-label="' + _t('Composition') + '">' + tiles.join('') + '</div>' : '') +
-        custom +
+        (soldOut ? '<div class="pack-oos"><p class="pack-oos-t">' + _t('Ce pack est indisponible pour l\'instant. Il reviendra sous peu.') + '</p>' +
+          notifyHtml(packNotify(pk)) + '</div>' : '') +
+        (!soldOut && tiles.length > 1 ? '<div class="pack-pres" role="group" aria-label="' + _t('Composition') + '">' + tiles.join('') + '</div>' : '') +
+        (soldOut ? '' : custom) +
         contains +
-        '<button type="button" class="pack-add btn-add" data-pk="' + esc(pk.id) + '"' + (comp && room > 0 ? '' : ' disabled') + '>' + IC.cart + '<span>' + btn + '</span></button>' +
+        (soldOut ? '' : '<button type="button" class="pack-add btn-add" data-pk="' + esc(pk.id) + '"' + (comp && room > 0 ? '' : ' disabled') + '>' + IC.cart + '<span>' + btn + '</span></button>') +
         (brand ? '<p class="pack-tier">' + _t('Le pack compte pour le rabais quantité de tes autres filaments ') + esc(brand) + '.</p>' : '') +
         '<ul class="pdp-assure">' +
           '<li>' + IC.pin + _t('Ramassage local à Québec, sur rendez-vous</li>') +
@@ -1535,13 +1550,16 @@
       if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(val)) { say(_t('Entre un courriel valide.'), 'bad'); email.focus(); return; }
       if (!sb) { say(_t('Service momentanément indisponible.'), 'bad'); return; }
       btn.disabled = true; say(_t('Envoi…'));
-      sb.rpc('waitlist_subscribe', { p_product: p.id, p_kind: type, p_email: val, p_hp: $('.cfg-hp', form).value || '', p_lang: window.CA.lang || 'fr' })
+      var hp = $('.cfg-hp', form).value || '', lang = window.CA.lang || 'fr';
+      (o.pack ? sb.rpc('waitlist_pack_subscribe', { p_pack: p.id, p_email: val, p_hp: hp, p_lang: lang })
+              : sb.rpc('waitlist_subscribe', { p_product: p.id, p_kind: type, p_email: val, p_hp: hp, p_lang: lang }))
         .then(function (res) {
           btn.disabled = false;
           var r = res && !res.error ? res.data : null;
           if (r === 'ok' || r === 'exists') {
             notifyDone[p.id + '|' + type] = r === 'ok'
               ? _t('✓ C\'est noté ! On t\'écrit dès que ') + o.the + _t(' est de retour.')
+              : o.pack ? _t('Tu es déjà sur la liste pour ce pack — on t\'écrit dès son retour.')
               : _t('Tu es déjà sur la liste pour ce produit — on t\'écrit dès son arrivée.');
             rerender();
             return;
