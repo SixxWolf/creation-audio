@@ -970,6 +970,110 @@
     if (added !== units) caDialog.toast('Composition incomplète : vérifie le pack dans Packs.');
     afterChange();
   }
+  /* ---- pack personnalisé (Facturation seulement, 2026-11-19) : 4 unités de n'importe quel filament de la boutique,
+     prix du pack modifiable ; pack sans fiche dans la table packs (pas de clé id → hors Populaires, pas de photo) ---- */
+  var CPK_UNITS = 4;
+  function customPackDialog() {
+    Promise.all([loadFxPacks(), loadCatalog('filament', true)]).then(null, function () {}).then(function () {
+      var ref = (fxPacks || []).filter(function (x) { return (x.units | 0) === CPK_UNITS && +x.price > 0; })[0];
+      var st = { kind: 'refill', rows: [] };
+      var body = document.createElement('div'); body.className = 'fx-cpk';
+      body.innerHTML =
+        '<div class="fx-cpk-top">' +
+          '<div class="fx-type fx-cpk-kind"><button type="button" class="fx-type-btn is-active" data-kind="refill">Recharge</button>' +
+            '<button type="button" class="fx-type-btn" data-kind="spool">Avec bobine</button></div>' +
+          '<span class="unit fx-cpk-price" data-unit="$"><input type="number" min="0" step="0.01" value="' + (ref ? +ref.price : 60) + '" aria-label="Prix du pack"></span>' +
+        '</div>' +
+        '<select class="fx-cpk-add" aria-label="Ajouter une couleur"></select>' +
+        '<div class="fx-cpk-rows"></div>';
+      var elRows = $('.fx-cpk-rows', body), elAdd = $('.fx-cpk-add', body), elPrice = $('.fx-cpk-price input', body), go = null;
+      function total() { return st.rows.reduce(function (s, r) { return s + r.n; }, 0); }
+      function stockOf(p) { var q = st.kind === 'refill' ? p.qty_2 : p.qty; return q == null ? null : q | 0; }
+      function fillAdd() {
+        var groups = [], idx = {};
+        (catalog.filament || []).forEach(function (p) {
+          if (!filOffers(p, st.kind)) return;
+          var g = (p.brand || 'Autres') + ' · ' + (p.material || 'Autres');
+          if (!(g in idx)) { idx[g] = groups.length; groups.push({ g: g, items: [] }); }
+          groups[idx[g]].items.push(p);
+        });
+        elAdd.innerHTML = '<option value="">Ajouter une couleur</option>' + groups.map(function (g) {
+          return '<optgroup label="' + esc(g.g) + '">' + g.items.map(function (p) {
+            var s = stockOf(p);
+            return '<option value="' + esc(p.id) + '" data-sw="' + esc(p.hex || '#ccc') + '">' + esc(p.name) + (s != null ? ' · ' + s + ' en stock' : '') + '</option>';
+          }).join('') + '</optgroup>';
+        }).join('');
+        elAdd.value = '';
+        if (window.CA.pick) window.CA.pick(elAdd);
+      }
+      function paint() {
+        var t = total();
+        elRows.innerHTML = st.rows.map(function (r, i) {
+          var s = stockOf(r.p);
+          return '<div class="fx-cpk-row' + (s != null && r.n > s ? ' is-short' : '') + '">' + swatchSVG(r.p.hex) +
+            '<span class="fx-cpk-n"><b>' + esc(r.p.name) + '</b> <span>' + esc([r.p.brand, r.p.material].filter(Boolean).join(' · ')) + '</span></span>' +
+            '<span class="fx-cpk-step"><button type="button" data-d="-1" data-i="' + i + '" aria-label="Moins">−</button>' +
+            '<b>' + r.n + '</b><button type="button" data-d="1" data-i="' + i + '" aria-label="Plus"' + (t >= CPK_UNITS ? ' disabled' : '') + '>+</button></span></div>';
+        }).join('');
+        elAdd.disabled = t >= CPK_UNITS;
+        if (elAdd._pk) elAdd._pk.refresh();
+        if (!go) { var d = body.closest('dialog'); go = d && $('.dlg-go', d); }
+        if (go) { go.disabled = t !== CPK_UNITS || !(+elPrice.value >= 0) || elPrice.value === ''; go.textContent = 'Ajouter · ' + t + ' / ' + CPK_UNITS; }
+      }
+      elAdd.addEventListener('change', function () {
+        var id = elAdd.value; if (!id) return;
+        var p = (catalog.filament || []).filter(function (x) { return String(x.id) === id; })[0];
+        if (p && total() < CPK_UNITS) {
+          var r = st.rows.filter(function (x) { return String(x.p.id) === id; })[0];
+          if (r) r.n++; else st.rows.push({ p: p, n: 1 });
+        }
+        elAdd.value = ''; paint();
+      });
+      elRows.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-d]'); if (!b) return;
+        var r = st.rows[+b.getAttribute('data-i')]; if (!r) return;
+        r.n += +b.getAttribute('data-d');
+        if (r.n <= 0) st.rows.splice(st.rows.indexOf(r), 1);
+        paint();
+      });
+      $$('.fx-cpk-kind .fx-type-btn', body).forEach(function (b) {
+        b.addEventListener('click', function () {
+          st.kind = b.getAttribute('data-kind');
+          $$('.fx-cpk-kind .fx-type-btn', body).forEach(function (x) { x.classList.toggle('is-active', x === b); });
+          st.rows = st.rows.filter(function (r) { return filOffers(r.p, st.kind); });
+          fillAdd(); paint();
+        });
+      });
+      elPrice.addEventListener('input', paint);
+      fillAdd();
+      var pr = caDialog.confirm({ title: 'Pack personnalisé', message: '', body: body, ok: 'Ajouter', icon: 'plus' });
+      paint();
+      pr.then(function (ok) {
+        if (ok !== true || total() !== CPK_UNITS) return;
+        addCustomPack(st.kind, round2(Math.max(0, +elPrice.value || 0)), st.rows);
+      });
+    });
+  }
+  function addCustomPack(kind, price, rows) {
+    var unit = round2(price / CPK_UNITS), maxK = 0;
+    lines.forEach(function (l) { var m = l.pack && /^k(\d+)$/.exec(l.pack.k || ''); if (m) maxK = Math.max(maxK, +m[1]); });
+    var pack = { k: 'k' + (maxK + 1), n: 1, name: 'Pack personnalisé', name_en: 'Custom pack', code: null, price: round2(unit * CPK_UNITS), kind: kind, custom: true };
+    rows.forEach(function (r) {
+      var p = r.p;
+      lines.push({ id: uid(), productId: String(p.id), ptype: 'filament', kind: kind, label: p.name,
+        meta: [p.brand, p.material, kind === 'refill' ? 'Recharge' : 'Avec bobine'].filter(Boolean).join(' · '),
+        hex: p.hex, qty: r.n, base: unit, tiers: [], cost: +filCost(p, kind) || 0, tierKey: filTierKey(p),
+        price: unit, manual: true, sp: null, pack: pack });
+    });
+    if (pack.price !== price) caDialog.toast('Prix arrondi à ' + money(pack.price) + '.');
+    afterChange();
+  }
+  // prix d'un pack = somme de ses lignes (le prix unitaire d'une ligne de pack reste modifiable sur la facture)
+  function syncPackPrices() {
+    var sum = {};
+    lines.forEach(function (l) { if (l.pack && l.pack.k) sum[l.pack.k] = (sum[l.pack.k] || 0) + l.qty * l.price; });
+    lines.forEach(function (l) { if (l.pack && l.pack.k) l.pack.price = round2(sum[l.pack.k] / Math.max(1, +l.pack.n || 1)); });
+  }
   var elPackBtn = $('#fx-add-pack');
   if (elPackBtn) elPackBtn.addEventListener('click', addPackDialog);
   // packs trouvés par la barre de recherche (« pack », nom, code, composition) : un clic = toutes leurs lignes
@@ -982,7 +1086,8 @@
       elCatalog.parentNode.insertBefore(elPackHits, elCatalog);
       elPackHits.addEventListener('click', function (e) {
         var b = e.target.closest('.fx-packopt'); if (!b) return;
-        var pk = (fxPacks || []).filter(function (x) { return String(x.id) === b.getAttribute('data-pk'); })[0];
+        if (b.hasAttribute('data-custom')) { customPackDialog(); return; }
+        var pk =(fxPacks || []).filter(function (x) { return String(x.id) === b.getAttribute('data-pk'); })[0];
         var pr = pk && (pk.presets || [])[+b.getAttribute("data-pr")];
         if (pk && pr) { addPackLines(pk, pr); caDialog.toast(pk.name + ' · ' + pr.name + ' ajouté.'); }
       });
@@ -999,14 +1104,20 @@
           if (window.CA.searchMatch ? window.CA.searchMatch(hay, q) : hay.toLowerCase().indexOf(q.toLowerCase()) !== -1) hits.push({ pk: pk, pr: pr, i: i });
         });
       });
-      elPackHits.hidden = !hits.length;
-      elPackHits.innerHTML = !hits.length ? '' : '<div class="pk-group-title"><span class="pk-gt-brand">Packs</span></div>' + hits.slice(0, 12).map(function (o) {
+      var cHay = 'pack personnalise personnalisable custom sur mesure';
+      var custom = (window.CA.searchMatch ? window.CA.searchMatch(cHay, q) : cHay.indexOf(q.toLowerCase()) !== -1)
+        ? '<button type="button" class="fx-packopt fx-packcustom" data-custom="1"><span class="fx-packdots fx-cpk-ic" aria-hidden="true">' +
+          '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>' +
+          '<span class="fx-packn"><b>Pack personnalisé</b> · ' + CPK_UNITS + ' au choix</span><span class="fx-packp">Prix libre</span></button>' : '';
+      var any = hits.length || custom;
+      elPackHits.hidden = !any;
+      elPackHits.innerHTML = !any ? '' : '<div class="pk-group-title"><span class="pk-gt-brand">Packs</span></div>' + hits.slice(0, 12).map(function (o) {
         var dots = (o.pr.lines || []).map(function (l) { var h = findProduct(l.p); return h ? swatchSVG(h.p.hex) : ''; }).join('');
         return '<button type="button" class="fx-packopt" data-pk="' + esc(o.pk.id) + '" data-pr="' + o.i + '">' +
           '<span class="fx-packdots">' + dots + '</span>' +
           '<span class="fx-packn"><b>' + esc(o.pk.name) + '</b> · ' + esc(o.pr.name) + (o.pk.enabled ? '' : ' <em>hors ligne</em>') + '</span>' +
           '<span class="fx-packp">' + money(o.pk.price) + '</span></button>';
-      }).join('');
+      }).join('') + custom;
     });
   }
   function addFreeLine(preset) {
@@ -1047,6 +1158,7 @@
   /* ---------- rendu de la facture ---------- */
   function render() {
     repriceLines();   // applique le rabais quantité (cumulé par marque pour les filaments)
+    syncPackPrices();
     paintCredit(totals());
     syncToOrder();
     if (!lines.length) {

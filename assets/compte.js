@@ -444,7 +444,7 @@
       lines.forEach(function (l) {
         if (spacersOnly) { cart[l.product_id] = { id: l.product_id, qty: +l.qty }; return; }
         if (l.ptype === 'spacer') return;
-        if (l.pack && l.pack.k) {   // pack : une ligne de panier par pack (même clé que boutique.js)
+        if (l.pack && l.pack.k && l.pack.id) {   // pack : une ligne de panier par pack (même clé que boutique.js) ; pack personnalisé (sans id) = lignes à l'unité
           var pg = packs[l.pack.k] || (packs[l.pack.k] = { id: l.pack.id, type: 'pack', comp: [], qty: +l.pack.n || 1 });
           pg.comp.push({ id: l.product_id, n: Math.round(+l.qty / (+l.pack.n || 1)) });
           return;

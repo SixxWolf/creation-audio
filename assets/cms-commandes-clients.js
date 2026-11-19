@@ -449,7 +449,7 @@
     linesOf(o).forEach(function (l) {
       if (!l.product_id) { dropped++; return; }
       // pack (2026-11-16) : ses lignes restent groupées ; seule la quantité de packs se modifie
-      if (l.pack && l.pack.k) {
+      if (l.pack && l.pack.k && l.pack.id) {   // pack personnalisé de la Facturation (sans id) : lignes à l'unité
         var g = packs[l.pack.k];
         if (!g) { g = packs[l.pack.k] = { pack: l.pack, kind: 'pack', pid: l.pack.id, name: l.pack.name || 'Pack', meta: '', qty: +l.pack.n || 1, comp: [] }; items.push(g); }
         var per = Math.round((l.qty | 0) / (+l.pack.n || 1));
