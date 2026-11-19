@@ -410,6 +410,9 @@
       }
       g.line_total += +l.line_total || 0;
       g.qty_pending += +l.qty_pending || 0;
+      // pack hors stock (2026-11-18) : nombre de packs encore à recevoir = le pire des couleurs
+      var per = (+l.qty || 0) / (+pk.n || 1);
+      if (per > 0) g.qty_to_order = Math.max(g.qty_to_order, Math.ceil((+l.qty_to_order || 0) / per));
       g.members.push(Math.round((+l.qty || 0) / (+pk.n || 1)) + ' × ' + (l.name || l.label || ''));
       if (l.hex) g.hexes.push(l.hex);
       g.meta = [pk.code].concat(g.members.join(', ')).filter(Boolean).join(' · ');   // code d'offre + couleurs (comme PDF/courriels)
@@ -422,7 +425,7 @@
   function lineLi(l, bo) {
     return '<li>' + swatch(l.hex, (l.name || '') + ' ' + (l.meta || '')) +
       '<span class="ol-tx"><b>' + esc(l.name || '') + '</b>' + (l.meta ? '<small>' + esc(l.meta) + '</small>' : '') +
-        (bo ? '<em class="ol-pend">' + (emptyIds[l.product_id] ? bo + _t(' à compléter · sans garantie')
+        (bo ? '<em class="ol-pend">' + (l.pack ? _t('Réservé à la prochaine réception') : emptyIds[l.product_id] ? bo + _t(' à compléter · sans garantie')
           : bo + _t(' à commander · ') + (l.ptype === 'spacer' ? _t('délai à confirmer') : _t('3 à 14 jours ouvrables'))) + '</em>' : '') + '</span>' +
       '<span class="ol-q">' + (+l.qty) + ' × ' + money(l.unit_price) + '</span>' +
       '<span class="ol-t">' + money(l.line_total) + '</span></li>';

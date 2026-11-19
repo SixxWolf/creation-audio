@@ -1015,12 +1015,12 @@
     preloadPack(pk);
     var s = selOf(pk), pres = presetsOf(pk), comp = selComp(pk), units = packUnits(pk), soldOut = !packAnyStock(pk);
     var tiles = pres.map(function (pr) {
-      var c = preComp(pr), ok = packRoom(pk, c, null, true) > 0, on = s.sel === pr.id;
-      return '<button type="button" class="pack-pre' + (on ? ' is-on' : '') + (ok ? '' : ' is-out') + '" data-pk="' + esc(pk.id) + '" data-pre="' + esc(pr.id) + '"' +
-        ' aria-pressed="' + on + '"' + (ok ? '' : ' disabled') + '>' +
+      // hors stock : toujours choisissable, sans « Épuisé » (le pack part « à commander », Théo 2026-11-18)
+      var c = preComp(pr), on = s.sel === pr.id;
+      return '<button type="button" class="pack-pre' + (on ? ' is-on' : '') + '" data-pk="' + esc(pk.id) + '" data-pre="' + esc(pr.id) + '"' +
+        ' aria-pressed="' + on + '">' +
         '<span class="pack-pre-art">' + packArt(pk, c) + '</span>' +
         '<span class="pack-pre-name">' + esc(preName(pr)) + '</span>' +
-        (ok ? '' : '<span class="pack-pre-out">' + _t('Épuisé') + '</span>') +
       '</button>';
     });
     if (packCustom(pk)) {
@@ -1038,11 +1038,11 @@
         packCols(pk).map(function (p) {
           var n = s.custom[p.id] | 0;
           // reste du stock pour cette couleur (panier compris), une fois les unités déjà choisies
-          var free = stockOf(p, pk.kind) - packUse(p.id, pk.kind, null) - (canBackorder() ? 0 : regQty(p.id, pk.kind));
-          var canInc = used + 1 <= units && n + 1 <= free;
-          return '<div class="pack-crow' + (free < 1 && !n ? ' is-out' : '') + '">' +
+          // au-delà du stock : permis (à commander), sans mention
+          var canInc = used + 1 <= units;
+          return '<div class="pack-crow">' +
             '<span class="pack-csw" style="background:' + esc(swatchBg(p)) + '"></span>' +
-            '<span class="pack-cname">' + esc(p.name) + (free < 1 && !n ? ' <em>' + _t('Épuisé') + '</em>' : '') + '</span>' +
+            '<span class="pack-cname">' + esc(p.name) + '</span>' +
             '<span class="pack-step">' +
               '<button type="button" data-pk="' + esc(pk.id) + '" data-p="' + esc(p.id) + '" data-d="-1" aria-label="' + _t('Retirer une unité') + '"' + (n ? '' : ' disabled') + '>&minus;</button>' +
               '<b>' + n + '</b>' +
@@ -1052,9 +1052,7 @@
         }).join('') +
       '</div>';
     }
-    var room = comp ? packRoom(pk, comp, null) : 0, bare = comp ? packRoom(pk, comp, null, true) : 0;
-    var btn = !comp ? (s.sel === 'custom' ? _t('Choisis ') + units + (pk.kind === 'spool' ? _t(' bobines') : _t(' recharges')) : _t('Épuisé'))
-      : bare < 1 ? _t('Épuisé') : room < 1 ? _t('Maximum au panier') : _t('Ajouter au panier');
+    var btn = !comp && s.sel === 'custom' ? _t('Choisis ') + units + (pk.kind === 'spool' ? _t(' bobines') : _t(' recharges')) : _t('Ajouter au panier');
     var note = packNote(pk), brand = brandOf(pk), view = viewComp(pk), sv = packSaving(pk, comp);
     var imgs = packImgs(pk); if (pkImg >= imgs.length) pkImg = 0;
     // « Ce pack contient » : couleur, code Bambu Lab, quantité
@@ -1089,10 +1087,10 @@
         // une seule composition, sans Personnaliser : la photo suffit, pas de tuile à choisir
         (soldOut ? '<div class="pack-oos"><p class="pack-oos-t">' + _t('Ce pack est indisponible pour l\'instant. Il reviendra sous peu.') + '</p>' +
           notifyHtml(packNotify(pk)) + '</div>' : '') +
-        (!soldOut && tiles.length > 1 ? '<div class="pack-pres" role="group" aria-label="' + _t('Composition') + '">' + tiles.join('') + '</div>' : '') +
-        (soldOut ? '' : custom) +
+        (tiles.length > 1 ? '<div class="pack-pres" role="group" aria-label="' + _t('Composition') + '">' + tiles.join('') + '</div>' : '') +
+        custom +
         contains +
-        (soldOut ? '' : '<button type="button" class="pack-add btn-add" data-pk="' + esc(pk.id) + '"' + (comp && room > 0 ? '' : ' disabled') + '>' + IC.cart + '<span>' + btn + '</span></button>') +
+        '<button type="button" class="pack-add btn-add" data-pk="' + esc(pk.id) + '"' + (comp ? '' : ' disabled') + '>' + IC.cart + '<span>' + btn + '</span></button>' +
         (brand ? '<p class="pack-tier">' + _t('Le pack compte pour le rabais quantité de tes autres filaments ') + esc(brand) + '.</p>' : '') +
         '<ul class="pdp-assure">' +
           '<li>' + IC.pin + _t('Ramassage local à Québec, sur rendez-vous</li>') +
@@ -1103,10 +1101,35 @@
       '</div>' +
     '</article>';
   }
+  // Pack hors stock (Théo 2026-11-18) : fenêtre « indisponible pour l'instant » ; commandé avec un compte,
+  // il part « à commander » et lui est réservé à la prochaine réception. Sans compte : connexion d'abord,
+  // puis le pack s'ajoute tout seul (gardé en sessionStorage pour le retour par l'appli courriel).
+  var PEND_K = 'ca_pack_pending';
+  function setPending(v) { try { if (v) sessionStorage.setItem(PEND_K, JSON.stringify(v)); else sessionStorage.removeItem(PEND_K); } catch (e) {} }
+  function takePending() {
+    var v = null; try { v = JSON.parse(sessionStorage.getItem(PEND_K) || 'null'); } catch (e) {}
+    setPending(null);
+    var pk = v && packById[v.id];
+    if (pk && v.comp && compValid(pk, v.comp)) putPack(pk, v.comp);
+  }
   function addPack(pk, comp) {
     if (!comp || !compValid(pk, comp)) return;
-    if (packRoom(pk, comp, null) < 1) { toast(_t('Plus assez de stock pour ce pack.')); updatePackCard(pk); return; }
+    if (packRoom(pk, comp, null) >= 1) { putPack(pk, comp); return; }
+    var on = canBackorder();
+    caDialog.confirm({
+      title: _t('Pack indisponible pour l\'instant'),
+      message: _t('Ajoute-le au panier et envoie ta commande avec ton compte : on te le réserve automatiquement dès la prochaine réception des packs.'),
+      ok: on ? _t('Ajouter au panier') : _t('Me connecter'), cancel: _t('Retour'), icon: 'cart'
+    }).then(function (ok) {
+      if (ok !== true) return;
+      if (on) { putPack(pk, comp); return; }
+      setPending({ id: pk.id, comp: comp.map(function (c) { return { id: c.id, n: c.n }; }) });
+      window.CA.panierCompte.open(false);
+    });
+  }
+  function putPack(pk, comp) {
     var k = packKey(pk, comp), cur = cart[k] ? cart[k].qty : 0;
+    if (cur >= 20) { toast(_t('Maximum au panier')); return; }
     cart[k] = { id: pk.id, type: 'pack', key: k, comp: comp.map(function (c) { return { id: c.id, n: c.n }; }), qty: cur + 1 };
     saveCart(); renderCart(); updatePackCard(pk); pulseCart();
     toast(packName(pk) + _t(' ajouté au panier.'));
@@ -2014,7 +2037,7 @@
   }
   function maxOf(it) {
     if (it.type === 'accessory') { var a = accById[it.id]; return accCanBO(a) ? BO_MAX : a && a.qty != null ? a.qty : Infinity; }
-    if (isPack(it)) { var pk = packById[it.id]; return pk ? packRoom(pk, it.comp, it.key) : 0; }
+    if (isPack(it)) { var pk = packById[it.id]; return !pk ? 0 : canBackorder() ? 20 : packRoom(pk, it.comp, it.key); }
     if (canBackorder()) return BO_MAX;
     var p = byId[it.id]; return p ? freeStock(p, it.type) : it.qty;
   }
@@ -2166,12 +2189,28 @@
 
   // ligne au-delà du stock (client connecté) : « N à commander » (bobine vide : « N à compléter · sans garantie »)
   function boTag(it) {
-    if (!canBackorder() || isPack(it)) return '';
+    if (!canBackorder()) return '';
+    if (isPack(it)) return packOver(it) ? ' · <span class="citem-bo">' + _t('Réservé à la prochaine réception') + '</span>' : '';
     var m = metaOf(it); if (!m) return '';
     var st = it.type === 'accessory' ? m.qty : freeStock(m, it.type);
     var n = st == null ? 0 : it.qty - Math.max(0, st | 0);
     if (n <= 0) return '';
     return ' · <span class="citem-bo">' + (it.type === 'accessory' && isEmptySpool(m) ? boLabel(n, true) : n + _t(' à commander · 3 à 14 jours')) + '</span>';
+  }
+  // pack du panier au-delà du stock (les packs passent avant les lignes ordinaires, dans l'ordre du panier)
+  function packOver(it) {
+    var pk = packById[it.id]; if (!pk || !it.comp) return false;
+    return it.comp.some(function (c) {
+      var p = byId[c.id]; if (!p) return true;
+      var prior = 0;
+      entries().some(function (o) {
+        if (o.key === it.key) return true;
+        if (isPack(o) && packById[o.id] && packById[o.id].kind === pk.kind)
+          (o.comp || []).forEach(function (x) { if (x.id === c.id) prior += x.n * o.qty; });
+        return false;
+      });
+      return prior + c.n * it.qty > Math.max(0, stockOf(p, pk.kind) | 0);
+    });
   }
   function renderCart() {
     var n = count();
@@ -2210,7 +2249,7 @@
             '<div class="citem-thumb">' + thumbHtml(it) + '</div>' +
             '<div class="citem-main">' +
               '<div class="citem-name">' + esc(name) + '</div>' +
-              '<div class="citem-type">' + (pack ? esc(compText(it.comp)) + ' · <span class="citem-unit">' + money(unitOf(it)) + _t(' le pack') + '</span>'
+              '<div class="citem-type">' + (pack ? esc(compText(it.comp)) + ' · <span class="citem-unit">' + money(unitOf(it)) + _t(' le pack') + '</span>' + boTag(it)
                 : (it.type === 'accessory' ? esc(m.cat || _t('Accessoire')) : esc(m.material || '') + ' · ' + typeLabel(it)) +
                 ' · <span class="citem-unit">' + money(unitOf(it)) + '/u</span>' + boTag(it)) + '</div>' +
               '<div class="citem-qty">' +
@@ -2325,7 +2364,8 @@
   // Réservation 72 h (client approuvé) : articles EN STOCK seulement -> lignes au-delà du stock listées
   function overStock() {
     return entries().filter(function (it) {
-      var m = metaOf(it); if (!m || isPack(it)) return false;
+      if (isPack(it)) return packOver(it);
+      var m = metaOf(it); if (!m) return false;
       var st = it.type === 'accessory' ? m.qty : freeStock(m, it.type);
       return st != null && it.qty > Math.max(0, st | 0);
     });
@@ -2360,9 +2400,11 @@
   window.CA.panierCompte.setup({
     onMessenger: function () { orderBtn.click(); },
     onEmail: function () { if (emailBtn) emailBtn.click(); },
+    onCancel: function () { setPending(null); },
     onSignedIn: function (send) {
       // désormais connecté : note, réservation, articles hors stock commandables
-      renderCart(); loadResvInfo();
+      takePending(); renderCart(); loadResvInfo();
+      if (curPack && screenPack && !screenPack.hidden) updatePackCard(curPack);
       if (curColor && !screenProduct.hidden) renderConfig();
       if (!screenAccs.hidden) renderAccs();
       if (curAcc && !screenAcc.hidden) renderAcc();

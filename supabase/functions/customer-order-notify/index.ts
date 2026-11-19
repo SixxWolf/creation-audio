@@ -79,7 +79,8 @@ const BO_DELAY = "3 à 14 jours ouvrables";
 let emptyIds = new Set<string>();   // bobines vides (rempli par requête)
 const isEmpty = (l: Line) => !!l.product_id && emptyIds.has(l.product_id);
 const BO_DELAY_EN = "3 to 14 business days";
-const boLabel = (l: Line, n: number, en = false) => en
+// pack hors stock (2026-11-18) : réservé au client à la prochaine réception des packs
+const boLabel = (l: Line, n: number, en = false) => l.pack ? (en ? "Reserved from the next delivery" : "Réservé à la prochaine réception") : en
   ? (isEmpty(l) ? n + " to make · not guaranteed" : n + " to order" + (l.ptype === "spacer" ? "" : " · " + BO_DELAY_EN))
   : isEmpty(l) ? n + " à compléter · sans garantie"
   : n + " à commander" + (l.ptype === "spacer" ? "" : " · " + BO_DELAY);

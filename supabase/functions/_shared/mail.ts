@@ -364,12 +364,15 @@ export function packGroup<T extends Record<string, any>>(lines: T[], en = false)
       const name = (en && p.name_en) || p.name || "Pack";
       out.push({ ...l, name, label: name, qty: n, unit_price: Number(p.price) || 0, line_total: Number(l.line_total) || 0,
         qty_to_order: 0, qty_pending: Number(l.qty_pending) || 0, _cols: [col], pack_comp: {} });
+      // (qty_to_order du pack : calculé plus bas, pour toutes ses lignes)
     } else {
       const g = out[at[p.k]];
       g.line_total = r2(g.line_total + (Number(l.line_total) || 0));
       g.qty_pending += Number(l.qty_pending) || 0;
       g._cols.push(col);
     }
+    // pack hors stock (2026-11-18) : packs encore à recevoir = le pire des couleurs
+    if (per > 0) { const g = out[at[p.k]]; g.qty_to_order = Math.max(g.qty_to_order, Math.ceil((Number(l.qty_to_order) || 0) / per)); }
     // composition d'UN pack (produit → nombre) : sert à trouver la photo de la composition choisie
     if (l.product_id) { const g = out[at[p.k]]; g.pack_comp[l.product_id] = (g.pack_comp[l.product_id] || 0) + per; }
   }

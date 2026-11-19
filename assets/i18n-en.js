@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 50;
+window.CA_EN_V = 51;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -1202,6 +1202,10 @@ window.CA_EN = (function (pairs) {
   [`Composition`, `Mix`],
   [`Le pack compte pour le rabais quantité de tes autres filaments `, `The pack counts toward the volume discount on your other filaments from `],
   [`Plus assez de stock pour ce pack.`, `Not enough stock left for this pack.`],
+  [`Pack indisponible pour l'instant`, `Pack unavailable for now`],
+  [`Ajoute-le au panier et envoie ta commande avec ton compte : on te le réserve automatiquement dès la prochaine réception des packs.`, `Add it to your cart and send your order with your account: we'll set one aside for you automatically as soon as the next packs come in.`],
+  [`Me connecter`, `Sign in`],
+  [`Réservé à la prochaine réception`, `Reserved from the next delivery`],
   [`Économise {s}`, `Save {s}`],
   [`Économise {s} par rapport à {n} recharges achetées à l'unité ({t})`, `Save {s} compared with {n} refills bought individually ({t})`],
   [`Économise {s} par rapport à {n} bobines achetées à l'unité ({t})`, `Save {s} compared with {n} spools bought individually ({t})`],
