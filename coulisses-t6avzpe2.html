@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=181">
+<link rel="stylesheet" href="assets/admin.css?v=182">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
@@ -293,6 +293,7 @@
         <a class="btn btn-ghost btn-sm" href="./boutique/promotions" target="_blank" rel="noopener" data-ic="link">Voir la boutique</a>
         <button class="btn btn-ghost btn-sm" id="pm-refresh" type="button" data-ic="refresh" data-pmsub-only="promos">Rafraîchir</button>
         <button class="btn btn-ghost btn-sm" id="nv-refresh" type="button" data-ic="refresh" data-pmsub-only="nouveautes" hidden>Rafraîchir</button>
+        <button class="btn btn-ghost btn-sm" id="rt-refresh" type="button" data-ic="refresh" data-pmsub-only="retour" hidden>Rafraîchir</button>
         <button class="btn btn-ghost btn-sm" id="pp-refresh" type="button" data-ic="refresh" data-pmsub-only="populaires" hidden>Rafraîchir</button>
         <button class="btn btn-accent" id="pm-new" type="button" data-ic="plus" data-pmsub-only="promos">Promotion</button>
       </div>
@@ -300,6 +301,7 @@
       <div class="inv-subtabs" role="tablist" aria-label="Promos et nouveautés">
         <button type="button" class="inv-subtab is-active" role="tab" data-pmsub="promos" aria-selected="true">Promotions</button>
         <button type="button" class="inv-subtab" role="tab" data-pmsub="nouveautes" aria-selected="false">Nouveautés</button>
+        <button type="button" class="inv-subtab" role="tab" data-pmsub="retour" aria-selected="false">De retour</button>
         <button type="button" class="inv-subtab" role="tab" data-pmsub="populaires" aria-selected="false">Populaires</button>
       </div>
 
@@ -424,6 +426,16 @@
 
       <div class="pm-list" id="nv-list"><p class="muted">Chargement…</p></div>
       </div><!-- /#pm-sub-new -->
+
+      <!-- De retour (cms-retour.js, 2026-11-19) : reçu avec 2 ou moins en stock, pastille 7 jours.
+           Calcul : schema-v2.sql § PASTILLE « DE RETOUR » (admin_back_items, admin_back_hide). -->
+      <div id="pm-sub-back" hidden>
+      <div class="editor rt-head">
+        <p class="muted pp-note">Reçu avec 2 ou moins en stock · pastille 7 jours.</p>
+        <span class="status" id="rt-status"></span>
+      </div>
+      <div id="rt-list"><p class="muted">Chargement…</p></div>
+      </div><!-- /#pm-sub-back -->
 
       <!-- Populaires (cms-populaires.js, 2026-11-18) : top des ventes par rayon, réglages + forcer/masquer.
            Calcul : schema-v2.sql § PASTILLE « POPULAIRE » (admin_popular, popular_settings, popular_overrides). -->
@@ -3334,8 +3346,9 @@
 <script src="assets/cms-aujourdhui.js?v=3"></script>
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-promotions.js?v=9"></script>
-<script src="assets/cms-nouveautes.js?v=3"></script>
+<script src="assets/cms-nouveautes.js?v=4"></script>
 <script src="assets/cms-populaires.js?v=1"></script>
+<script src="assets/cms-retour.js?v=1"></script>
 <script src="assets/cms-packs.js?v=6"></script>
 <script src="assets/cms-recherche.js?v=5"></script>
 <script src="assets/aide.js?v=4"></script>

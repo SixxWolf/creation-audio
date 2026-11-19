@@ -13,6 +13,8 @@
    CA.promo.loadPopular()           -> promesse : charge les articles « Populaire » (une fois)
    CA.promo.isPop(kind, ref)        -> true si l'article porte la pastille (après loadPopular)
    CA.promo.popTag(inline)          -> pastille dorée « ★ Populaire » (coin haut-droit de la photo, ou en ligne)
+   CA.promo.isBack(kind, ref)       -> true si l'article est « De retour » (chargé par loadPopular, même appel)
+   CA.promo.backTag(inline)         -> pastille verte « De retour » (coin bas-gauche, au-dessus de « Nouveau » s'il y est)
    ========================================================= */
 (function () {
   'use strict';
@@ -62,10 +64,22 @@
     if (popP) return popP;
     var sb = CA.sb;
     if (!sb || !sb.rpc) return (popP = Promise.resolve());
-    popP = Promise.resolve(sb.rpc('popular_items')).then(function (r) {
-      ((r && !r.error && r.data) || []).forEach(function (x) { popSet[x.kind + ':' + x.ref] = 1; });
-    }, function () {});
+    popP = Promise.all([
+      Promise.resolve(sb.rpc('popular_items')).then(function (r) {
+        ((r && !r.error && r.data) || []).forEach(function (x) { popSet[x.kind + ':' + x.ref] = 1; });
+      }, function () {}),
+      // « De retour » (2026-11-19) : RPC back_items (schema-v2.sql § PASTILLE « DE RETOUR »), mêmes kind/ref, 7 jours
+      Promise.resolve(sb.rpc('back_items')).then(function (r) {
+        ((r && !r.error && r.data) || []).forEach(function (x) { backSet[x.kind + ':' + x.ref] = x.at || 1; });
+      }, function () {})
+    ]);
     return popP;
+  }
+  var backSet = {};
+  function isBack(kind, ref) { return ref != null && !!backSet[kind + ':' + ref]; }
+  var BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 0 1 13-5.1M19.5 12a7.5 7.5 0 0 1-13 5.1" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M18.2 3v4.2H14M5.8 21v-4.2H10" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function backTag(inline) {
+    return '<span class="back-tag' + (inline ? '' : ' is-abs') + '">' + BACK + _t('De retour') + '</span>';
   }
   function isPop(kind, ref) { return ref != null && !!popSet[kind + ':' + ref]; }
   var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>';
@@ -73,5 +87,5 @@
     return '<span class="pop-tag' + (inline ? '' : ' is-abs') + '">' + STAR + _t('Populaire') + '</span>';
   }
   CA.promo = { pct: pct, pctText: pctText, endText: endText, nameOf: nameOf, ribbon: ribbon, banner: banner, isNew: isNew, newTag: newTag,
-               loadPopular: loadPopular, isPop: isPop, popTag: popTag, star: STAR };
+               loadPopular: loadPopular, isPop: isPop, popTag: popTag, star: STAR, isBack: isBack, backTag: backTag };
 })();

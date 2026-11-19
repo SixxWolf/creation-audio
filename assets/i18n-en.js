@@ -970,6 +970,7 @@ window.CA_EN = (function (pairs) {
   [`PROMO`, `SALE`],
   [`Nouveau`, `New`],
   [`Populaire`, `Popular`],
+  [`De retour`, `Back in stock`],
   [`jusqu'au {d}`, `until {d}`],
   [`couleur en promo`, `color on sale`],
   [`couleurs en promo`, `colors on sale`],

@@ -507,6 +507,15 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
 .pop-brand + .pop-tag.is-abs { top:46px; }
 .mat-name .pop-tag { margin-left:6px; padding:4px 8px 4px 7px; font-size:.64rem; vertical-align:.18em; }
 .mat-name .pop-tag svg { width:10px; height:10px; }
+/* « De retour » (promo.js backTag, 2026-11-19) : bleu ciel (le vert est à « Nouveau »), coin bas-gauche, au-dessus de « Nouveau » s'il y est */
+:root { --back:#1769c2; --back-2:#46a6ef; --on-back:#fff; }
+.back-tag { display:inline-flex; align-items:center; gap:4px; padding:5px 10px 5px 8px; color:var(--on-back); background:linear-gradient(135deg, var(--back-2), var(--back)); border-radius:100px;
+  font-family:var(--display); font-weight:800; font-size:.74rem; line-height:1; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap; box-shadow:0 6px 14px -5px rgba(23,105,194,.6); }
+.back-tag svg { width:12px; height:12px; flex:none; }
+.back-tag.is-abs { position:absolute; left:10px; bottom:10px; z-index:3; }
+.new-tag.is-abs ~ .back-tag.is-abs { bottom:42px; }
+.mat-name .back-tag { margin-left:6px; padding:4px 8px 4px 7px; font-size:.64rem; vertical-align:.18em; }
+.mat-name .back-tag svg { width:10px; height:10px; }
 .pop-media { position:relative; }
 .pop-brand { position:absolute; top:10px; right:10px; z-index:2; width:84px; height:28px; overflow:hidden; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 2px 8px rgba(20,22,26,.12); }
 .pop-brand img, a.pop-card:hover .pop-media .pop-brand img { display:block; width:100%; height:100%; object-fit:cover; transform:none; }
@@ -520,6 +529,8 @@ a.ch:hover { border-color:var(--ember); transform:translateX(2px); }
   .pop-brand { top:8px; right:8px; width:66px; height:22px; border-radius:6px; }
   .pop-tag { padding:4px 8px 4px 7px; font-size:.66rem; } .pop-tag svg { width:10px; height:10px; }
   .pop-tag.is-abs { right:8px; top:8px; } .pop-brand + .pop-tag.is-abs { top:36px; }
+  .back-tag { padding:4px 8px 4px 7px; font-size:.66rem; } .back-tag svg { width:10px; height:10px; }
+  .back-tag.is-abs { left:8px; bottom:8px; } .new-tag.is-abs ~ .back-tag.is-abs { bottom:35px; }
 }
 
 /* une seule promo : carte large horizontale (image à gauche, détails à droite) */

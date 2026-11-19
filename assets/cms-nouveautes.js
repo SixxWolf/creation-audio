@@ -191,11 +191,11 @@
   });
   $('#nv-refresh').addEventListener('click', load);
 
-  /* ---------- sous-onglets Promotions | Nouveautés | Populaires (#promotions, #promotions/nouveautes, #promotions/populaires) ----------
-     Populaires (2026-11-18) : cms-populaires.js, chargé par CA.loadPopulaires(). */
-  var SUBS = { promos: '#pm-sub-promos', nouveautes: '#pm-sub-new', populaires: '#pm-sub-pop' };
+  /* ---------- sous-onglets Promotions | Nouveautés | De retour | Populaires (#promotions, #promotions/nouveautes, #promotions/retour, #promotions/populaires) ----------
+     Populaires (2026-11-18) : cms-populaires.js, chargé par CA.loadPopulaires(). De retour (2026-11-19) : cms-retour.js, CA.loadRetour(). */
+  var SUBS = { promos: '#pm-sub-promos', nouveautes: '#pm-sub-new', retour: '#pm-sub-back', populaires: '#pm-sub-pop' };
   var cur = 'promos', tabOpen = false;
-  function subOf(s) { return s === 'nouveautes' || s === 'populaires' ? s : 'promos'; }
+  function subOf(s) { return s === 'nouveautes' || s === 'populaires' || s === 'retour' ? s : 'promos'; }
   function showSub(s, force) {
     var was = cur;
     cur = subOf(s);
@@ -209,6 +209,7 @@
     if (!tabOpen || !(force || was !== cur)) return;
     if (cur === 'nouveautes') load();
     else if (cur === 'populaires' && window.CA.loadPopulaires) window.CA.loadPopulaires();
+    else if (cur === 'retour' && window.CA.loadRetour) window.CA.loadRetour();
   }
   $$('[data-pmsub]').forEach(function (b) {
     b.addEventListener('click', function () {
@@ -225,6 +226,6 @@
   window.CA.onTab = function (name) {
     if (typeof prevOnTab === 'function') prevOnTab(name);
     tabOpen = name === 'promotions';
-    if (tabOpen) { var m = /^#promotions\/(nouveautes|populaires)\b/.exec(location.hash); showSub(m ? m[1] : '', true); }
+    if (tabOpen) { var m = /^#promotions\/(nouveautes|retour|populaires)\b/.exec(location.hash); showSub(m ? m[1] : '', true); }
   };
 })();

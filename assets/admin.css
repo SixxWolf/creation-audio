@@ -2528,9 +2528,19 @@ a.ms-b-file:hover { border-color:var(--ink); }
 .pp-state.s-on { padding:3px 9px; justify-content:center; border-radius:100px; color:#3a2500; background:linear-gradient(135deg, #f4c450, #c98a12); }
 .pp-state svg { width:11px; height:11px; fill:currentColor; }
 .pp-acts { display:flex; justify-content:flex-end; min-width:96px; }
+/* De retour (cms-retour.js, 2026-11-19) : mêmes rangées que Populaires, pastille bleue (le vert est à « Nouveau ») */
+.rt-head { display:flex; align-items:center; gap:12px; }
+.rt-head .pp-note { margin:0; }
+.rt-row { grid-template-columns:20px minmax(0, 1fr) auto auto auto; }
+.rt-row.is-on { border-color:color-mix(in srgb, #1769c2 40%, var(--line)); }
+.rt-sw { display:flex; align-items:center; }
+.pp-state.rt-on { padding:3px 9px; justify-content:center; border-radius:100px; color:#fff; background:linear-gradient(135deg, #46a6ef, #1769c2); }
+.pp-sec > h3 .muted { font-weight:600; margin-left:4px; }
 @media (max-width:640px) {
   .pp-row { grid-template-columns:34px minmax(0, 1fr) auto; row-gap:6px; }
   .pp-qty { grid-column:2; grid-row:2; }
   .pp-state { grid-column:3; grid-row:1; min-width:0; }
   .pp-acts { grid-column:3; grid-row:2; min-width:0; }
+  .rt-row { grid-template-columns:20px minmax(0, 1fr) auto; }
+  .rt-row .pp-qty { white-space:normal; font-size:.82rem; }
 }

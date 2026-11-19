@@ -6585,3 +6585,88 @@ begin
   return v_out;
 end $$;
 revoke all on function public._customer_fill_lines(jsonb) from public, anon, authenticated;
+
+-- ============================================================
+-- PASTILLE « DE RETOUR » (2026-11-19)
+-- Un article reçu alors qu'il était presque épuisé : réception (filaments,
+-- accessoires) ou production (spacers) d'un format qui avait 2 unités ou moins
+-- juste avant. Pastille 7 jours, tant que ce format reste en stock.
+-- Lu dans le journal stock_moves (aucune colonne produit). Rayons (kind) :
+-- spacer · accessory · color · material ('Marque|Matériau', une couleur suffit) ·
+-- pack (refaisable ET une de ses couleurs du bon format est de retour).
+-- Admin › Promos & nouveautés › De retour peut retirer la pastille (back_hidden).
+-- ============================================================
+alter table public.stock_moves add column if not exists back_hidden boolean not null default false;
+
+create or replace function public._back_rank()
+returns table (kind text, ref text, label text, fmt text, at timestamptz, qty_before integer, qty_now integer, hidden boolean)
+language sql stable security definer set search_path = '' as $$
+  with mv as (
+    select distinct on (m.product_id, m.kind) m.product_id, m.kind as fmt, m.at, coalesce(m.qty_before, 0) as qb, m.back_hidden
+      from public.stock_moves m
+     where m.reason in ('reception', 'production') and m.delta > 0 and coalesce(m.qty_before, 0) <= 2
+       and m.at > now() - interval '7 days'
+       -- une 1re réception n'est pas un retour : déjà eu du stock au journal, ou produit créé il y a plus de 14 jours
+       -- (le journal ne remonte qu'au 2026-11-16)
+       and (exists (select 1 from public.stock_moves o
+                     where o.product_id = m.product_id and o.kind = m.kind and o.at < m.at and coalesce(o.qty_after, 0) > 0)
+            or exists (select 1 from public.products p where p.id = m.product_id and p.created_at < m.at - interval '14 days'))
+     order by m.product_id, m.kind, m.at desc
+  ),
+  pr as (
+    select case pp.type when 'filament' then 'color' else pp.type end as kind, pp.id, pp.brand, pp.material,
+           case when pp.type = 'filament' then pp.name || ' · ' || pp.brand || ' · ' || coalesce(pp.material, '') else pp.name end as label,
+           mv.fmt, mv.at, mv.qb, mv.back_hidden,
+           coalesce(case when mv.fmt = 'refill' then pp.qty_2 else pp.qty end, 0) as qn
+      from mv join public.products_public pp on pp.id = mv.product_id
+     where pp.type in ('filament', 'spacer', 'accessory')
+  ),
+  live as (select * from pr where qn > 0)
+  select l.kind, l.id::text, l.label, l.fmt, l.at, l.qb, l.qn, l.back_hidden from live l
+  union all
+  select 'material', l.brand || '|' || l.material, max(l.brand || ' · ' || l.material), null, max(l.at), null, null, false
+    from live l where l.kind = 'color' and l.material is not null and not l.back_hidden
+   group by l.brand, l.material
+  union all
+  select 'pack', pk.id::text, max(pk.name), max(pk.kind), max(l.at), null, null, false
+    from public.packs pk
+    join live l on l.kind = 'color' and l.fmt = pk.kind and not l.back_hidden
+     and (l.id = any (pk.colors) or exists (
+           select 1 from jsonb_array_elements(pk.presets) p, jsonb_array_elements(
+                    case when jsonb_typeof(p -> 'lines') = 'array' then p -> 'lines' else '[]'::jsonb end) ln
+            where lower(ln ->> 'p') = l.id::text))
+   where pk.enabled and public._pack_has_room(pk.id)
+   group by pk.id
+$$;
+revoke all on function public._back_rank() from public, anon, authenticated;
+
+-- public : seulement ce qui porte la pastille (jamais les quantités)
+create or replace function public.back_items()
+returns table (kind text, ref text, at timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select r.kind, r.ref, r.at from public._back_rank() r where not r.hidden
+$$;
+revoke all on function public.back_items() from public;
+grant execute on function public.back_items() to anon, authenticated;
+
+-- admin : liste complète (retirés compris)
+create or replace function public.admin_back_items()
+returns table (kind text, ref text, label text, fmt text, at timestamptz, qty_before integer, qty_now integer, hidden boolean)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'admin only'; end if;
+  return query select * from public._back_rank();
+end $$;
+revoke all on function public.admin_back_items() from public, anon;
+grant execute on function public.admin_back_items() to authenticated;
+
+-- admin : retirer / remettre la pastille d'un produit (ses réceptions des 7 derniers jours)
+create or replace function public.admin_back_hide(p_product uuid, p_hide boolean)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'admin only'; end if;
+  update public.stock_moves set back_hidden = coalesce(p_hide, false)
+   where product_id = p_product and reason in ('reception', 'production') and at > now() - interval '8 days';
+end $$;
+revoke all on function public.admin_back_hide(uuid, boolean) from public, anon;
+grant execute on function public.admin_back_hide(uuid, boolean) to authenticated;

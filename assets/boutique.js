@@ -139,7 +139,9 @@
   /* ---------- promotions (vues products_public : sell_price = prix promo, reg_price = prix normal) ---------- */
   var PR = window.CA.promo;
   // pastille « Populaire » (promo.js, RPC popular_items, chargée dans load()) : coin haut-droit, sous le logo de marque
-  function popT(kind, ref) { return PR.isPop && PR.isPop(kind, ref) ? PR.popTag() : ''; }
+  // + pastille « De retour » (même chargement, coin bas-gauche, 2026-11-19)
+  function popT(kind, ref) { return (PR.isPop && PR.isPop(kind, ref) ? PR.popTag() : '') + (PR.isBack && PR.isBack(kind, ref) ? PR.backTag() : ''); }
+  function isBackIn(kind, ref) { return !!(PR.isBack && PR.isBack(kind, ref)); }
   function isPopular(kind, ref) { return !!(PR.isPop && PR.isPop(kind, ref)); }
   function promoOn(p, type) { return !!(p && p.promo_id && (type === 'refill' ? p.promo_on_2 : p.promo_on)); }
   function regOf(p, type) { return type === 'refill' ? p.reg_price_2 : p.reg_price; }
@@ -643,38 +645,38 @@
     var items = [];
     brands.forEach(function (B) {
       B.materials.forEach(function (m) {
-        var pm = matPromo(m), nw = m.items.some(PR.isNew), pp = isPopular('material', m.brand + '|' + m.name);
-        if (pm || nw || pp) items.push({ pc: pm ? pm.pct : 0, nw: nw, pp: pp, html: matCard(m) });
+        var pm = matPromo(m), nw = m.items.some(PR.isNew), pp = isPopular('material', m.brand + '|' + m.name), bk = isBackIn('material', m.brand + '|' + m.name);
+        if (pm || nw || pp || bk) items.push({ pc: pm ? pm.pct : 0, nw: nw, pp: pp, bk: bk, html: matCard(m) });
       });
     });
     accessories.forEach(function (a) {
-      var pc = a.promoOn ? accPromoPct(a) : 0, nw = PR.isNew(a.promoRow), pp = isPopular('accessory', a.id);
-      if (a.promoOn || nw || pp) items.push({ pc: pc || (a.promoOn ? 1 : 0), nw: nw, pp: pp, html: accCard(a) });
+      var pc = a.promoOn ? accPromoPct(a) : 0, nw = PR.isNew(a.promoRow), pp = isPopular('accessory', a.id), bk = isBackIn('accessory', a.id);
+      if (a.promoOn || nw || pp || bk) items.push({ pc: pc || (a.promoOn ? 1 : 0), nw: nw, pp: pp, bk: bk, html: accCard(a) });
     });
     spacers.forEach(function (p) {
-      var pc = spacerPromoPct(p), nw = PR.isNew(p), pp = isPopular('spacer', p.id);
-      if (pc || nw || pp) items.push({ pc: pc, nw: nw, pp: pp, html: spacerCard(p) });
+      var pc = spacerPromoPct(p), nw = PR.isNew(p), pp = isPopular('spacer', p.id), bk = isBackIn('spacer', p.id);
+      if (pc || nw || pp || bk) items.push({ pc: pc, nw: nw, pp: pp, bk: bk, html: spacerCard(p) });
     });
     packs.forEach(function (pk) {
-      var nw = packIsNew(pk), pp = isPopular('pack', pk.id);
-      if ((nw || pp) && packCols(pk).length) items.push({ pc: 0, nw: nw, pp: pp, html: packCard(pk) });
+      var nw = packIsNew(pk), pp = isPopular('pack', pk.id), bk = isBackIn('pack', pk.id);
+      if ((nw || pp || bk) && packCols(pk).length) items.push({ pc: 0, nw: nw, pp: pp, bk: bk, html: packCard(pk) });
     });
-    // pastilles Tout · En promo · Nouveau · Populaire (2026-11-18) ; montrées dès que 2 sortes existent
+    // pastilles Tout · En promo · Nouveau · De retour (2026-11-19) · Populaire (2026-11-18) ; montrées dès que 2 sortes existent
     var nP = items.filter(function (x) { return x.pc > 0; }).length, nN = items.filter(function (x) { return x.nw; }).length,
-        nO = items.filter(function (x) { return x.pp; }).length;
-    if (prFilter === 'promo' && !nP || prFilter === 'new' && !nN || prFilter === 'pop' && !nO) prFilter = 'all';
+        nO = items.filter(function (x) { return x.pp; }).length, nB = items.filter(function (x) { return x.bk; }).length;
+    if (prFilter === 'promo' && !nP || prFilter === 'new' && !nN || prFilter === 'pop' && !nO || prFilter === 'back' && !nB) prFilter = 'all';
     if (prChips) {
-      prChips.hidden = ((nP ? 1 : 0) + (nN ? 1 : 0) + (nO ? 1 : 0)) < 2;
-      prChips.innerHTML = [['all', _t('Tout'), items.length], ['promo', _t('En promo'), nP], ['new', _t('Nouveau'), nN], ['pop', _t('Populaire'), nO]].filter(function (c) {
+      prChips.hidden = ((nP ? 1 : 0) + (nN ? 1 : 0) + (nO ? 1 : 0) + (nB ? 1 : 0)) < 2;
+      prChips.innerHTML = [['all', _t('Tout'), items.length], ['promo', _t('En promo'), nP], ['new', _t('Nouveau'), nN], ['back', _t('De retour'), nB], ['pop', _t('Populaire'), nO]].filter(function (c) {
         return c[0] === 'all' || c[2] > 0;
       }).map(function (c) {
         return '<button type="button" class="chip" data-f="' + c[0] + '"' + (prFilter === c[0] ? ' aria-current="true"' : '') + '>' +
           c[1] + ' <span class="chip-n">' + c[2] + '</span></button>';
       }).join('');
     }
-    var shown = items.filter(function (x) { return prFilter === 'promo' ? x.pc > 0 : prFilter === 'new' ? x.nw : prFilter === 'pop' ? x.pp : true; });
+    var shown = items.filter(function (x) { return prFilter === 'promo' ? x.pc > 0 : prFilter === 'new' ? x.nw : prFilter === 'pop' ? x.pp : prFilter === 'back' ? x.bk : true; });
     // promos d'abord (meilleur rabais en tête), puis les nouveautés dans l'ordre des rayons
-    shown = shown.map(function (x, i) { x.i = i; return x; }).sort(function (a, b) { return (b.pc > 0) - (a.pc > 0) || b.pc - a.pc || (b.nw ? 1 : 0) - (a.nw ? 1 : 0) || a.i - b.i; });   // puis nouveautés, puis populaires
+    shown = shown.map(function (x, i) { x.i = i; return x; }).sort(function (a, b) { return (b.pc > 0) - (a.pc > 0) || b.pc - a.pc || (b.nw ? 1 : 0) - (a.nw ? 1 : 0) || (b.bk ? 1 : 0) - (a.bk ? 1 : 0) || a.i - b.i; });   // puis nouveautés, de retour, populaires
     $('#pr-st-items').textContent = nP;
     var stNew = $('#pr-st-new'); if (stNew) stNew.textContent = nN;
     var best = 0;
