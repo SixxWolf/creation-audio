@@ -55,9 +55,12 @@
   var spacers = [], byId = {}, loaded = false;
   function load() {
     if (!sb) { $('#sp-list').innerHTML = _t('<p class="empty">Boutique momentanément indisponible.</p>'); return; }
-    sb.from('products_public').select('*').eq('type', 'spacer')
-      .order('sort_order', { ascending: true }).order('name', { ascending: true })
-      .then(function (res) {
+    var PRm = window.CA.promo;   // pastille « Populaire » chargée avec le catalogue (une erreur n'en bloque rien)
+    Promise.all([sb.from('products_public').select('*').eq('type', 'spacer')
+      .order('sort_order', { ascending: true }).order('name', { ascending: true }),
+      PRm && PRm.loadPopular ? PRm.loadPopular() : null])
+      .then(function (all) {
+        var res = all[0];
         if (res.error) { $('#sp-list').innerHTML = _t('<p class="empty">Impossible de charger les spacers.</p>'); return; }
         spacers = res.data || [];
         byId = {}; spacers.forEach(function (p) { byId[p.id] = p; });

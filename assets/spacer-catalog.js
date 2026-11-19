@@ -460,7 +460,7 @@
         '<a class="sp-card-link" href="' + esc(hrefOf(p)) + '">' +
           '<div class="mat-media">' +
             (url ? '<img src="' + esc(url) + '" alt="" loading="lazy">' : '<span class="sp-noimg">' + IC.photo + '</span>') +
-            (spPromo(p) ? PR.ribbon(spPct(p)) : '') + (PR.isNew(p) ? PR.newTag() : '') +
+            (spPromo(p) ? PR.ribbon(spPct(p)) : '') + (PR.isNew(p) ? PR.newTag() : '') + (PR.isPop && PR.isPop('spacer', p.id) ? PR.popTag() : '') +
           '</div>' +
           '<div class="sp-body">' +
             (tags ? '<div class="sp-tags">' + tags + '</div>' : '') +

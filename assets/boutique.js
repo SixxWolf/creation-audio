@@ -138,6 +138,9 @@
   function tiersOf(p, type) { return type === 'refill' ? p.tiers_2 : p.tiers; }
   /* ---------- promotions (vues products_public : sell_price = prix promo, reg_price = prix normal) ---------- */
   var PR = window.CA.promo;
+  // pastille « Populaire » (promo.js, RPC popular_items, chargée dans load()) : coin haut-droit, sous le logo de marque
+  function popT(kind, ref) { return PR.isPop && PR.isPop(kind, ref) ? PR.popTag() : ''; }
+  function isPopular(kind, ref) { return !!(PR.isPop && PR.isPop(kind, ref)); }
   function promoOn(p, type) { return !!(p && p.promo_id && (type === 'refill' ? p.promo_on_2 : p.promo_on)); }
   function regOf(p, type) { return type === 'refill' ? p.reg_price_2 : p.reg_price; }
   function pctOf(p, type) { return promoOn(p, type) ? PR.pct(regOf(p, type), baseOf(p, type)) : 0; }
@@ -375,7 +378,8 @@
       PAGE === 'promotions' ? sb.from('products_public').select('*').eq('type', 'spacer').order('sort_order', { ascending: true }) : Promise.resolve({ data: [] }),
       // packs en ligne seulement : le filtre est explicite, car connecté en admin la RLS laisse passer les packs hors ligne
       // (session partagée avec la page admin) ; une erreur ne bloque pas la boutique
-      sb.from('packs').select('*').eq('enabled', true).order('sort_order', { ascending: true })
+      sb.from('packs').select('*').eq('enabled', true).order('sort_order', { ascending: true }),
+      PR.loadPopular ? PR.loadPopular() : null
     ]).then(function (res) {
       var pr = res[0], br = res[1], ac = res[2];
       spacers = (res[3] && !res[3].error && res[3].data) || [];
@@ -607,7 +611,7 @@
     var pc = spacerPromoPct(p), img = publicUrl(p.image_path), out = (p.qty | 0) <= 0;
     return '<a class="mcard' + (pc ? ' is-promo' : '') + (out ? ' is-out' : '') + '" href="' + esc('spacers#/s/' + encodeURIComponent(p.slug || p.id)) + '">' +
       '<span class="mcard-media">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy">' : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') +
-        (pc ? PR.ribbon(pc) : '') + (PR.isNew(p) ? PR.newTag() : '') + '</span>' +
+        (pc ? PR.ribbon(pc) : '') + (PR.isNew(p) ? PR.newTag() : '') + popT('spacer', p.id) + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(p.name) + '</span>' +
         '<span class="mcard-foot">' +
@@ -639,33 +643,38 @@
     var items = [];
     brands.forEach(function (B) {
       B.materials.forEach(function (m) {
-        var pm = matPromo(m), nw = m.items.some(PR.isNew);
-        if (pm || nw) items.push({ pc: pm ? pm.pct : 0, nw: nw, html: matCard(m) });
+        var pm = matPromo(m), nw = m.items.some(PR.isNew), pp = isPopular('material', m.brand + '|' + m.name);
+        if (pm || nw || pp) items.push({ pc: pm ? pm.pct : 0, nw: nw, pp: pp, html: matCard(m) });
       });
     });
     accessories.forEach(function (a) {
-      var pc = a.promoOn ? accPromoPct(a) : 0, nw = PR.isNew(a.promoRow);
-      if (a.promoOn || nw) items.push({ pc: pc || (a.promoOn ? 1 : 0), nw: nw, html: accCard(a) });
+      var pc = a.promoOn ? accPromoPct(a) : 0, nw = PR.isNew(a.promoRow), pp = isPopular('accessory', a.id);
+      if (a.promoOn || nw || pp) items.push({ pc: pc || (a.promoOn ? 1 : 0), nw: nw, pp: pp, html: accCard(a) });
     });
     spacers.forEach(function (p) {
-      var pc = spacerPromoPct(p), nw = PR.isNew(p);
-      if (pc || nw) items.push({ pc: pc, nw: nw, html: spacerCard(p) });
+      var pc = spacerPromoPct(p), nw = PR.isNew(p), pp = isPopular('spacer', p.id);
+      if (pc || nw || pp) items.push({ pc: pc, nw: nw, pp: pp, html: spacerCard(p) });
     });
     packs.forEach(function (pk) {
-      if (packIsNew(pk) && packCols(pk).length) items.push({ pc: 0, nw: true, html: packCard(pk) });
+      var nw = packIsNew(pk), pp = isPopular('pack', pk.id);
+      if ((nw || pp) && packCols(pk).length) items.push({ pc: 0, nw: nw, pp: pp, html: packCard(pk) });
     });
-    var nP = items.filter(function (x) { return x.pc > 0; }).length, nN = items.filter(function (x) { return x.nw; }).length;
-    if (prFilter === 'promo' && !nP || prFilter === 'new' && !nN) prFilter = 'all';
+    // pastilles Tout · En promo · Nouveau · Populaire (2026-11-18) ; montrées dès que 2 sortes existent
+    var nP = items.filter(function (x) { return x.pc > 0; }).length, nN = items.filter(function (x) { return x.nw; }).length,
+        nO = items.filter(function (x) { return x.pp; }).length;
+    if (prFilter === 'promo' && !nP || prFilter === 'new' && !nN || prFilter === 'pop' && !nO) prFilter = 'all';
     if (prChips) {
-      prChips.hidden = !(nP && nN);
-      prChips.innerHTML = [['all', _t('Tout'), items.length], ['promo', _t('En promo'), nP], ['new', _t('Nouveau'), nN]].map(function (c) {
+      prChips.hidden = ((nP ? 1 : 0) + (nN ? 1 : 0) + (nO ? 1 : 0)) < 2;
+      prChips.innerHTML = [['all', _t('Tout'), items.length], ['promo', _t('En promo'), nP], ['new', _t('Nouveau'), nN], ['pop', _t('Populaire'), nO]].filter(function (c) {
+        return c[0] === 'all' || c[2] > 0;
+      }).map(function (c) {
         return '<button type="button" class="chip" data-f="' + c[0] + '"' + (prFilter === c[0] ? ' aria-current="true"' : '') + '>' +
           c[1] + ' <span class="chip-n">' + c[2] + '</span></button>';
       }).join('');
     }
-    var shown = items.filter(function (x) { return prFilter === 'promo' ? x.pc > 0 : prFilter === 'new' ? x.nw : true; });
+    var shown = items.filter(function (x) { return prFilter === 'promo' ? x.pc > 0 : prFilter === 'new' ? x.nw : prFilter === 'pop' ? x.pp : true; });
     // promos d'abord (meilleur rabais en tête), puis les nouveautés dans l'ordre des rayons
-    shown = shown.map(function (x, i) { x.i = i; return x; }).sort(function (a, b) { return (b.pc > 0) - (a.pc > 0) || b.pc - a.pc || a.i - b.i; });
+    shown = shown.map(function (x, i) { x.i = i; return x; }).sort(function (a, b) { return (b.pc > 0) - (a.pc > 0) || b.pc - a.pc || (b.nw ? 1 : 0) - (a.nw ? 1 : 0) || a.i - b.i; });   // puis nouveautés, puis populaires
     $('#pr-st-items').textContent = nP;
     var stNew = $('#pr-st-new'); if (stNew) stNew.textContent = nN;
     var best = 0;
@@ -767,7 +776,7 @@
   function packCard(pk) {
     var out = !packAnyStock(pk);
     return '<a class="mcard pack-mcard' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
-      '<span class="mcard-media">' + packMedia(pk, defComp(pk)) + (packIsNew(pk) ? PR.newTag() : '') + '</span>' +
+      '<span class="mcard-media">' + packMedia(pk, defComp(pk)) + (packIsNew(pk) ? PR.newTag() : '') + popT('pack', pk.id) + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(packName(pk)) + '</span>' +
         '<span class="mcard-tag">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
@@ -847,7 +856,7 @@
   function packMini(pk) {
     var out = !packAnyStock(pk);
     return '<a class="pack-mini' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
-      '<span class="pack-mini-art">' + packMedia(pk, defComp(pk)) + (packIsNew(pk) ? PR.newTag() : '') + '</span>' +
+      '<span class="pack-mini-art">' + packMedia(pk, defComp(pk)) + (packIsNew(pk) ? PR.newTag() : '') + popT('pack', pk.id) + '</span>' +
       '<span class="pack-mini-body">' +
         '<span class="pack-mini-name">' + esc(packName(pk)) + '</span>' +
         '<span class="pack-mini-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
@@ -914,7 +923,7 @@
     var out = !packAnyStock(pk), comp = defComp(pk);
     // pas d'économie sur la carte (choix de Théo 2026-11-16 : trop de prix au même endroit) → seulement sur la fiche
     return '<a class="pack-tile' + (out ? ' is-out' : '') + '" href="' + esc(packHref(pk)) + '">' +
-      '<span class="pack-tile-art">' + packMedia(pk, comp) + (packIsNew(pk) ? PR.newTag() : '') + '</span>' +
+      '<span class="pack-tile-art">' + packMedia(pk, comp) + (packIsNew(pk) ? PR.newTag() : '') + popT('pack', pk.id) + '</span>' +
       '<span class="pack-tile-body">' +
         '<span class="pack-tile-name">' + esc(packName(pk)) + '</span>' +
         '<span class="pack-tile-sub">' + unitsText(pk, packUnits(pk)) + ' · ' + esc(lineOf(pk)) + '</span>' +
@@ -1124,7 +1133,7 @@
                          : '<span class="mcard-sw" style="background:' + esc(swatchBg(m.rep)) + '"></span>';
     var pm = matPromo(m);
     return '<a class="mcard' + (out ? ' is-out' : '') + (pm ? ' is-promo' : '') + '" href="' + esc(routeFor(m.brand, m.name)) + '">' +
-      '<span class="mcard-media">' + media + (pm ? PR.ribbon(pm.pct) : '') + (m.items.some(PR.isNew) ? PR.newTag() : '') + brandBadge(m.brand, 'mcard-brand') + '</span>' +
+      '<span class="mcard-media">' + media + (pm ? PR.ribbon(pm.pct) : '') + (m.items.some(PR.isNew) ? PR.newTag() : '') + brandBadge(m.brand, 'mcard-brand') + popT('material', m.brand + '|' + m.name) + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(m.name) + '</span>' +
         (pm ? '<span class="mcard-promo">' + plural(pm.n, 'couleur en promo', 'couleurs en promo') + '</span>' : '') +
@@ -1314,10 +1323,11 @@
     // pastilles dans l'ordre de l'admin (sort_order), ruptures comprises (barrées)
     var items = m.items.slice();
     var swatches = items.map(function (it) {
-      var on = it === p, o = !inStockAs(it, curType);
+      var on = it === p, o = !inStockAs(it, curType), pop = isPopular('color', it.id);
       return '<button type="button" class="sw' + (on ? ' is-active' : '') + (o ? ' is-out' : '') + (promoOn(it, curType) ? ' is-promo' : '') + '" data-id="' + esc(it.id) + '"' +
-        ' style="--c:' + esc(swatchBg(it)) + '" aria-label="' + esc(it.name + ' — ' + swStockText(it)) + '" aria-pressed="' + on + '"' +
-        ' tabindex="' + (on ? '0' : '-1') + '"></button>';
+        ' style="--c:' + esc(swatchBg(it)) + '" aria-label="' + esc(it.name + (pop ? ' — ' + _t('Populaire') : '') + ' — ' + swStockText(it)) + '" aria-pressed="' + on + '"' +
+        (pop ? ' title="' + esc(it.name + ' · ' + _t('Populaire')) + '"' : '') +
+        ' tabindex="' + (on ? '0' : '-1') + '">' + (pop ? '<span class="sw-pop" aria-hidden="true">' + PR.star + '</span>' : '') + '</button>';
     }).join('');
 
     var descLines = String(m.desc || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -1681,7 +1691,7 @@
     if (tag.length > 90) tag = tag.slice(0, 88).replace(/\s+\S*$/, '') + '…';
     return '<a class="mcard acard' + (out ? ' is-out' : '') + (a.promoOn ? ' is-promo' : '') + '" href="' + esc(accHref(a)) + '">' +
       '<span class="mcard-media">' + (a.img ? '<img src="' + esc(a.img) + '" alt="" loading="lazy">'
-        : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') + (a.promoOn ? PR.ribbon(accPromoPct(a)) : '') + (PR.isNew(a.promoRow) ? PR.newTag() : '') + '</span>' +
+        : '<span class="sp-noimg" aria-hidden="true">' + IC.cart + '</span>') + (a.promoOn ? PR.ribbon(accPromoPct(a)) : '') + (PR.isNew(a.promoRow) ? PR.newTag() : '') + popT('accessory', a.id) + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(a.name) + '</span>' +
         (tag ? '<span class="mcard-tag">' + esc(tag) + '</span>' : '') +

@@ -191,24 +191,29 @@
   });
   $('#nv-refresh').addEventListener('click', load);
 
-  /* ---------- sous-onglets Promotions | Nouveautés (#promotions, #promotions/nouveautes) ---------- */
-  var subNew = false, tabOpen = false, subPromos = $('#pm-sub-promos'), subNewEl = $('#pm-sub-new');
+  /* ---------- sous-onglets Promotions | Nouveautés | Populaires (#promotions, #promotions/nouveautes, #promotions/populaires) ----------
+     Populaires (2026-11-18) : cms-populaires.js, chargé par CA.loadPopulaires(). */
+  var SUBS = { promos: '#pm-sub-promos', nouveautes: '#pm-sub-new', populaires: '#pm-sub-pop' };
+  var cur = 'promos', tabOpen = false;
+  function subOf(s) { return s === 'nouveautes' || s === 'populaires' ? s : 'promos'; }
   function showSub(s, force) {
-    var was = subNew;
-    subNew = s === 'nouveautes';
+    var was = cur;
+    cur = subOf(s);
     $$('[data-pmsub]').forEach(function (b) {
-      var on = (b.getAttribute('data-pmsub') === 'nouveautes') === subNew;
+      var on = b.getAttribute('data-pmsub') === cur;
       b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on);
     });
-    $$('[data-pmsub-only]').forEach(function (b) { b.hidden = (b.getAttribute('data-pmsub-only') === 'nouveautes') !== subNew; });
-    if (subNew) { var ed = $('#pm-editor'); if (ed && !ed.hidden) { var c = $('#pm-cancel'); if (c) c.click(); } }
-    if (subPromos) subPromos.hidden = subNew;
-    if (subNewEl) subNewEl.hidden = !subNew;
-    if (subNew && tabOpen && (force || !was)) load();
+    $$('[data-pmsub-only]').forEach(function (b) { b.hidden = b.getAttribute('data-pmsub-only') !== cur; });
+    if (cur !== 'promos') { var ed = $('#pm-editor'); if (ed && !ed.hidden) { var c = $('#pm-cancel'); if (c) c.click(); } }
+    Object.keys(SUBS).forEach(function (k) { var el = $(SUBS[k]); if (el) el.hidden = k !== cur; });
+    if (!tabOpen || !(force || was !== cur)) return;
+    if (cur === 'nouveautes') load();
+    else if (cur === 'populaires' && window.CA.loadPopulaires) window.CA.loadPopulaires();
   }
   $$('[data-pmsub]').forEach(function (b) {
     b.addEventListener('click', function () {
-      var s = b.getAttribute('data-pmsub') === 'nouveautes' ? 'nouveautes' : '';
+      var s = subOf(b.getAttribute('data-pmsub'));
+      if (s === 'promos') s = '';
       if (window.CA.route && window.CA.route.goSub) window.CA.route.goSub(s); else showSub(s);
     });
   });
@@ -220,6 +225,6 @@
   window.CA.onTab = function (name) {
     if (typeof prevOnTab === 'function') prevOnTab(name);
     tabOpen = name === 'promotions';
-    if (tabOpen) showSub(/^#promotions\/nouveautes\b/.test(location.hash) ? 'nouveautes' : '', true);
+    if (tabOpen) { var m = /^#promotions\/(nouveautes|populaires)\b/.exec(location.hash); showSub(m ? m[1] : '', true); }
   };
 })();

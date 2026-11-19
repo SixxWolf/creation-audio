@@ -6225,3 +6225,102 @@ end $$;
 revoke all on function public.order_admin_mail_tick() from public, anon, authenticated;
 select cron.unschedule(jobid) from cron.job where jobname = 'order-admin-mail-tick';
 select cron.schedule('order-admin-mail-tick', '* * * * *', 'select public.order_admin_mail_tick()');
+
+-- ============================================================
+-- PASTILLE « POPULAIRE » (2026-11-18)
+-- Classement des meilleures ventes par rayon, calculé en direct depuis les factures :
+-- status 'final', clients + dealers (pas interne, pas Amazon), sur `days` jours.
+-- Rayons (kind) : spacer · accessory · color (couleur de filament) · material (carte
+-- matériau = somme de ses couleurs, ref = 'Marque|Matériau') · pack (instances de pack).
+-- Couleurs : top par matériau (étoile dans la fiche). Top `top` par rayon avec au moins `min_qty` unités ; Admin › Promos & nouveautés ›
+-- Populaires peut forcer ('force') ou masquer ('hide') un article.
+-- Le public ne reçoit que (kind, ref) : jamais les quantités.
+-- ============================================================
+create table if not exists public.popular_settings (
+  id      smallint primary key default 1 check (id = 1),
+  days    integer  not null default 90 check (days between 7 and 730),
+  top     integer  not null default 3  check (top between 1 and 20),
+  min_qty numeric(10,2) not null default 5 check (min_qty >= 0)
+);
+insert into public.popular_settings (id) values (1) on conflict (id) do nothing;
+create table if not exists public.popular_overrides (
+  kind text not null check (kind in ('spacer','accessory','color','material','pack')),
+  ref  text not null,
+  mode text not null check (mode in ('force','hide')),
+  primary key (kind, ref)
+);
+alter table public.popular_settings  enable row level security;
+alter table public.popular_overrides enable row level security;
+drop policy if exists popular_settings_admin on public.popular_settings;
+create policy popular_settings_admin on public.popular_settings for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+drop policy if exists popular_overrides_admin on public.popular_overrides;
+create policy popular_overrides_admin on public.popular_overrides for all to authenticated
+  using ( (select public.is_admin()) ) with check ( (select public.is_admin()) );
+
+create or replace function public._popular_rank()
+returns table (kind text, ref text, label text, qty numeric, rnk integer, mode text, popular boolean)
+language sql stable security definer set search_path = '' as $$
+  with st as (select days, top, min_qty from public.popular_settings where id = 1),
+  lines as (
+    select l.*, i.id as inv
+    from public.invoice_lines l join public.invoices i on i.id = l.invoice_id, st
+    where i.status = 'final' and i.client_type in ('client','dealer') and i.amazon is null
+      and i.invoice_date > current_date - st.days
+  ),
+  prod as (
+    select case p.type when 'filament' then 'color' else p.type end as kind,
+           p.id::text as ref,
+           case when p.type = 'filament' then p.name || ' · ' || p.brand || ' · ' || coalesce(p.material, '') else p.name end as label,
+           case when p.type = 'filament' then p.brand || '|' || coalesce(p.material, '') end as grp, sum(l.qty) as qty
+    from lines l join public.products p on p.id = l.product_id
+    where p.type in ('spacer','accessory','filament')
+    group by 1, 2, 3, 4
+    union all
+    select 'material', p.brand || '|' || p.material, p.brand || ' · ' || p.material, null, sum(l.qty)
+    from lines l join public.products p on p.id = l.product_id
+    where p.type = 'filament' and p.material is not null
+    group by 2, 3
+    union all
+    select 'pack', x.id, max(x.name), null, sum(x.n)
+    from (select distinct l.inv, l.pack->>'k' as k, l.pack->>'id' as id, l.pack->>'name' as name,
+                 coalesce((l.pack->>'n')::numeric, 1) as n
+          from lines l where l.pack is not null and l.pack ? 'id') x
+    group by x.id
+  ),
+  ranked as (
+    select pr.*, (row_number() over (partition by pr.kind, pr.grp order by pr.qty desc, pr.label))::int as rnk
+    from prod pr
+  ),
+  allr as (
+    select r.kind, r.ref, r.label, r.qty, r.rnk from ranked r
+    union all  -- articles forcés sans vente sur la période
+    select o.kind, o.ref, null, 0, null from public.popular_overrides o
+    where o.mode = 'force' and not exists (select 1 from ranked r where r.kind = o.kind and r.ref = o.ref)
+  )
+  select a.kind, a.ref, a.label, a.qty, a.rnk, o.mode,
+         case when o.mode = 'hide' then false when o.mode = 'force' then true
+              else a.rnk <= st.top and a.qty >= st.min_qty end
+  from allr a cross join st left join public.popular_overrides o on o.kind = a.kind and o.ref = a.ref
+$$;
+revoke all on function public._popular_rank() from public, anon, authenticated;
+
+-- public : seulement les articles qui portent la pastille
+create or replace function public.popular_items()
+returns table (kind text, ref text)
+language sql stable security definer set search_path = '' as $$
+  select r.kind, r.ref from public._popular_rank() r where r.popular
+$$;
+revoke all on function public.popular_items() from public;
+grant execute on function public.popular_items() to anon, authenticated;
+
+-- admin : classement complet avec quantités
+create or replace function public.admin_popular()
+returns table (kind text, ref text, label text, qty numeric, rnk integer, mode text, popular boolean)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'admin only'; end if;
+  return query select * from public._popular_rank();
+end $$;
+revoke all on function public.admin_popular() from public, anon;
+grant execute on function public.admin_popular() to authenticated;

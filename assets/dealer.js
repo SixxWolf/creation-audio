@@ -270,8 +270,11 @@
   /* ---------- catalogue (prix dealer) ---------- */
   var spacers = [], byId = {}, loaded = false;
   function load() {
-    sb.from('products_dealer').select('*').order('sort_order', { ascending: true }).order('name', { ascending: true })
-      .then(function (res) {
+    var PRm = window.CA.promo;   // pastille « Populaire » chargée avec le catalogue
+    Promise.all([sb.from('products_dealer').select('*').order('sort_order', { ascending: true }).order('name', { ascending: true }),
+      PRm && PRm.loadPopular ? PRm.loadPopular() : null])
+      .then(function (all) {
+        var res = all[0];
         if (res.error) { $('#dl-list').innerHTML = _t('<p class="empty">Impossible de charger le catalogue dealer.</p>'); return; }
         spacers = res.data || [];
         byId = {}; spacers.forEach(function (p) { byId[p.id] = p; });

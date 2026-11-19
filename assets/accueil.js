@@ -285,6 +285,8 @@
     return mats.length;
   }
 
+  // pastille « Populaire » (promo.js) : coin haut-droit de la photo (sous le logo), ou en ligne après le nom
+  function popT(kind, ref, inline) { var P = window.CA.promo; return P && P.isPop && P.isPop(kind, ref) ? (inline ? ' ' : '') + P.popTag(inline) : ''; }
   function matCard(g) {
     var band = g.stock.slice().sort(hueSort).slice(0, 28).map(function (p, i) {
       return '<i style="--s:' + esc(swatchBg(p)) + ';--i:' + i + '"></i>';
@@ -298,7 +300,8 @@
       '<span class="mat-band" aria-hidden="true">' + band + '</span>' +
       '<span class="mat-go" aria-hidden="true">' + ARROW + '</span>' +
       '<span class="mat-body">' +
-        '<span class="mat-name">' + esc(g.material) + (window.CA.promo && g.all.some(window.CA.promo.isNew) ? ' ' + window.CA.promo.newTag(true) : '') + '</span>' +
+        '<span class="mat-name">' + esc(g.material) + (window.CA.promo && g.all.some(window.CA.promo.isNew) ? ' ' + window.CA.promo.newTag(true) : '') +
+          popT('material', g.brand + '|' + g.material, true) + '</span>' +
         (tag ? '<span class="mat-tag">' + esc(tag) + '</span>' : '') +
         '<span class="mat-foot"><span>' + tn(n, '<b>{n}</b> couleur en stock', '<b>{n}</b> couleurs en stock') + '</span>' +
           (min != null ? '<span class="mat-price">' + _t('dès <b>{p}</b>', { p: priceShort(min) }) + '</span>' : '') + '</span>' +
@@ -413,7 +416,8 @@
       var sub = isF ? (promo ? tn(g.np, '{n} couleur en promo', '{n} couleurs en promo') : tn(g.n, '{n} couleur', '{n} couleurs')) : (promo ? esc(P.nameOf(p)) : '');
       var end = promo ? P.endText(p.promo_ends) : '';
       return '<a class="pop-card ' + (promo ? 'promo-card' : 'new-card') + '" href="' + esc(href) + '">' + (promo ? P.ribbon(g.pc) : '') +
-        '<span class="pop-media">' + media + (g.nw ? P.newTag() : '') + (isF ? brandBadge(p.brand) : '') + '</span><span class="pop-body">' +
+        '<span class="pop-media">' + media + (g.nw ? P.newTag() : '') + (isF ? brandBadge(p.brand) : '') +
+        popT(isF ? 'material' : p.type, isF ? p.brand + '|' + p.material : p.id) + '</span><span class="pop-body">' +
         '<span class="pop-name">' + title + '</span>' +
         (sub || end ? '<span class="pop-meta"><span>' + sub + (sub && end ? ' · ' : '') + (end ? esc(end) : '') + '</span></span>' : '') +
         '<span class="pop-foot">' + (g.min != null ? '<span>' + (isF ? _t('dès') + ' ' : '') + '<b>' + money(g.min) + '</b>' +
@@ -430,7 +434,7 @@
         media = '<span class="pk-dots" aria-hidden="true">' + hx.slice(0, units).map(function (h) { return '<i style="background:' + esc(h) + '"></i>'; }).join('') + '</span>';
       }
       return '<a class="pop-card new-card" href="' + esc('boutique/packs#/p/' + encodeURIComponent(pk.slug || pk.id)) + '">' +
-        '<span class="pop-media">' + media + P.newTag() + '</span><span class="pop-body">' +
+        '<span class="pop-media">' + media + P.newTag() + popT('pack', pk.id) + '</span><span class="pop-body">' +
         '<span class="pop-name">' + esc((CA0.lang === 'en' && pk.name_en) || pk.name) + '</span>' +
         '<span class="pop-meta"><span>' + tn(units, spool ? '{n} bobine' : '{n} recharge', spool ? '{n} bobines' : '{n} recharges') + '</span></span>' +
         '<span class="pop-foot"><span><b>' + money(+pk.price) + '</b> <span class="pk-unit">' + money(unit) + ' ' + (spool ? _t('la bobine') : _t('la recharge')) + '</span></span></span>' +
@@ -474,7 +478,9 @@
       sb.from('brands').select('name,sort_order,slug,image_path'),
       sb.from('product_popularity').select('product_id,qty_sold'),
       // packs en ligne (filtre explicite : la session admin passe la RLS) — pour les packs marqués « Nouveau »
-      sb.from('packs').select('id,slug,name,name_en,kind,units,price,colors,presets,image_path,new_until,sort_order').eq('enabled', true).order('sort_order', { ascending: true })
+      sb.from('packs').select('id,slug,name,name_en,kind,units,price,colors,presets,image_path,new_until,sort_order').eq('enabled', true).order('sort_order', { ascending: true }),
+      // pastille « Populaire » (promo.js, RPC popular_items) : une erreur n'en bloque rien
+      window.CA.promo && window.CA.promo.loadPopular ? window.CA.promo.loadPopular() : null
     ]).then(function (res) {
       var pr = res[0], br = res[1], po = res[2];
       if (!pr || pr.error || !pr.data) { fail(); return; }

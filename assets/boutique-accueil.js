@@ -100,6 +100,8 @@
     });
     return order.map(function (k) { return map[k]; });
   }
+  // pastille « Populaire » (promo.js, chargée dans load()) : coin haut-droit, sous le logo de marque
+  function popT(kind, ref) { return PR && PR.isPop && PR.isPop(kind, ref) ? PR.popTag() : ''; }
   // une carte : ruban % si promo, pastille « Nouveau » si nouveau (les deux possibles, choix de Théo 2026-11-17)
   function card(g) {
     var p = g.p, isF = p.type === 'filament', promo = g.pc > 0;
@@ -107,7 +109,8 @@
     var sub = isF ? (promo ? tn(g.np, '{n} couleur en promo', '{n} couleurs en promo') : tn(g.n, '{n} couleur', '{n} couleurs'))
       : p.type === 'spacer' ? _t('Spacer') : _t('Accessoire');
     return '<a class="mcard' + (promo ? ' is-promo' : '') + '" href="' + esc(hrefOf(p)) + '">' +
-      '<span class="mcard-media">' + media(p) + (promo ? PR.ribbon(g.pc) : '') + (g.nw ? PR.newTag() : '') + (isF ? brandBadge(p.brand) : '') + '</span>' +
+      '<span class="mcard-media">' + media(p) + (promo ? PR.ribbon(g.pc) : '') + (g.nw ? PR.newTag() : '') + (isF ? brandBadge(p.brand) : '') +
+        popT(isF ? 'material' : p.type, isF ? p.brand + '|' + p.material : p.id) + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc(name) + '</span>' +
         '<span class="' + (promo && isF ? 'mcard-promo' : 'mcard-tag') + '">' + esc(sub) + '</span>' +
@@ -134,7 +137,7 @@
       art = '<span class="pack-dots" aria-hidden="true">' + dots + '</span>';
     }
     return '<a class="mcard pack-mcard" href="' + esc('boutique/packs#/p/' + encodeURIComponent(pk.slug || pk.id)) + '">' +
-      '<span class="mcard-media">' + art + (packIsNew(pk) ? PR.newTag() : '') + '</span>' +
+      '<span class="mcard-media">' + art + (packIsNew(pk) ? PR.newTag() : '') + popT('pack', pk.id) + '</span>' +
       '<span class="mcard-body">' +
         '<span class="mcard-name">' + esc((CA.lang === 'en' && pk.name_en) || pk.name) + '</span>' +
         '<span class="mcard-tag">' + tn(units, spool ? '{n} bobine' : '{n} recharge', spool ? '{n} bobines' : '{n} recharges') + '</span>' +
@@ -226,7 +229,8 @@
     Promise.all([
       sb.from('products_public').select(cols).in('type', ['filament', 'spacer', 'accessory']).order('sort_order', { ascending: true }).limit(2000),
       sb.from('brands').select('name,sort_order,slug,image_path'),
-      sb.from('packs').select('*').eq('enabled', true).order('sort_order', { ascending: true })   // explicite : l'admin connecté voit aussi les packs hors ligne
+      sb.from('packs').select('*').eq('enabled', true).order('sort_order', { ascending: true }),   // explicite : l'admin connecté voit aussi les packs hors ligne
+      PR && PR.loadPopular ? PR.loadPopular() : null
     ]).then(function (res) {
       var pr = res[0], br = res[1];
       if (!pr || pr.error || !pr.data) return;

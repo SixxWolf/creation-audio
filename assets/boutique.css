@@ -865,6 +865,21 @@ body.cart-lock { overflow:hidden; }
 .new-tag.is-abs { position:absolute; left:10px; bottom:10px; z-index:3; }
 @media (max-width:640px) { .new-tag { padding:4px 9px; font-size:.7rem; } .new-tag.is-abs { left:8px; bottom:8px; } }
 
+/* ---------- « Populaire » (promo.js popTag, 2026-11-18) : pastille dorée, coin haut-droit (sous le logo de marque s'il y en a un) ---------- */
+:root { --pop:#c98a12; --pop-2:#f4c450; --on-pop:#3a2500; }
+.pop-tag { display:inline-flex; align-items:center; gap:4px; padding:5px 10px 5px 8px; color:var(--on-pop); background:linear-gradient(135deg, var(--pop-2), var(--pop)); border-radius:100px;
+  font-family:var(--display); font-weight:800; font-size:.74rem; line-height:1; letter-spacing:.05em; text-transform:uppercase; white-space:nowrap; box-shadow:0 6px 14px -5px rgba(201,138,18,.65); }
+.pop-tag svg { width:12px; height:12px; flex:none; fill:currentColor; }
+.pop-tag.is-abs { position:absolute; right:10px; top:10px; z-index:3; }
+.mcard-brand + .pop-tag.is-abs { top:46px; }
+.sw-pop { position:absolute; left:-4px; top:-4px; width:17px; height:17px; display:grid; place-items:center; border-radius:50%; color:var(--on-pop);
+  background:linear-gradient(135deg, var(--pop-2), var(--pop)); border:2px solid #fff; pointer-events:none; }
+.sw-pop svg { width:9px; height:9px; fill:currentColor; }
+@media (max-width:640px) {
+  .pop-tag { padding:4px 8px 4px 7px; font-size:.66rem; } .pop-tag svg { width:10px; height:10px; }
+  .pop-tag.is-abs { right:8px; top:8px; } .mcard-brand + .pop-tag.is-abs { top:36px; }
+}
+
 /* ---- Marque évidente partout (logo de la marque, Admin › Marques) ---- */
 .mcard-brand, .cat-glogo, .pdp-blogo, .cgroup-logo { display:inline-block; flex:none; overflow:hidden; background:#fff;
   border:1px solid var(--line); border-radius:8px; }

@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=179">
+<link rel="stylesheet" href="assets/admin.css?v=180">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
@@ -293,12 +293,14 @@
         <a class="btn btn-ghost btn-sm" href="./boutique/promotions" target="_blank" rel="noopener" data-ic="link">Voir la boutique</a>
         <button class="btn btn-ghost btn-sm" id="pm-refresh" type="button" data-ic="refresh" data-pmsub-only="promos">Rafraîchir</button>
         <button class="btn btn-ghost btn-sm" id="nv-refresh" type="button" data-ic="refresh" data-pmsub-only="nouveautes" hidden>Rafraîchir</button>
+        <button class="btn btn-ghost btn-sm" id="pp-refresh" type="button" data-ic="refresh" data-pmsub-only="populaires" hidden>Rafraîchir</button>
         <button class="btn btn-accent" id="pm-new" type="button" data-ic="plus" data-pmsub-only="promos">Promotion</button>
       </div>
 
       <div class="inv-subtabs" role="tablist" aria-label="Promos et nouveautés">
         <button type="button" class="inv-subtab is-active" role="tab" data-pmsub="promos" aria-selected="true">Promotions</button>
         <button type="button" class="inv-subtab" role="tab" data-pmsub="nouveautes" aria-selected="false">Nouveautés</button>
+        <button type="button" class="inv-subtab" role="tab" data-pmsub="populaires" aria-selected="false">Populaires</button>
       </div>
 
       <div id="pm-sub-promos">
@@ -422,6 +424,30 @@
 
       <div class="pm-list" id="nv-list"><p class="muted">Chargement…</p></div>
       </div><!-- /#pm-sub-new -->
+
+      <!-- Populaires (cms-populaires.js, 2026-11-18) : top des ventes par rayon, réglages + forcer/masquer.
+           Calcul : schema-v2.sql § PASTILLE « POPULAIRE » (admin_popular, popular_settings, popular_overrides). -->
+      <div id="pm-sub-pop" hidden>
+      <div class="editor" id="pp-box">
+        <div class="grid">
+          <div class="field">
+            <label class="lbl" for="pp-days">Période (jours)</label>
+            <input type="number" id="pp-days" min="7" max="730" step="1" value="90" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pp-top">Top par rayon</label>
+            <input type="number" id="pp-top" min="1" max="20" step="1" value="3" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label class="lbl" for="pp-min">Minimum vendu</label>
+            <input type="number" id="pp-min" min="0" step="1" value="5" inputmode="numeric">
+          </div>
+        </div>
+        <p class="muted pp-note">Ventes du site et des revendeurs (factures). Couleurs : top dans chaque matériau.</p>
+        <span class="status" id="pp-status"></span>
+      </div>
+      <div id="pp-list"><p class="muted">Chargement…</p></div>
+      </div><!-- /#pm-sub-pop -->
      </div><!-- /.dock-main -->
      <aside class="dock" data-dock aria-label="Éditeur"></aside>
     </section>
@@ -3308,7 +3334,8 @@
 <script src="assets/cms-aujourdhui.js?v=3"></script>
 <script src="assets/cms-nouvelles.js?v=5"></script>
 <script src="assets/cms-promotions.js?v=9"></script>
-<script src="assets/cms-nouveautes.js?v=2"></script>
+<script src="assets/cms-nouveautes.js?v=3"></script>
+<script src="assets/cms-populaires.js?v=1"></script>
 <script src="assets/cms-packs.js?v=6"></script>
 <script src="assets/cms-recherche.js?v=5"></script>
 <script src="assets/aide.js?v=4"></script>
