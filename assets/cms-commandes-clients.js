@@ -50,7 +50,7 @@
     if (!x || !x.pickup_date) return '';
     var p = String(x.pickup_date).split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]);
     return d.toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'short' }) +
-      (x.pickup_start ? ', ' + CA.hourTxt(x.pickup_start) + (x.pickup_end ? ' – ' + CA.hourTxt(x.pickup_end) : '') : '');
+      (x.pickup_start ? ', ' + CA.hourTxt(x.pickup_start) + (x.pickup_end ? ' – ' + CA.hourTxt(x.pickup_end) : '') : ', heure à confirmer');
   };
   CA.pickupLine = function (x) {
     var t = CA.fmtPickup(x), q = x && x.pickup_req;
@@ -62,6 +62,7 @@
     var ok = x && x.pickup_confirmed_at;
     return (t ? '<p class="co-pk"><b>Cueillette :</b> ' + esc(t) +
       (ok ? ' <span class="co-status is-ready">Confirmée</span>'
+          : x.manual && !x.pickup_start ? ' <span class="co-status is-new">Heure à confirmer</span>'   // l'heure se met par « Cueillette »
           : x.status === 'new' ? ''   // commande en ligne Nouvelle : le bouton principal de la carte confirme tout
           : ' <button type="button" class="btn btn-accent btn-sm" data-pkok data-ic="check">Confirmer</button>') + '</p>' : '') + req;
   };
@@ -141,7 +142,9 @@
         d = panel.querySelector('#pke-d').value; s = panel.querySelector('#pke-s').value;
         var eEl = panel.querySelector('#pke-e'); en = eEl && eEl.value || null;
       } else { var v = p && p.value(); d = v && v.d; s = v && v.s; }
-      if (!d || !s) { caDialog.toast('Choisis un jour et une heure.', 'bad'); return; }
+      // commande hors site : jour seul permis (heure à confirmer)
+      if (!d || (!s && !x.manual)) { caDialog.toast('Choisis un jour et une heure.', 'bad'); return; }
+      if (!s && en) { caDialog.toast('Choisis l\'heure de début.', 'bad'); return; }
       if (en && en <= s) { caDialog.toast('L\'heure de fin doit suivre l\'heure de début.', 'bad'); return; }
       btn.disabled = true;
       var args = { p_kind: kind, p_id: x.id, p_d: d, p_s: s };

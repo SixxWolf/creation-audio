@@ -182,6 +182,7 @@
 .inv-table th.num, .inv-table td.num { text-align:right; }
 .inv-table td { padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:middle; font-size:.9rem; }
 .inv-sw { vertical-align:-2px; margin-right:6px; }
+.inv-thumb { width:34px; height:34px; object-fit:contain; vertical-align:middle; margin-right:8px; border-radius:6px; background:#fff; }
 .inv-mat { color:var(--muted); font-size:.78rem; }
 /* champs éditables de l'aperçu (écran seulement : bordures retirées à l'impression) */
 .inv-qty, .inv-price { width:78px; text-align:right; padding:6px 8px; border:1px solid #DAD7CF;

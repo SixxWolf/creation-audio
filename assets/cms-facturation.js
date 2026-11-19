@@ -1091,7 +1091,7 @@
             (marginShown ? '<span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
               (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span>' : '') +
           '</div>'
-        : swatchSVG(l.hex) + esc(l.label) + (l.pack ? ' <span class="inv-mat fx-packtag">' + esc(l.pack.name || 'Pack') + '</span>' : '') + (l.meta ? ' <span class="inv-mat">' + esc(CA.kindMeta(l.meta)) + '</span> ' + CA.kindPill(CA.kindOf(l.meta, l.kind)) : '') + pendPill +
+        : lineThumb(l) + esc(l.label) + (l.pack ? ' <span class="inv-mat fx-packtag">' + esc(l.pack.name || 'Pack') + '</span>' : '') + (l.meta ? ' <span class="inv-mat">' + esc(CA.kindMeta(l.meta)) + '</span> ' + CA.kindPill(CA.kindOf(l.meta, l.kind)) : '') + pendPill +
           // coût unitaire modifiable (privé) : seulement quand la marge est affichée
           (marginShown ? '<div class="inv-sub no-print"><span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
             (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span></div>' : '');
@@ -1471,7 +1471,9 @@
       ok: tg ? 'Mettre à jour' : 'Envoyer', icon: 'clock' }).then(function (ok) {
       if (ok !== true) return;
       var d = $('#fxo-d', body).value, s = $('#fxo-s', body).value, e = $('#fxo-e', body).value;
-      if (d && !s) { caDialog.toast('Choisis l\'heure de passage.', 'bad'); return; }
+      // jour seul permis (heure à confirmer plus tard dans la carte de la commande)
+      if (!s && e) { caDialog.toast('Choisis l\'heure de début.', 'bad'); return; }
+      if (!d && s) { caDialog.toast('Choisis le jour.', 'bad'); return; }
       if (s && e && e <= s) { caDialog.toast('L\'heure de fin doit suivre l\'heure de début.', 'bad'); return; }
       elToOrder.disabled = true; elStatus.textContent = 'Envoi…';
       // la note rechargée commence par « Commande C-0041 — » : on ne garde que la note du client
@@ -1856,6 +1858,11 @@
     if (path.charAt(0) === '/' || /^assets\//.test(path)) return (CA.siteRoot || '') + path.replace(/^\//, '');
     try { return sb.storage.from('products').getPublicUrl(path, { transform: { width: 200, height: 200, resize: 'contain' } }).data.publicUrl; }
     catch (e) { return ''; }
+  }
+  // aperçu à l'écran (2026-11-18) : la même photo que le PDF (filament = photo du format), pastille si aucune photo
+  function lineThumb(l) {
+    var url = printImg(lineImgPath(l));
+    return url ? '<img class="inv-thumb" src="' + esc(url) + '" alt="" loading="lazy">' : swatchSVG(l.hex);
   }
   function lineImgPath(l) {
     var MAINT = /^Entretien(?: mensuel)? — (.+)$/, hit = l.productId ? findProduct(l.productId) : null;

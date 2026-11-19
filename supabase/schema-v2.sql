@@ -2341,7 +2341,8 @@ begin
     v_d := (p_pickup ->> 'd')::date;
     v_s := nullif(p_pickup ->> 's', '')::time;
     v_e := nullif(p_pickup ->> 'e', '')::time;
-    if v_s is null then raise exception 'Choisis l''heure de passage.'; end if;
+    -- jour seul permis (2026-11-18) : l'heure se confirme plus tard (carte de la commande › Cueillette)
+    if v_s is null and v_e is not null then raise exception 'Choisis l''heure de début.'; end if;
     if v_e is not null and v_e <= v_s then raise exception 'L''heure de fin doit suivre l''heure de début.'; end if;
   end if;
   if p_order is not null then
@@ -2384,14 +2385,14 @@ begin
                                         pickup_date, pickup_start, pickup_end, pickup_confirmed_at, ready_notified_at, stock_hold, pickup_due)
     values (v_num, null, k.id, true, nullif(lower(btrim(coalesce(k.email, ''))), ''), k.name, nullif(btrim(coalesce(k.phone, '')), ''),
             nullif(left(btrim(coalesce(p_note, '')), 500), ''), v_total, v_bo, 'ready',
-            v_d, v_s, v_e, case when v_d is not null then now() end, now(), true, null)
+            v_d, v_s, v_e, case when v_s is not null then now() end, now(), true, null)
     returning id into v_id;
   else
     v_id := p_order; v_num := o.number;
     update public.customer_orders set client_id = k.id, email = nullif(lower(btrim(coalesce(k.email, ''))), ''), name = k.name,
            phone = nullif(btrim(coalesce(k.phone, '')), ''), note = nullif(left(btrim(coalesce(p_note, '')), 500), ''),
            total = v_total, has_backorder = v_bo, pickup_date = v_d, pickup_start = v_s, pickup_end = v_e,
-           pickup_confirmed_at = case when v_d is not null then now() end, stock_hold = true, updated_at = now()
+           pickup_confirmed_at = case when v_s is not null then now() end, stock_hold = true, updated_at = now()
      where id = p_order;
   end if;
   insert into public.customer_order_lines (order_id, product_id, ptype, kind, name, meta, qty, unit_price, line_total, qty_to_order, sort_order, pack)
@@ -3003,7 +3004,9 @@ returns jsonb language plpgsql security definer set search_path = '' as $$
 declare n int;
 begin
   if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
-  if p_d is null or p_s is null then raise exception 'Choisis un jour et une heure.'; end if;
+  -- heure vide permise pour une commande hors site seulement (jour seul, heure à confirmer — 2026-11-18)
+  if p_d is null or (p_s is null and p_kind <> 'order') then raise exception 'Choisis un jour et une heure.'; end if;
+  if p_s is null and p_e is not null then raise exception 'Choisis l''heure de début.'; end if;
   if p_e is not null and p_e <= p_s then raise exception 'L''heure de fin doit suivre l''heure de début.'; end if;
   if p_kind = 'invoice' then
     update public.invoices set pickup_date = p_d, pickup_start = p_s, pickup_end = null, pickup_confirmed_at = null
@@ -3018,8 +3021,8 @@ begin
      where id = p_id and status = 'active';
   else
     update public.customer_orders set pickup_date = p_d, pickup_start = p_s, pickup_end = p_e, pickup_req = null,
-           pickup_confirmed_at = case when manual then now() end, updated_at = now()
-     where id = p_id and status in ('new', 'preparing', 'ready');
+           pickup_confirmed_at = case when manual and p_s is not null then now() end, updated_at = now()
+     where id = p_id and status in ('new', 'preparing', 'ready') and (p_s is not null or manual);
   end if;
   get diagnostics n = row_count;
   if n = 0 then raise exception 'Commande introuvable ou fermée.'; end if;

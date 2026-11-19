@@ -335,7 +335,7 @@
     hit.sort(function (a, b) { return (a.pickup_date + hm(a.pickup_start)) < (b.pickup_date + hm(b.pickup_start)) ? -1 : 1; });
     var box = document.createElement('div');
     box.innerHTML = hit.map(function (it) {
-      return '<p style="margin:4px 0"><b>' + esc(it.name || it.email) + '</b> — ' + esc(dayLabel(it.pickup_date)) + ', ' + esc(hTxt(it.pickup_start)) + '</p>';
+      return '<p style="margin:4px 0"><b>' + esc(it.name || it.email) + '</b> — ' + esc(dayLabel(it.pickup_date)) + ', ' + (it.pickup_start ? esc(hTxt(it.pickup_start)) : 'heure à confirmer') + '</p>';
     }).join('');
     caDialog.alert({ title: plural(hit.length, 'cueillette déjà prise', 'cueillettes déjà prises'),
       message: 'Dans une heure fermée. Rien n\'est annulé; écris aux clients.', ok: 'Compris', danger: true, body: box });
@@ -376,7 +376,7 @@
         if (slot) html += '</div>';
         slot = k;
         var inSlot = items.filter(function (x) { return x.pickup_date === day && hm(x.pickup_start) + '|' + hm(x.pickup_end) === k; }).length;
-        html += '<div class="cq-slotblk"><div class="cq-sloth"><b>' + esc(hTxt(it.pickup_start)) + (it.pickup_end ? ' – ' + esc(hTxt(it.pickup_end)) : '') + '</b>' +
+        html += '<div class="cq-slotblk"><div class="cq-sloth"><b>' + (it.pickup_start ? esc(hTxt(it.pickup_start)) + (it.pickup_end ? ' – ' + esc(hTxt(it.pickup_end)) : '') : 'Heure à confirmer') + '</b>' +
           (cap ? '<span class="cq-cap' + (inSlot >= cap ? ' is-full' : '') + '">' + inSlot + ' / ' + cap + '</span>' : '') + '</div>';
       }
       html += itemHtml(it);
