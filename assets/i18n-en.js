@@ -4,7 +4,7 @@
    Chargé seulement par les pages /en/ (tools/build-en.js insère la balise).
    Textes manquants : node tools/i18n/check-js.js  ·  après modif : CA_EN_V + 1
    ========================================================= */
-window.CA_EN_V = 48;
+window.CA_EN_V = 49;
 window.CA_EN = (function (pairs) {
   var o = {};
   for (var i = 0; i < pairs.length; i++) o[pairs[i][0]] = pairs[i][1];
@@ -1159,6 +1159,10 @@ window.CA_EN = (function (pairs) {
   [`Utilisable sur tous les articles de la boutique, promotions comprises. N'expire pas. Ni remboursable ni échangeable contre de l'argent.`, `Usable on every item in the store, sales included. Never expires. Not refundable or exchangeable for cash.`],
   [`Merci de votre confiance !`, `Thank you for your business!`],
   [`Crédit`, `Credit`],
+  // Facture « A · Accent » imprimée (doc-print.js, 2026-11-18) : même document que le PDF du courriel
+  [`De`, `From`],
+  [`Prix unitaire`, `Unit price`],
+  [`Merci pour ta commande !`, `Thank you for your order!`],
   // Rayons de la boutique (2026-11-14) : page Promotions, accueil de la boutique
   [`Création Audio — Promotions`, `Création Audio — Promotions`],
   // Promos et nouveautés regroupées (2026-11-17)

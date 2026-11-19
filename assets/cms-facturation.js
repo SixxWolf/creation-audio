@@ -1846,14 +1846,77 @@
   };
 
   /* ---------- impression / copie ---------- */
-  var TITLE = document.title;
+  /* « Imprimer / PDF » (2026-11-18) : même document que le PDF joint au courriel (CA.docPrint, doc-print.js) —
+     photo de chaque article (même choix que invoice-notify : filament = photo du format, pack = photo de sa
+     composition, entretien = photo de l'imprimante) au lieu de la pastille de l'écran. */
+  function printImg(path) {
+    path = String(path || '');
+    if (!path) return '';
+    if (/^(https?:|data:)/i.test(path)) return path;
+    if (path.charAt(0) === '/' || /^assets\//.test(path)) return (CA.siteRoot || '') + path.replace(/^\//, '');
+    try { return sb.storage.from('products').getPublicUrl(path, { transform: { width: 200, height: 200, resize: 'contain' } }).data.publicUrl; }
+    catch (e) { return ''; }
+  }
+  function lineImgPath(l) {
+    var MAINT = /^Entretien(?: mensuel)? — (.+)$/, hit = l.productId ? findProduct(l.productId) : null;
+    if (hit) {
+      var a = hit.p.attrs || {};
+      return (hit.c === 'filament' && (l.kind === 'refill' ? a.img_refill : a.img_spool)) || hit.p.image_path || '';
+    }
+    var mp = (catalog.maintenance || []).filter(function (p) {
+      if (l.maintId) return String(p.id) === l.maintId;
+      var m = MAINT.exec(l.label || '');
+      return m && [p.brand, p.name].filter(Boolean).join(' ').toLowerCase() === m[1].trim().toLowerCase();
+    })[0];
+    return mp ? mp.photo || '' : '';
+  }
+  // pack : la photo du préréglage dont la composition est celle de la facture, sinon celle du pack
+  function packImgPath(pk) {
+    var p = (fxPacks || []).filter(function (x) { return String(x.id) === String(pk.id); })[0];
+    if (!p) return '';
+    var key = function (m) { return Object.keys(m).filter(function (k) { return m[k] > 0; }).sort().map(function (k) { return k + ':' + m[k]; }).join(','); };
+    var have = {};
+    lines.forEach(function (l) { if (l.pack && l.pack.k === pk.k && l.productId) have[l.productId] = (have[l.productId] || 0) + (l.qty | 0); });
+    var want = key(have), path = '';
+    (Array.isArray(p.presets) ? p.presets : []).some(function (pr) {
+      if (!pr || !pr.img) return false;
+      var m = {};
+      (pr.lines || []).forEach(function (x) { if (x && x.p && (x.n | 0) > 0) m[x.p] = (m[x.p] || 0) + (x.n | 0) * Math.max(1, +pk.n || 1); });
+      if (key(m) === want) { path = pr.img; return true; }
+      return false;
+    });
+    return path || p.image_path || '';
+  }
   if (elPrint) elPrint.addEventListener('click', function () {
-    if (!lines.length) return;
-    // le titre = nom proposé par « Enregistrer en PDF »
-    document.title = (elNumber.value || '').trim().replace(/[\\/:*?"<>|]+/g, '-') || TITLE;
-    document.body.classList.add('fx-printing');
-    window.print();
-    setTimeout(function () { document.body.classList.remove('fx-printing'); document.title = TITLE; }, 300);
+    if (!lines.length || !CA.docPrint) return;
+    var needPacks = lines.some(function (l) { return l.pack; });
+    var needMaint = lines.some(function (l) { return !l.productId && /^Entretien/.test(l.label || ''); });
+    Promise.all([needPacks ? loadFxPacks() : null, needMaint ? loadCatalog('maintenance', true) : null]).then(null, function () {}).then(function () {
+      var t = totals(), internal = isInternal(), cr = internal ? 0 : creditNow(t), packImgs = {};
+      var docLines = lines.map(function (l) {
+        var pack = null;
+        if (l.pack) {
+          if (!(l.pack.k in packImgs)) packImgs[l.pack.k] = printImg(packImgPath(l.pack));
+          pack = Object.assign({}, l.pack, { img: packImgs[l.pack.k] });
+        }
+        return { label: l.label, meta: l.meta, qty: l.qty, unit_price: l.price, line_total: round2(l.qty * l.price), pack: pack,
+          img: pack ? '' : printImg(lineImgPath(l)) };
+      });
+      CA.docPrint('invoice', {
+        title: docTitle(), internal: internal,
+        extra: isAmazon() ? amzDocRows(amzData(), t.cost) : '',
+        company: readCompanyForm(),
+        invoice: {
+          number: (elNumber.value || '').trim(), invoice_date: elDate.value || todayISO(),
+          client_name: internal ? '' : elCliName.value.trim(), client_contact: internal ? '' : contactStr(),
+          client_address: internal ? '' : elCliAddress.value.trim(), client_city: internal ? '' : elCliCity.value.trim(),
+          tax_enabled: taxEnabled, subtotal: round2(t.sub), tax_gst: round2(t.gst), tax_qst: round2(t.qst), total: round2(t.total),
+          note: elNote.value.trim(), credit_used: cr,
+          pay_method: internal ? null : (creditCovers(t) ? 'credit' : payMethod || null),
+          lines: docLines
+        }
+      });
+    });
   });
   function invoiceText() {
     var co = readCompanyForm(), t = totals();

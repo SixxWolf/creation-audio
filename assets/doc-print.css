@@ -40,3 +40,53 @@
   border:2px solid #1F7A3D; border-radius:10px; color:#1F7A3D; }
 .doc-print .inv-paid b { font-size:1.2rem; letter-spacing:.12em; }
 .doc-print .inv-foot { margin-top:18px; color:#6C727C; font-size:.78rem; text-align:center; border-top:1px solid #E7E7E2; padding-top:12px; }
+
+/* Facture « A · Accent » (2026-11-18) — même document que le PDF joint au courriel (invoice-notify/pdf.ts).
+   Mesures en pt calquées sur le PDF (Lettre 612 pt, marges 48 pt). Admin Facturation + Commandes + portail dealer. */
+.doc-print .ia { margin:-14mm -14mm 0; padding:0 48pt 30pt; color:#181A1F; font:400 9.5pt/1.35 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.doc-print .ia-rule { height:6pt; background:#FF6A2B; margin:0 -48pt 30pt; }
+.doc-print .ia-top { display:flex; justify-content:space-between; align-items:flex-start; gap:24pt; margin-bottom:28pt; }
+.doc-print .ia-co-name { font:700 21pt/1.1 "Space Grotesk", Inter, sans-serif; }
+.doc-print .ia-logo { display:block; max-height:34pt; max-width:150pt; object-fit:contain; }
+.doc-print .ia-tag { margin-top:6pt; font-size:8.5pt; color:#6C727C; }
+.doc-print .ia-title { text-align:right; flex:none; }
+.doc-print .ia-title i { display:block; width:28pt; height:3pt; background:#FF6A2B; margin:0 0 8pt auto; }
+.doc-print .ia-title h1 { margin:0; font:700 24pt/1 "Space Grotesk", Inter, sans-serif; letter-spacing:.01em; }
+.doc-print .ia-no { margin-top:7pt; font-weight:600; font-size:10pt; }
+.doc-print .ia-date { margin-top:2pt; font-size:9pt; color:#6C727C; }
+.doc-print .ia-parties { display:grid; grid-template-columns:1fr 1fr; gap:30pt; margin-bottom:20pt; }
+.doc-print .ia-lbl { font-weight:600; font-size:7pt; letter-spacing:.06em; text-transform:uppercase; color:#6C727C; margin-bottom:5pt; }
+.doc-print .ia-who { font-weight:600; font-size:10pt; }
+.doc-print .ia-soft { font-size:9pt; color:#6C727C; margin-top:2pt; }
+.doc-print .ia-table { width:100%; border-collapse:collapse; }
+.doc-print .ia-table th { background:#F4F3EF; text-align:left; font-weight:600; font-size:7pt; letter-spacing:.06em; text-transform:uppercase;
+  color:#6C727C; padding:6pt 8pt; }
+.doc-print .ia-table td { padding:8pt; border-bottom:.6pt solid #E7E7E2; vertical-align:top; }
+.doc-print .ia-table .num { text-align:right; white-space:nowrap; width:1%; font-variant-numeric:tabular-nums; }
+.doc-print .ia-table th.num { padding-left:18pt; }
+.doc-print .ia-table .ia-b { font-weight:600; }
+.doc-print .ia-table .ia-th { width:38pt; padding-right:4pt; }
+.doc-print .ia-th span { display:flex; align-items:center; justify-content:center; width:38pt; height:38pt; box-sizing:border-box;
+  background:#fff; border:.6pt solid #E7E7E2; }
+.doc-print .ia-th img { max-width:100%; max-height:100%; object-fit:contain; display:block; }
+.doc-print .ia-name { font-weight:600; }
+.doc-print .ia-meta { font-size:8pt; color:#6C727C; margin-top:2pt; }
+.doc-print .ia-table tr { break-inside:avoid; }
+.doc-print .ia-bottom { display:flex; justify-content:space-between; align-items:flex-start; gap:24pt; margin-top:12pt; break-inside:avoid; }
+.doc-print .ia-left { flex:1; min-width:0; padding-top:4pt; }
+.doc-print .ia-note { font-size:9pt; margin-bottom:10pt; white-space:pre-line; }
+.doc-print .ia-note .ia-lbl { margin-bottom:3pt; }
+.doc-print .ia-left .inv-pay { margin:0 0 6pt; background:none; padding:0; font-size:9pt; }
+.doc-print .ia-tot { width:200pt; flex:none; }
+.doc-print .ia-line { display:flex; justify-content:space-between; padding:3pt 10pt; font-variant-numeric:tabular-nums; }
+.doc-print .ia-line span:first-child { color:#6C727C; }
+.doc-print .ia-due span { color:#181A1F !important; font-weight:600; }
+.doc-print .ia-grand { display:flex; justify-content:space-between; align-items:center; margin:6pt 0; padding:8pt 10pt; background:#181A1F;
+  border-left:3pt solid #FF6A2B; color:#fff; }
+.doc-print .ia-grand span { font-weight:600; font-size:10.5pt; }
+.doc-print .ia-grand b { font:700 15pt/1 "Space Grotesk", Inter, sans-serif; font-variant-numeric:tabular-nums; }
+.doc-print .ia-thanks { margin-top:22pt; font-weight:600; font-size:10pt; }
+.doc-print .ia-foot { margin-top:26pt; padding-top:9pt; border-top:.6pt solid #E7E7E2; font-size:7.5pt; color:#6C727C; }
+.doc-print .ia .inv-cancelled { margin:0 0 16pt; }
+.doc-print .ia .inv-paid { margin:0 0 10pt; }
