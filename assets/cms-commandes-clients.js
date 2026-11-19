@@ -119,8 +119,10 @@
       '<div class="co-pkedit-foot"><button type="button" class="btn btn-accent btn-sm" data-ic="check" data-k="ok">Enregistrer</button>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-k="free">Autre jour ou heure</button>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-k="no">Annuler</button></div>';
-    var anchor = card.querySelector('.co-table-wrap');
-    anchor.parentNode.insertBefore(panel, anchor);
+    // juste sous les boutons (là où on a cliqué « Cueillette ») : visible même sur une longue commande
+    var foot = card.querySelector('.co-foot');
+    if (foot) foot.parentNode.insertBefore(panel, foot.nextSibling); else card.appendChild(panel);
+    setTimeout(function () { panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 30);
     var calEl = panel.querySelector('.co-pkedit-cal'), freeEl = panel.querySelector('.co-pkedit-free'), p = null;
     if (x.manual) {   // commande hors site : fourchette libre, pas de plages
       calEl.hidden = true; freeEl.hidden = false;
