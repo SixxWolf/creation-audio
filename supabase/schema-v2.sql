@@ -205,6 +205,10 @@ begin
           from public.customer_order_lines l
           join public.customer_orders o on o.id = l.order_id
          where o.stock_hold and o.status in ('new', 'preparing', 'ready') and l.product_id is not null
+        union all
+        -- packs prêts (2026-11-20, section PACKS PRÊTS) : les recharges des packs préparés et pas encore vendus
+        -- ni gardés sont réservées aux packs -> retirées du stock à l'unité
+        select r.product_id, r.kind, r.qty from public._pack_reserve() r
       ) u
      group by u.product_id;
 end $$;
@@ -6341,6 +6345,89 @@ alter table public.waitlist drop constraint if exists waitlist_target_chk;
 alter table public.waitlist add constraint waitlist_target_chk check (num_nonnulls(product_id, topic, pack_id) = 1);
 create index if not exists waitlist_pack_open_idx on public.waitlist (pack_id) where status = 'open' and pack_id is not null;
 
+-- ============================================================
+-- PACKS PRÊTS (2026-11-20, demande de Théo)
+-- Les packs puisaient dans le même stock que les recharges à l'unité : tout le rouge partait dans
+-- les packs. Désormais Admin › Packs règle, par composition toute faite, le nombre de packs préparés :
+--   packs.ready = { "<pid:n,pid:n…>" : { "n": préparés, "at": quand le compte a été posé } }
+-- (clé = _pack_ckey, comme compKey de boutique.js). Composition absente = pas suivie : le pack puise
+-- dans le stock à l'unité comme avant.
+-- Composition suivie : packs restants = n − packs facturés depuis `at` (factures non annulées)
+--                                        − packs gardés (commandes ouvertes stock_hold, réservations actives).
+-- Les recharges des packs restants sont retirées du stock à l'unité (_held_stock -> products_public) ;
+-- au-delà des packs restants, le pack part « à commander » (_customer_fill_lines).
+-- Le format « Avec bobine » d'un pack recharge n'est jamais suivi (pack.kind = spool ≠ packs.kind).
+-- ============================================================
+alter table public.packs add column if not exists ready jsonb not null default '{}'::jsonb;
+
+-- clé de composition depuis des lignes [{p, n}] (presets.lines) : « pid:n » triés, séparés par des virgules
+create or replace function public._pack_ckey(p_lines jsonb)
+returns text language sql immutable set search_path = '' as $$
+  select string_agg(lower(l ->> 'p') || ':' || ((l ->> 'n')::int)::text, ',' order by lower(l ->> 'p') collate "C")
+    from jsonb_array_elements(case when jsonb_typeof(p_lines) = 'array' then p_lines else '[]'::jsonb end) l
+   where coalesce(l ->> 'n', '') ~ '^\d{1,3}$' and (l ->> 'n')::int > 0 and (l ->> 'p') is not null
+$$;
+
+-- packs prêts par composition suivie (lu par la boutique, l'admin, _held_stock et _customer_fill_lines)
+create or replace function public.pack_ready()
+returns table (pack_id uuid, ckey text, ready integer, held integer, left_n integer)
+language sql stable security definer set search_path = '' as $$
+  with r as (
+    select pk.id as pack_id, pk.kind, e.key as ckey, (e.value ->> 'n')::int as ready,
+           coalesce(case when coalesce(e.value ->> 'at', '') <> '' then (e.value ->> 'at')::timestamptz end, '-infinity'::timestamptz) as at
+      from public.packs pk,
+           jsonb_each(case when jsonb_typeof(pk.ready) = 'object' then pk.ready else '{}'::jsonb end) e
+     where pk.enabled and jsonb_typeof(e.value) = 'object' and coalesce(e.value ->> 'n', '') ~ '^\d{1,4}$'
+  ), ln as (   -- lignes de pack des packs suivis : facturées, en commande gardée, en réservation active
+    select 'i:' || l.invoice_id::text as src, i.created_at as at, false as hold, l.product_id, l.qty, 0 as tor, l.pack
+      from public.invoice_lines l join public.invoices i on i.id = l.invoice_id
+     where l.pack is not null and i.cancelled_at is null and l.product_id is not null
+       and (l.pack ->> 'id') in (select r.pack_id::text from r)
+    union all
+    select 'o:' || l.order_id::text, o.created_at, true, l.product_id, l.qty, l.qty_to_order, l.pack
+      from public.customer_order_lines l join public.customer_orders o on o.id = l.order_id
+     where l.pack is not null and o.stock_hold and o.status in ('new', 'preparing', 'ready') and l.product_id is not null
+       and (l.pack ->> 'id') in (select r.pack_id::text from r)
+    union all
+    select 'r:' || l.reservation_id::text, c.created_at, true, l.product_id, l.qty, 0, l.pack
+      from public.customer_reservation_lines l join public.customer_reservations c on c.id = l.reservation_id
+     where l.pack is not null and c.status = 'active' and c.expires_at > now() and l.product_id is not null
+       and (l.pack ->> 'id') in (select r.pack_id::text from r)
+  ), g as (    -- un groupe = les packs d'une même ligne de panier (source + pack.k)
+    select src, at, hold, pack ->> 'id' as pack_id, pack ->> 'kind' as kind,
+           greatest(max((pack ->> 'n')::int), 1) as n,
+           string_agg(lower(product_id::text) || ':' || (qty / greatest((pack ->> 'n')::int, 1))::text, ','
+                      order by lower(product_id::text) collate "C") as ckey,
+           -- packs « à commander » du groupe (pas gardés : rien en stock pour eux)
+           max(ceil(tor::numeric / greatest(qty / greatest((pack ->> 'n')::int, 1), 1)))::int as bo
+      from ln
+     group by src, at, hold, pack ->> 'id', pack ->> 'kind', pack ->> 'k'
+  )
+  select r.pack_id, r.ckey, r.ready, coalesce(h.held, 0)::int,
+         greatest(0, r.ready - coalesce(s.sold, 0) - coalesce(h.held, 0))::int
+    from r
+    left join lateral (select sum(g.n) as sold from g
+                        where not g.hold and g.pack_id = r.pack_id::text and g.kind = r.kind and g.ckey = r.ckey
+                          and g.at > r.at) s on true
+    left join lateral (select sum(greatest(g.n - g.bo, 0)) as held from g
+                        where g.hold and g.pack_id = r.pack_id::text and g.kind = r.kind and g.ckey = r.ckey) h on true
+$$;
+revoke all on function public.pack_ready() from public;
+grant execute on function public.pack_ready() to anon, authenticated;   -- comptes de packs seulement
+
+-- recharges (ou bobines) réservées aux packs restants, par couleur -> retirées du stock à l'unité
+create or replace function public._pack_reserve()
+returns table (product_id uuid, kind text, qty integer)
+language sql stable security definer set search_path = '' as $$
+  select split_part(c, ':', 1)::uuid, pk.kind, sum(rd.left_n * split_part(c, ':', 2)::int)::int
+    from public.pack_ready() rd
+    join public.packs pk on pk.id = rd.pack_id
+    cross join lateral regexp_split_to_table(rd.ckey, ',') c
+   where rd.left_n > 0 and c ~ '^[0-9a-f-]{36}:\d+$'
+   group by 1, 2
+$$;
+revoke all on function public._pack_reserve() from public, anon, authenticated;
+
 -- un pack peut-il être refait avec le stock offert ? (même règle que la boutique : une composition
 -- toute faite complète, ou Personnaliser noir et blanc avec assez d'unités au total)
 create or replace function public._pack_has_room(p_pack uuid)
@@ -6349,11 +6436,16 @@ returns boolean language sql stable security definer set search_path = '' as $$
       select 1 from public.packs pk, jsonb_array_elements(pk.presets) pr
        where pk.id = p_pack and pk.enabled
          and jsonb_array_length(case when jsonb_typeof(pr -> 'lines') = 'array' then pr -> 'lines' else '[]'::jsonb end) > 0
-         and not exists (
+         -- packs prêts (2026-11-20) : composition suivie = il reste des packs préparés ; sinon stock à l'unité
+         and coalesce((select rd.left_n > 0 from public.pack_ready() rd
+                        where rd.pack_id = pk.id and rd.ckey = public._pack_ckey(pr -> 'lines')), true)
+         and (exists (select 1 from public.pack_ready() rd
+                       where rd.pack_id = pk.id and rd.ckey = public._pack_ckey(pr -> 'lines'))
+              or not exists (
            select 1 from jsonb_array_elements(pr -> 'lines') l
              left join public.products_public pp on pp.id::text = lower(l ->> 'p')
             where coalesce(l ->> 'n', '') ~ '^\d+$' and (l ->> 'n')::int > 0
-              and coalesce(case when pk.kind = 'refill' then pp.qty_2 else pp.qty end, 0) < (l ->> 'n')::int))
+              and coalesce(case when pk.kind = 'refill' then pp.qty_2 else pp.qty end, 0) < (l ->> 'n')::int)))
     or exists (
       select 1 from public.packs pk
        where pk.id = p_pack and pk.enabled and pk.allow_custom
@@ -6519,15 +6611,32 @@ begin
        and (x ->> 'product_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
        and coalesce(x ->> 'qty', '') ~ '^\d{1,4}$' and (x ->> 'qty')::int > 0
      group by 1, 2
-  ), pk as (
-    select (y ->> 'product_id')::uuid as pid, y ->> 'kind' as kind, (y ->> 'qty')::int as qty, y ->> 'gkey' as gkey, y, o as ord
+  ), pk0 as (
+    select (y ->> 'product_id')::uuid as pid, y ->> 'kind' as kind, (y ->> 'qty')::int as qty, y ->> 'gkey' as gkey, y, o as ord,
+           y -> 'pack' ->> 'id' as pkid, y -> 'pack' ->> 'k' as k, greatest((y -> 'pack' ->> 'n')::int, 1) as n
       from jsonb_array_elements(v_pk) with ordinality as t(y, o)
+  ), pkk as (
+    -- packs prêts (2026-11-20) : une ligne de panier de pack = une composition ; suivie -> packs restants (pack_ready)
+    select pk0.k, min(pk0.ord) as ord, max(pk0.n) as n, rd.left_n,
+           sum(max(pk0.n)) over (partition by min(pk0.pkid), min(z.ckey) order by min(pk0.ord)) as cum
+      from pk0
+      join (select k, string_agg(lower(pid::text) || ':' || (qty / n)::text, ',' order by lower(pid::text) collate "C") as ckey
+              from pk0 group by k) z on z.k = pk0.k
+      left join public.packs p on p.id::text = pk0.pkid
+      left join public.pack_ready() rd on rd.pack_id::text = pk0.pkid and rd.ckey = z.ckey and p.kind = pk0.kind
+     group by pk0.k, rd.left_n
+  ), pk as (
+    select pk0.*, pkk.left_n, pkk.cum from pk0 join pkk on pkk.k = pk0.k
   ), pkt as (
     -- packs hors stock (2026-11-18) : ce qui dépasse le stock, dans l'ordre du panier, part « à commander »
-    select pk.*, greatest(0, least(pk.qty, sum(pk.qty) over (partition by pk.pid, pk.kind order by pk.ord)
-             - greatest(coalesce(case when pk.kind = 'refill' then pp.qty_2 else pp.qty end, 0), 0)))::int as tor
+    -- composition suivie : au-delà des packs prêts restants, le pack entier part « à commander »
+    select pk.*,
+           case when pk.left_n is not null
+                then (pk.qty / pk.n) * greatest(0, least(pk.n, pk.cum - pk.left_n))
+                else greatest(0, least(pk.qty, sum(pk.qty) filter (where pk.left_n is null) over (partition by pk.pid, pk.kind order by pk.ord)
+                       - greatest(coalesce(case when pk.kind = 'refill' then pp.qty_2 else pp.qty end, 0), 0))) end::int as tor
       from pk left join public.products_public pp on pp.id = pk.pid
-  ), pks as (select pid, kind, sum(qty)::int as q from pk group by 1, 2
+  ), pks as (select pid, kind, sum(qty)::int as q from pk where left_n is null group by 1, 2   -- packs suivis : hors stock à l'unité
   ), j as (
     select l.pid, l.kind, l.qty, pp.type, pp.name, pp.brand, pp.material, pp.sort_order,
            case when pp.type = 'filament' and l.kind = 'refill' then pp.sell_price_2 else pp.sell_price end as base,

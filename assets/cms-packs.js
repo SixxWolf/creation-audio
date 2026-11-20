@@ -57,7 +57,9 @@
       sb.from('materials').select('*'),
       sb.from('brands').select('name,sort_order'),
       // stock offert (réel − réservations en cours), comme la boutique
-      sb.from('products_public').select('id,qty,qty_2').eq('type', 'filament')
+      sb.from('products_public').select('id,qty,qty_2').eq('type', 'filament'),
+      // packs prêts restants par composition suivie (préparés − vendus − gardés)
+      sb.rpc('pack_ready')
     ]).then(function (r) {
       var bad = r.filter(function (x) { return x.error; })[0];
       if (bad) { listEl.innerHTML = '<p class="empty">Impossible de charger les packs.<br>' + esc(bad.error.message || bad.error) + '</p>'; return; }
@@ -68,6 +70,7 @@
       fils = (r[1].data || []).slice().sort(filCmp);
       byId = {}; fils.forEach(function (p) { byId[p.id] = p; });
       (r[4].data || []).forEach(function (v) { var p = byId[v.id]; if (p) { p.avail = v.qty; p.avail_2 = v.qty_2; } });
+      setReady(r[5].data);
       loaded = true;
       render();
     });
@@ -108,15 +111,56 @@
     var o = {}; (pr.lines || []).forEach(function (l) { if (l && l.p && l.n > 0) o[l.p] = (o[l.p] || 0) + (+l.n); }); return o;
   }
 
+  /* ---------- packs prêts (2026-11-20) ----------
+     packs.ready = { "<pid:n,…>": { n, at } } par composition toute faite (clé = _pack_ckey en SQL).
+     Absent = pas suivi (le pack puise dans le stock à l'unité). Suivi : ses recharges sont retirées du stock
+     à l'unité ; au-delà des packs restants, le pack part « à commander ». On affiche les RESTANTS (RPC pack_ready) ;
+     changer le compte pose n = restants voulus + packs gardés, at = maintenant (les ventes d'avant ne comptent plus). */
+  var readyLeft = {};   // 'packId|ckey' -> { left, held }
+  function setReady(rows) {
+    readyLeft = {};
+    (rows || []).forEach(function (x) { readyLeft[x.pack_id + '|' + x.ckey] = { left: x.left_n | 0, held: x.held | 0 }; });
+  }
+  function ckeyOf(pr) {
+    var o = linesObj(pr);
+    return Object.keys(o).map(function (p) { return { p: String(p).toLowerCase(), n: o[p] | 0 }; })
+      .sort(function (a, b) { return a.p < b.p ? -1 : a.p > b.p ? 1 : 0; })
+      .map(function (l) { return l.p + ':' + l.n; }).join(',');
+  }
+  function readyOf(pk, pr) { return readyLeft[pk.id + '|' + ckeyOf(pr)] || null; }
+  function setPackReady(pk, pr, left) {   // left = null -> plus suivi
+    var key = ckeyOf(pr), cur = readyOf(pk, pr), next = {};
+    var src = pk.ready && typeof pk.ready === 'object' ? pk.ready : {};
+    Object.keys(src).forEach(function (k) { if (k !== key) next[k] = src[k]; });
+    if (left != null) next[key] = { n: Math.max(0, left) + (cur ? cur.held : 0), at: new Date().toISOString() };
+    return sb.from('packs').update({ ready: next, updated_at: new Date().toISOString() }).eq('id', pk.id).select().then(function (res) {
+      if (res.error) throw res.error;
+      if (!res.data || !res.data.length) throw new Error('Enregistrement refusé (permissions).');
+      pk.ready = res.data[0].ready;
+      return Promise.all([sb.rpc('pack_ready'), sb.from('products_public').select('id,qty,qty_2').eq('type', 'filament')]);
+    }).then(function (r) {
+      if (r[0].error) throw r[0].error;
+      setReady(r[0].data);
+      (r[1].data || []).forEach(function (v) { var p = byId[v.id]; if (p) { p.avail = v.qty; p.avail_2 = v.qty_2; } });
+      render();
+    });
+  }
+
   /* ---------- liste ---------- */
   function render() {
     if (!packs.length) { listEl.innerHTML = '<p class="empty">Aucun pack. Crée le premier avec « Pack ».</p>'; return; }
     listEl.innerHTML = packs.map(function (pk) {
       var units = pk.units || 4, unit = r2(pk.price / units);
       var cols = (pk.colors || []).map(function (id) { return byId[id]; }).filter(Boolean).sort(filCmp);
-      var pres = (pk.presets || []).map(function (pr) {
-        var n = possible(linesObj(pr), pk.kind);
-        return '<span class="pk-pre' + (n ? '' : ' is-out') + '">' + esc(pr.name || 'Sans nom') + ' <em>' + (n ? n + ' en stock' : 'Épuisé') + '</em></span>';
+      var pres = (pk.presets || []).map(function (pr, i) {
+        var rd = readyOf(pk, pr), n = rd ? rd.left : possible(linesObj(pr), pk.kind);
+        return '<span class="pk-pre' + (n ? '' : ' is-out') + (rd ? ' is-ready' : '') + '">' + esc(pr.name || 'Sans nom') +
+          (rd ? '' : ' <em>' + (n ? n + ' en stock' : 'Épuisé') + '</em>') +
+          '<span class="pk-rdy" title="Packs prêts">Prêts' +
+            '<button type="button" data-a="rdy" data-d="-1" data-i="' + i + '" aria-label="Un pack prêt de moins">−</button>' +
+            '<b>' + (rd ? rd.left : '—') + '</b>' +
+            '<button type="button" data-a="rdy" data-d="1" data-i="' + i + '" aria-label="Un pack prêt de plus">+</button>' +
+          '</span></span>';
       }).join('');
       var img = pk.image_path ? '<img src="' + esc(publicUrl(pk.image_path)) + '" alt="">' : spoolsSvg(cols.slice(0, 4));
       return '<article class="pk-row' + (pk.enabled ? '' : ' is-off') + '" data-id="' + esc(pk.id) + '" draggable="true">' +
@@ -155,7 +199,14 @@
     var row = b.closest('.pk-row'), pk = packs.filter(function (x) { return x.id === row.getAttribute('data-id'); })[0];
     if (!pk) return;
     var a = b.getAttribute('data-a');
-    if (a === 'edit') openEditor(pk);
+    if (a === 'rdy') {   // packs prêts : + depuis « — » = 1 ; − à 0 = plus suivi (« — »)
+      var pr = (pk.presets || [])[+b.getAttribute('data-i')]; if (!pr || b.disabled) return;
+      var rd = readyOf(pk, pr), d = +b.getAttribute('data-d');
+      var left = rd ? (d < 0 && rd.left === 0 ? null : rd.left + d) : (d > 0 ? 1 : null);
+      if (!rd && left == null) return;
+      $$('[data-a="rdy"]', row).forEach(function (x) { x.disabled = true; });
+      setPackReady(pk, pr, left).then(null, function (err) { caDialog.error(err); render(); });
+    } else if (a === 'edit') openEditor(pk);
     else if (a === 'toggle') {
       var on = !pk.enabled;
       var go = on && !(pk.presets || []).some(function (pr) { return possible(linesObj(pr), pk.kind) > 0; }) && !pk.allow_custom

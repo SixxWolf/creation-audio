@@ -382,8 +382,12 @@
       // packs en ligne seulement : le filtre est explicite, car connecté en admin la RLS laisse passer les packs hors ligne
       // (session partagée avec la page admin) ; une erreur ne bloque pas la boutique
       sb.from('packs').select('*').eq('enabled', true).order('sort_order', { ascending: true }),
-      PR.loadPopular ? PR.loadPopular() : null
+      PR.loadPopular ? PR.loadPopular() : null,
+      // packs prêts restants par composition suivie (2026-11-20) ; une erreur = rien de suivi
+      sb.rpc('pack_ready')
     ]).then(function (res) {
+      packReady = {};
+      ((res[6] && !res[6].error && res[6].data) || []).forEach(function (x) { packReady[x.pack_id + '|' + x.ckey] = x.left_n | 0; });
       var pr = res[0], br = res[1], ac = res[2];
       spacers = (res[3] && !res[3].error && res[3].data) || [];
       packsOk = !!(res[4] && !res[4].error);
@@ -696,7 +700,7 @@
      du pack comptent pour le palier de la marque des autres filaments (option B).
      Stock : le pack passe avant les autres lignes (jamais « à commander »).
      ========================================================= */
-  var packs = [], packById = {}, packsOk = false, packSel = {};
+  var packs = [], packById = {}, packsOk = false, packSel = {}, packReady = {};   // packReady : "packId|compKey" -> packs prêts restants
   function isPack(it) { return !!(it && it.type === 'pack'); }
   // « Avec bobine » d'un pack recharge (2026-11-19) : même pack, prix spool_price, photos *_spool.
   // packAs(pk, 'spool') rend une copie au format bobine (même id) ; le reste du code lit pk.kind / pk.price.
@@ -775,11 +779,30 @@
   function compText(comp) {
     return comp.map(function (c) { var p = byId[c.id]; return c.n + ' × ' + (p ? p.name : '?'); }).join(' · ');
   }
+  // packs prêts (2026-11-20) : composition suivie dans Admin › Packs -> nombre de packs préparés restants
+  // (leurs recharges sont déjà retirées du stock à l'unité par products_public) ; null = pas suivie, le pack
+  // puise dans le stock à l'unité comme avant. Le format « Avec bobine » (pk._src) n'est jamais suivi.
+  function readyLeft(pk, comp) {
+    if (!pk || pk._src || !comp) return null;
+    var v = packReady[pk.id + '|' + compKey(comp.map(function (c) { return { id: String(c.id).toLowerCase(), n: c.n }; }))];
+    return v == null ? null : v;
+  }
+  // packs suivis de la même composition déjà au panier (avant la ligne `upTo`, ou tous sauf `skip`)
+  function readyUsed(pk, comp, skip, upTo) {
+    var key = compKey(comp), n = 0;
+    entries().some(function (it) {
+      if (upTo && it.key === upTo) return true;
+      if (isPack(it) && it.key !== skip && packOf(it) && packOf(it).id === pk.id && !packOf(it)._src && compKey(it.comp || []) === key) n += it.qty;
+      return false;
+    });
+    return n;
+  }
   // unités d'une couleur (format) prises par les packs du panier, sauf la ligne `skip`
   function packUse(pid, kind, skip) {
     return entries().reduce(function (s, it) {
       if (!isPack(it) || it.key === skip) return s;
       var pk = packOf(it); if (!pk || pk.kind !== kind) return s;
+      if (readyLeft(pk, it.comp) != null) return s;   // pack prêt : hors stock à l'unité
       return s + (it.comp || []).reduce(function (t, c) { return t + (c.id === pid ? c.n * it.qty : 0); }, 0);
     }, 0);
   }
@@ -788,6 +811,8 @@
   function regQty(pid, kind) { var it = cart[keyOf(pid, kind)]; return it ? it.qty : 0; }
   // nombre de packs de cette composition possibles (bare = stock seul, sans le panier)
   function packRoom(pk, comp, skip, bare) {
+    var rl = readyLeft(pk, comp);
+    if (rl != null) return Math.max(0, rl - (bare ? 0 : readyUsed(pk, comp, skip, null)));
     var room = 99;
     comp.forEach(function (c) {
       var p = byId[c.id];
@@ -2258,12 +2283,14 @@
   // pack du panier au-delà du stock (les packs passent avant les lignes ordinaires, dans l'ordre du panier)
   function packOver(it) {
     var pk = packOf(it); if (!pk || !it.comp) return false;
+    var rl = readyLeft(pk, it.comp);
+    if (rl != null) return readyUsed(pk, it.comp, null, it.key) + it.qty > rl;
     return it.comp.some(function (c) {
       var p = byId[c.id]; if (!p) return true;
       var prior = 0;
       entries().some(function (o) {
         if (o.key === it.key) return true;
-        if (isPack(o) && packOf(o) && packOf(o).kind === pk.kind)
+        if (isPack(o) && packOf(o) && packOf(o).kind === pk.kind && readyLeft(packOf(o), o.comp) == null)
           (o.comp || []).forEach(function (x) { if (x.id === c.id) prior += x.n * o.qty; });
         return false;
       });

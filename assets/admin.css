@@ -2347,6 +2347,15 @@ a.ms-b-file:hover { border-color:var(--ink); }
 .pk-pre { padding:2px 9px; font-size:.78rem; border:1px solid var(--line-2); border-radius:100px; }
 .pk-pre em { font-style:normal; color:var(--good); }
 .pk-pre.is-out em { color:var(--bad); }
+/* packs prêts (2026-11-20) : compteur par composition — « — » = pas suivi */
+.pk-pre { display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.pk-rdy { display:inline-flex; align-items:center; gap:2px; padding-left:8px; border-left:1px solid var(--line-2); color:var(--muted); }
+.pk-rdy b { min-width:1.6em; text-align:center; color:var(--ink); font-variant-numeric:tabular-nums; }
+.pk-pre.is-ready .pk-rdy b { color:var(--ember-ink); }
+.pk-pre.is-ready.is-out .pk-rdy b { color:var(--bad); }
+.pk-rdy button { width:22px; height:22px; padding:0; border:1px solid var(--line-2); border-radius:50%; background:transparent; color:var(--ink); font:inherit; line-height:1; cursor:pointer; }
+.pk-rdy button:hover { border-color:var(--ember); color:var(--ember-ink); }
+.pk-rdy button:disabled { opacity:.4; cursor:default; }
 .pk-calc { min-height:40px; display:flex; flex-wrap:wrap; align-items:center; gap:4px; font-size:.88rem; font-variant-numeric:tabular-nums; }
 .pk-calc .pos, .pk-pcf .pos { color:var(--good); } .pk-calc .neg, .pk-pcf .neg { color:var(--bad); }
 .pk-colors { display:flex; flex-direction:column; gap:10px; max-height:360px; overflow:auto; padding:2px; }
