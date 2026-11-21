@@ -6853,3 +6853,92 @@ begin
   return v_out;
 end $$;
 revoke all on function public._pack_fill(jsonb) from public, anon, authenticated;
+
+-- ------------------------------------------------------------
+-- COÛT DES FILAMENTS = MOYENNE MOBILE (2026-11-20, choix de Théo)
+-- Remplace la moyenne de TOUTES les réceptions : le coût ne se calcule que sur
+-- ce qui reste en stock. Rejeu chronologique par produit + format :
+--   réception (receipts.received_at, puis created_at) : coût = (stock × coût + reçu × prix) / (stock + reçu)
+--                                                        (stock à 0 → coût = prix de la réception)
+--   vente (invoice_lines, factures non annulées, même jour : après les réceptions) : stock − qté, coût inchangé
+-- Le stock rejoué ne descend jamais sous 0 (corrections manuelles hors rejeu).
+-- Écrit products.attrs.avg_cost {spool, refill} (seule clé touchée ; last_cost reste au navigateur).
+-- p_invoices = true : réécrit aussi le coût des lignes de filament des factures (coût au moment de
+-- la vente) et décale invoices.cost_total de l'écart. Appel unique fait le 2026-11-20 (sauvegarde :
+-- _backup_cost_20261120) ; l'Inventaire l'appelle sans p_invoices après chaque réception.
+-- ------------------------------------------------------------
+create or replace function public.admin_filament_mavg(p_ids uuid[] default null, p_invoices boolean default false)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  e record; cur_p uuid; cur_k text; q numeric; a numeric;
+  res jsonb := '{}'::jsonb; ac jsonb; pid uuid; v_lines int := 0;
+begin
+  if not public.is_admin() then raise exception 'Réservé à l''administrateur.' using errcode = '42501'; end if;
+  create temp table if not exists _mavg_line (line_id uuid primary key, new_cost numeric) on commit drop;
+  truncate _mavg_line;
+  for e in
+    select * from (
+      select l.product_id p, l.kind k, r.received_at d, r.created_at c, 0 ord, l.qty::numeric qty, l.unit_cost cost, null::uuid lid
+        from public.receipt_lines l join public.receipts r on r.id = l.receipt_id
+        join public.products pr on pr.id = l.product_id
+       where pr.type = 'filament' and l.kind in ('spool', 'refill') and l.qty > 0
+         and (p_ids is null or l.product_id = any(p_ids))
+      union all
+      select il.product_id, il.kind, i.invoice_date, i.created_at, 1, il.qty, null, il.id
+        from public.invoice_lines il join public.invoices i on i.id = il.invoice_id
+        join public.products pr on pr.id = il.product_id
+       where pr.type = 'filament' and il.kind in ('spool', 'refill') and il.qty > 0
+         and i.cancelled_at is null and coalesce(i.status, '') <> 'cancelled'
+         and (p_ids is null or il.product_id = any(p_ids))
+    ) x order by p, k, d nulls first, ord, c
+  loop
+    if cur_p is distinct from e.p or cur_k is distinct from e.k then
+      if cur_p is not null and a is not null then
+        res := jsonb_set(case when res ? cur_p::text then res else res || jsonb_build_object(cur_p::text, '{}'::jsonb) end,
+                         array[cur_p::text, cur_k], to_jsonb(round(a, 2)));
+      end if;
+      cur_p := e.p; cur_k := e.k; q := 0; a := null;
+    end if;
+    if e.ord = 0 then
+      if e.cost is not null then
+        a := case when q <= 0 or a is null then e.cost else (q * a + e.qty * e.cost) / (q + e.qty) end;
+      end if;
+      q := q + e.qty;
+    else
+      if a is not null then insert into _mavg_line values (e.lid, round(a, 2)) on conflict (line_id) do nothing; end if;
+      q := greatest(q - e.qty, 0);
+    end if;
+  end loop;
+  if cur_p is not null and a is not null then
+    res := jsonb_set(case when res ? cur_p::text then res else res || jsonb_build_object(cur_p::text, '{}'::jsonb) end,
+                     array[cur_p::text, cur_k], to_jsonb(round(a, 2)));
+  end if;
+
+  -- coût moyen des produits (ceux demandés, ou tous les filaments)
+  for pid in select id from public.products where type = 'filament' and (p_ids is null or id = any(p_ids)) loop
+    ac := res -> pid::text;
+    update public.products
+       set attrs = case when ac is null or ac = '{}'::jsonb then coalesce(attrs, '{}'::jsonb) - 'avg_cost'
+                        else jsonb_set(coalesce(attrs, '{}'::jsonb), '{avg_cost}', ac) end,
+           updated_at = now()
+     where id = pid and (attrs -> 'avg_cost') is distinct from ac;
+  end loop;
+
+  if p_invoices then
+    with d as (
+      select il.id, il.invoice_id, il.qty, coalesce(il.unit_cost, 0) old_c, m.new_cost
+        from _mavg_line m join public.invoice_lines il on il.id = m.line_id
+       where il.unit_cost is distinct from m.new_cost
+    ), upd as (
+      update public.invoice_lines il set unit_cost = d.new_cost from d where il.id = d.id returning il.id
+    ), tot as (
+      select invoice_id, round(sum((new_cost - old_c) * qty), 2) delta from d group by invoice_id
+    )
+    update public.invoices i set cost_total = round(i.cost_total + t.delta, 2)
+      from tot t where i.id = t.invoice_id and t.delta <> 0;
+    get diagnostics v_lines = row_count;
+  end if;
+  return jsonb_build_object('avg', res, 'invoices', v_lines);
+end $$;
+revoke all on function public.admin_filament_mavg(uuid[], boolean) from public, anon;
+grant execute on function public.admin_filament_mavg(uuid[], boolean) to authenticated;

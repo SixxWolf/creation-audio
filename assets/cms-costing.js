@@ -3,8 +3,10 @@
    Math pure utilisée par l'Inventaire (coût moyen stocké sur
    products.attrs.avg_cost).
 
-   Modèle : « moyenne pondérée périodique ». Le coût moyen d'un
-   produit = Σ(qté × prix payé) / Σ(qté) sur ses réceptions.
+   Filaments (2026-11-20) : MOYENNE MOBILE calculée en base
+   (RPC admin_filament_mavg) — seul le stock restant compte.
+   avg() ci-dessous ne sert plus qu'aux accessoires :
+   Σ(qté × prix payé) / Σ(qté) sur leurs réceptions.
    Chaque réception porte le prix réellement payé (taxes incluses,
    repris de la commande en route) : plus de prix catalogue éditable.
    Aucune dépendance à Supabase ici — que du calcul.

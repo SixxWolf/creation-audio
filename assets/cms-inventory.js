@@ -1143,8 +1143,9 @@
 
   /* ---- Coût moyen pondéré : recalcul par rejeu des réceptions ----
      Pour chaque produit touché, on relit TOUTES ses lignes de réception et on
-     recalcule attrs.avg_cost { spool, refill | item } (prix payés, taxes incluses)
-     + attrs.last_cost (dernier prix payé : estimé de la liste à commander).
+     recalcule attrs.last_cost (dernier prix payé : estimé de la liste à commander)
+     + attrs.avg_cost : accessoire = moyenne de ses réceptions (ici) ; filament = moyenne
+     mobile (stock restant, ventes comprises) par la RPC admin_filament_mavg.
      Le rejeu rend le tout cohérent même après modification/suppression. */
   function recomputeAvgCosts(productIds) {
     productIds = uniq(productIds || []).filter(Boolean);
@@ -1172,22 +1173,36 @@
           priced.sort(function (a, z) { return a.w < z.w ? -1 : a.w > z.w ? 1 : 0; });
           return round2(priced[priced.length - 1].unit_cost);
         };
+        var filIds = [];
         return Promise.all(productIds.map(function (pid) {
           var f = bcProd(pid);
           if (!f) return null;
           var g = byProd[pid] || { spool: [], refill: [] };
-          var ac = {}, lc = {}, v;
+          var ac = {}, lc = {}, v, acc = isAcc(f);
+          if (!acc) filIds.push(pid);
           // accessoire : un seul coût (lignes 'item' rangées avec 'spool' ci-dessus)
-          (isAcc(f) ? [['item', g.spool]] : [['spool', g.spool], ['refill', g.refill]]).forEach(function (k) {
-            v = CA.costing.avg(k[1], null); if (v != null) ac[k[0]] = v;
+          (acc ? [['item', g.spool]] : [['spool', g.spool], ['refill', g.refill]]).forEach(function (k) {
+            if (acc) { v = CA.costing.avg(k[1], null); if (v != null) ac[k[0]] = v; }
             v = last(k[1]); if (v != null) lc[k[0]] = v;
           });
-          // fusion dans les attrs ACTUELS de la base (seuls avg_cost / last_cost changent)
-          return CA.updateProduct(pid, { updated_at: new Date().toISOString() }, { attrs: {
-            avg_cost: Object.keys(ac).length ? ac : null,
-            last_cost: Object.keys(lc).length ? lc : null
-          } }).then(function (r) { if (r.data && r.data[0]) f.attrs = r.data[0].attrs || f.attrs; });
-        }));
+          // fusion dans les attrs ACTUELS de la base (filament : last_cost seul, avg_cost vient de la base)
+          var patch = { last_cost: Object.keys(lc).length ? lc : null };
+          if (acc) patch.avg_cost = Object.keys(ac).length ? ac : null;
+          return CA.updateProduct(pid, { updated_at: new Date().toISOString() }, { attrs: patch })
+            .then(function (r) { if (r.data && r.data[0]) f.attrs = r.data[0].attrs || f.attrs; });
+        })).then(function () {
+          // filaments : moyenne mobile (stock restant seulement, ventes comprises) calculée en base
+          if (!filIds.length) return;
+          return sb.rpc('admin_filament_mavg', { p_ids: filIds }).then(function (res) {
+            if (res.error) throw res.error;
+            var avg = (res.data && res.data.avg) || {};
+            filIds.forEach(function (pid) {
+              var f = bcProd(pid); if (!f) return;
+              f.attrs = f.attrs || {};
+              if (avg[pid]) f.attrs.avg_cost = avg[pid]; else delete f.attrs.avg_cost;
+            });
+          });
+        });
       });
   }
 

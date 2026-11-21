@@ -111,7 +111,10 @@ J'ai commandé (En route) : supplier_order_lines.unit_cost  +  supplier_orders.t
         │   (taux par défaut : admin_settings « taxes_fournisseur » {marque: %}, Bambu 14,975 %, sinon 0)
         ▼
 Réception (pointage) : receipt_lines.unit_cost = prix payé × (1 + taxe)
-        │   recomputeAvgCosts() rejoue TOUTES les réceptions du produit
+        │   recomputeAvgCosts() : last_cost (+ avg_cost des accessoires) en JS, puis
+        │   filaments → RPC admin_filament_mavg(p_ids) = MOYENNE MOBILE (2026-11-20) : rejeu réceptions + ventes
+        │   (invoice_lines non annulées) par date, stock rejoué ≥ 0 → seul le stock restant compte.
+        │   p_invoices=true réécrit aussi invoice_lines.unit_cost + invoices.cost_total (fait une fois le 2026-11-20).
         ▼
 products.attrs.avg_cost {spool, refill | item}  +  attrs.last_cost (estimé de la liste à commander)
         (un don à 0 $ compte dans avg_cost mais jamais dans last_cost : seul un prix > 0 est un « dernier prix »)
