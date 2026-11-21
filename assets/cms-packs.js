@@ -4,6 +4,9 @@
    compositions toutes faites (presets) + « Personnaliser » au choix du client.
    Le prix n'a pas de palier ; ses unités comptent pour le palier de la marque (option B, serveur).
    Le serveur (_pack_fill) refuse un prix qui ne se divise pas au cent près et tout ce qui dépasse le stock.
+   Refonte 2026-11-20 (choix de Théo) : rangées larges (grande photo à gauche, en haut sur mobile),
+   une mini-carte par composition avec « Packs prêts » − n + bloqué au stock, interrupteur En ligne,
+   éditeur en fenêtre plein écran (Infos · Prix · Couleurs · Compositions · Photo).
    ========================================================= */
 (function () {
   'use strict';
@@ -33,30 +36,29 @@
     try { return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl; } catch (e) { return ''; }
   }
 
-  var listEl = $('#pk-list'), editor = $('#pk-editor');
-  if (!listEl || !editor) return;
+  var listEl = $('#pk-list'), editor = $('#pk-editor'), modal = $('#pk-modal');
+  if (!listEl || !editor || !modal) return;
   var codeI = $('#pk-code');
   var nameI = $('#pk-name'), nameEnI = $('#pk-name-en'), noteI = $('#pk-note'), noteEnI = $('#pk-note-en'),
       kindSeg = $('#pk-kind'), unitsI = $('#pk-units'), priceI = $('#pk-price'), calcEl = $('#pk-calc'),
       customI = $('#pk-custom'), featI = $('#pk-featured'), qI = $('#pk-q'), colorsEl = $('#pk-colors'),
-      presetsEl = $('#pk-presets'), photoEl = $('#pk-photo'), fileI = $('#pk-file'),
+      presetsEl = $('#pk-presets'), photoEl = $('#pk-photo'), delBtn = $('#pk-del'),
       saveBtn = $('#pk-save'), statusEl = $('#pk-status'),
       spoolF = $('#pk-spool-f'), spoolOnI = $('#pk-spool-on'), spoolPriceI = $('#pk-spool-price'), photoSpoolEl = $('#pk-photo-spool');
 
   var packs = [], fils = [], byId = {}, matOrder = {}, brandOrder = {}, mats = {};
   var loaded = false, editingId = null;
   var st = null;                      // état de l'éditeur
-  var imgFile = null, imgBlob = '';
 
   /* ---------- données ---------- */
   function load() {
-    listEl.innerHTML = '<p class="muted">Chargement…</p>';
+    if (!packs.length) listEl.innerHTML = '<p class="muted">Chargement…</p>';
     return Promise.all([
       sb.from('packs').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: true }),
       sb.from('products').select('*').eq('type', 'filament').eq('active', true),
       sb.from('materials').select('*'),
       sb.from('brands').select('name,sort_order'),
-      // stock offert (réel − réservations en cours), comme la boutique
+      // stock offert (réel − réservations en cours − recharges des packs prêts), comme la boutique
       sb.from('products_public').select('id,qty,qty_2').eq('type', 'filament'),
       // packs prêts restants par composition suivie (préparés − vendus − gardés)
       sb.rpc('pack_ready')
@@ -69,12 +71,13 @@
       (r[3].data || []).forEach(function (b, i) { brandOrder[b.name] = b.sort_order != null ? b.sort_order : i; });
       fils = (r[1].data || []).slice().sort(filCmp);
       byId = {}; fils.forEach(function (p) { byId[p.id] = p; });
-      (r[4].data || []).forEach(function (v) { var p = byId[v.id]; if (p) { p.avail = v.qty; p.avail_2 = v.qty_2; } });
+      setAvail(r[4].data);
       setReady(r[5].data);
       loaded = true;
       render();
     });
   }
+  function setAvail(rows) { (rows || []).forEach(function (v) { var p = byId[v.id]; if (p) { p.avail = v.qty; p.avail_2 = v.qty_2; } }); }
   // ordre de la section Filaments : marque → matériau → couleur
   function filCmp(a, b) {
     function bo(p) { return brandOrder[p.brand] != null ? brandOrder[p.brand] : 999; }
@@ -82,7 +85,7 @@
     return (bo(a) - bo(b)) || (mo(a) - mo(b)) || ((a.sort_order || 0) - (b.sort_order || 0)) || String(a.name).localeCompare(String(b.name));
   }
   function offers(p, kind) { return kind === 'refill' ? p.offer_refill !== false : p.offer_spool !== false; }
-  // stock offert : la vue publique soustrait les réservations en cours ; repli sur le stock brut
+  // stock offert : la vue publique soustrait les réservations en cours et les packs prêts ; repli sur le stock brut
   function stockOf(p, kind) {
     var v = kind === 'refill' ? (p.avail_2 !== undefined ? p.avail_2 : p.qty_2) : (p.avail !== undefined ? p.avail : p.qty);
     return Math.max(0, v || 0);
@@ -98,7 +101,7 @@
   function dot(p) { return '<i class="pm-dot" style="background:' + esc(p && p.hex || '#ccc') + '"></i>'; }
   function unitWord(kind, n) { return kind === 'spool' ? (n > 1 ? 'bobines' : 'bobine') : (n > 1 ? 'recharges' : 'recharge'); }
 
-  // packs possibles avec le stock pour une composition { pid: unités }
+  // packs possibles avec le stock offert pour une composition { pid: unités }
   function possible(lines, kind) {
     var best = Infinity, any = false;
     Object.keys(lines).forEach(function (pid) {
@@ -110,12 +113,22 @@
   function linesObj(pr) {
     var o = {}; (pr.lines || []).forEach(function (l) { if (l && l.p && l.n > 0) o[l.p] = (o[l.p] || 0) + (+l.n); }); return o;
   }
+  // pastilles : une par unité (règle de Théo : jamais de bobines dessinées)
+  function dotsHtml(lines, cls) {
+    var out = [];
+    Object.keys(lines).map(function (id) { return byId[id]; }).filter(Boolean).sort(filCmp).forEach(function (p) {
+      for (var i = 0; i < lines[p.id]; i++) out.push('<i style="background:' + esc(p.hex || '#ccc') + '"></i>');
+    });
+    return out.length ? '<span class="pk-pills ' + (cls || '') + '">' + out.join('') + '</span>' : '';
+  }
+  function colorLines(ids) { var o = {}; ids.forEach(function (id) { if (byId[id]) o[id] = 1; }); return o; }
 
   /* ---------- packs prêts (2026-11-20) ----------
      packs.ready = { "<pid:n,…>": { n, at } } par composition toute faite (clé = _pack_ckey en SQL).
      Absent = pas suivi (le pack puise dans le stock à l'unité). Suivi : ses recharges sont retirées du stock
      à l'unité ; au-delà des packs restants, le pack part « à commander ». On affiche les RESTANTS (RPC pack_ready) ;
-     changer le compte pose n = restants voulus + packs gardés, at = maintenant (les ventes d'avant ne comptent plus). */
+     changer le compte pose n = restants voulus + packs gardés, at = maintenant (les ventes d'avant ne comptent plus).
+     Plafond : restants + packs encore possibles avec le stock offert (qui exclut déjà les packs prêts). */
   var readyLeft = {};   // 'packId|ckey' -> { left, held }
   function setReady(rows) {
     readyLeft = {};
@@ -128,6 +141,7 @@
       .map(function (l) { return l.p + ':' + l.n; }).join(',');
   }
   function readyOf(pk, pr) { return readyLeft[pk.id + '|' + ckeyOf(pr)] || null; }
+  function readyMax(pk, pr) { var rd = readyOf(pk, pr); return (rd ? rd.left : 0) + possible(linesObj(pr), pk.kind); }
   function setPackReady(pk, pr, left) {   // left = null -> plus suivi
     var key = ckeyOf(pr), cur = readyOf(pk, pr), next = {};
     var src = pk.ready && typeof pk.ready === 'object' ? pk.ready : {};
@@ -141,104 +155,106 @@
     }).then(function (r) {
       if (r[0].error) throw r[0].error;
       setReady(r[0].data);
-      (r[1].data || []).forEach(function (v) { var p = byId[v.id]; if (p) { p.avail = v.qty; p.avail_2 = v.qty_2; } });
+      setAvail(r[1].data);
       render();
     });
   }
 
-  /* ---------- liste ---------- */
+  /* ---------- liste : une rangée large par pack ---------- */
   function render() {
     if (!packs.length) { listEl.innerHTML = '<p class="empty">Aucun pack. Crée le premier avec « Pack ».</p>'; return; }
-    listEl.innerHTML = packs.map(function (pk) {
-      var units = pk.units || 4, unit = r2(pk.price / units);
-      var cols = (pk.colors || []).map(function (id) { return byId[id]; }).filter(Boolean).sort(filCmp);
-      var pres = (pk.presets || []).map(function (pr, i) {
-        var rd = readyOf(pk, pr), n = rd ? rd.left : possible(linesObj(pr), pk.kind);
-        return '<span class="pk-pre' + (n ? '' : ' is-out') + (rd ? ' is-ready' : '') + '">' + esc(pr.name || 'Sans nom') +
-          (rd ? '' : ' <em>' + (n ? n + ' en stock' : 'Épuisé') + '</em>') +
-          '<span class="pk-rdy" title="Packs prêts">Prêts' +
-            '<button type="button" data-a="rdy" data-d="-1" data-i="' + i + '" aria-label="Un pack prêt de moins">−</button>' +
-            '<b>' + (rd ? rd.left : '—') + '</b>' +
-            '<button type="button" data-a="rdy" data-d="1" data-i="' + i + '" aria-label="Un pack prêt de plus">+</button>' +
-          '</span></span>';
-      }).join('');
-      var img = pk.image_path ? '<img src="' + esc(publicUrl(pk.image_path)) + '" alt="">' : spoolsSvg(cols.slice(0, 4));
-      return '<article class="pk-row' + (pk.enabled ? '' : ' is-off') + '" data-id="' + esc(pk.id) + '" draggable="true">' +
-        '<div class="pk-thumb">' + img + '</div>' +
-        '<div class="pm-main">' +
-          '<div class="pm-top"><b class="pm-title">' + esc(pk.name) + '</b>' +
-            '<span class="pm-state' + (pk.enabled ? ' s-on' : '') + '">' + (pk.enabled ? 'En ligne' : 'Hors ligne') + '</span>' +
-            (pk.featured ? '<span class="pm-tag">En haut de Filaments</span>' : '') + '</div>' +
-          '<div class="pm-meta">' + (pk.code ? esc(pk.code) + ' · ' : '') + money(+pk.price) + ' · ' + units + ' ' + unitWord(pk.kind, units) + ' · ' + money(unit) + ' l\'unité' +
-            (pk.kind === 'refill' && pk.spool_price != null ? ' · avec bobine ' + money(+pk.spool_price) : '') +
-            (pk.allow_custom ? ' · personnalisable' : '') + '</div>' +
-          '<div class="pk-cols">' + cols.map(function (p) { return '<span class="pk-col">' + dot(p) + esc(p.name) + '</span>'; }).join('') + '</div>' +
-          (pres ? '<div class="pk-pres">' + pres + '</div>' : '') +
-        '</div>' +
-        '<div class="pm-acts">' +
-          '<button type="button" class="btn btn-ghost btn-sm" data-a="edit">Modifier</button>' +
-          '<button type="button" class="btn btn-ghost btn-sm" data-a="toggle">' + (pk.enabled ? 'Retirer' : 'Mettre en ligne') + '</button>' +
-          '<button type="button" class="btn btn-ghost btn-sm" data-a="del" data-ic="trash" aria-label="Supprimer"></button>' +
-        '</div></article>';
-    }).join('');
+    listEl.innerHTML = packs.map(rowHtml).join('');
     $$('.pk-row', listEl).forEach(wireDrag);
   }
-  // bobines dessinées (même dessin que la boutique, en petit)
-  function spoolsSvg(cols) {
-    if (!cols.length) return '';
-    var w = 22, out = cols.map(function (p, i) {
-      var x = 4 + i * w, c = esc(p.hex || '#ccc');
-      return '<g transform="translate(' + x + ',6)"><rect x="0" y="0" width="18" height="36" rx="5" fill="' + c + '" stroke="rgba(0,0,0,.25)"/>' +
-        '<rect x="0" y="15" width="18" height="6" fill="rgba(0,0,0,.12)"/></g>';
-    }).join('');
-    return '<svg viewBox="0 0 ' + (8 + cols.length * w) + ' 48" aria-hidden="true">' + out + '</svg>';
+  function rowHtml(pk) {
+    var units = pk.units || 4, unit = r2(pk.price / units);
+    // photo du pack, sinon celle de la 1re composition qui en a une, sinon pastilles
+    var main = pk.image_path || ((pk.presets || []).filter(function (pr) { return pr.img; })[0] || {}).img;
+    var img = main
+      ? '<img src="' + esc(publicUrl(main)) + '" alt="">'
+      : (dotsHtml((pk.presets && pk.presets[0]) ? linesObj(pk.presets[0]) : colorLines(pk.colors || []), 'is-lg') || '<span class="pk-nophoto">Aucune photo</span>');
+    var meta = [];
+    if (pk.code) meta.push('<span class="pk-code">' + esc(pk.code) + '</span>');
+    meta.push('<b>' + money(+pk.price) + '</b>');
+    meta.push(units + ' ' + unitWord(pk.kind, units));
+    meta.push(money(unit) + ' l\'unité');
+    if (pk.kind === 'refill' && pk.spool_price != null) meta.push('avec bobine ' + money(+pk.spool_price));
+    var tags = (pk.featured ? '<span class="pk-tag">En haut de Filaments</span>' : '') +
+               (pk.allow_custom ? '<span class="pk-tag">Personnalisable</span>' : '');
+    var comps = (pk.presets || []).map(function (pr, i) { return compHtml(pk, pr, i); }).join('');
+    return '<article class="pk-row' + (pk.enabled ? '' : ' is-off') + '" data-id="' + esc(pk.id) + '" draggable="true">' +
+      '<div class="pk-media">' + img + '</div>' +
+      '<div class="pk-body">' +
+        '<div class="pk-head">' +
+          '<h3 class="pk-title">' + esc(pk.name) + '</h3>' +
+          '<label class="pk-tg-l pk-online"><span class="pk-tg"><input type="checkbox" data-a="toggle"' + (pk.enabled ? ' checked' : '') + '><span></span></span>' +
+            '<span class="pk-online-t">' + (pk.enabled ? 'En ligne' : 'Hors ligne') + '</span></label>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-a="edit" data-ic="edit">Modifier</button>' +
+        '</div>' +
+        '<div class="pk-meta">' + meta.join('<span class="pk-sep">·</span>') + '</div>' +
+        (tags ? '<div class="pk-tags">' + tags + '</div>' : '') +
+        (comps ? '<div class="pk-comps-l">Packs prêts</div><div class="pk-comps">' + comps + '</div>' : '') +
+      '</div></article>';
+  }
+  function compHtml(pk, pr, i) {
+    var rd = readyOf(pk, pr), max = readyMax(pk, pr), left = rd ? rd.left : null;
+    // une seule composition sans photo à elle = la photo du pack
+    var im = pr.img || ((pk.presets || []).length === 1 ? pk.image_path : null);
+    var src = im ? publicUrl(im) : '';
+    var out = rd ? left === 0 : max === 0;
+    var state = rd ? (left === 0 ? 'À commander' : 'max ' + max) : (max ? 'max ' + max : 'Aucun stock');
+    return '<div class="pk-mc' + (rd ? ' is-ready' : '') + (out ? ' is-out' : '') + '">' +
+      '<div class="pk-mc-img">' + (src ? '<img src="' + esc(src) + '" alt="">' : dotsHtml(linesObj(pr))) + '</div>' +
+      '<div class="pk-mc-name">' + esc(pr.name || 'Sans nom') + '</div>' +
+      '<div class="pk-stp">' +
+        '<button type="button" class="pk-sb" data-a="rdy" data-d="-1" data-i="' + i + '"' + (rd ? '' : ' disabled') + ' aria-label="Un pack prêt de moins">−</button>' +
+        '<b>' + (rd ? left : '—') + '</b>' +
+        '<button type="button" class="pk-sb" data-a="rdy" data-d="1" data-i="' + i + '"' + ((left || 0) < max ? '' : ' disabled') + ' aria-label="Un pack prêt de plus">+</button>' +
+      '</div>' +
+      '<div class="pk-mc-st">' + state + '</div>' +
+    '</div>';
   }
 
   listEl.addEventListener('click', function (e) {
     var b = e.target.closest('[data-a]'); if (!b) return;
-    var row = b.closest('.pk-row'), pk = packs.filter(function (x) { return x.id === row.getAttribute('data-id'); })[0];
+    var row = b.closest('.pk-row'), pk = row && packs.filter(function (x) { return x.id === row.getAttribute('data-id'); })[0];
     if (!pk) return;
     var a = b.getAttribute('data-a');
-    if (a === 'rdy') {   // packs prêts : + depuis « — » = 1 ; − à 0 = plus suivi (« — »)
+    if (a === 'rdy') {   // packs prêts : + depuis « — » = 1 ; − à 0 = plus suivi (« — ») ; + bloqué au stock
       var pr = (pk.presets || [])[+b.getAttribute('data-i')]; if (!pr || b.disabled) return;
-      var rd = readyOf(pk, pr), d = +b.getAttribute('data-d');
+      var rd = readyOf(pk, pr), d = +b.getAttribute('data-d'), max = readyMax(pk, pr);
       var left = rd ? (d < 0 && rd.left === 0 ? null : rd.left + d) : (d > 0 ? 1 : null);
       if (!rd && left == null) return;
+      if (left != null && d > 0 && left > max) return;   // plafond : stock offert
       $$('[data-a="rdy"]', row).forEach(function (x) { x.disabled = true; });
       setPackReady(pk, pr, left).then(null, function (err) { caDialog.error(err); render(); });
     } else if (a === 'edit') openEditor(pk);
-    else if (a === 'toggle') {
-      var on = !pk.enabled;
-      var go = on && !(pk.presets || []).some(function (pr) { return possible(linesObj(pr), pk.kind) > 0; }) && !pk.allow_custom
-        ? caDialog.confirm({ title: 'Aucune composition en stock', message: 'Le pack s\'affichera « Épuisé ».', ok: 'Mettre en ligne', cancel: 'Annuler' })
-        : Promise.resolve(true);
-      go.then(function (ok) {
-        if (!ok) return;
-        sb.from('packs').update({ enabled: on, updated_at: new Date().toISOString() }).eq('id', pk.id).select().then(function (res) {
-          if (res.error) { caDialog.error(res.error); return; }
-          if (!res.data || !res.data.length) { caDialog.error('Enregistrement refusé (permissions).'); return; }
-          pk.enabled = on; render();
-        });
-      });
-    } else if (a === 'del') {
-      caDialog.confirm({ title: 'Supprimer ce pack ?', message: pk.name + ' — les commandes passées gardent leurs lignes.', ok: 'Supprimer', cancel: 'Annuler', danger: true }).then(function (ok) {
-        if (!ok) return;
-        sb.from('packs').delete().eq('id', pk.id).select().then(function (res) {
-          if (res.error) { caDialog.error(res.error); return; }
-          if (!res.data || !res.data.length) { caDialog.error('Suppression refusée (permissions).'); return; }
-          if (pk.image_path && !/^assets\//.test(pk.image_path)) sb.storage.from(BUCKET).remove([pk.image_path]).then(null, function () {});
-          if (editingId === pk.id) closeEditor();
-          packs = packs.filter(function (x) { return x.id !== pk.id; }); render();
-        });
-      });
-    }
+  });
+  listEl.addEventListener('change', function (e) {
+    var t = e.target; if (t.getAttribute('data-a') !== 'toggle') return;
+    var row = t.closest('.pk-row'), pk = packs.filter(function (x) { return x.id === row.getAttribute('data-id'); })[0];
+    if (!pk) return;
+    var on = t.checked;
+    var empty = on && !pk.allow_custom && !(pk.presets || []).some(function (pr) { return readyMax(pk, pr) > 0; });
+    var go = empty
+      ? caDialog.confirm({ title: 'Aucune composition en stock', message: 'Il se commandera « Réservé à la prochaine réception ».', ok: 'Mettre en ligne', cancel: 'Annuler' })
+      : Promise.resolve(true);
+    go.then(function (ok) {
+      if (!ok) { t.checked = !on; return; }
+      t.disabled = true;
+      sb.from('packs').update({ enabled: on, updated_at: new Date().toISOString() }).eq('id', pk.id).select().then(function (res) {
+        if (res.error) throw res.error;
+        if (!res.data || !res.data.length) throw new Error('Enregistrement refusé (permissions).');
+        pk.enabled = on; render();
+      }).then(null, function (err) { caDialog.error(err); render(); });
+    });
   });
 
   /* ---------- glisser-déposer (ordre des packs) ---------- */
   var dragRow = null;
   function wireDrag(el) {
     el.addEventListener('dragstart', function (e) {
-      if (e.target.closest && e.target.closest('button, input')) { e.preventDefault(); return; }
+      if (e.target.closest && e.target.closest('button, input, label')) { e.preventDefault(); return; }
       dragRow = el; el.classList.add('dragging');
       if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', el.getAttribute('data-id')); } catch (_) {} }
     });
@@ -265,7 +281,7 @@
     });
   }
 
-  /* ---------- éditeur ---------- */
+  /* ---------- éditeur (fenêtre plein écran) ---------- */
   function setKind(k) {
     st.kind = k === 'spool' ? 'spool' : 'refill';
     $$('.fx-seg-btn', kindSeg).forEach(function (b) {
@@ -284,7 +300,7 @@
   function openEditor(pk) {
     if (!loaded) return;
     editingId = pk ? pk.id : null;
-    $('#pk-editor-title').textContent = pk ? 'Modifier le pack' : 'Nouveau pack';
+    $('#pk-editor-title').textContent = pk ? pk.name : 'Nouveau pack';
     nameI.value = pk ? pk.name || '' : '';
     nameEnI.value = pk ? pk.name_en || '' : '';
     codeI.value = pk ? pk.code || '' : '';
@@ -305,21 +321,26 @@
     };
     setKind(pk ? pk.kind : 'refill');
     syncCustom();
-    imgFile = null; if (imgBlob) { URL.revokeObjectURL(imgBlob); imgBlob = ''; }
+    delBtn.hidden = !pk;
     qI.value = ''; statusEl.textContent = '';
-    renderColors(); renderPresets(); renderCalc(); renderPhoto(); renderSpoolPhoto();
-    var docked = !!(window.CA.dockEditor && window.CA.dockEditor(editor));
-    editor.hidden = false;
-    if (docked) { nameI.focus({ preventScroll: true }); editor.parentNode.scrollTop = 0; return; }
-    nameI.focus();
-    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    renderColors(); renderPresets(); renderCalc(); renderPhotos();
+    modal.hidden = false;
+    document.documentElement.classList.add('pk-lock');
+    $('.pk-sh-body', editor).scrollTop = 0;
+    nameI.focus({ preventScroll: true });
   }
   function closeEditor() {
-    editor.hidden = true; editingId = null; imgFile = null;
-    if (imgBlob) { URL.revokeObjectURL(imgBlob); imgBlob = ''; }
+    modal.hidden = true; editingId = null;
+    document.documentElement.classList.remove('pk-lock');
   }
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden && !e.defaultPrevented) closeEditor(); });
 
   function unitsVal() { var n = parseInt(unitsI.value, 10); return isFinite(n) ? Math.max(1, Math.min(20, n)) : 4; }
+  editor.addEventListener('click', function (e) {
+    var u = e.target.closest('[data-u]'); if (!u) return;
+    unitsI.value = Math.max(1, Math.min(20, unitsVal() + (+u.getAttribute('data-u'))));
+    renderCalc(); renderPresets();
+  });
   function renderCalc() {
     var a = '<span class="pk-calc-row">' + calcLine(num(priceI.value), st.kind) + '</span>';
     if (spoolOn()) a += '<span class="pk-calc-row"><span class="pk-calc-k">Avec bobine</span> ' + calcLine(num(spoolPriceI.value), 'spool') + '</span>';
@@ -352,8 +373,11 @@
     var ok = bwOnly();
     customI.disabled = !ok;
     if (!ok) customI.checked = false;
-    customI.parentNode.title = ok ? '' : 'Noir et blanc seulement';
+    customI.closest('.pk-tg-l').title = ok ? '' : 'Noir et blanc seulement';
+    customI.closest('.pk-tg-l').classList.toggle('is-dis', !ok);
   }
+
+  /* couleurs permises : grosses pastilles par matériau, nom + stock dessous */
   function renderColors() {
     var q = fold(qI.value.trim()), sel = {};
     st.colors.forEach(function (id) { sel[id] = true; });
@@ -366,10 +390,10 @@
       map[k].items.push(p);
     });
     colorsEl.innerHTML = groups.map(function (g) {
-      return '<div class="pk-cg"><div class="pk-cgl">' + esc(g.label) + '</div><div class="pk-chips">' + g.items.map(function (p) {
+      return '<div class="pk-cg"><div class="pk-cgl">' + esc(g.label) + '</div><div class="pk-sws">' + g.items.map(function (p) {
         var s = stockOf(p, st.kind);
-        return '<button type="button" class="pk-chip' + (sel[p.id] ? ' is-on' : '') + '" data-c="' + esc(p.id) + '" aria-pressed="' + (sel[p.id] ? 'true' : 'false') + '">' +
-          dot(p) + '<span>' + esc(p.name) + '</span><em>' + s + '</em></button>';
+        return '<button type="button" class="pk-cs' + (sel[p.id] ? ' is-on' : '') + (s ? '' : ' is-zero') + '" data-c="' + esc(p.id) + '" aria-pressed="' + (sel[p.id] ? 'true' : 'false') + '" title="' + esc(p.name) + '">' +
+          '<i style="background:' + esc(p.hex || '#ccc') + '"></i><span>' + esc(p.name) + '</span><em>' + s + '</em></button>';
       }).join('') + '</div></div>';
     }).join('') || '<p class="muted">Aucune couleur.</p>';
   }
@@ -385,35 +409,51 @@
   });
   qI.addEventListener('input', renderColors);
 
+  /* tuile photo : image entière centrée, ou bouton « + Photo » ; t = cible (main, spool, p:i, ps:i) */
+  function phTile(src, t, label) {
+    return '<div class="pk-ph' + (src ? ' has-img' : '') + '">' +
+      (label ? '<span class="pk-ph-l">' + esc(label) + '</span>' : '') +
+      (src
+        ? '<img src="' + esc(src) + '" alt="">' +
+          '<div class="pk-ph-acts">' +
+            '<button type="button" class="btn btn-ghost btn-sm" data-ph="pick" data-t="' + t + '" data-ic="refresh">Changer</button>' +
+            '<button type="button" class="btn btn-ghost btn-sm btn-icon" data-ph="del" data-t="' + t + '" data-ic="trash" aria-label="Retirer la photo"></button>' +
+          '</div>'
+        : '<button type="button" class="pk-ph-add" data-ph="pick" data-t="' + t + '"><b>+</b>Photo</button>') +
+    '</div>';
+  }
+
+  /* compositions : une tuile chacune — photo, noms, − n + par couleur, total et stock */
   function renderPresets() {
     var units = unitsVal(), cols = st.colors.map(function (id) { return byId[id]; }).filter(Boolean);
-    if (!st.presets.length) { presetsEl.innerHTML = '<p class="muted">Aucune composition.</p>'; return; }
     presetsEl.innerHTML = st.presets.map(function (pr, i) {
       var tot = Object.keys(pr.lines).reduce(function (s, k) { return s + (pr.lines[k] || 0); }, 0);
       var n = possible(pr.lines, st.kind);
       return '<div class="pk-pc" data-i="' + i + '" draggable="true">' +
-        '<div class="pk-pch">' +
+        phTile(pr.img ? publicUrl(pr.img) : '', 'p:' + i) +
+        (spoolOn() ? '<div class="pk-pc-sp">' + phTile(pr.img_spool ? publicUrl(pr.img_spool) : '', 'ps:' + i, 'Avec bobine') + '</div>' : '') +
+        '<div class="pk-pc-names">' +
           '<input type="text" data-f="name" value="' + esc(pr.name) + '" placeholder="Nom (ex. 4 noires)" maxlength="40" aria-label="Nom">' +
           '<input type="text" data-f="name_en" value="' + esc(pr.name_en) + '" placeholder="Anglais (ex. 4 black)" maxlength="40" aria-label="Nom en anglais">' +
-          (pr.img ? '<img class="pk-pimg" src="' + esc(publicUrl(pr.img)) + '" alt="">' : '') +
-          '<button type="button" class="btn btn-ghost btn-sm" data-pimg="' + i + '" data-ic="plus">' + (pr.img ? 'Changer' : 'Photo') + '</button>' +
-          (pr.img ? '<button type="button" class="btn btn-ghost btn-sm" data-pimgdel="' + i + '" aria-label="Retirer la photo">×</button>' : '') +
-          (spoolOn() ? (pr.img_spool ? '<img class="pk-pimg" src="' + esc(publicUrl(pr.img_spool)) + '" alt="" title="Avec bobine">' : '') +
-            '<button type="button" class="btn btn-ghost btn-sm" data-pimg="' + i + '" data-spool="1" data-ic="plus">' + (pr.img_spool ? 'Changer bobine' : 'Photo bobine') + '</button>' +
-            (pr.img_spool ? '<button type="button" class="btn btn-ghost btn-sm" data-pimgdel="' + i + '" data-spool="1" aria-label="Retirer la photo avec bobine">×</button>' : '') : '') +
-          '<button type="button" class="btn btn-ghost btn-sm" data-pdel="' + i + '" data-ic="trash" aria-label="Retirer"></button>' +
         '</div>' +
         '<div class="pk-steps">' + (cols.length ? cols.map(function (p) {
           var v = pr.lines[p.id] || 0;
-          return '<div class="pk-step' + (v ? ' is-on' : '') + '">' + dot(p) + '<span>' + esc(p.name) + '</span>' +
-            '<button type="button" data-st="-1" data-p="' + esc(p.id) + '" aria-label="Moins">−</button>' +
-            '<b>' + v + '</b>' +
-            '<button type="button" data-st="1" data-p="' + esc(p.id) + '" aria-label="Plus">+</button></div>';
+          return '<div class="pk-step' + (v ? ' is-on' : '') + '">' + dot(p) + '<span class="pk-step-n">' + esc(p.name) + '</span>' +
+            '<span class="pk-stp">' +
+              '<button type="button" class="pk-sb" data-st="-1" data-p="' + esc(p.id) + '"' + (v ? '' : ' disabled') + ' aria-label="Moins">−</button>' +
+              '<b>' + v + '</b>' +
+              '<button type="button" class="pk-sb" data-st="1" data-p="' + esc(p.id) + '"' + (tot < units ? '' : ' disabled') + ' aria-label="Plus">+</button>' +
+            '</span></div>';
         }).join('') : '<p class="muted">Choisis d\'abord les couleurs.</p>') + '</div>' +
-        '<div class="pk-pcf"><span class="' + (tot === units ? 'pos' : 'neg') + '">' + tot + ' / ' + units + '</span>' +
-          (tot === units ? ' · ' + (n ? n + ' en stock' : 'Épuisé') : '') + '</div>' +
+        '<div class="pk-pcf">' +
+          '<span class="' + (tot === units ? 'pos' : 'neg') + '">' + tot + ' / ' + units + '</span>' +
+          (tot === units ? '<span class="pk-sep">·</span><span>' + (n ? n + ' en stock' : 'Aucun stock') + '</span>' : '') +
+          '<span class="grow"></span>' +
+          '<button type="button" class="btn btn-ghost btn-sm btn-icon pk-del" data-pdel="' + i + '" data-ic="trash" aria-label="Retirer la composition"></button>' +
+        '</div>' +
       '</div>';
-    }).join('');
+    }).join('') +
+    '<button type="button" class="pk-pc pk-pc-add" id="pk-preset-add"><b>+</b>Composition</button>';
     wirePresetDrag();
   }
   presetsEl.addEventListener('input', function (e) {
@@ -421,14 +461,24 @@
     st.presets[+c.getAttribute('data-i')][t.getAttribute('data-f')] = t.value;
   });
   presetsEl.addEventListener('click', function (e) {
+    if (e.target.closest('#pk-preset-add')) {
+      st.presets.push({ id: uid(), name: '', name_en: '', img: null, img_spool: null, lines: {} });
+      renderPresets();
+      var c = presetsEl.querySelector('.pk-pc[data-i="' + (st.presets.length - 1) + '"] input');
+      if (c) c.focus();
+      return;
+    }
     var del = e.target.closest('[data-pdel]'), stp = e.target.closest('[data-st]');
-    var pim = e.target.closest('[data-pimg]'), pimDel = e.target.closest('[data-pimgdel]');
-    if (pimDel) { st.presets[+pimDel.getAttribute('data-pimgdel')][pimDel.hasAttribute('data-spool') ? 'img_spool' : 'img'] = null; renderPresets(); return; }
-    if (pim) { pickPresetImg(st.presets[+pim.getAttribute('data-pimg')], pim, pim.hasAttribute('data-spool') ? 'img_spool' : 'img'); return; }
-    if (del) { st.presets.splice(+del.getAttribute('data-pdel'), 1); renderPresets(); return; }
-    if (stp) {
+    if (del) {
+      var k = +del.getAttribute('data-pdel'), pr0 = st.presets[k];
+      caDialog.confirm({ title: 'Retirer cette composition ?', message: (pr0.name || 'Sans nom'), ok: 'Retirer', cancel: 'Annuler', danger: true }).then(function (ok) {
+        if (ok) { st.presets.splice(k, 1); renderPresets(); }
+      });
+      return;
+    }
+    if (stp && !stp.disabled) {
       var pr = st.presets[+stp.closest('.pk-pc').getAttribute('data-i')], pid = stp.getAttribute('data-p');
-      var tot = Object.keys(pr.lines).reduce(function (s, k) { return s + (pr.lines[k] || 0); }, 0);
+      var tot = Object.keys(pr.lines).reduce(function (s, k2) { return s + (pr.lines[k2] || 0); }, 0);
       var d = +stp.getAttribute('data-st'), v = (pr.lines[pid] || 0) + d;
       if (v < 0 || (d > 0 && tot >= unitsVal())) return;
       if (v) pr.lines[pid] = v; else delete pr.lines[pid];
@@ -437,7 +487,7 @@
   });
   var dragPc = null;
   function wirePresetDrag() {
-    $$('.pk-pc', presetsEl).forEach(function (el) {
+    $$('.pk-pc[data-i]', presetsEl).forEach(function (el) {
       el.addEventListener('dragstart', function (e) {
         if (e.target.closest && e.target.closest('input, button')) { e.preventDefault(); return; }
         dragPc = el; el.classList.add('dragging');
@@ -453,103 +503,74 @@
       });
     });
   }
-  $('#pk-preset-add').addEventListener('click', function () {
-    st.presets.push({ id: uid(), name: '', name_en: '', img: null, lines: {} });
-    renderPresets();
-    var last = presetsEl.lastElementChild, inp = last && $('input', last);
-    if (inp) inp.focus();
-  });
 
-  /* ---------- photo facultative ---------- */
-  function renderPhoto() {
-    var src = imgBlob || (st.image ? publicUrl(st.image) : '');
-    photoEl.innerHTML = (src ? '<img src="' + esc(src) + '" alt="">' : '') +
-      '<button type="button" class="btn btn-ghost btn-sm" data-ph="pick" data-ic="plus">' + (src ? 'Changer' : 'Ajouter') + '</button>' +
-      (src ? '<button type="button" class="btn btn-ghost btn-sm" data-ph="del" data-ic="trash">Retirer</button>' : '') +
-      (src ? '' : '<span class="muted">Sinon, bobines dessinées.</span>');
+  /* ---------- photos : envoyées tout de suite au bucket products/packs/ ---------- */
+  function renderPhotos() {
+    photoEl.innerHTML = phTile(st.image ? publicUrl(st.image) : '', 'main', spoolOn() ? 'Recharges' : '');
+    photoSpoolEl.innerHTML = phTile(st.spoolImage ? publicUrl(st.spoolImage) : '', 'spool', 'Avec bobine');
   }
-  photoEl.addEventListener('click', function (e) {
+  function photoSet(t, path) {
+    if (t === 'main') st.image = path;
+    else if (t === 'spool') st.spoolImage = path;
+    else { var m = /^(p|ps):(\d+)$/.exec(t); if (m && st.presets[+m[2]]) st.presets[+m[2]][m[1] === 'p' ? 'img' : 'img_spool'] = path; }
+  }
+  function photoRedraw(t) { if (t === 'main' || t === 'spool') renderPhotos(); else renderPresets(); }
+  editor.addEventListener('click', function (e) {
     var b = e.target.closest('[data-ph]'); if (!b) return;
-    if (b.getAttribute('data-ph') === 'pick') fileI.click();
-    else { imgFile = null; if (imgBlob) { URL.revokeObjectURL(imgBlob); imgBlob = ''; } st.image = null; renderPhoto(); }
-  });
-  fileI.addEventListener('change', function () {
-    var f = fileI.files && fileI.files[0]; fileI.value = '';
-    if (!f) return;
-    imgFile = f; if (imgBlob) URL.revokeObjectURL(imgBlob); imgBlob = URL.createObjectURL(f);
-    renderPhoto();
-  });
-  // photo d'une composition (montrée quand le client la choisit) : envoyée tout de suite
-  function pickPresetImg(pr, btn, field, done) {
+    var t = b.getAttribute('data-t');
+    if (b.getAttribute('data-ph') === 'del') { photoSet(t, null); photoRedraw(t); return; }
     var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
     inp.addEventListener('change', function () {
       var f = inp.files && inp.files[0]; if (!f) return;
       var ext = (f.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
       var path = 'packs/' + Date.now() + '-' + uid() + '.' + ext;
-      btn.disabled = true; statusEl.textContent = 'Envoi de la photo…';
+      b.disabled = true; statusEl.textContent = 'Envoi de la photo…';
       sb.storage.from(BUCKET).upload(path, f, { cacheControl: '3600', upsert: false, contentType: f.type || undefined })
-        .then(function (res) { if (res.error) throw res.error; pr[field || 'img'] = path; statusEl.textContent = ''; (done || renderPresets)(); })
-        .catch(function (err) { statusEl.textContent = ''; btn.disabled = false; caDialog.error(err); });
+        .then(function (res) { if (res.error) throw res.error; photoSet(t, path); statusEl.textContent = ''; photoRedraw(t); })
+        .catch(function (err) { statusEl.textContent = ''; b.disabled = false; caDialog.error(err); });
     });
     inp.click();
-  }
-  // photo du pack avec bobine : envoyée tout de suite, comme celles des compositions
-  function renderSpoolPhoto() {
-    var src = st.spoolImage ? publicUrl(st.spoolImage) : '';
-    photoSpoolEl.innerHTML = '<span class="pk-calc-k">Avec bobine</span>' + (src ? '<img src="' + esc(src) + '" alt="">' : '') +
-      '<button type="button" class="btn btn-ghost btn-sm" data-sph="pick" data-ic="plus">' + (src ? 'Changer' : 'Ajouter') + '</button>' +
-      (src ? '<button type="button" class="btn btn-ghost btn-sm" data-sph="del" data-ic="trash">Retirer</button>' : '');
-  }
-  photoSpoolEl.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-sph]'); if (!b) return;
-    if (b.getAttribute('data-sph') === 'del') { st.spoolImage = null; renderSpoolPhoto(); return; }
-    pickPresetImg(st, b, 'spoolImage', renderSpoolPhoto);
   });
-  function uploadImg() {
-    if (!imgFile) return Promise.resolve(null);
-    var ext = (imgFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-    var path = 'packs/' + Date.now() + '-' + uid() + '.' + ext;
-    return sb.storage.from(BUCKET).upload(path, imgFile, { cacheControl: '3600', upsert: false, contentType: imgFile.type || undefined })
-      .then(function (res) { if (res.error) throw res.error; return path; });
-  }
 
   [unitsI, priceI, spoolPriceI].forEach(function (el) { el.addEventListener('input', function () { renderCalc(); if (el === unitsI) renderPresets(); }); });
   spoolOnI.addEventListener('change', function () {
     if (spoolOnI.checked && !spoolPriceI.value) { var p = num(priceI.value); if (p) spoolPriceI.value = r2(p + 10); }
-    syncSpool(); renderCalc(); renderPresets(); renderSpoolPhoto();
+    syncSpool(); renderCalc(); renderPresets(); renderPhotos();
     if (spoolOnI.checked) spoolPriceI.focus();
   });
   kindSeg.addEventListener('click', function (e) {
     var b = e.target.closest('[data-kind]'); if (!b) return;
-    setKind(b.getAttribute('data-kind')); renderColors(); renderPresets(); renderCalc();
+    setKind(b.getAttribute('data-kind')); renderColors(); renderPresets(); renderCalc(); renderPhotos();
   });
 
   /* ---------- enregistrement ---------- */
+  function fail(msg, el) { statusEl.textContent = msg; statusEl.classList.add('is-bad'); if (el) el.focus(); }
   editor.addEventListener('submit', function (e) {
     e.preventDefault();
+    statusEl.classList.remove('is-bad');
     var name = nameI.value.trim(), price = num(priceI.value), units = unitsVal();
-    if (!name) { statusEl.textContent = 'Nom requis.'; nameI.focus(); return; }
-    if (price == null || price <= 0) { statusEl.textContent = 'Prix requis.'; priceI.focus(); return; }
+    if (!name) return fail('Nom requis.', nameI);
+    if (price == null || price <= 0) return fail('Prix requis.', priceI);
     price = r2(price);
-    if (Math.abs(r2(price / units) * units - price) > 0.001) { statusEl.textContent = 'Le prix doit se diviser au cent près par ' + units + '.'; priceI.focus(); return; }
+    if (Math.abs(r2(price / units) * units - price) > 0.001) return fail('Le prix doit se diviser au cent près par ' + units + '.', priceI);
     var spoolPrice = null;
     if (spoolOn()) {
       spoolPrice = num(spoolPriceI.value);
-      if (spoolPrice == null || spoolPrice <= 0) { statusEl.textContent = 'Prix avec bobine requis.'; spoolPriceI.focus(); return; }
+      if (spoolPrice == null || spoolPrice <= 0) return fail('Prix avec bobine requis.', spoolPriceI);
       spoolPrice = r2(spoolPrice);
-      if (Math.abs(r2(spoolPrice / units) * units - spoolPrice) > 0.001) { statusEl.textContent = 'Le prix avec bobine doit se diviser au cent près par ' + units + '.'; spoolPriceI.focus(); return; }
+      if (Math.abs(r2(spoolPrice / units) * units - spoolPrice) > 0.001) return fail('Le prix avec bobine doit se diviser au cent près par ' + units + '.', spoolPriceI);
     }
-    if (!st.colors.length) { statusEl.textContent = 'Choisis au moins une couleur.'; return; }
+    if (!st.colors.length) return fail('Choisis au moins une couleur.');
     var presets = st.presets.map(function (pr) {
       return { id: pr.id, name: pr.name.trim(), name_en: pr.name_en.trim() || null, img: pr.img || null, img_spool: pr.img_spool || null,
         lines: st.colors.filter(function (id) { return pr.lines[id] > 0; }).map(function (id) { return { p: id, n: pr.lines[id] }; }) };
     });
     for (var i = 0; i < presets.length; i++) {
       var tot = presets[i].lines.reduce(function (s, l) { return s + l.n; }, 0);
-      if (!presets[i].name) { statusEl.textContent = 'Nomme chaque composition.'; return; }
-      if (tot !== units) { statusEl.textContent = '« ' + presets[i].name + ' » doit compter ' + units + ' unités.'; return; }
+      if (!presets[i].name) return fail('Nomme chaque composition.');
+      if (tot !== units) return fail('« ' + presets[i].name + ' » doit compter ' + units + ' unités.');
     }
-    if (!presets.length && !customI.checked) { statusEl.textContent = 'Ajoute une composition ou permets « Personnaliser ».'; return; }
+    if (!presets.length && !customI.checked) return fail('Ajoute une composition ou permets « Personnaliser ».');
     var cols = st.colors.map(function (id) { return byId[id]; });
     var below = cols.filter(function (p) { var c = costOf(p, st.kind); return c != null && r2(price / units) < c; }).map(function (p) { return p.name; });
     if (spoolPrice != null) cols.forEach(function (p) { var c = costOf(p, 'spool'); if (c != null && r2(spoolPrice / units) < c) below.push(p.name + ' (bobine)'); });
@@ -564,7 +585,8 @@
         kind: st.kind, units: units, price: price, colors: st.colors.slice(), presets: presets,
         allow_custom: customI.checked && bwOnly(), featured: featI.checked, updated_at: new Date().toISOString(),
         spool_price: st.kind === 'refill' ? spoolPrice : null,
-        spool_image_path: st.kind === 'refill' && spoolPrice != null ? st.spoolImage || null : null
+        spool_image_path: st.kind === 'refill' && spoolPrice != null ? st.spoolImage || null : null,
+        image_path: st.image || null
       };
       if (!old) {
         var base = slugify(name), slug = base, n = 2, taken = packs.map(function (x) { return x.slug; });
@@ -573,12 +595,10 @@
       }
       saveBtn.disabled = true; statusEl.textContent = 'Enregistrement…';
       var oldImg = old ? old.image_path : null;
-      uploadImg().then(function (path) {
-        row.image_path = path || st.image || null;
-        return old
-          ? sb.from('packs').update(row).eq('id', old.id).select().then(function (r) { if (r.error) throw r.error; if (!r.data || !r.data.length) throw new Error('Enregistrement refusé (permissions).'); return r.data[0]; })
-          : sb.from('packs').insert(row).select().then(function (r) { if (r.error) throw r.error; return r.data[0]; });
-      }).then(function (saved) {
+      (old
+        ? sb.from('packs').update(row).eq('id', old.id).select().then(function (r) { if (r.error) throw r.error; if (!r.data || !r.data.length) throw new Error('Enregistrement refusé (permissions).'); return r.data[0]; })
+        : sb.from('packs').insert(row).select().then(function (r) { if (r.error) throw r.error; return r.data[0]; })
+      ).then(function (saved) {
         if (oldImg && oldImg !== saved.image_path && !/^assets\//.test(oldImg)) sb.storage.from(BUCKET).remove([oldImg]).then(null, function () {});
         closeEditor(); return load();
       }).catch(function (err) { caDialog.error(err); })
@@ -586,13 +606,29 @@
     });
   });
 
+  delBtn.addEventListener('click', function () {
+    var pk = packs.filter(function (x) { return x.id === editingId; })[0]; if (!pk) return;
+    caDialog.confirm({ title: 'Supprimer ce pack ?', message: pk.name + ' — les commandes passées gardent leurs lignes.', ok: 'Supprimer', cancel: 'Annuler', danger: true }).then(function (ok) {
+      if (!ok) return;
+      sb.from('packs').delete().eq('id', pk.id).select().then(function (res) {
+        if (res.error) { caDialog.error(res.error); return; }
+        if (!res.data || !res.data.length) { caDialog.error('Suppression refusée (permissions).'); return; }
+        if (pk.image_path && !/^assets\//.test(pk.image_path)) sb.storage.from(BUCKET).remove([pk.image_path]).then(null, function () {});
+        closeEditor();
+        packs = packs.filter(function (x) { return x.id !== pk.id; }); render();
+      });
+    });
+  });
+
   $('#pk-new').addEventListener('click', function () { openEditor(null); });
   $('#pk-refresh').addEventListener('click', load);
   $('#pk-cancel').addEventListener('click', closeEditor);
+  $('#pk-close').addEventListener('click', closeEditor);
 
   var prevOnTab = window.CA.onTab;
   window.CA.onTab = function (name) {
     if (typeof prevOnTab === 'function') prevOnTab(name);
     if (name === 'packs') load();
+    else if (!modal.hidden) closeEditor();
   };
 })();

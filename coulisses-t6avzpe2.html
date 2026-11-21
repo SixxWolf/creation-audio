@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/tokens.css?v=5">
-<link rel="stylesheet" href="assets/admin.css?v=186">
+<link rel="stylesheet" href="assets/admin.css?v=187">
 <link rel="stylesheet" href="assets/demande-fil.css?v=1">
 <link rel="stylesheet" href="assets/cueillette.css?v=5">
 <link rel="stylesheet" href="assets/aide.css?v=2">
@@ -471,7 +471,7 @@
       <div class="panel-head">
         <div>
           <h1>Packs</h1>
-          <p class="muted">Recharges à prix fixe, composées par paires.</p>
+          <p class="muted">Recharges à prix fixe et packs prêts.</p>
         </div>
         <span class="grow"></span>
         <a class="btn btn-ghost btn-sm" href="./boutique/packs" target="_blank" rel="noopener" data-ic="link">Voir la boutique</a>
@@ -479,84 +479,103 @@
         <button class="btn btn-accent" id="pk-new" type="button" data-ic="plus">Pack</button>
       </div>
 
-      <form class="editor" id="pk-editor" hidden>
-        <h2 id="pk-editor-title">Pack</h2>
-        <div class="grid">
-          <div class="field">
-            <label class="lbl" for="pk-name">Nom</label>
-            <input type="text" id="pk-name" maxlength="50" placeholder="Ex. Pack Essentiels" autocomplete="off">
-          </div>
-          <div class="field">
-            <label class="lbl" for="pk-name-en">Nom en anglais</label>
-            <input type="text" id="pk-name-en" maxlength="50" placeholder="Ex. Essentials Pack" autocomplete="off">
-          </div>
-          <div class="field">
-            <label class="lbl" for="pk-note">Phrase courte</label>
-            <input type="text" id="pk-note" maxlength="90" autocomplete="off">
-          </div>
-          <div class="field">
-            <label class="lbl" for="pk-note-en">Phrase en anglais</label>
-            <input type="text" id="pk-note-en" maxlength="90" autocomplete="off">
-          </div>
-          <div class="field">
-            <span class="lbl" id="pk-kind-l">Format</span>
-            <div class="fx-seg pr-seg" id="pk-kind" role="radiogroup" aria-labelledby="pk-kind-l">
-              <button type="button" class="fx-seg-btn" data-kind="refill" role="radio" aria-checked="true">Recharges</button>
-              <button type="button" class="fx-seg-btn" data-kind="spool" role="radio" aria-checked="false">Avec bobine</button>
+      <div class="pk-modal" id="pk-modal" hidden>
+       <form class="pk-sheet" id="pk-editor" role="dialog" aria-modal="true" aria-labelledby="pk-editor-title" novalidate>
+        <header class="pk-sh-head">
+          <h2 id="pk-editor-title">Pack</h2>
+          <button type="button" class="pk-x" id="pk-close" aria-label="Fermer">✕</button>
+        </header>
+        <div class="pk-sh-body">
+          <section class="pk-sec">
+            <h3>Infos</h3>
+            <div class="pk-fields">
+              <div class="field">
+                <label class="lbl" for="pk-name">Nom</label>
+                <input type="text" id="pk-name" maxlength="50" placeholder="Ex. Pack Essentiels" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="lbl" for="pk-name-en">Nom en anglais</label>
+                <input type="text" id="pk-name-en" maxlength="50" placeholder="Ex. Essentials Pack" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="lbl" for="pk-note">Phrase courte</label>
+                <input type="text" id="pk-note" maxlength="90" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="lbl" for="pk-note-en">Phrase en anglais</label>
+                <input type="text" id="pk-note-en" maxlength="90" autocomplete="off">
+              </div>
+              <div class="field">
+                <label class="lbl" for="pk-code">Code d'offre</label>
+                <input type="text" id="pk-code" maxlength="24" placeholder="Ex. CA-PCK-ESS-001" autocomplete="off" spellcheck="false">
+              </div>
             </div>
-          </div>
-          <div class="field">
-            <label class="lbl" for="pk-units">Unités</label>
-            <input type="number" id="pk-units" min="1" max="20" step="1" value="4" inputmode="numeric">
-          </div>
-          <div class="field">
-            <label class="lbl" for="pk-price">Prix du pack ($)</label>
-            <input type="number" id="pk-price" min="1" step="0.01" inputmode="decimal">
-          </div>
-          <div class="field" id="pk-spool-f">
-            <label class="lbl pk-spool-l"><input type="checkbox" id="pk-spool-on"> Avec bobine ($)</label>
-            <input type="number" id="pk-spool-price" min="1" step="0.01" inputmode="decimal" aria-label="Prix avec bobine">
-          </div>
-          <div class="field">
-            <label class="lbl" for="pk-code">Code d'offre</label>
-            <input type="text" id="pk-code" maxlength="24" placeholder="Ex. CA-PCK-ESS-001" autocomplete="off" spellcheck="false">
-          </div>
-          <div class="field col-2">
-            <span class="lbl">Par unité</span>
+          </section>
+
+          <section class="pk-sec">
+            <h3>Prix</h3>
+            <div class="pk-fields">
+              <div class="field">
+                <span class="lbl" id="pk-kind-l">Format</span>
+                <div class="fx-seg pr-seg" id="pk-kind" role="radiogroup" aria-labelledby="pk-kind-l">
+                  <button type="button" class="fx-seg-btn" data-kind="refill" role="radio" aria-checked="true">Recharges</button>
+                  <button type="button" class="fx-seg-btn" data-kind="spool" role="radio" aria-checked="false">Avec bobine</button>
+                </div>
+              </div>
+              <div class="field">
+                <label class="lbl" for="pk-units">Unités</label>
+                <div class="pk-num">
+                  <button type="button" class="pk-sb" data-u="-1" aria-label="Une unité de moins">−</button>
+                  <input type="number" id="pk-units" min="1" max="20" step="1" value="4" inputmode="numeric">
+                  <button type="button" class="pk-sb" data-u="1" aria-label="Une unité de plus">+</button>
+                </div>
+              </div>
+              <div class="field">
+                <label class="lbl" for="pk-price">Prix du pack ($)</label>
+                <input type="number" id="pk-price" min="1" step="0.01" inputmode="decimal">
+              </div>
+              <div class="field" id="pk-spool-f">
+                <label class="lbl pk-tg-l"><span class="pk-tg"><input type="checkbox" id="pk-spool-on"><span></span></span>Avec bobine ($)</label>
+                <input type="number" id="pk-spool-price" min="1" step="0.01" inputmode="decimal" aria-label="Prix avec bobine">
+              </div>
+            </div>
             <div class="pk-calc" id="pk-calc"></div>
-          </div>
-          <div class="field col-2">
-            <span class="lbl">Options</span>
-            <div class="ac-show">
-              <label class="inline"><input type="checkbox" id="pk-custom" checked> Personnaliser</label>
-              <label class="inline"><input type="checkbox" id="pk-featured" checked> En haut de Filaments</label>
+            <div class="pk-opts">
+              <label class="pk-tg-l"><span class="pk-tg"><input type="checkbox" id="pk-custom" checked><span></span></span>Personnaliser</label>
+              <label class="pk-tg-l"><span class="pk-tg"><input type="checkbox" id="pk-featured" checked><span></span></span>En haut de Filaments</label>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <div class="pm-sec">
-          <h3>Couleurs permises</h3>
-          <input type="search" id="pk-q" class="pm-q" placeholder="Chercher" autocomplete="off">
-          <div class="pk-colors" id="pk-colors"></div>
-        </div>
-        <div class="pm-sec">
-          <h3>Compositions</h3>
-          <div class="pk-presets" id="pk-presets"></div>
-          <button type="button" class="btn btn-ghost btn-sm" id="pk-preset-add" data-ic="plus">Composition</button>
-        </div>
-        <div class="pm-sec">
-          <h3>Photo</h3>
-          <div class="pk-photo" id="pk-photo"></div>
-          <input type="file" id="pk-file" accept="image/*" hidden>
-          <div class="pk-photo" id="pk-photo-spool" hidden></div>
-        </div>
+          <section class="pk-sec">
+            <div class="pk-sec-h">
+              <h3>Couleurs permises</h3>
+              <input type="search" id="pk-q" class="pk-q" placeholder="Chercher" autocomplete="off">
+            </div>
+            <div class="pk-colors" id="pk-colors"></div>
+          </section>
 
-        <div class="editor-actions">
-          <button class="btn btn-accent" type="submit" id="pk-save" data-ic="save">Enregistrer</button>
-          <button class="btn btn-ghost" type="button" id="pk-cancel">Annuler</button>
+          <section class="pk-sec">
+            <h3>Compositions</h3>
+            <div class="pk-presets" id="pk-presets"></div>
+          </section>
+
+          <section class="pk-sec">
+            <h3>Photo du pack</h3>
+            <div class="pk-photos">
+              <div class="pk-ph-w" id="pk-photo"></div>
+              <div class="pk-ph-w" id="pk-photo-spool" hidden></div>
+            </div>
+          </section>
+        </div>
+        <footer class="pk-sh-foot">
+          <button class="btn btn-ghost btn-sm pk-del" type="button" id="pk-del" data-ic="trash" hidden>Supprimer</button>
           <span class="status" id="pk-status"></span>
-        </div>
-      </form>
+          <span class="grow"></span>
+          <button class="btn btn-ghost" type="button" id="pk-cancel">Annuler</button>
+          <button class="btn btn-accent" type="submit" id="pk-save" data-ic="save">Enregistrer</button>
+        </footer>
+       </form>
+      </div>
 
       <div class="pk-list" id="pk-list"><p class="muted">Chargement…</p></div>
      </div><!-- /.dock-main -->
@@ -3353,7 +3372,7 @@
 <script src="assets/cms-nouveautes.js?v=4"></script>
 <script src="assets/cms-populaires.js?v=1"></script>
 <script src="assets/cms-retour.js?v=1"></script>
-<script src="assets/cms-packs.js?v=8"></script>
+<script src="assets/cms-packs.js?v=9"></script>
 <script src="assets/cms-recherche.js?v=5"></script>
 <script src="assets/aide.js?v=4"></script>
 <script src="assets/cms-aide.js?v=8"></script>
