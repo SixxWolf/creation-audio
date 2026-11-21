@@ -52,9 +52,10 @@ function json(body: unknown, status = 200) {
 // photo du site (/assets/entretien/x.webp) : sa copie PNG voisine (pdf-lib ne lit pas le WebP).
 // Une photo introuvable = pas de vignette, jamais d'échec de l'envoi.
 // deno-lint-ignore no-explicit-any
-async function lineImages(db: any, rows: any[]): Promise<{ url: string; bytes: Uint8Array | null }[]> {
+async function lineImages(db: any, rows: any[]): Promise<{ url: string; bytes: Uint8Array | null; quad?: { url: string; bytes: Uint8Array | null }[] }[]> {
   const base = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
-  const ids = [...new Set(rows.map((r) => r.product_id).filter(Boolean))];
+  // + filaments des packs (composition) : damier 2×2 d'un pack sans photo (pack personnalisé, 2026-11-20)
+  const ids = [...new Set(rows.flatMap((r) => [r.product_id].concat(r.pack_comp ? Object.keys(r.pack_comp) : [])).filter(Boolean))];
   // deno-lint-ignore no-explicit-any
   const prods: Record<string, any> = {};
   if (ids.length) {
@@ -100,7 +101,18 @@ async function lineImages(db: any, rows: any[]): Promise<{ url: string; bytes: U
       return b.length > 0 && b.length < 3_000_000 ? b : null;
     } catch { return null; }
   })();
-  return await Promise.all(rows.map(async (r, i) => { const u = urlOf(r, i); return { url: u, bytes: u ? await get(u) : null }; }));
+  return await Promise.all(rows.map(async (r, i) => {
+    if (r.pack?.k && !packImg[i] && r.pack_comp) {   // pack sans photo : la photo du format de chacune de ses 4 unités
+      const units: string[] = [];
+      for (const [pid, n] of Object.entries(r.pack_comp as Record<string, number>)) for (let j = 0; j < (Number(n) || 0) && units.length < 4; j++) units.push(pid);
+      const quad = await Promise.all(units.map(async (pid) => {
+        const u = urlOf({ product_id: pid, kind: r.kind }, -1);
+        return { url: u, bytes: u ? await get(u) : null };
+      }));
+      if (quad.some((q) => q.bytes)) return { url: "", bytes: null, quad };
+    }
+    const u = urlOf(r, i); return { url: u, bytes: u ? await get(u) : null };
+  }));
 }
 
 // polices : chargées au premier envoi, gardées en mémoire ; null = repli Helvetica
@@ -206,10 +218,10 @@ Deno.serve(async (req) => {
   const { data: lines } = await db.from("invoice_lines")
     .select("label, meta, qty, unit_price, line_total, product_id, kind, pack").eq("invoice_id", invoiceId).order("sort_order");
   const L = packGroup((lines || []) as (InvoiceLine & { product_id?: string | null; kind?: string; pack?: unknown })[], en);   // un pack = une ligne (code + couleurs)
-  let imgs: { url: string; bytes: Uint8Array | null }[] = [];
+  let imgs: Awaited<ReturnType<typeof lineImages>> = [];
   try {
     imgs = await lineImages(db, L);
-    L.forEach((l, i) => { l.img = imgs[i]?.bytes || null; });
+    L.forEach((l, i) => { l.img = imgs[i]?.bytes || null; l.quad = imgs[i]?.quad ? imgs[i].quad!.map((q) => q.bytes) : null; });
   } catch { /* sans vignettes */ }
   const { data: coRow } = await db.from("admin_settings").select("value").eq("key", "entreprise").maybeSingle();
   const company = (coRow?.value || {}) as Record<string, unknown>;
@@ -243,8 +255,9 @@ Deno.serve(async (req) => {
         const im = imgs[i];
         const ok = !!(im?.url && im.bytes);   // photo réellement trouvée → affichée dans le courriel
         const sz = ok ? fitBox(imageSize(im!.bytes)) : null;
+        const quad = im?.quad ? im.quad.map((q) => (q.url && q.bytes ? { src: emailSrc(q.url), ...fitBox(imageSize(q.bytes), 25) } : null)) : null;
         return { label: l.label, meta: l.meta, qty: l.qty, unit_price: l.unit_price, line_total: l.line_total,
-          src: ok ? emailSrc(im!.url) : null, w: sz?.w, h: sz?.h };
+          src: ok ? emailSrc(im!.url) : null, w: sz?.w, h: sz?.h, quad };
       }),
     });
     const msg: Record<string, unknown> = {

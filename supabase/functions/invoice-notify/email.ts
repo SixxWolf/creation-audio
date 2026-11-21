@@ -11,7 +11,8 @@ import { dateTxt, money, qtyTxt, type Company, type InvoiceHead } from "./pdf.ts
 
 // src : adresse publique de la photo ; w/h : taille d'affichage (≤ 52 px, proportions gardées)
 export type EmailLine = { label?: string | null; meta?: string | null; qty: number; unit_price: number; line_total: number;
-  src?: string | null; w?: number; h?: number };
+  src?: string | null; w?: number; h?: number;
+  quad?: ({ src: string; w: number; h: number } | null)[] | null };   // pack personnalisé : damier 2×2
 
 const INK = "#181A1F", SOFT = "#6C727C", LINE = "#E7E7E2", BAND = "#F4F3EF", EMBER = "#FF6A2B";
 const SANS = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
@@ -66,9 +67,15 @@ export function buildInvoiceEmail(o: { company: Company; invoice: InvoiceHead; l
   const rows = o.lines.map((l, i) => {
     const last = i === o.lines.length - 1;
     const bd = last ? "" : "border-bottom:1px solid " + LINE + ";";
+    const cell = (q: { src: string; w: number; h: number } | null) =>
+      '<td width="26" height="26" align="center" valign="middle" style="width:26px;height:26px;line-height:0;font-size:0">' +
+      (q ? '<img src="' + esc(q.src) + '" width="' + q.w + '" height="' + q.h + '" alt="" style="display:block;border:0;outline:none;width:' + q.w + 'px;height:' + q.h + 'px">' : "&nbsp;") + '</td>';
+    const qd = l.quad && l.quad.some(Boolean) ? [0, 1, 2, 3].map((k) => l.quad![k] || null) : null;
     const img = l.src
       ? '<img src="' + esc(l.src) + '" width="' + (l.w || 52) + '" height="' + (l.h || 52) + '" alt="" style="display:block;border:0;outline:none;width:' + (l.w || 52) + 'px;height:' + (l.h || 52) + 'px">'
-      : "&nbsp;";
+      : qd
+        ? '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="52"><tr>' + cell(qd[0]) + cell(qd[1]) + '</tr><tr>' + cell(qd[2]) + cell(qd[3]) + '</tr></table>'
+        : "&nbsp;";
     const sub = [l.meta ? esc(l.meta) : "", esc(qtyTxt(l.qty, en)) + " × " + m(l.unit_price)];
     return '<tr>' +
       '<td valign="top" width="56" class="ln" style="padding:14px 0;' + bd + 'width:56px">' +
