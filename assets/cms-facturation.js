@@ -382,6 +382,7 @@
     $$('.fx-seg-btn[data-cat]').forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-cat') === c); });
     elType.hidden = (c !== 'filament');
     if (elFilters) elFilters.hidden = (c !== 'filament');
+    paintCpk();   // barre du pack personnalisé : seulement sur Filament (la sélection est gardée)
     loadCatalog(c);
   }
   $$('.fx-seg-btn[data-cat]').forEach(function (b) {
@@ -626,6 +627,7 @@
     b.addEventListener('click', function () {
       pickerKind = b.getAttribute('data-kind');
       $$('.fx-type-btn').forEach(function (x) { x.classList.toggle('is-active', x === b); });
+      cpkKind(pickerKind);
       buildPicker();
     });
   });
@@ -698,8 +700,9 @@
         if (!(key in idx)) { idx[key] = groups.length; groups.push({ title: key, brand: p.brand || 'Autres', mat: p.material || 'Autres', items: [] }); }
         groups[idx[key]].items.push(p);
       });
-      if (!groups.length) { elCatalog.innerHTML = '<p class="empty">Aucune couleur pour ces filtres.</p>'; return; }
-      elCatalog.innerHTML = groups.map(function (g) {
+      if (fxPacks === null) loadFxPacks().then(function () { if (cat === 'filament') buildPicker(); });   // packs : tuiles dès qu'ils sont chargés
+      if (!groups.length) { elCatalog.innerHTML = '<p class="empty">Aucune couleur pour ces filtres.</p>'; paintCpk(); return; }
+      elCatalog.innerHTML = packTilesHtml() + groups.map(function (g) {
         return '<div class="pk-group"><div class="pk-group-title"><span class="pk-gt-brand">' + esc(g.brand) + '</span><span class="pk-gt-mat">' + esc(g.mat) + '</span></div><div class="pk-grid">' +
           g.items.map(function (p) {
             var hx = /^#[0-9a-f]{6}$/i.test(p.hex || '') ? p.hex : '#cccccc';
@@ -740,6 +743,7 @@
     bindPickerClicks();
     applyFilter(elSearch.value);
     refreshPickerBadges();
+    paintCpk();
   }
   function applyFilter(q) {
     q = (q || '').trim().toLowerCase();
@@ -760,20 +764,30 @@
   }
   function refreshPickerBadges() {
     // filament : la pastille ne compte que le format actif (bobine OU recharge) ; un point signale l'autre format déjà ajouté
-    var counts = {}, other = {}, fil = cat === 'filament';
-    lines.forEach(function (l) {
+    var counts = {}, other = {}, fil = cat === 'filament', packs = {};
+    if (fil && cpk) {   // pack personnalisé en cours : les pastilles comptent les couleurs choisies
+      cpk.picks.forEach(function (p) { counts[p.id] = (counts[p.id] || 0) + 1; });
+    } else lines.forEach(function (l) {
+      if (l.pack && l.pack.k) {   // tuile de pack : nombre de ce pack (même composition, même format)
+        if (!l.pack.custom && l.pack.pr != null && (pickerKind === 'spool') === (l.pack.kind === 'spool')) packs[l.pack.id + '|' + l.pack.pr + '|' + l.pack.k] = +l.pack.n || 1;
+        return;
+      }
       var k = l.productId || l.maintId; if (!k) return;
       if (fil && l.ptype === 'filament' && l.kind !== pickerKind) other[k] = (other[k] || 0) + l.qty;
       else counts[k] = (counts[k] || 0) + l.qty;
     });
+    var packCnt = {};
+    Object.keys(packs).forEach(function (k) { var a = k.split('|'), key = a[0] + "|" + a[1]; packCnt[key] = (packCnt[key] || 0) + packs[k]; });
     $$('.pk-cell', elCatalog).forEach(function (b) {
-      var id = b.getAttribute('data-id'), n = counts[id] || 0, badge = $('.pk-badge', b);
+      if (b.hasAttribute('data-custom')) { b.classList.toggle('sel', !!cpk); return; }
+      var id = b.getAttribute('data-id'), badge = $('.pk-badge', b);
+      var n = b.hasAttribute('data-pk') ? (cpk ? 0 : packCnt[b.getAttribute('data-pk') + '|' + b.getAttribute('data-pr')] || 0) : counts[id] || 0;
       b.classList.toggle('alt', !n && (other[id] || 0) > 0);
       if (n > 0) { b.classList.add('sel'); if (badge) badge.textContent = n; }
       else { b.classList.remove('sel'); if (badge) badge.textContent = ''; }
     });
   }
-  if (elSearch) elSearch.addEventListener('input', function () { applyFilter(this.value); renderPackHits(this.value); });
+  if (elSearch) elSearch.addEventListener('input', function () { applyFilter(this.value); });
 
   /* ---------- ajout de lignes ---------- */
   function prodById(id) { var arr = catalog[cat] || []; return arr.filter(function (p) { return String(p.id) === String(id); })[0] || null; }
@@ -802,7 +816,7 @@
   function removeOne(id) {
     var key = String(id), kind = cat === 'filament' ? pickerKind : 'unit';
     var cand = lines.filter(function (l) {
-      return cat === 'maintenance' ? l.maintId === key : (l.productId === key && l.kind === kind);
+      return cat === 'maintenance' ? l.maintId === key : (l.productId === key && l.kind === kind && !l.pack);
     });
     var l = cand.filter(function (x) { return !x.manual; })[0] || cand[0];
     if (!l) return;
@@ -813,10 +827,22 @@
   document.addEventListener('touchstart', function () { lastTouch = Date.now(); }, { passive: true, capture: true });
   function bindPickerClicks() {
     $$('.pk-cell', elCatalog).forEach(function (b) {
-      b.addEventListener('click', function () { addProduct(b.getAttribute('data-id')); });
+      b.addEventListener('click', function () {
+        if (b.hasAttribute('data-custom')) { if (!cpk) cpkStart(); return; }
+        if (b.hasAttribute('data-pk')) { addPackTile(b); return; }
+        if (cpk && cat === 'filament') { cpkPick(b.getAttribute('data-id')); return; }
+        addProduct(b.getAttribute('data-id'));
+      });
       b.addEventListener('contextmenu', function (e) {
         e.preventDefault();
         if (Date.now() - lastTouch < 1500) return;   // appui long au doigt : pas de retrait par accident
+        if (b.hasAttribute('data-custom')) return;
+        if (b.hasAttribute('data-pk')) { removeOnePack(b); return; }
+        if (cpk && cat === 'filament') {   // pack personnalisé : retire cette couleur de la barre
+          var id = b.getAttribute('data-id');
+          for (var j = cpk.picks.length - 1; j >= 0; j--) if (String(cpk.picks[j].id) === id) { cpk.picks.splice(j, 1); break; }
+          paintCpk(); refreshPickerBadges(); return;
+        }
         removeOne(b.getAttribute('data-id'));
       });
     });
@@ -925,43 +951,46 @@
     return sb.from('packs').select('*').order('sort_order', { ascending: true })
       .then(function (r) { fxPacks = (!r.error && r.data) || []; return fxPacks; }, function () { return []; });
   }
-  function addPackDialog() {
-    Promise.all([loadFxPacks(), loadCatalog('filament', true)]).then(null, function () {}).then(function () {
-      var opts = [];
-      (fxPacks || []).forEach(function (pk) {
-        (Array.isArray(pk.presets) ? pk.presets : []).forEach(function (pr) {
-          opts.push({ pk: pk, pr: pr });
-          if (fxHasSpool(pk)) opts.push({ pk: pk, pr: pr, sp: true });   // « Avec bobine » (2026-11-19)
-        });
-      });
-      if (!opts.length) { caDialog.toast('Aucun pack. Crée-le dans Packs.'); return; }
-      var body = document.createElement('div'); body.className = 'fx-packpick';
-      body.innerHTML = opts.map(function (o, i) {
-        var dots = (o.pr.lines || []).map(function (l) { var h = findProduct(l.p); return h ? swatchSVG(h.p.hex) : ''; }).join('');
-        return '<button type="button" class="fx-packopt' + (i ? '' : ' is-on') + '" data-i="' + i + '">' +
-          '<span class="fx-packdots">' + dots + '</span>' +
-          '<span class="fx-packn"><b>' + esc(o.pk.name) + '</b> · ' + esc(o.pr.name) + (o.sp ? ' · Avec bobine' : '') + (o.pk.enabled ? '' : ' <em>hors ligne</em>') + '</span>' +
-          '<span class="fx-packp">' + money(o.sp ? o.pk.spool_price : o.pk.price) + '</span></button>';
-      }).join('');
-      var pick = 0;
-      $$('.fx-packopt', body).forEach(function (b) {
-        b.addEventListener('click', function () {
-          pick = +b.getAttribute('data-i');
-          $$('.fx-packopt', body).forEach(function (x) { x.classList.toggle('is-on', x === b); });
-        });
-      });
-      caDialog.confirm({ title: 'Ajouter un pack', message: '', body: body, ok: 'Ajouter', icon: 'plus' }).then(function (ok) {
-        if (ok === true) addPackLines(opts[pick].pk, opts[pick].pr, opts[pick].sp);
-      });
-    });
-  }
   function fxHasSpool(pk) { return pk.kind === 'refill' && pk.spool_price != null && +pk.spool_price > 0; }
-  function addPackLines(pk, pr, sp) {
-    var price = sp && fxHasSpool(pk) ? +pk.spool_price : +pk.price;
-    var units = (pk.units | 0) || 4, unit = Math.round(price / Math.max(1, units) * 100) / 100, kind = sp && fxHasSpool(pk) ? 'spool' : (pk.kind || 'refill');
+  // format du slider : Recharge = packs recharge ; Avec bobine = packs bobine + packs recharge offerts avec bobine
+  function packKindOk(pk, kind) { return kind === 'spool' ? (pk.kind === 'spool' || fxHasSpool(pk)) : pk.kind !== 'spool'; }
+  function packPriceFor(pk, kind) { return kind === 'spool' && pk.kind !== 'spool' ? +pk.spool_price : +pk.price; }
+  // groupe d'un pack sur la facture (toutes ses lignes, même repère pack.k)
+  function packGroupLines(k) { return lines.filter(function (l) { return l.pack && l.pack.k === k; }); }
+  function packN(ls) { return Math.max(1, +(ls[0] && ls[0].pack.n) || 1); }
+  function nextPackK() {
     var maxK = 0;
     lines.forEach(function (l) { var m = l.pack && /^k(\d+)$/.exec(l.pack.k || ''); if (m) maxK = Math.max(maxK, +m[1]); });
-    var pack = { id: pk.id, k: 'k' + (maxK + 1), n: 1, name: pk.name, name_en: pk.name_en || null, code: pk.code || null, price: price, kind: kind };
+    return 'k' + (maxK + 1);
+  }
+  // nombre de packs d'un groupe : chaque couleur suit (qté = couleurs d'un pack × n) ; 0 = retiré
+  function setPackN(k, n) {
+    var ls = packGroupLines(k); if (!ls.length) return;
+    var n0 = packN(ls);
+    n = Math.max(0, n | 0);
+    if (!n) { lines = lines.filter(function (l) { return !(l.pack && l.pack.k === k); }); return; }
+    ls.forEach(function (l) {
+      var allPend = (l.pending || 0) > 0 && l.pending >= l.qty;
+      l.qty = Math.round(l.qty / n0 * n);
+      l.pending = allPend ? l.qty : Math.min(l.pending || 0, l.qty);
+      l.pack = Object.assign({}, l.pack, { n: n });
+    });
+  }
+  // prix d'UN pack : réparti également sur ses unités (le prix d'une ligne de pack est fixe)
+  function setPackPrice(k, price) {
+    var ls = packGroupLines(k); if (!ls.length) return;
+    var n = packN(ls), units = ls.reduce(function (s, l) { return s + l.qty / n; }, 0) || 1;
+    var unit = round2(Math.max(0, price) / units);
+    ls.forEach(function (l) { l.price = unit; l.manual = true; });
+    if (round2(unit * units) !== round2(price)) caDialog.toast('Prix arrondi à ' + money(round2(unit * units)) + '.');
+  }
+  function addPackLines(pk, pr, sp, prIdx) {
+    var price = sp && fxHasSpool(pk) ? +pk.spool_price : +pk.price;
+    var units = (pk.units | 0) || 4, unit = Math.round(price / Math.max(1, units) * 100) / 100, kind = sp && fxHasSpool(pk) ? 'spool' : (pk.kind || 'refill');
+    // même pack, même composition, même format : la quantité monte sur la même ligne
+    var same = lines.filter(function (l) { return l.pack && !l.pack.custom && String(l.pack.id) === String(pk.id) && l.pack.kind === kind && l.pack.pr === prIdx; })[0];
+    if (same && prIdx != null) { setPackN(same.pack.k, packN(packGroupLines(same.pack.k)) + 1); afterChange(); return; }
+    var pack = { id: pk.id, k: nextPackK(), n: 1, name: pk.name, name_en: pk.name_en || null, code: pk.code || null, price: price, kind: kind, pr: prIdx };
     var added = 0;
     (pr.lines || []).forEach(function (pl) {
       var hit = findProduct(pl.p); if (!hit || !(pl.n > 0)) return;
@@ -975,94 +1004,81 @@
     if (added !== units) caDialog.toast('Composition incomplète : vérifie le pack dans Packs.');
     afterChange();
   }
-  /* ---- pack personnalisé (Facturation seulement, 2026-11-19) : 4 unités de n'importe quel filament de la boutique,
-     prix du pack modifiable ; pack sans fiche dans la table packs (pas de clé id → hors Populaires, pas de photo) ---- */
+  /* ---- pack personnalisé (2026-11-20) : tuile « + Pack personnalisé » en bas des Packs → barre de 4 cases au-dessus
+     de la grille ; chaque clic sur une couleur remplit une case, la 4e ajoute le pack (prix modifiable sur sa ligne).
+     Rien n'est bloqué : Retour retire la dernière couleur, Annuler ferme la barre. Pack sans id → hors Populaires. ---- */
   var CPK_UNITS = 4;
-  function customPackDialog() {
-    Promise.all([loadFxPacks(), loadCatalog('filament', true)]).then(null, function () {}).then(function () {
-      var ref = (fxPacks || []).filter(function (x) { return (x.units | 0) === CPK_UNITS && +x.price > 0; })[0];
-      var st = { kind: 'refill', rows: [] };
-      var body = document.createElement('div'); body.className = 'fx-cpk';
-      body.innerHTML =
-        '<div class="fx-cpk-top">' +
-          '<div class="fx-type fx-cpk-kind"><button type="button" class="fx-type-btn is-active" data-kind="refill">Recharge</button>' +
-            '<button type="button" class="fx-type-btn" data-kind="spool">Avec bobine</button></div>' +
-          '<span class="unit fx-cpk-price" data-unit="$"><input type="number" min="0" step="0.01" value="' + (ref ? +ref.price : 60) + '" aria-label="Prix du pack"></span>' +
-        '</div>' +
-        '<select class="fx-cpk-add" aria-label="Ajouter une couleur"></select>' +
-        '<div class="fx-cpk-rows"></div>';
-      var elRows = $('.fx-cpk-rows', body), elAdd = $('.fx-cpk-add', body), elPrice = $('.fx-cpk-price input', body), go = null;
-      function total() { return st.rows.reduce(function (s, r) { return s + r.n; }, 0); }
-      function stockOf(p) { var q = st.kind === 'refill' ? p.qty_2 : p.qty; return q == null ? null : q | 0; }
-      function fillAdd() {
-        var groups = [], idx = {};
-        (catalog.filament || []).forEach(function (p) {
-          if (!filOffers(p, st.kind)) return;
-          var g = (p.brand || 'Autres') + ' · ' + (p.material || 'Autres');
-          if (!(g in idx)) { idx[g] = groups.length; groups.push({ g: g, items: [] }); }
-          groups[idx[g]].items.push(p);
-        });
-        elAdd.innerHTML = '<option value="">Ajouter une couleur</option>' + groups.map(function (g) {
-          return '<optgroup label="' + esc(g.g) + '">' + g.items.map(function (p) {
-            var s = stockOf(p);
-            return '<option value="' + esc(p.id) + '" data-sw="' + esc(p.hex || '#ccc') + '">' + esc(p.name) + (s != null ? ' · ' + s + ' en stock' : '') + '</option>';
-          }).join('') + '</optgroup>';
-        }).join('');
-        elAdd.value = '';
-        if (window.CA.pick) window.CA.pick(elAdd);
-      }
-      function paint() {
-        var t = total();
-        elRows.innerHTML = st.rows.map(function (r, i) {
-          var s = stockOf(r.p);
-          return '<div class="fx-cpk-row' + (s != null && r.n > s ? ' is-short' : '') + '">' + swatchSVG(r.p.hex) +
-            '<span class="fx-cpk-n"><b>' + esc(r.p.name) + '</b> <span>' + esc([r.p.brand, r.p.material].filter(Boolean).join(' · ')) + '</span></span>' +
-            '<span class="fx-cpk-step"><button type="button" data-d="-1" data-i="' + i + '" aria-label="Moins">−</button>' +
-            '<b>' + r.n + '</b><button type="button" data-d="1" data-i="' + i + '" aria-label="Plus"' + (t >= CPK_UNITS ? ' disabled' : '') + '>+</button></span></div>';
-        }).join('');
-        elAdd.disabled = t >= CPK_UNITS;
-        if (elAdd._pk) elAdd._pk.refresh();
-        if (!go) { var d = body.closest('dialog'); go = d && $('.dlg-go', d); }
-        if (go) { go.disabled = t !== CPK_UNITS || !(+elPrice.value >= 0) || elPrice.value === ''; go.textContent = 'Ajouter · ' + t + ' / ' + CPK_UNITS; }
-      }
-      elAdd.addEventListener('change', function () {
-        var id = elAdd.value; if (!id) return;
-        var p = (catalog.filament || []).filter(function (x) { return String(x.id) === id; })[0];
-        if (p && total() < CPK_UNITS) {
-          var r = st.rows.filter(function (x) { return String(x.p.id) === id; })[0];
-          if (r) r.n++; else st.rows.push({ p: p, n: 1 });
-        }
-        elAdd.value = ''; paint();
+  var cpk = null;   // { kind, picks: [produit…] } pendant la sélection
+  var elCpk = null;
+  function cpkDefaultPrice(kind) {
+    var ref = (fxPacks || []).filter(function (x) { return (x.units | 0) === CPK_UNITS && x.kind !== 'spool' && +x.price > 0; })[0];
+    if (kind === 'spool') {
+      var rs = (fxPacks || []).filter(function (x) { return (x.units | 0) === CPK_UNITS && packKindOk(x, 'spool') && packPriceFor(x, 'spool') > 0; })[0];
+      return rs ? packPriceFor(rs, 'spool') : (ref ? +ref.price + 10 : 70);
+    }
+    return ref ? +ref.price : 60;
+  }
+  function cpkStart() {
+    cpk = { kind: pickerKind, picks: [] };
+    paintCpk(); refreshPickerBadges();
+  }
+  function cpkStop() { cpk = null; paintCpk(); refreshPickerBadges(); }
+  function cpkPick(id) {
+    var p = prodById(id); if (!p || !cpk) return;
+    cpk.picks.push(p);
+    if (cpk.picks.length >= CPK_UNITS) {
+      var rows = [], at = {};
+      cpk.picks.forEach(function (x) { var k = String(x.id); if (!(k in at)) { at[k] = rows.length; rows.push({ p: x, n: 0 }); } rows[at[k]].n++; });
+      var kind = cpk.kind;
+      cpk = null; paintCpk();
+      addCustomPack(kind, cpkDefaultPrice(kind), rows);
+      return;
+    }
+    paintCpk(); refreshPickerBadges();
+  }
+  // le slider change de format pendant la sélection : les couleurs absentes de ce format sortent de la barre
+  function cpkKind(kind) {
+    if (!cpk) return;
+    cpk.kind = kind;
+    cpk.picks = cpk.picks.filter(function (p) { return filOffers(p, kind); });
+    paintCpk();
+  }
+  function paintCpk() {
+    if (!elCpk && elCatalog) {
+      elCpk = document.createElement('div');
+      elCpk.className = 'fx-cpk-bar'; elCpk.hidden = true;
+      elCatalog.parentNode.insertBefore(elCpk, elCatalog);
+      elCpk.addEventListener('click', function (e) {
+        if (!cpk) return;
+        var s = e.target.closest('[data-slot]');
+        if (s) { cpk.picks.splice(+s.getAttribute('data-slot'), 1); paintCpk(); refreshPickerBadges(); return; }
+        if (e.target.closest('[data-cpk-back]')) { cpk.picks.pop(); paintCpk(); refreshPickerBadges(); return; }
+        if (e.target.closest('[data-cpk-cancel]')) cpkStop();
       });
-      elRows.addEventListener('click', function (e) {
-        var b = e.target.closest('button[data-d]'); if (!b) return;
-        var r = st.rows[+b.getAttribute('data-i')]; if (!r) return;
-        r.n += +b.getAttribute('data-d');
-        if (r.n <= 0) st.rows.splice(st.rows.indexOf(r), 1);
-        paint();
-      });
-      $$('.fx-cpk-kind .fx-type-btn', body).forEach(function (b) {
-        b.addEventListener('click', function () {
-          st.kind = b.getAttribute('data-kind');
-          $$('.fx-cpk-kind .fx-type-btn', body).forEach(function (x) { x.classList.toggle('is-active', x === b); });
-          st.rows = st.rows.filter(function (r) { return filOffers(r.p, st.kind); });
-          fillAdd(); paint();
-        });
-      });
-      elPrice.addEventListener('input', paint);
-      fillAdd();
-      var pr = caDialog.confirm({ title: 'Pack personnalisé', message: '', body: body, ok: 'Ajouter', icon: 'plus' });
-      paint();
-      pr.then(function (ok) {
-        if (ok !== true || total() !== CPK_UNITS) return;
-        addCustomPack(st.kind, round2(Math.max(0, +elPrice.value || 0)), st.rows);
-      });
-    });
+    }
+    if (!elCpk) return;
+    var on = !!cpk && cat === 'filament';
+    elCpk.hidden = !on;
+    if (elCatalog) elCatalog.classList.toggle('is-cpk', on);
+    if (!on) { elCpk.innerHTML = ''; return; }
+    var slots = '';
+    for (var i = 0; i < CPK_UNITS; i++) {
+      var p = cpk.picks[i];
+      slots += p
+        ? '<button type="button" class="fx-cpk-slot is-full" data-slot="' + i + '" title="Retirer">' + swatchSVG(p.hex) + '<span>' + esc(p.name) + '</span></button>'
+        : '<span class="fx-cpk-slot"><i>?</i></span>';
+    }
+    elCpk.innerHTML =
+      '<div class="fx-cpk-head"><b>Pack personnalisé</b><span class="fx-cpk-count">' + cpk.picks.length + ' / ' + CPK_UNITS + '</span>' +
+        '<span class="fx-cpk-fmt">' + (cpk.kind === 'refill' ? 'Recharge' : 'Avec bobine') + '</span></div>' +
+      '<div class="fx-cpk-slots">' + slots + '</div>' +
+      '<div class="fx-cpk-acts">' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-cpk-back data-ic="undo"' + (cpk.picks.length ? '' : ' disabled') + '>Retour</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-cpk-cancel>Annuler</button></div>';
   }
   function addCustomPack(kind, price, rows) {
-    var unit = round2(price / CPK_UNITS), maxK = 0;
-    lines.forEach(function (l) { var m = l.pack && /^k(\d+)$/.exec(l.pack.k || ''); if (m) maxK = Math.max(maxK, +m[1]); });
-    var pack = { k: 'k' + (maxK + 1), n: 1, name: 'Pack personnalisé', name_en: 'Custom pack', code: null, price: round2(unit * CPK_UNITS), kind: kind, custom: true };
+    var unit = round2(price / CPK_UNITS);
+    var pack = { k: nextPackK(), n: 1, name: 'Pack personnalisé', name_en: 'Custom pack', code: null, price: round2(unit * CPK_UNITS), kind: kind, custom: true };
     rows.forEach(function (r) {
       var p = r.p;
       lines.push({ id: uid(), productId: String(p.id), ptype: 'filament', kind: kind, label: p.name,
@@ -1070,63 +1086,53 @@
         hex: p.hex, qty: r.n, base: unit, tiers: [], cost: +filCost(p, kind) || 0, tierKey: filTierKey(p),
         price: unit, manual: true, sp: null, pack: pack });
     });
-    if (pack.price !== price) caDialog.toast('Prix arrondi à ' + money(pack.price) + '.');
     afterChange();
   }
-  // prix d'un pack = somme de ses lignes (le prix unitaire d'une ligne de pack reste modifiable sur la facture)
+  // prix d'un pack = somme de ses lignes
   function syncPackPrices() {
     var sum = {};
     lines.forEach(function (l) { if (l.pack && l.pack.k) sum[l.pack.k] = (sum[l.pack.k] || 0) + l.qty * l.price; });
     lines.forEach(function (l) { if (l.pack && l.pack.k) l.pack.price = round2(sum[l.pack.k] / Math.max(1, +l.pack.n || 1)); });
   }
-  var elPackBtn = $('#fx-add-pack');
-  if (elPackBtn) elPackBtn.addEventListener('click', addPackDialog);
-  // packs trouvés par la barre de recherche (« pack », nom, code, composition) : un clic = toutes leurs lignes
-  var elPackHits = null;
-  function renderPackHits(q) {
-    q = norm(q);
-    if (!elPackHits && elCatalog) {
-      elPackHits = document.createElement('div');
-      elPackHits.className = 'fx-packhits'; elPackHits.hidden = true;
-      elCatalog.parentNode.insertBefore(elPackHits, elCatalog);
-      elPackHits.addEventListener('click', function (e) {
-        var b = e.target.closest('.fx-packopt'); if (!b) return;
-        if (b.hasAttribute('data-custom')) { customPackDialog(); return; }
-        var pk =(fxPacks || []).filter(function (x) { return String(x.id) === b.getAttribute('data-pk'); })[0];
-        var pr = pk && (pk.presets || [])[+b.getAttribute("data-pr")], sp = b.hasAttribute('data-sp');
-        if (pk && pr) { addPackLines(pk, pr, sp); caDialog.toast(pk.name + ' · ' + pr.name + (sp ? ' · avec bobine' : '') + ' ajouté.'); }
+  /* ---- catégorie « Packs » en tête de la grille des filaments (2026-11-20) : une tuile pleine largeur par
+     composition (pack · préréglage), prix du format du slider, couleurs nommées ; recherche = nom, code, couleurs ;
+     filtres marque / matériau = packs qui contiennent un filament de ce filtre ---- */
+  function packTilesHtml() {
+    var tiles = [];
+    (fxPacks || []).forEach(function (pk) {
+      if (!packKindOk(pk, pickerKind)) return;
+      (Array.isArray(pk.presets) ? pk.presets : []).forEach(function (pr, i) {
+        var cols = (pr.lines || []).map(function (pl) { var h = findProduct(pl.p); return h && pl.n > 0 ? { p: h.p, n: +pl.n } : null; }).filter(Boolean);
+        if (!cols.length) return;
+        if ((brandFilter !== 'all' || matFilter !== 'all') && !cols.some(function (c) {
+          return (brandFilter === 'all' || (c.p.brand || 'Autres') === brandFilter) && (matFilter === 'all' || (c.p.material || 'Autres') === matFilter);
+        })) return;
+        var hay = ['pack', pk.name, pk.name_en, pk.code, pr.name].concat(cols.map(function (c) { return c.p.name; })).join(' ').toLowerCase();
+        tiles.push('<button type="button" class="pk-cell pk-pack" data-pk="' + esc(pk.id) + '" data-pr="' + i + '" data-search="' + esc(hay) + '">' +
+          '<span class="pk-pack-top"><span class="pk-pack-n"><b>' + esc(pk.name) + '</b>' + (pr.name && pr.name !== pk.name ? ' · ' + esc(pr.name) : '') +
+            (pk.enabled ? '' : ' <em>hors ligne</em>') + '</span><span class="pk-pack-p">' + money(packPriceFor(pk, pickerKind)) + '</span></span>' +
+          '<span class="pk-pack-cols">' + cols.map(function (c) {
+            return '<span class="pk-pack-c">' + swatchSVG(c.p.hex) + (c.n > 1 ? c.n + ' × ' : '') + esc(c.p.name) + '</span>';
+          }).join('') + '</span><span class="pk-badge"></span></button>');
       });
-    }
-    if (!elPackHits) return;
-    if (q.length < 2) { elPackHits.hidden = true; elPackHits.innerHTML = ''; return; }
-    Promise.all([loadFxPacks(), loadCatalog('filament', true)]).then(null, function () {}).then(function () {
-      if (norm(elSearch.value) !== q) return;   // la recherche a changé entre-temps
-      var hits = [];
-      (fxPacks || []).forEach(function (pk) {
-        (Array.isArray(pk.presets) ? pk.presets : []).forEach(function (pr, i) {
-          // pas les couleurs : chercher « noir » ne doit pas sortir tous les packs
-          var hay = ['pack', pk.name, pk.name_en, pk.code, pr.name].join(' ');
-          if (window.CA.searchMatch ? window.CA.searchMatch(hay, q) : hay.toLowerCase().indexOf(q.toLowerCase()) !== -1) {
-            hits.push({ pk: pk, pr: pr, i: i });
-            if (fxHasSpool(pk)) hits.push({ pk: pk, pr: pr, i: i, sp: true });
-          }
-        });
-      });
-      var cHay = 'pack personnalise personnalisable custom sur mesure';
-      var custom = (window.CA.searchMatch ? window.CA.searchMatch(cHay, q) : cHay.indexOf(q.toLowerCase()) !== -1)
-        ? '<button type="button" class="fx-packopt fx-packcustom" data-custom="1"><span class="fx-packdots fx-cpk-ic" aria-hidden="true">' +
-          '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></span>' +
-          '<span class="fx-packn"><b>Pack personnalisé</b> · ' + CPK_UNITS + ' au choix</span><span class="fx-packp">Prix libre</span></button>' : '';
-      var any = hits.length || custom;
-      elPackHits.hidden = !any;
-      elPackHits.innerHTML = !any ? '' : '<div class="pk-group-title"><span class="pk-gt-brand">Packs</span></div>' + hits.slice(0, 12).map(function (o) {
-        var dots = (o.pr.lines || []).map(function (l) { var h = findProduct(l.p); return h ? swatchSVG(h.p.hex) : ''; }).join('');
-        return '<button type="button" class="fx-packopt" data-pk="' + esc(o.pk.id) + '" data-pr="' + o.i + '"' + (o.sp ? ' data-sp="1"' : '') + '>' +
-          '<span class="fx-packdots">' + dots + '</span>' +
-          '<span class="fx-packn"><b>' + esc(o.pk.name) + '</b> · ' + esc(o.pr.name) + (o.sp ? ' · Avec bobine' : '') + (o.pk.enabled ? '' : ' <em>hors ligne</em>') + '</span>' +
-          '<span class="fx-packp">' + money(o.sp ? o.pk.spool_price : o.pk.price) + '</span></button>';
-      }).join('') + custom;
     });
+    tiles.push('<button type="button" class="pk-cell pk-pack pk-pack-custom" data-custom="1" data-search="pack personnalisé personnalise custom sur mesure">' +
+      '<span class="pk-pack-top"><span class="pk-pack-n"><b>+ Pack personnalisé</b> · ' + CPK_UNITS + ' au choix</span><span class="pk-pack-p">' + money(cpkDefaultPrice(pickerKind)) + '</span></span>' +
+      '<span class="pk-pack-cols">' + new Array(CPK_UNITS + 1).join('<span class="pk-pack-c pk-pack-empty"><i></i>?</span>') + '</span></button>');
+    return '<div class="pk-group pk-group-packs"><div class="pk-group-title"><span class="pk-gt-brand">Packs</span></div><div class="pk-grid">' + tiles.join('') + '</div></div>';
+  }
+  function addPackTile(b) {
+    var pk = (fxPacks || []).filter(function (x) { return String(x.id) === b.getAttribute('data-pk'); })[0];
+    var i = +b.getAttribute('data-pr'), pr = pk && (pk.presets || [])[i];
+    if (pk && pr) addPackLines(pk, pr, pickerKind === 'spool' && pk.kind !== 'spool', i);
+  }
+  // clic droit sur une tuile de pack : un pack de moins
+  function removeOnePack(b) {
+    var id = b.getAttribute('data-pk'), i = +b.getAttribute('data-pr');
+    var l = lines.filter(function (x) { return x.pack && !x.pack.custom && String(x.pack.id) === id && x.pack.pr === i && (pickerKind === 'spool' ? x.pack.kind === 'spool' : x.pack.kind !== 'spool'); }).pop();
+    if (!l) return;
+    setPackN(l.pack.k, packN(packGroupLines(l.pack.k)) - 1);
+    afterChange();
   }
   function addFreeLine(preset) {
     preset = preset || {};
@@ -1195,7 +1201,13 @@
         (cliContact ? '<div>' + esc(cliContact) + '</div>' : '') + '</div>'
       : '';
 
+    var seenPack = {};
     var rows = lines.map(function (l, i) {
+      if (l.pack && l.pack.k) {   // pack : une seule ligne (photo, nom, couleurs) à sa 1re couleur
+        if (seenPack[l.pack.k]) return '';
+        seenPack[l.pack.k] = true;
+        return packRowHtml(l.pack.k, internal);
+      }
       var pend = Math.min(l.pending || 0, l.qty);
       // pastille « À venir » (écran seulement) ; quantité réglable si une partie seulement est remise
       var pendPill = pend > 0
@@ -1211,7 +1223,7 @@
             (marginShown ? '<span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
               (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span>' : '') +
           '</div>'
-        : lineThumb(l) + esc(l.label) + (l.pack ? ' <span class="inv-mat fx-packtag">' + esc(l.pack.name || 'Pack') + '</span>' : '') + (l.meta ? ' <span class="inv-mat">' + esc(CA.kindMeta(l.meta)) + '</span> ' + CA.kindPill(CA.kindOf(l.meta, l.kind)) : '') + pendPill +
+        : lineThumb(l) + esc(l.label) + (l.meta ? ' <span class="inv-mat">' + esc(CA.kindMeta(l.meta)) + '</span> ' + CA.kindPill(CA.kindOf(l.meta, l.kind)) : '') + pendPill +
           // coût unitaire modifiable (privé) : seulement quand la marge est affichée
           (marginShown ? '<div class="inv-sub no-print"><span class="unit unit-sm inv-cost-w" data-unit="$"><input class="inv-cost" type="number" min="0" step="0.01" value="' +
             (l.cost ? round2(l.cost) : '') + '" data-i="' + i + '" placeholder="Coût" aria-label="Coût unitaire"></span></div>' : '');
@@ -1269,7 +1281,7 @@
       (internal ? '' : '<div class="inv-foot">Aucun paiement en ligne — ramassage à Québec. Merci de votre confiance&nbsp;!</div>');
 
     // écouteurs des champs éditables
-    $$('.inv-qty', elInvoice).forEach(function (inp) {
+    $$('.inv-qty:not(.inv-pqty)', elInvoice).forEach(function (inp) {
       inp.addEventListener('change', function () {
         var l = lines[+this.getAttribute('data-i')]; if (!l) return;
         var allPending = l.pending > 0 && l.pending >= l.qty;   // ligne entièrement « à venir » : le reste
@@ -1279,7 +1291,7 @@
       });
     });
     // « À venir » : article facturé mais pas encore remis (commandé chez le fournisseur)
-    $$('.inv-pend', elInvoice).forEach(function (b) {
+    $$('.inv-pend:not(.inv-ppend)', elInvoice).forEach(function (b) {
       b.addEventListener('click', function () {
         var l = lines[+this.getAttribute('data-i')]; if (!l) return;
         l.pending = l.pending > 0 ? 0 : l.qty;
@@ -1293,7 +1305,7 @@
         afterChange();
       });
     });
-    $$('.inv-price', elInvoice).forEach(function (inp) {
+    $$('.inv-price:not(.inv-pprice)', elInvoice).forEach(function (inp) {
       inp.addEventListener('change', function () {
         var l = lines[+this.getAttribute('data-i')]; if (!l) return;
         l.price = Math.max(0, num(this.value) || 0); l.manual = true;
@@ -1313,8 +1325,25 @@
     $$('.inv-cat', elInvoice).forEach(function (sel) {
       sel.addEventListener('change', function () { var l = lines[+this.getAttribute('data-i')]; if (l) { l.ptype = this.value; afterChange(); } });
     });
-    $$('.inv-del', elInvoice).forEach(function (b) {
+    $$('.inv-del:not(.inv-pdel)', elInvoice).forEach(function (b) {
       b.addEventListener('click', function () { lines.splice(+this.getAttribute('data-i'), 1); afterChange(); });
+    });
+    // ligne de pack : qté = nombre de packs, prix = prix d'un pack, À venir / retrait = tout le pack
+    $$('.inv-pqty', elInvoice).forEach(function (inp) {
+      inp.addEventListener('change', function () { setPackN(this.getAttribute('data-k'), parseInt(this.value, 10) || 0); afterChange(); });
+    });
+    $$('.inv-pprice', elInvoice).forEach(function (inp) {
+      inp.addEventListener('change', function () { setPackPrice(this.getAttribute('data-k'), num(this.value) || 0); afterChange(); });
+    });
+    $$('.inv-ppend', elInvoice).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var ls = packGroupLines(this.getAttribute('data-k')), on = ls.some(function (l) { return (l.pending || 0) > 0; });
+        ls.forEach(function (l) { l.pending = on ? 0 : l.qty; });
+        afterChange();
+      });
+    });
+    $$('.inv-pdel', elInvoice).forEach(function (b) {
+      b.addEventListener('click', function () { setPackN(this.getAttribute('data-k'), 0); afterChange(); });
     });
 
     // marge (privé) : masquée par défaut (client devant l'écran), un clic l'affiche / la masque
@@ -1984,6 +2013,54 @@
     var url = printImg(lineImgPath(l));
     return url ? '<img class="inv-thumb" src="' + esc(url) + '" alt="" loading="lazy">' : swatchSVG(l.hex);
   }
+  /* ---- ligne de pack sur la facture (2026-11-20) : une ligne par pack — photo (pack personnalisé = damier 2×2 des
+     photos de ses filaments), nom + format, couleurs nommées ; Qté = nombre de packs ; le détail par couleur reste
+     dans `lines` (stock, paliers, PDF, courriels) ---- */
+  var packImgAsked = false;
+  function packQuad(ls) {   // 4 cases : photo du format de chaque unité (sinon sa couleur)
+    var n = packN(ls), out = [];
+    ls.forEach(function (l) {
+      var per = Math.max(1, Math.round(l.qty / n));
+      for (var j = 0; j < per && out.length < 4; j++) out.push({ url: printImg(lineImgPath(l)), hex: l.hex });
+    });
+    return out;
+  }
+  function quadHtml(q, cls) {
+    return '<span class="' + cls + '">' + q.map(function (c) {
+      return c.url ? '<img src="' + esc(c.url) + '" alt="" loading="lazy">' : '<i style="background:' + esc(c.hex || '#ccc') + '"></i>';
+    }).join('') + '</span>';
+  }
+  function packThumbHtml(pk, ls) {
+    if (pk.id && fxPacks === null && !packImgAsked) { packImgAsked = true; loadFxPacks().then(function () { if (lines.length) render(); }); }
+    var url = pk.id ? printImg(packImgPath(pk)) : '';
+    return url ? '<img class="inv-thumb" src="' + esc(url) + '" alt="" loading="lazy">' : quadHtml(packQuad(ls), 'inv-quad');
+  }
+  function packRowHtml(k, internal) {
+    var ls = packGroupLines(k), pk = ls[0].pack, n = packN(ls);
+    var total = ls.reduce(function (s, l) { return s + l.qty * l.price; }, 0);
+    var cost = ls.reduce(function (s, l) { return s + l.qty * (+l.cost || 0); }, 0) / n;
+    var pend = ls.some(function (l) { return (l.pending || 0) > 0; });
+    var cols = ls.map(function (l) {
+      var per = Math.round(l.qty / n);
+      return '<span class="inv-pkc">' + swatchSVG(l.hex) + (per > 1 ? per + ' × ' : '') + esc(l.label) + '</span>';
+    }).join('');
+    return '<tr class="inv-pkrow' + (pend ? ' is-pending' : '') + '" data-k="' + esc(k) + '">' +
+      '<td><div class="inv-pk">' + packThumbHtml(pk, ls) + '<div class="inv-pk-tx">' +
+        '<div><b>' + esc(pk.name || 'Pack') + '</b> ' + CA.kindPill(pk.kind === 'spool' ? 'spool' : 'refill') +
+          (pend ? ' <span class="inv-pend-pill no-print">À venir</span>' : '') + '</div>' +
+        '<div class="inv-pkcols">' + cols + '</div>' +
+        (marginShown ? '<div class="inv-sub no-print"><span class="inv-mat">Coût ' + money(cost) + '</span></div>' : '') +
+      '</div></div></td>' +
+      '<td class="num"><input class="inv-qty inv-pqty" type="number" min="0" step="1" value="' + n + '" data-k="' + esc(k) + '" aria-label="Nombre de packs"></td>' +
+      '<td class="num"><input class="inv-price inv-pprice" type="number" min="0" step="0.01" value="' + round2(total / n) + '" data-k="' + esc(k) + '"' +
+        (internal ? ' disabled title="Usage interne : 0 $"' : '') + ' aria-label="Prix du pack"></td>' +
+      '<td class="num">' + money(total) + '</td>' +
+      '<td class="num no-print"><div class="inv-acts">' +
+        '<button type="button" class="inv-pend inv-ppend" data-k="' + esc(k) + '" aria-pressed="' + pend + '" title="' +
+          (pend ? 'Marquer remis' : 'À venir (pas encore remis)') + '">' + PEND_SVG + '</button>' +
+        '<button type="button" class="inv-del inv-pdel" data-k="' + esc(k) + '" title="Retirer">&times;</button>' +
+      '</div></td></tr>';
+  }
   function lineImgPath(l) {
     var MAINT = /^Entretien(?: mensuel)? — (.+)$/, hit = l.productId ? findProduct(l.productId) : null;
     if (hit) {
@@ -2005,14 +2082,16 @@
     var have = {};
     lines.forEach(function (l) { if (l.pack && l.pack.k === pk.k && l.productId) have[l.productId] = (have[l.productId] || 0) + (l.qty | 0); });
     var want = key(have), path = '';
+    var sp = pk.kind === 'spool' && p.kind !== 'spool';   // pack recharge vendu « Avec bobine » : ses photos bobine d'abord (comme mail.ts)
     (Array.isArray(p.presets) ? p.presets : []).some(function (pr) {
-      if (!pr || !pr.img) return false;
+      var im = pr && ((sp && pr.img_spool) || pr.img);
+      if (!im) return false;
       var m = {};
       (pr.lines || []).forEach(function (x) { if (x && x.p && (x.n | 0) > 0) m[x.p] = (m[x.p] || 0) + (x.n | 0) * Math.max(1, +pk.n || 1); });
-      if (key(m) === want) { path = pr.img; return true; }
+      if (key(m) === want) { path = im; return true; }
       return false;
     });
-    return path || p.image_path || '';
+    return path || (sp && p.spool_image_path) || p.image_path || '';
   }
   if (elPrint) elPrint.addEventListener('click', function () {
     if (!lines.length || !CA.docPrint) return;
@@ -2024,7 +2103,9 @@
         var pack = null;
         if (l.pack) {
           if (!(l.pack.k in packImgs)) packImgs[l.pack.k] = printImg(packImgPath(l.pack));
-          pack = Object.assign({}, l.pack, { img: packImgs[l.pack.k] });
+          // sans photo de pack (pack personnalisé) : damier 2×2 des photos de ses filaments
+          pack = Object.assign({}, l.pack, { img: packImgs[l.pack.k],
+            imgs: packImgs[l.pack.k] ? null : packQuad(packGroupLines(l.pack.k)).map(function (c) { return c.url || ''; }) });
         }
         return { label: l.label, meta: l.meta, qty: l.qty, unit_price: l.price, line_total: round2(l.qty * l.price), pack: pack,
           img: pack ? '' : printImg(lineImgPath(l)) };

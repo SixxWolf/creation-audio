@@ -2498,39 +2498,6 @@ a.ms-b-file:hover { border-color:var(--ink); }
 
 /* Packs dans Commandes / Réservations / Facturation (2026-11-16) */
 .cc-meta.cc-pack, .cc-meta .cc-pack { color:var(--ember-ink); font-weight:700; }
-.fx-packtag { color:var(--ember-ink); font-weight:700; }
-.fx-packpick { grid-column:1 / -1; margin-top:16px; display:flex; flex-direction:column; gap:8px; max-height:52vh; overflow:auto; }
-.fx-packopt { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; font:inherit; color:var(--ink); text-align:left;
-  cursor:pointer; background:var(--paper); border:1px solid var(--line-2); border-radius:12px; }
-.fx-packopt:hover { border-color:var(--ink-2); }
-.fx-packopt.is-on { border-color:var(--ember); box-shadow:inset 0 0 0 1px var(--ember); }
-.fx-packdots { display:flex; flex:none; gap:2px; }
-.fx-packn { flex:1; min-width:0; }
-.fx-packn em { font-style:normal; font-size:.8rem; color:var(--muted); }
-.fx-packp { flex:none; font-weight:700; font-variant-numeric:tabular-nums; }
-/* packs trouvés par la barre de recherche de la Facturation */
-.fx-packhits { display:flex; flex-direction:column; gap:6px; margin:0 0 12px; }
-.fx-packhits .fx-packopt { padding:8px 10px; }
-.fx-packhits .fx-packopt:hover { border-color:var(--ember); }
-/* pack personnalisé (Facturation, 2026-11-19) */
-.fx-packcustom { border-style:dashed; }
-.fx-cpk-ic { color:var(--ember-ink); width:15px; justify-content:center; }
-.fx-cpk { grid-column:1 / -1; display:flex; flex-direction:column; gap:12px; margin-top:14px; min-width:0; }
-@media (min-width:600px) { .fx-cpk { width:440px; max-width:100%; } }
-.fx-cpk-top { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-.fx-cpk-price { width:120px; }
-.fx-cpk-rows { display:flex; flex-direction:column; gap:6px; max-height:40vh; overflow:auto; }
-.fx-cpk-rows:empty { display:none; }
-.fx-cpk-row { display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--paper); border:1px solid var(--line-2); border-radius:12px; }
-.fx-cpk-row.is-short { border-color:color-mix(in srgb, #d33 55%, var(--line-2)); }
-.fx-cpk-n { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.fx-cpk-n span { color:var(--muted); font-size:.82rem; }
-.fx-cpk-step { display:inline-flex; align-items:center; gap:4px; flex:none; }
-.fx-cpk-step b { min-width:22px; text-align:center; font-variant-numeric:tabular-nums; }
-.fx-cpk-step button { width:32px; height:32px; font:inherit; font-size:1.1rem; line-height:1; color:var(--ink); cursor:pointer;
-  background:var(--wash); border:1px solid var(--line-2); border-radius:9px; }
-.fx-cpk-step button:hover:not(:disabled) { border-color:var(--ember); }
-.fx-cpk-step button:disabled { opacity:.4; cursor:default; }
 .dlg-go:disabled { opacity:.5; cursor:default; }
 /* « Envoyer dans les commandes » : passage du client (jour, De à À) */
 .fx-topick { grid-column:1 / -1; display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:16px; }
