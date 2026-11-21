@@ -99,7 +99,8 @@ Commandes clients (attente / statut) et des Réservations (60 s), événement `c
 **Promis** (`cms-reserves.js`, depuis 2026-10-11) = articles pas encore sortis du stock mais dus à un client : lignes « À venir »
 des factures non annulées (`qty_pending`) + lignes des **réservations actives non échues** + lignes **complètes** des **commandes en
 ligne ouvertes** (Nouvelle / En préparation / Prête — toute la quantité, pas seulement `qty_to_order`, car tout sortira du stock à la
-facture). Une réservation ou commande facturée sort du compte (sa facture prend le relais si « À venir »). Rechargé à chaque ouverture
+facture) + **packs prêts restants** (RPC `pack_ready` × composition `ckey`, même chiffre que `_pack_reserve` dans `_held_stock`,
+étiquette « 📦 Pack » → onglet Packs ; exclus de l'alerte au scan, 2026-11-20). Une réservation ou commande facturée sort du compte (sa facture prend le relais si « À venir »). Rechargé à chaque ouverture
 de l'Inventaire et après une facture. Même source pour la pastille « 📦 N réservés », les étiquettes « Pour <client> · n° » de la
 Liste à commander (ouvrent la facture / la réservation / la commande : `CA.reserved.open`) et l'alerte `#res-alert` au scan.
 Alertes au poste de scan : liste d'attente (`CA.waitlist.onScan/onReceived`), promis (`CA.reserved.onScan/onReceived`).

@@ -1818,7 +1818,7 @@
         var res = window.CA.reserved ? window.CA.reserved.detail(it.f.id, it.kind) : [];
         if (res.length) {
           var resQty = res.reduce(function (s, d) { return s + d.qty; }, 0);
-          var TIP = { invoice: 'Ouvrir la facture', resv: 'Ouvrir la réservation', order: 'Ouvrir la commande' };
+          var TIP = { invoice: 'Ouvrir la facture', resv: 'Ouvrir la réservation', order: 'Ouvrir la commande', pack: 'Ouvrir les packs' };
           fors = '<span class="ro-fors">' + res.map(function (d) {
             return '<button type="button" class="ro-for" data-type="' + esc(d.type) + '" data-id="' + esc(d.id) + '" title="' +
               esc((TIP[d.type] || TIP.invoice) + ' — ' + (resQty >= it.qty && res.length === 1 ? 'pour ' : d.qty + ' pour ') + d.client) + '">📦 ' + esc(d.number) + '</button>';

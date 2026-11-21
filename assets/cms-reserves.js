@@ -36,8 +36,32 @@
   var SRC = {
     invoice: { open: '#historique', btn: 'Voir la facture', what: 'à remettre' },
     resv:    { open: '#commandes/reservations', btn: 'Voir la réservation', what: 'réservé' },
-    order:   { open: '#commandes/clients', btn: 'Voir la commande', what: 'en commande' }
+    order:   { open: '#commandes/clients', btn: 'Voir la commande', what: 'en commande' },
+    pack:    { open: '#packs', btn: 'Voir les packs', what: 'en pack' }
   };
+
+  // packs prêts restants (RPC pack_ready, packs.ready) : leurs recharges / bobines sont gardées hors
+  // de la boutique (_pack_reserve dans _held_stock) -> à compter aussi dans « Manque ».
+  // Les packs déjà en commande / réservation sont exclus de left_n (comptés par leurs propres lignes).
+  function readyPacks() {
+    return Promise.all([sb.rpc('pack_ready'), sb.from('packs').select('id,name,kind')]).then(function (r) {
+      if (r[0].error) throw r[0].error;
+      if (r[1].error) throw r[1].error;
+      var byId = {}; (r[1].data || []).forEach(function (p) { byId[p.id] = p; });
+      var out = [];
+      (r[0].data || []).forEach(function (rd) {
+        var pk = byId[rd.pack_id], n = rd.left_n | 0;
+        if (!pk || n <= 0) return;
+        String(rd.ckey || '').split(',').forEach(function (c) {
+          var m = /^([0-9a-f-]{36}):(\d+)$/i.exec(c);
+          if (!m) return;
+          out.push({ line: { product_id: m[1], kind: pk.kind === 'spool' ? 'spool' : 'refill', label: pk.name, meta: '', qty: n * (+m[2]) },
+            src: { type: 'pack', id: pk.id, number: 'Pack', client: (pk.name || 'Pack') + ' · ' + n + ' prêt' + (n > 1 ? 's' : '') } });
+        });
+      });
+      return out;
+    }).then(null, function () { return []; });
+  }
 
   function pendingInvoices() {
     return sb.from('invoice_lines').select('id,invoice_id,product_id,kind,label,meta,qty,qty_pending')
@@ -108,9 +132,10 @@
         .eq('status', 'active'), 'customer_reservation_lines', 'resv'),
       openCustomer(sb.from('customer_orders')
         .select('id,number,name,email,status,customer_order_lines(product_id,kind,name,meta,qty)')
-        .in('status', ['new', 'preparing', 'ready']), 'customer_order_lines', 'order')
+        .in('status', ['new', 'preparing', 'ready']), 'customer_order_lines', 'order'),
+      readyPacks()
     ]).then(function (r) {
-      rows = r[1].concat(r[2], r[3]);
+      rows = r[1].concat(r[2], r[3], r[4]);
       loaded = true;
       renderAlert();
       try { document.dispatchEvent(new CustomEvent('ca:reserved')); } catch (e) {}
@@ -127,6 +152,9 @@
       return true;
     });
   }
+  // alerte au scan : clients seulement (pas les packs prêts)
+  function clientMatch(pid, kind) { return matchFor(pid, kind).filter(function (x) { return x.src.type !== 'pack'; }); }
+  function clientCount(pid, kind) { return clientMatch(pid, kind).reduce(function (s, x) { return s + (x.line.qty || 0); }, 0); }
   function count(pid, kind) {
     return matchFor(pid, kind).reduce(function (s, x) { return s + (x.line.qty || 0); }, 0);
   }
@@ -139,8 +167,8 @@
   function renderAlert() {
     var el = $('#res-alert'); if (!el) return;
     // pas d'alerte si le stock déjà en main (avant cette réception) couvre ce que les clients attendent
-    var groups = alerted.filter(function (a) { return a.before == null || a.before < count(a.pid, a.kind); })
-      .map(function (a) { return matchFor(a.pid, a.kind); }).filter(function (g) { return g.length; });
+    var groups = alerted.filter(function (a) { return a.before == null || a.before < clientCount(a.pid, a.kind); })
+      .map(function (a) { return clientMatch(a.pid, a.kind); }).filter(function (g) { return g.length; });
     if (!groups.length) { el.hidden = true; el.innerHTML = ''; return; }
     var clients = {};
     groups.forEach(function (g) { g.forEach(function (x) { clients[x.src.type + x.src.id] = 1; }); });
@@ -203,7 +231,7 @@
   }
   // recvQty : quantité qui vient d'entrer (0 au scan : le stock n'est pas encore touché)
   function flag(pid, kind, recvQty) {
-    if (!pid || !matchFor(pid, kind).length) return Promise.resolve();
+    if (!pid || !clientMatch(pid, kind).length) return Promise.resolve();
     return stockNow(pid, kind).then(function (n) {
       var before = n == null ? null : Math.max(0, n - (recvQty | 0));
       alerted = alerted.filter(function (a) { return !(String(a.pid) === String(pid) && a.kind === kind); });
