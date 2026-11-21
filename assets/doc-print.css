@@ -70,6 +70,9 @@
 .doc-print .ia-th span { display:flex; align-items:center; justify-content:center; width:38pt; height:38pt; box-sizing:border-box;
   background:#fff; border:.6pt solid #E7E7E2; }
 .doc-print .ia-th img { max-width:100%; max-height:100%; object-fit:contain; display:block; }
+/* pack personnalisé : damier 2×2 des photos de ses filaments */
+.doc-print .ia-th span.ia-quad { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:.6pt; padding:0; overflow:hidden; }
+.doc-print .ia-quad img { width:100%; height:100%; min-width:0; min-height:0; }
 .doc-print .ia-name { font-weight:600; }
 .doc-print .ia-meta { font-size:8pt; color:#6C727C; margin-top:2pt; }
 .doc-print .ia-table tr { break-inside:avoid; }

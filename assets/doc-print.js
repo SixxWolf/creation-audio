@@ -49,9 +49,11 @@
     var toRows = [inv.client_name, inv.client_address, inv.client_city, inv.client_contact].filter(Boolean);
     var to = (!docs.internal && toRows.length) ? block(isReceipt ? _t('Reçu de') : _t('Facturé à'), toRows) : '<div class="ia-blk"></div>';
     var L = window.CA.packRows(inv.lines || []);
-    var hasImg = L.some(function (l) { return l.img; });   // une colonne photo dès qu'une ligne en a une
+    var hasImg = L.some(function (l) { return l.img || l.imgs; });   // une colonne photo dès qu'une ligne en a une
     var rows = L.map(function (l) {
-      return '<tr>' + (hasImg ? '<td class="ia-th">' + (l.img ? '<span><img src="' + esc(l.img) + '" alt=""></span>' : '') + '</td>' : '') +
+      var th = l.img ? '<span><img src="' + esc(l.img) + '" alt=""></span>'
+        : l.imgs ? '<span class="ia-quad">' + l.imgs.map(function (u) { return u ? '<img src="' + esc(u) + '" alt="">' : '<i></i>'; }).join('') + '</span>' : '';
+      return '<tr>' + (hasImg ? '<td class="ia-th">' + th + '</td>' : '') +
         '<td class="ia-desc"><div class="ia-name">' + esc(l.label || '') + '</div>' + (l.meta ? '<div class="ia-meta">' + esc(l.meta) + '</div>' : '') + '</td>' +
         '<td class="num">' + (+l.qty) + '</td><td class="num">' + money(l.unit_price) + '</td><td class="num ia-b">' + money(l.line_total) + '</td></tr>';
     }).join('');
@@ -155,7 +157,8 @@
       var g = at[pk.k];
       if (!g) {
         g = at[pk.k] = { pack: pk, label: ((window.CA.lang === 'en' && pk.name_en) || pk.name || 'Pack') + (pk.kind === 'spool' ? (window.CA.lang === 'en' ? ' · With spool' : ' · Avec bobine') : ''), qty: n, unit_price: +pk.price || 0,
-          line_total: 0, qty_pending: 0, cols: [], img: pk.img || l.img || null };
+          line_total: 0, qty_pending: 0, cols: [], img: pk.img || (pk.imgs && pk.imgs.length ? null : l.img) || null,
+          imgs: !pk.img && pk.imgs && pk.imgs.some(Boolean) ? pk.imgs : null };   // pack personnalisé : damier 2×2
         out.push(g);
       }
       g.line_total = Math.round((g.line_total + (+l.line_total || 0)) * 100) / 100;
